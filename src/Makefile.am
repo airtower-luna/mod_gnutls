@@ -2,7 +2,7 @@ CLEANFILES = .libs/libmod_gnutls *~
 
 libmod_gnutls_la_SOURCES = mod_gnutls.c
 libmod_gnutls_la_CFLAGS = -Wall ${MODULE_CFLAGS}
-libmod_gnutls_la_LDFLAGS =
+libmod_gnutls_la_LDFLAGS = ${MODULE_LIBS}
 
 lib_LTLIBRARIES = libmod_gnutls.la
 
