@@ -49,7 +49,6 @@ typedef struct {
     char *key_file;
     char *cert_file;
     int enabled;
-    int non_https;
     int ciphers[16];
     int key_exchange[16];
     int macs[16];
@@ -62,14 +61,13 @@ struct gnutls_handle_t
 {
     gnutls_srvconf_rec *sc;
     gnutls_session_t session;
-#ifdef GNUTLS_AS_FILTER
     ap_filter_t *input_filter;
     apr_bucket_brigade *input_bb;
     apr_read_type_e input_block;
-#endif
+    int status;
+    int non_https;
 };
 
-#ifdef GNUTLS_AS_FILTER
 static apr_status_t gnutls_filter_input(ap_filter_t * f,
                                         apr_bucket_brigade * bb,
                                         ap_input_mode_t mode,
@@ -85,21 +83,6 @@ static apr_status_t gnutls_filter_input(ap_filter_t * f,
         return APR_ECONNABORTED;
     }
 
-    return status;
-}
-
-static apr_status_t gnutls_filter_output(ap_filter_t * f,
-                                         apr_bucket_brigade * bb)
-{
-    apr_bucket *b;
-    const char *buf = 0;
-    apr_size_t bytes = 0;
-    gnutls_handle_t *ctxt = (gnutls_handle_t *) f->ctx;
-    apr_status_t status = APR_SUCCESS;
-
-    if (!ctxt) {
-        /* first run. */
-    }
 
     for (b = APR_BRIGADE_FIRST(bb);
          b != APR_BRIGADE_SENTINEL(bb); b = APR_BUCKET_NEXT(b)) {
@@ -115,7 +98,117 @@ static apr_status_t gnutls_filter_output(ap_filter_t * f,
     return status;
 }
 
-#endif /* GNUTLS_AS_FILTER */
+#define HANDSHAKE_ATTEMPTS 10
+
+static apr_status_t gnutls_filter_output(ap_filter_t * f,
+                                         apr_bucket_brigade * bb)
+{
+    int ret, i;
+    const char *buf = 0;
+    apr_size_t bytes = 0;
+    gnutls_handle_t *ctxt = (gnutls_handle_t *) f->ctx;
+    apr_status_t status = APR_SUCCESS;
+    apr_read_type_e rblock = APR_NONBLOCK_READ;
+
+    if (f->c->aborted) {
+        apr_brigade_cleanup(bb);
+        return APR_ECONNABORTED;
+    }
+
+    if(ctxt->status == 0) {
+        for (i=HANDSHAKE_ATTEMPTS; i>0; i--){
+            ret = gnutls_handshake(ctxt->session);
+
+            if(ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN){
+                continue;
+            }
+
+            if (ret < 0) {
+                if (ret == GNUTLS_E_WARNING_ALERT_RECEIVED || ret == GNUTLS_E_FATAL_ALERT_RECEIVED) {
+                    ret = gnutls_alert_get(ctxt->session);
+                    ap_log_error(APLOG_MARK, APLOG_ERR, 0, f->c->base_server,
+                        "GnuTLS: Hanshake Alert (%d) '%s'.\n", ret, gnutls_alert_get_name(ret));
+                }
+
+                if (gnutls_error_is_fatal(ret) != 0) {
+                    gnutls_deinit(ctxt->session);
+                    ap_log_error(APLOG_MARK, APLOG_ERR, 0, f->c->base_server,
+                         "GnuTLS: Handshake Failed (%d) '%s'",ret, gnutls_strerror(ret));
+                    ctxt->status = -1;
+                    break;
+                }
+            }
+            else {
+                ctxt->status = 1;
+                break; /* all done with the handshake */
+            }
+        } 
+    }
+
+    if (ctxt->status < 0) {
+        return ap_pass_brigade(f->next, bb);
+    }
+
+    while (!APR_BRIGADE_EMPTY(bb)) {
+        apr_bucket *bucket = APR_BRIGADE_FIRST(bb);
+        if (APR_BUCKET_IS_EOS(bucket) || APR_BUCKET_IS_FLUSH(bucket)) {
+            /** TODO: GnuTLS doesn't have a special flush method? **/
+            if ((status = ap_pass_brigade(f->next, bb)) != APR_SUCCESS) {
+                return status;
+            }
+            break;
+        }
+        else if(AP_BUCKET_IS_EOC(bucket)) {
+            gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
+
+            if ((status = ap_pass_brigade(f->next, bb)) != APR_SUCCESS) {
+                return status;
+            }
+            break;
+        }
+        else {
+            /* filter output */
+            const char *data;
+            apr_size_t len;
+
+            status = apr_bucket_read(bucket, &data, &len, rblock);
+
+            if (APR_STATUS_IS_EAGAIN(status)) {
+                 rblock = APR_BLOCK_READ;
+                 continue; /* and try again with a blocking read. */
+            }
+
+            rblock = APR_NONBLOCK_READ;
+
+            if (!APR_STATUS_IS_EOF(status) && (status != APR_SUCCESS)) {
+                break;
+            }
+
+            ret = gnutls_record_send(ctxt->session, data, len);
+            status = ssl_filter_write(f, data, len);
+            if(ret < 0) {
+                /* error sending output */
+            }
+            else if ((apr_size_t)res != len) {
+                /* not all of the data was sent. */
+                /* mod_ssl basicly errors out here.. this doesn't seem right? */
+            }
+            else {
+                /* send complete */
+                
+            }
+
+            apr_bucket_delete(bucket);
+
+            if (status != APR_SUCCESS) {
+                break;
+            }
+
+        }
+    }
+
+    return status;
+}
 
 static apr_status_t gnutls_cleanup_pre_config(void *data)
 {
@@ -206,7 +299,6 @@ static apr_port_t gnutls_hook_default_port(const request_rec * r)
     return 443;
 }
 
-#ifdef GNUTLS_AS_FILTER
 /**
  * From mod_ssl / ssl_engine_io.c
  * This function will read from a brigade and discard the read buckets as it
@@ -345,14 +437,9 @@ static ssize_t gnutls_transport_write(gnutls_transport_ptr_t ptr,
     //APR_BRIGADE_INSERT_TAIL(outctx->bb, bucket);
     return 0;
 }
-#endif /* GNUTLS_AS_FILTER */
 
 static int gnutls_hook_pre_connection(conn_rec * c, void *csd)
 {
-#ifndef GNUTLS_AS_FILTER
-    int cfd;
-    int ret;
-#endif
     gnutls_handle_t *ctxt;
     gnutls_srvconf_rec *sc =
         (gnutls_srvconf_rec *) ap_get_module_config(c->base_server->
@@ -366,6 +453,7 @@ static int gnutls_hook_pre_connection(conn_rec * c, void *csd)
     ctxt = apr_pcalloc(c->pool, sizeof(*ctxt));
 
     ctxt->sc = sc;
+    ctxt->status = 0;
     gnutls_init(&ctxt->session, GNUTLS_SERVER);
 
     gnutls_cipher_set_priority(ctxt->session, sc->ciphers);
@@ -375,6 +463,10 @@ static int gnutls_hook_pre_connection(conn_rec * c, void *csd)
     gnutls_mac_set_priority(ctxt->session, sc->macs);
 
     gnutls_credentials_set(ctxt->session, GNUTLS_CRD_CERTIFICATE, sc->certs);
+//  if(anon) {
+//    gnutls_credentials_set(ctxt->session, GNUTLS_CRD_ANON, sc->anoncred);
+//  }
+
     gnutls_certificate_server_set_request(ctxt->session, GNUTLS_CERT_IGNORE);
 
 //    gnutls_dh_set_prime_bits(ctxt->session, DH_BITS);
@@ -382,43 +474,12 @@ static int gnutls_hook_pre_connection(conn_rec * c, void *csd)
 
     ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
 
-#ifdef GNUTLS_AS_FILTER
     gnutls_transport_set_pull_function(ctxt->session, gnutls_transport_read);
     gnutls_transport_set_push_function(ctxt->session, gnutls_transport_write);
     gnutls_transport_set_ptr(ctxt->session, ctxt);
-
     ap_add_input_filter(GNUTLS_INPUT_FILTER_NAME, ctxt, NULL, c);
     ap_add_output_filter(GNUTLS_OUTPUT_FILTER_NAME, ctxt, NULL, c);
-#else
-    apr_os_sock_get(&cfd, csd);
-    gnutls_transport_set_ptr(ctxt->session, (gnutls_transport_ptr)cfd);
-    gnutls_credentials_set(ctxt->session, GNUTLS_CRD_ANON, sc->anoncred);
 
-    do{
-        ret = gnutls_handshake(ctxt->session);
-
-        if(ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN){
-            continue;
-        }
-
-        if (ret < 0) {
-            if (ret == GNUTLS_E_WARNING_ALERT_RECEIVED || ret == GNUTLS_E_FATAL_ALERT_RECEIVED) {
-                ret = gnutls_alert_get(ctxt->session);
-                ap_log_error(APLOG_MARK, APLOG_ERR, 0, c->base_server,
-                    "GnuTLS: Hanshake Alert (%d) '%s'.\n", ret, gnutls_alert_get_name(ret));
-            }
-
-            if (gnutls_error_is_fatal(ret) != 0) {
-                gnutls_deinit(ctxt->session);
-                ap_log_error(APLOG_MARK, APLOG_ERR, 0, c->base_server,
-                     "GnuTLS: Handshake Failed (%d) '%s'",ret, gnutls_strerror(ret));
-                sc->non_https = 1;
-                break;
-            }
-        }
-        break; /* all done with the handshake */
-    } while(1);
-#endif
     return OK;
 }
 
@@ -501,12 +562,10 @@ static void gnutls_hooks(apr_pool_t * p)
     /* ap_register_output_filter ("UPGRADE_FILTER", 
      *          ssl_io_filter_Upgrade, NULL, AP_FTYPE_PROTOCOL + 5);
      */
-#ifdef GNUTLS_AS_FILTER
     ap_register_input_filter(GNUTLS_INPUT_FILTER_NAME, gnutls_filter_input,
                              NULL, AP_FTYPE_CONNECTION + 5);
     ap_register_output_filter(GNUTLS_OUTPUT_FILTER_NAME, gnutls_filter_output,
                               NULL, AP_FTYPE_CONNECTION + 5);
-#endif
 }
 
 static void *gnutls_config_server_create(apr_pool_t * p, server_rec * s)
