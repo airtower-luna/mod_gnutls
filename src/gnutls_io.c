@@ -224,14 +224,6 @@ static apr_status_t gnutls_io_input_read(mod_gnutls_handle_t * ctxt,
 
     while (1) {
 
-        if (ctxt->status < 0) {
-            /* Ensure a non-zero error code is returned */
-            if (ctxt->input_rc == APR_SUCCESS) {
-                ctxt->input_rc = APR_EGENERAL;
-            }
-            break;
-        }
-
         rc = gnutls_record_recv(ctxt->session, buf + bytes, wanted - bytes);
 
         if (rc > 0) {
@@ -348,6 +340,7 @@ static void gnutls_do_handshake(mod_gnutls_handle_t * ctxt)
 
     if (ctxt->status != 0)
         return;
+#if 0
 
     for (i = GNUTLS_HANDSHAKE_ATTEMPTS; i > 0; i--) {
         ret = gnutls_handshake(ctxt->session);
@@ -364,14 +357,12 @@ static void gnutls_do_handshake(mod_gnutls_handle_t * ctxt)
                              gnutls_alert_get_name(ret));
             }
 
-            if (gnutls_error_is_fatal(ret) != 0) {
-                gnutls_deinit(ctxt->session);
-                ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
+            gnutls_deinit(ctxt->session);
+            ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
                              "GnuTLS: Handshake Failed (%d) '%s'", ret,
                              gnutls_strerror(ret));
                 ctxt->status = -1;
                 return;
-            }
         }
         else {
             ctxt->status = 1;
@@ -380,6 +371,30 @@ static void gnutls_do_handshake(mod_gnutls_handle_t * ctxt)
     }
     ctxt->status = -1;
     return;
+#else
+ret = gnutls_handshake(ctxt->session);
+        if (ret < 0) {
+            if (ret == GNUTLS_E_WARNING_ALERT_RECEIVED
+                || ret == GNUTLS_E_FATAL_ALERT_RECEIVED) {
+                ret = gnutls_alert_get(ctxt->session);
+                ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
+                             "GnuTLS: Hanshake Alert (%d) '%s'.\n", ret,
+                             gnutls_alert_get_name(ret));
+            }
+    
+            gnutls_deinit(ctxt->session);
+            ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
+                             "GnuTLS: Handshake Failed (%d) '%s'", ret,
+                             gnutls_strerror(ret));
+                ctxt->status = -1;
+                return;
+        }
+        else {
+            ctxt->status = 1;
+            return;             /* all done with the handshake */
+        }
+
+#endif
 }
 
 
@@ -404,7 +419,7 @@ apr_status_t mod_gnutls_filter_input(ap_filter_t * f,
     }
 
     if (ctxt->status < 0) {
-        return ap_get_brigade(f->next, bb, mode, block, readbytes);
+//        return ap_get_brigade(f->next, bb, mode, block, readbytes);
     }
 
     /* XXX: we don't currently support anything other than these modes. */
@@ -643,19 +658,6 @@ ssize_t mod_gnutls_transport_write(gnutls_transport_ptr_t ptr,
 {
     mod_gnutls_handle_t *ctxt = ptr;
 
-    if (!ctxt->output_length
-        && (len + ctxt->output_blen < sizeof(ctxt->output_buffer))) {
-        /* the first two SSL_writes (of 1024 and 261 bytes)
-         * need to be in the same packet (vec[0].iov_base)
-         */
-        /* XXX: could use apr_brigade_write() to make code look cleaner  
-         * but this way we avoid the malloc(APR_BUCKET_BUFF_SIZE)
-         * and free() of it later
-         */
-        memcpy(&ctxt->output_buffer[ctxt->output_blen], buffer, len);
-        ctxt->output_blen += len;
-    }
-    else {
         /* pass along the encrypted data
          * need to flush since we're using SSL's malloc-ed buffer
          * which will be overwritten once we leave here
@@ -670,7 +672,5 @@ ssize_t mod_gnutls_transport_write(gnutls_transport_ptr_t ptr,
         if (write_flush(ctxt) < 0) {
             return -1;
         }
-    }
-
     return len;
 }

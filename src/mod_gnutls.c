@@ -149,7 +149,7 @@ static mod_gnutls_handle_t* create_gnutls_handle(apr_pool_t* pool, conn_rec * c)
 
     gnutls_certificate_server_set_request(ctxt->session, GNUTLS_CERT_IGNORE);
 
-//    gnutls_dh_set_prime_bits(ctxt->session, DH_BITS);
+    gnutls_dh_set_prime_bits(ctxt->session, DH_BITS);
 
     return ctxt;
 }
@@ -188,7 +188,7 @@ static const char *gnutls_set_cert_file(cmd_parms * parms, void *dummy,
         (mod_gnutls_srvconf_rec *) ap_get_module_config(parms->server->
                                                         module_config,
                                                         &gnutls_module);
-    sc->cert_file = apr_pstrdup(parms->pool, arg);
+    sc->cert_file = ap_server_root_relative(parms->pool, arg);
     return NULL;
 }
 
@@ -199,7 +199,7 @@ static const char *gnutls_set_key_file(cmd_parms * parms, void *dummy,
         (mod_gnutls_srvconf_rec *) ap_get_module_config(parms->server->
                                                         module_config,
                                                         &gnutls_module);
-    sc->key_file = apr_pstrdup(parms->pool, arg);
+    sc->key_file = ap_server_root_relative(parms->pool, arg);
     return NULL;
 }
 
@@ -291,9 +291,10 @@ static void *gnutls_config_server_create(apr_pool_t * p, server_rec * s)
     sc->ciphers[i] = 0;
 
     i = 0;
+    sc->key_exchange[i++] = GNUTLS_KX_DHE_DSS;
     sc->key_exchange[i++] = GNUTLS_KX_RSA;
-    sc->key_exchange[i++] = GNUTLS_KX_RSA_EXPORT;
     sc->key_exchange[i++] = GNUTLS_KX_DHE_RSA;
+    sc->key_exchange[i++] = GNUTLS_KX_RSA_EXPORT;
     sc->key_exchange[i++] = GNUTLS_KX_DHE_DSS;
     sc->key_exchange[i] = 0;
 
