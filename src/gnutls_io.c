@@ -28,9 +28,9 @@ apr_status_t mod_gnutls_filter_input(ap_filter_t * f,
                                      apr_read_type_e block,
                                      apr_off_t readbytes)
 {
-    apr_bucket* b;
+    apr_bucket *b;
     apr_status_t status = APR_SUCCESS;
-    gnutls_handle_t *ctxt = (gnutls_handle_t *) f->ctx;
+    mod_gnutls_handle_t *ctxt = (mod_gnutls_handle_t *) f->ctx;
 
     if (f->c->aborted) {
         apr_bucket *bucket = apr_bucket_eos_create(f->c->bucket_alloc);
@@ -61,7 +61,7 @@ apr_status_t mod_gnutls_filter_output(ap_filter_t * f,
     int ret, i;
     const char *buf = 0;
     apr_size_t bytes = 0;
-    gnutls_handle_t *ctxt = (gnutls_handle_t *) f->ctx;
+    mod_gnutls_handle_t *ctxt = (mod_gnutls_handle_t *) f->ctx;
     apr_status_t status = APR_SUCCESS;
     apr_read_type_e rblock = APR_NONBLOCK_READ;
 
@@ -256,7 +256,7 @@ static apr_status_t brigade_consume(apr_bucket_brigade * bb,
 ssize_t mod_gnutls_transport_read(gnutls_transport_ptr_t ptr,
                                   void *buffer, size_t len)
 {
-    gnutls_handle_t *ctxt = ptr;
+    mod_gnutls_handle_t *ctxt = ptr;
     apr_status_t rc;
     apr_size_t in = len;
     /* If Len = 0, we don't do anything. */
@@ -295,7 +295,7 @@ ssize_t mod_gnutls_transport_read(gnutls_transport_ptr_t ptr,
 ssize_t mod_gnutls_transport_write(gnutls_transport_ptr_t ptr,
                                    const void *buffer, size_t len)
 {
-    gnutls_handle_t *ctxt = ptr;
+    mod_gnutls_handle_t *ctxt = ptr;
 
 //    apr_bucket *bucket = apr_bucket_transient_create(in, inl,
 //                                                     outctx->bb->

@@ -21,14 +21,14 @@
 GCRY_THREAD_OPTION_PTHREAD_IMPL;
 #endif
 
-static apr_status_t gnutls_cleanup_pre_config(void *data)
+static apr_status_t mod_gnutls_cleanup_pre_config(void *data)
 {
     gnutls_global_deinit();
     return APR_SUCCESS;
 }
 
-static int gnutls_hook_pre_config(apr_pool_t * pconf,
-                                  apr_pool_t * plog, apr_pool_t * ptemp)
+static int mod_gnutls_hook_pre_config(apr_pool_t * pconf,
+                                      apr_pool_t * plog, apr_pool_t * ptemp)
 {
 
 #if APR_HAS_THREADS
@@ -37,7 +37,7 @@ static int gnutls_hook_pre_config(apr_pool_t * pconf,
 
     gnutls_global_init();
 
-    apr_pool_cleanup_register(pconf, NULL, gnutls_cleanup_pre_config,
+    apr_pool_cleanup_register(pconf, NULL, mod_gnutls_cleanup_pre_config,
                               apr_pool_cleanup_null);
 
     return OK;
@@ -46,11 +46,11 @@ static int gnutls_hook_pre_config(apr_pool_t * pconf,
 #define DH_BITS 1024
 #define RSA_BITS 512
 
-static int gnutls_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
-                                   apr_pool_t * ptemp,
-                                   server_rec * base_server)
+static int mod_gnutls_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
+                                       apr_pool_t * ptemp,
+                                       server_rec * base_server)
 {
-    gnutls_srvconf_rec *sc;
+    mod_gnutls_srvconf_rec *sc;
     server_rec *s;
     gnutls_dh_params_t dh_params;
     gnutls_rsa_params_t rsa_params;
@@ -63,8 +63,8 @@ static int gnutls_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 //    gnutls_rsa_params_generate2(rsa_params, RSA_BITS);
 
     for (s = base_server; s; s = s->next) {
-        sc = (gnutls_srvconf_rec *) ap_get_module_config(s->module_config,
-                                                         &gnutls_module);
+        sc = (mod_gnutls_srvconf_rec *) ap_get_module_config(s->module_config,
+                                                             &gnutls_module);
         if (sc->cert_file != NULL && sc->key_file != NULL) {
             gnutls_certificate_set_x509_key_file(sc->certs, sc->cert_file,
                                                  sc->key_file,
@@ -84,11 +84,12 @@ static int gnutls_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
     return OK;
 }
 
-static const char *gnutls_hook_http_method(const request_rec * r)
+static const char *mod_gnutls_hook_http_method(const request_rec * r)
 {
-    gnutls_srvconf_rec *sc =
-        (gnutls_srvconf_rec *) ap_get_module_config(r->server->module_config,
-                                                    &gnutls_module);
+    mod_gnutls_srvconf_rec *sc =
+        (mod_gnutls_srvconf_rec *) ap_get_module_config(r->server->
+                                                        module_config,
+                                                        &gnutls_module);
 
     if (sc->enabled == GNUTLS_ENABLED_FALSE) {
         return NULL;
@@ -97,11 +98,12 @@ static const char *gnutls_hook_http_method(const request_rec * r)
     return "https";
 }
 
-static apr_port_t gnutls_hook_default_port(const request_rec * r)
+static apr_port_t mod_gnutls_hook_default_port(const request_rec * r)
 {
-    gnutls_srvconf_rec *sc =
-        (gnutls_srvconf_rec *) ap_get_module_config(r->server->module_config,
-                                                    &gnutls_module);
+    mod_gnutls_srvconf_rec *sc =
+        (mod_gnutls_srvconf_rec *) ap_get_module_config(r->server->
+                                                        module_config,
+                                                        &gnutls_module);
 
     if (sc->enabled == GNUTLS_ENABLED_FALSE) {
         return 0;
@@ -110,13 +112,13 @@ static apr_port_t gnutls_hook_default_port(const request_rec * r)
     return 443;
 }
 
-static int gnutls_hook_pre_connection(conn_rec * c, void *csd)
+static int mod_gnutls_hook_pre_connection(conn_rec * c, void *csd)
 {
-    gnutls_handle_t *ctxt;
-    gnutls_srvconf_rec *sc =
-        (gnutls_srvconf_rec *) ap_get_module_config(c->base_server->
-                                                    module_config,
-                                                    &gnutls_module);
+    mod_gnutls_handle_t *ctxt;
+    mod_gnutls_srvconf_rec *sc =
+        (mod_gnutls_srvconf_rec *) ap_get_module_config(c->base_server->
+                                                        module_config,
+                                                        &gnutls_module);
 
     if (!(sc && (sc->enabled == GNUTLS_ENABLED_TRUE))) {
         return DECLINED;
@@ -160,10 +162,10 @@ static int gnutls_hook_pre_connection(conn_rec * c, void *csd)
 static const char *gnutls_set_cert_file(cmd_parms * parms, void *dummy,
                                         const char *arg)
 {
-    gnutls_srvconf_rec *sc =
-        (gnutls_srvconf_rec *) ap_get_module_config(parms->server->
-                                                    module_config,
-                                                    &gnutls_module);
+    mod_gnutls_srvconf_rec *sc =
+        (mod_gnutls_srvconf_rec *) ap_get_module_config(parms->server->
+                                                        module_config,
+                                                        &gnutls_module);
     sc->cert_file = apr_pstrdup(parms->pool, arg);
     return NULL;
 }
@@ -171,10 +173,10 @@ static const char *gnutls_set_cert_file(cmd_parms * parms, void *dummy,
 static const char *gnutls_set_key_file(cmd_parms * parms, void *dummy,
                                        const char *arg)
 {
-    gnutls_srvconf_rec *sc =
-        (gnutls_srvconf_rec *) ap_get_module_config(parms->server->
-                                                    module_config,
-                                                    &gnutls_module);
+    mod_gnutls_srvconf_rec *sc =
+        (mod_gnutls_srvconf_rec *) ap_get_module_config(parms->server->
+                                                        module_config,
+                                                        &gnutls_module);
     sc->key_file = apr_pstrdup(parms->pool, arg);
     return NULL;
 }
@@ -182,10 +184,10 @@ static const char *gnutls_set_key_file(cmd_parms * parms, void *dummy,
 static const char *gnutls_set_enabled(cmd_parms * parms, void *dummy,
                                       const char *arg)
 {
-    gnutls_srvconf_rec *sc =
-        (gnutls_srvconf_rec *) ap_get_module_config(parms->server->
-                                                    module_config,
-                                                    &gnutls_module);
+    mod_gnutls_srvconf_rec *sc =
+        (mod_gnutls_srvconf_rec *) ap_get_module_config(parms->server->
+                                                        module_config,
+                                                        &gnutls_module);
     if (!strcasecmp(arg, "On")) {
         sc->enabled = GNUTLS_ENABLED_TRUE;
     }
@@ -224,13 +226,16 @@ static const command_rec gnutls_cmds[] = {
 
 static void gnutls_hooks(apr_pool_t * p)
 {
-    ap_hook_pre_connection(gnutls_hook_pre_connection, NULL, NULL,
+    ap_hook_pre_connection(mod_gnutls_hook_pre_connection, NULL, NULL,
                            APR_HOOK_MIDDLE);
-    ap_hook_post_config(gnutls_hook_post_config, NULL, NULL, APR_HOOK_MIDDLE);
-    ap_hook_http_method(gnutls_hook_http_method, NULL, NULL, APR_HOOK_MIDDLE);
-    ap_hook_default_port(gnutls_hook_default_port, NULL, NULL,
+    ap_hook_post_config(mod_gnutls_hook_post_config, NULL, NULL,
+                        APR_HOOK_MIDDLE);
+    ap_hook_http_method(mod_gnutls_hook_http_method, NULL, NULL,
+                        APR_HOOK_MIDDLE);
+    ap_hook_default_port(mod_gnutls_hook_default_port, NULL, NULL,
                          APR_HOOK_MIDDLE);
-    ap_hook_pre_config(gnutls_hook_pre_config, NULL, NULL, APR_HOOK_MIDDLE);
+    ap_hook_pre_config(mod_gnutls_hook_pre_config, NULL, NULL,
+                       APR_HOOK_MIDDLE);
 
     /* TODO: HTTP Upgrade Filter */
     /* ap_register_output_filter ("UPGRADE_FILTER", 
@@ -247,7 +252,7 @@ static void gnutls_hooks(apr_pool_t * p)
 static void *gnutls_config_server_create(apr_pool_t * p, server_rec * s)
 {
     int i;
-    gnutls_srvconf_rec *sc = apr_pcalloc(p, sizeof(*sc));
+    mod_gnutls_srvconf_rec *sc = apr_pcalloc(p, sizeof(*sc));
 
     sc->enabled = GNUTLS_ENABLED_FALSE;
 
