@@ -69,13 +69,32 @@ typedef struct
     int compression[16];
 } mod_gnutls_srvconf_rec;
 
+typedef struct {
+    int length;
+    char *value;
+} mod_gnutls_char_buffer_t;
+
 typedef struct
 {
     mod_gnutls_srvconf_rec *sc;
+    conn_rec* c;
     gnutls_session_t session;
+
+    apr_status_t input_rc;
     ap_filter_t *input_filter;
     apr_bucket_brigade *input_bb;
     apr_read_type_e input_block;
+    ap_input_mode_t input_mode;
+    mod_gnutls_char_buffer_t input_cbuf;
+    char input_buffer[AP_IOBUFSIZE];
+
+    apr_status_t output_rc;
+    ap_filter_t *output_filter;
+    apr_bucket_brigade *output_bb;
+    char output_buffer[AP_IOBUFSIZE];
+    apr_size_t output_blen;
+    apr_size_t output_length;
+
     int status;
     int non_https;
 } mod_gnutls_handle_t;

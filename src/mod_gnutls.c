@@ -57,8 +57,8 @@ static int mod_gnutls_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 
 
     /* TODO: Should we regenerate these after X requests / X time ? */
-//    gnutls_dh_params_init(&dh_params);
-//    gnutls_dh_params_generate2(dh_params, DH_BITS);
+    gnutls_dh_params_init(&dh_params);
+    gnutls_dh_params_generate2(dh_params, DH_BITS);
 //    gnutls_rsa_params_init(&rsa_params);
 //    gnutls_rsa_params_generate2(rsa_params, RSA_BITS);
 
@@ -70,7 +70,7 @@ static int mod_gnutls_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
                                                  sc->key_file,
                                                  GNUTLS_X509_FMT_PEM);
 //          gnutls_certificate_set_rsa_export_params(sc->certs, rsa_params);
-//          gnutls_certificate_set_dh_params(sc->certs, dh_params);
+          gnutls_certificate_set_dh_params(sc->certs, dh_params);
         }
         else if (sc->enabled == GNUTLS_ENABLED_TRUE) {
             ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
@@ -112,7 +112,7 @@ static apr_port_t mod_gnutls_hook_default_port(const request_rec * r)
     return 443;
 }
 
-static int mod_gnutls_hook_pre_connection(conn_rec * c, void *csd)
+static mod_gnutls_handle_t* create_gnutls_handle(apr_pool_t* pool, conn_rec * c)
 {
     mod_gnutls_handle_t *ctxt;
     mod_gnutls_srvconf_rec *sc =
@@ -120,14 +120,20 @@ static int mod_gnutls_hook_pre_connection(conn_rec * c, void *csd)
                                                         module_config,
                                                         &gnutls_module);
 
-    if (!(sc && (sc->enabled == GNUTLS_ENABLED_TRUE))) {
-        return DECLINED;
-    }
-
-    ctxt = apr_pcalloc(c->pool, sizeof(*ctxt));
-
+    ctxt = apr_pcalloc(pool, sizeof(*ctxt));
+    ctxt->c = c;
     ctxt->sc = sc;
     ctxt->status = 0;
+
+    ctxt->input_rc = APR_SUCCESS;
+    ctxt->input_bb = apr_brigade_create(c->pool, c->bucket_alloc);
+    ctxt->input_cbuf.length = 0;
+
+    ctxt->output_rc = APR_SUCCESS;
+    ctxt->output_bb = apr_brigade_create(c->pool, c->bucket_alloc);
+    ctxt->output_blen = 0;
+    ctxt->output_length = 0;
+
     gnutls_init(&ctxt->session, GNUTLS_SERVER);
 
     gnutls_cipher_set_priority(ctxt->session, sc->ciphers);
@@ -145,6 +151,22 @@ static int mod_gnutls_hook_pre_connection(conn_rec * c, void *csd)
 
 //    gnutls_dh_set_prime_bits(ctxt->session, DH_BITS);
 
+    return ctxt;
+}
+
+static int mod_gnutls_hook_pre_connection(conn_rec * c, void *csd)
+{
+    mod_gnutls_handle_t *ctxt;
+    mod_gnutls_srvconf_rec *sc =
+        (mod_gnutls_srvconf_rec *) ap_get_module_config(c->base_server->
+                                                        module_config,
+                                                        &gnutls_module);
+
+    if (!(sc && (sc->enabled == GNUTLS_ENABLED_TRUE))) {
+        return DECLINED;
+    }
+
+    ctxt = create_gnutls_handle(c->pool, c);
 
     ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
 
@@ -153,8 +175,8 @@ static int mod_gnutls_hook_pre_connection(conn_rec * c, void *csd)
     gnutls_transport_set_push_function(ctxt->session,
                                        mod_gnutls_transport_write);
     gnutls_transport_set_ptr(ctxt->session, ctxt);
-    ap_add_input_filter(GNUTLS_INPUT_FILTER_NAME, ctxt, NULL, c);
-    ap_add_output_filter(GNUTLS_OUTPUT_FILTER_NAME, ctxt, NULL, c);
+    ctxt->input_filter = ap_add_input_filter(GNUTLS_INPUT_FILTER_NAME, ctxt, NULL, c);
+    ctxt->output_filter = ap_add_output_filter(GNUTLS_OUTPUT_FILTER_NAME, ctxt, NULL, c);
 
     return OK;
 }

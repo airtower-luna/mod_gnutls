@@ -19,152 +19,80 @@
 
 /**
  * Describe how the GnuTLS Filter system works here 
- *  - It is basicly the same as what mod_ssl uses in that respect.
+ *  - Basicly the same as what mod_ssl does with OpenSSL.
+ *
  */
 
-apr_status_t mod_gnutls_filter_input(ap_filter_t * f,
-                                     apr_bucket_brigade * bb,
-                                     ap_input_mode_t mode,
-                                     apr_read_type_e block,
-                                     apr_off_t readbytes)
+#define HTTP_ON_HTTPS_PORT \
+    "GET /" CRLF
+
+#define HTTP_ON_HTTPS_PORT_BUCKET(alloc) \
+    apr_bucket_immortal_create(HTTP_ON_HTTPS_PORT, \
+                               sizeof(HTTP_ON_HTTPS_PORT) - 1, \
+                               alloc)
+
+static apr_status_t gnutls_io_filter_error(ap_filter_t * f,
+                                           apr_bucket_brigade * bb,
+                                           apr_status_t status)
 {
-    apr_bucket *b;
-    apr_status_t status = APR_SUCCESS;
     mod_gnutls_handle_t *ctxt = (mod_gnutls_handle_t *) f->ctx;
+    apr_bucket *bucket;
 
-    if (f->c->aborted) {
-        apr_bucket *bucket = apr_bucket_eos_create(f->c->bucket_alloc);
-        APR_BRIGADE_INSERT_TAIL(bb, bucket);
-        return APR_ECONNABORTED;
+    switch (status) {
+    case HTTP_BAD_REQUEST:
+        /* log the situation */
+        ap_log_error(APLOG_MARK, APLOG_INFO, 0,
+                     f->c->base_server,
+                     "GnuTLS handshake failed: HTTP spoken on HTTPS port; "
+                     "trying to send HTML error page");
+
+        ctxt->status = -1;
+
+        /* fake the request line */
+        bucket = HTTP_ON_HTTPS_PORT_BUCKET(f->c->bucket_alloc);
+        break;
+
+    default:
+        return status;
     }
 
-#if 0
-    for (b = APR_BRIGADE_FIRST(bb);
-         b != APR_BRIGADE_SENTINEL(bb); b = APR_BUCKET_NEXT(b)) {
-        if (APR_BUCKET_IS_EOS(b)) {
-            /* end of connection */
-        }
-        else if (apr_bucket_read(b, &buf, &bytes, APR_BLOCK_READ)
-                 == APR_SUCCESS) {
-            /* more data */
-        }
-    }
-#endif
-    return status;
+    APR_BRIGADE_INSERT_TAIL(bb, bucket);
+    bucket = apr_bucket_eos_create(f->c->bucket_alloc);
+    APR_BRIGADE_INSERT_TAIL(bb, bucket);
+
+    return APR_SUCCESS;
 }
 
-#define GNUTLS_HANDSHAKE_ATTEMPTS 10
-
-apr_status_t mod_gnutls_filter_output(ap_filter_t * f,
-                                      apr_bucket_brigade * bb)
+static int char_buffer_read(mod_gnutls_char_buffer_t * buffer, char *in,
+                            int inl)
 {
-    int ret, i;
-    const char *buf = 0;
-    apr_size_t bytes = 0;
-    mod_gnutls_handle_t *ctxt = (mod_gnutls_handle_t *) f->ctx;
-    apr_status_t status = APR_SUCCESS;
-    apr_read_type_e rblock = APR_NONBLOCK_READ;
-
-    if (f->c->aborted) {
-        apr_brigade_cleanup(bb);
-        return APR_ECONNABORTED;
+    if (!buffer->length) {
+        return 0;
     }
 
-    if (ctxt->status == 0) {
-        for (i = GNUTLS_HANDSHAKE_ATTEMPTS; i > 0; i--) {
-            ret = gnutls_handshake(ctxt->session);
-
-            if (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN) {
-                continue;
-            }
-
-            if (ret < 0) {
-                if (ret == GNUTLS_E_WARNING_ALERT_RECEIVED
-                    || ret == GNUTLS_E_FATAL_ALERT_RECEIVED) {
-                    ret = gnutls_alert_get(ctxt->session);
-                    ap_log_error(APLOG_MARK, APLOG_ERR, 0, f->c->base_server,
-                                 "GnuTLS: Hanshake Alert (%d) '%s'.\n", ret,
-                                 gnutls_alert_get_name(ret));
-                }
-
-                if (gnutls_error_is_fatal(ret) != 0) {
-                    gnutls_deinit(ctxt->session);
-                    ap_log_error(APLOG_MARK, APLOG_ERR, 0, f->c->base_server,
-                                 "GnuTLS: Handshake Failed (%d) '%s'", ret,
-                                 gnutls_strerror(ret));
-                    ctxt->status = -1;
-                    break;
-                }
-            }
-            else {
-                ctxt->status = 1;
-                break;          /* all done with the handshake */
-            }
-        }
+    if (buffer->length > inl) {
+        /* we have have enough to fill the caller's buffer */
+        memcpy(in, buffer->value, inl);
+        buffer->value += inl;
+        buffer->length -= inl;
+    }
+    else {
+        /* swallow remainder of the buffer */
+        memcpy(in, buffer->value, buffer->length);
+        inl = buffer->length;
+        buffer->value = NULL;
+        buffer->length = 0;
     }
 
-    if (ctxt->status < 0) {
-        return ap_pass_brigade(f->next, bb);
-    }
+    return inl;
+}
 
-    while (!APR_BRIGADE_EMPTY(bb)) {
-        apr_bucket *bucket = APR_BRIGADE_FIRST(bb);
-        if (APR_BUCKET_IS_EOS(bucket) || APR_BUCKET_IS_FLUSH(bucket)) {
-            /** TODO: GnuTLS doesn't have a special flush method? **/
-            if ((status = ap_pass_brigade(f->next, bb)) != APR_SUCCESS) {
-                return status;
-            }
-            break;
-        }
-        else if (AP_BUCKET_IS_EOC(bucket)) {
-            gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
-
-            if ((status = ap_pass_brigade(f->next, bb)) != APR_SUCCESS) {
-                return status;
-            }
-            break;
-        }
-        else {
-            /* filter output */
-            const char *data;
-            apr_size_t len;
-
-            status = apr_bucket_read(bucket, &data, &len, rblock);
-
-            if (APR_STATUS_IS_EAGAIN(status)) {
-                rblock = APR_BLOCK_READ;
-                continue;       /* and try again with a blocking read. */
-            }
-
-            rblock = APR_NONBLOCK_READ;
-
-            if (!APR_STATUS_IS_EOF(status) && (status != APR_SUCCESS)) {
-                break;
-            }
-
-            ret = gnutls_record_send(ctxt->session, data, len);
-            if (ret < 0) {
-                /* error sending output */
-            }
-            else if ((apr_size_t) ret != len) {
-                /* not all of the data was sent. */
-                /* mod_ssl basicly errors out here.. this doesn't seem right? */
-            }
-            else {
-                /* send complete */
-
-            }
-
-            apr_bucket_delete(bucket);
-
-            if (status != APR_SUCCESS) {
-                break;
-            }
-
-        }
-    }
-
-    return status;
+static int char_buffer_write(mod_gnutls_char_buffer_t * buffer, char *in,
+                             int inl)
+{
+    buffer->value = in;
+    buffer->length = inl;
+    return inl;
 }
 
 /**
@@ -253,15 +181,382 @@ static apr_status_t brigade_consume(apr_bucket_brigade * bb,
 }
 
 
+static apr_status_t gnutls_io_input_read(mod_gnutls_handle_t * ctxt,
+                                         char *buf, apr_size_t * len)
+{
+    apr_size_t wanted = *len;
+    apr_size_t bytes = 0;
+    int rc;
+
+    *len = 0;
+
+    /* If we have something leftover from last time, try that first. */
+    if ((bytes = char_buffer_read(&ctxt->input_cbuf, buf, wanted))) {
+        *len = bytes;
+        if (ctxt->input_mode == AP_MODE_SPECULATIVE) {
+            /* We want to rollback this read. */
+            if (ctxt->input_cbuf.length > 0) {
+                ctxt->input_cbuf.value -= bytes;
+                ctxt->input_cbuf.length += bytes;
+            }
+            else {
+                char_buffer_write(&ctxt->input_cbuf, buf, (int) bytes);
+            }
+            return APR_SUCCESS;
+        }
+        /* This could probably be *len == wanted, but be safe from stray
+         * photons.
+         */
+        if (*len >= wanted) {
+            return APR_SUCCESS;
+        }
+        if (ctxt->input_mode == AP_MODE_GETLINE) {
+            if (memchr(buf, APR_ASCII_LF, *len)) {
+                return APR_SUCCESS;
+            }
+        }
+        else {
+            /* Down to a nonblock pattern as we have some data already
+             */
+            ctxt->input_block = APR_NONBLOCK_READ;
+        }
+    }
+
+    while (1) {
+
+        if (ctxt->status < 0) {
+            /* Ensure a non-zero error code is returned */
+            if (ctxt->input_rc == APR_SUCCESS) {
+                ctxt->input_rc = APR_EGENERAL;
+            }
+            break;
+        }
+
+        rc = gnutls_record_recv(ctxt->session, buf + bytes, wanted - bytes);
+
+        if (rc > 0) {
+            *len += rc;
+            if (ctxt->input_mode == AP_MODE_SPECULATIVE) {
+                /* We want to rollback this read. */
+                char_buffer_write(&ctxt->input_cbuf, buf, rc);
+            }
+            return ctxt->input_rc;
+        }
+        else if (rc == 0) {
+            /* If EAGAIN, we will loop given a blocking read,
+             * otherwise consider ourselves at EOF.
+             */
+            if (APR_STATUS_IS_EAGAIN(ctxt->input_rc)
+                || APR_STATUS_IS_EINTR(ctxt->input_rc)) {
+                /* Already read something, return APR_SUCCESS instead.
+                 * On win32 in particular, but perhaps on other kernels,
+                 * a blocking call isn't 'always' blocking.
+                 */
+                if (*len > 0) {
+                    ctxt->input_rc = APR_SUCCESS;
+                    break;
+                }
+                if (ctxt->input_block == APR_NONBLOCK_READ) {
+                    break;
+                }
+            }
+            else {
+                if (*len > 0) {
+                    ctxt->input_rc = APR_SUCCESS;
+                }
+                else {
+                    ctxt->input_rc = APR_EOF;
+                }
+                break;
+            }
+        }
+        else {                  /* (rc < 0) */
+
+            if (rc == GNUTLS_E_REHANDSHAKE) {
+                /* A client has asked for a new Hankshake. Currently, we don't do it */
+                ap_log_error(APLOG_MARK, APLOG_INFO, ctxt->input_rc,
+                             ctxt->c->base_server,
+                             "GnuTLS: Error reading data. Client Requested a New Handshake."
+                             " (%d) '%s'", rc, gnutls_strerror(rc));
+            }
+            else {
+                /* Some Other Error. Report it. Die. */
+                ap_log_error(APLOG_MARK, APLOG_INFO, ctxt->input_rc,
+                             ctxt->c->base_server,
+                             "GnuTLS: Error reading data. (%d) '%s'", rc,
+                             gnutls_strerror(rc));
+            }
+
+            if (ctxt->input_rc == APR_SUCCESS) {
+                ctxt->input_rc = APR_EGENERAL;
+            }
+            break;
+        }
+    }
+    return ctxt->input_rc;
+}
+
+static apr_status_t gnutls_io_input_getline(mod_gnutls_handle_t * ctxt,
+                                            char *buf, apr_size_t * len)
+{
+    const char *pos = NULL;
+    apr_status_t status;
+    apr_size_t tmplen = *len, buflen = *len, offset = 0;
+
+    *len = 0;
+
+    while (tmplen > 0) {
+        status = gnutls_io_input_read(ctxt, buf + offset, &tmplen);
+
+        if (status != APR_SUCCESS) {
+            return status;
+        }
+
+        *len += tmplen;
+
+        if ((pos = memchr(buf, APR_ASCII_LF, *len))) {
+            break;
+        }
+
+        offset += tmplen;
+        tmplen = buflen - offset;
+    }
+
+    if (pos) {
+        char *value;
+        int length;
+        apr_size_t bytes = pos - buf;
+
+        bytes += 1;
+        value = buf + bytes;
+        length = *len - bytes;
+
+        char_buffer_write(&ctxt->input_cbuf, value, length);
+
+        *len = bytes;
+    }
+
+    return APR_SUCCESS;
+}
+
+
+#define GNUTLS_HANDSHAKE_ATTEMPTS 10
+
+static void gnutls_do_handshake(mod_gnutls_handle_t * ctxt)
+{
+    int i, ret;
+
+    if (ctxt->status != 0)
+        return;
+
+    for (i = GNUTLS_HANDSHAKE_ATTEMPTS; i > 0; i--) {
+        ret = gnutls_handshake(ctxt->session);
+        if (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN) {
+            continue;
+        }
+
+        if (ret < 0) {
+            if (ret == GNUTLS_E_WARNING_ALERT_RECEIVED
+                || ret == GNUTLS_E_FATAL_ALERT_RECEIVED) {
+                ret = gnutls_alert_get(ctxt->session);
+                ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
+                             "GnuTLS: Hanshake Alert (%d) '%s'.\n", ret,
+                             gnutls_alert_get_name(ret));
+            }
+
+            if (gnutls_error_is_fatal(ret) != 0) {
+                gnutls_deinit(ctxt->session);
+                ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
+                             "GnuTLS: Handshake Failed (%d) '%s'", ret,
+                             gnutls_strerror(ret));
+                ctxt->status = -1;
+                return;
+            }
+        }
+        else {
+            ctxt->status = 1;
+            return;             /* all done with the handshake */
+        }
+    }
+    ctxt->status = -1;
+    return;
+}
+
+
+apr_status_t mod_gnutls_filter_input(ap_filter_t * f,
+                                     apr_bucket_brigade * bb,
+                                     ap_input_mode_t mode,
+                                     apr_read_type_e block,
+                                     apr_off_t readbytes)
+{
+    apr_status_t status = APR_SUCCESS;
+    mod_gnutls_handle_t *ctxt = (mod_gnutls_handle_t *) f->ctx;
+    apr_size_t len = sizeof(ctxt->input_buffer);
+
+    if (f->c->aborted) {
+        apr_bucket *bucket = apr_bucket_eos_create(f->c->bucket_alloc);
+        APR_BRIGADE_INSERT_TAIL(bb, bucket);
+        return APR_ECONNABORTED;
+    }
+
+    if (ctxt->status == 0) {
+        gnutls_do_handshake(ctxt);
+    }
+
+    if (ctxt->status < 0) {
+        return ap_get_brigade(f->next, bb, mode, block, readbytes);
+    }
+
+    /* XXX: we don't currently support anything other than these modes. */
+    if (mode != AP_MODE_READBYTES && mode != AP_MODE_GETLINE &&
+        mode != AP_MODE_SPECULATIVE && mode != AP_MODE_INIT) {
+        return APR_ENOTIMPL;
+    }
+
+    ctxt->input_mode = mode;
+    ctxt->input_block = block;
+
+    if (ctxt->input_mode == AP_MODE_READBYTES ||
+        ctxt->input_mode == AP_MODE_SPECULATIVE) {
+        /* Err. This is bad. readbytes *can* be a 64bit int! len.. is NOT */
+        if (readbytes < len) {
+            len = (apr_size_t) readbytes;
+        }
+        status = gnutls_io_input_read(ctxt, ctxt->input_buffer, &len);
+    }
+    else if (ctxt->input_mode == AP_MODE_GETLINE) {
+        status = gnutls_io_input_getline(ctxt, ctxt->input_buffer, &len);
+    }
+    else {
+        /* We have no idea what you are talking about, so return an error. */
+        return APR_ENOTIMPL;
+    }
+
+    if (status != APR_SUCCESS) {
+        return gnutls_io_filter_error(f, bb, status);
+    }
+
+    /* Create a transient bucket out of the decrypted data. */
+    if (len > 0) {
+        apr_bucket *bucket =
+            apr_bucket_transient_create(ctxt->input_buffer, len,
+                                        f->c->bucket_alloc);
+        APR_BRIGADE_INSERT_TAIL(bb, bucket);
+    }
+
+    return status;
+}
+
+apr_status_t mod_gnutls_filter_output(ap_filter_t * f,
+                                      apr_bucket_brigade * bb)
+{
+    int ret;
+    mod_gnutls_handle_t *ctxt = (mod_gnutls_handle_t *) f->ctx;
+    apr_status_t status = APR_SUCCESS;
+    apr_read_type_e rblock = APR_NONBLOCK_READ;
+
+    if (f->c->aborted) {
+        apr_brigade_cleanup(bb);
+        return APR_ECONNABORTED;
+    }
+
+    if (ctxt->status == 0) {
+        gnutls_do_handshake(ctxt);
+    }
+
+    if (ctxt->status < 0) {
+        return ap_pass_brigade(f->next, bb);
+    }
+
+    while (!APR_BRIGADE_EMPTY(bb)) {
+        apr_bucket *bucket = APR_BRIGADE_FIRST(bb);
+        if (APR_BUCKET_IS_EOS(bucket) || APR_BUCKET_IS_FLUSH(bucket)) {
+            /** TODO: GnuTLS doesn't have a special flush method? **/
+            if ((status = ap_pass_brigade(f->next, bb)) != APR_SUCCESS) {
+                return status;
+            }
+            break;
+        }
+        else if (AP_BUCKET_IS_EOC(bucket)) {
+            gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
+
+            if ((status = ap_pass_brigade(f->next, bb)) != APR_SUCCESS) {
+                return status;
+            }
+            break;
+        }
+        else {
+            /* filter output */
+            const char *data;
+            apr_size_t len;
+
+            status = apr_bucket_read(bucket, &data, &len, rblock);
+
+            if (APR_STATUS_IS_EAGAIN(status)) {
+                rblock = APR_BLOCK_READ;
+                continue;       /* and try again with a blocking read. */
+            }
+
+            rblock = APR_NONBLOCK_READ;
+
+            if (!APR_STATUS_IS_EOF(status) && (status != APR_SUCCESS)) {
+                break;
+            }
+
+            ret = gnutls_record_send(ctxt->session, data, len);
+
+            if (ret < 0) {
+                /* error sending output */
+                ap_log_error(APLOG_MARK, APLOG_INFO, ctxt->output_rc,
+                             ctxt->c->base_server,
+                             "GnuTLS: Error writing data."
+                             " (%d) '%s'", ret, gnutls_strerror(ret));
+                if (ctxt->output_rc == APR_SUCCESS) {
+                    ctxt->output_rc = APR_EGENERAL;
+                }
+            }
+            else if ((apr_size_t) ret != len) {
+                /* not all of the data was sent. */
+                /* mod_ssl basicly errors out here.. this doesn't seem right? */
+                ap_log_error(APLOG_MARK, APLOG_INFO, ctxt->output_rc,
+                             ctxt->c->base_server,
+                             "GnuTLS: failed to write %" APR_SSIZE_T_FMT
+                             " of %" APR_SIZE_T_FMT " bytes.",
+                             len - (apr_size_t) ret, len);
+                if (ctxt->output_rc == APR_SUCCESS) {
+                    ctxt->output_rc = APR_EGENERAL;
+                }
+            }
+
+            apr_bucket_delete(bucket);
+
+            if (ctxt->output_rc != APR_SUCCESS) {
+                break;
+            }
+        }
+    }
+
+    return status;
+}
+
 ssize_t mod_gnutls_transport_read(gnutls_transport_ptr_t ptr,
                                   void *buffer, size_t len)
 {
     mod_gnutls_handle_t *ctxt = ptr;
     apr_status_t rc;
     apr_size_t in = len;
+    apr_read_type_e block = ctxt->input_block;
+
+    ctxt->input_rc = APR_SUCCESS;
+
     /* If Len = 0, we don't do anything. */
     if (!len)
         return 0;
+
+    if (!ctxt->input_bb) {
+        ctxt->input_rc = APR_EOF;
+        return -1;
+    }
 
     if (APR_BRIGADE_EMPTY(ctxt->input_bb)) {
 
@@ -283,13 +578,64 @@ ssize_t mod_gnutls_transport_read(gnutls_transport_ptr_t ptr,
         }
     }
 
-//    brigade_consume(ctxt->input_bb, ctxt->input_block, buffer, &len);
+    ctxt->input_rc = brigade_consume(ctxt->input_bb, block, buffer, &len);
+
+    if (ctxt->input_rc == APR_SUCCESS) {
+        return (ssize_t) len;
+    }
+
+    if (APR_STATUS_IS_EAGAIN(ctxt->input_rc)
+        || APR_STATUS_IS_EINTR(ctxt->input_rc)) {
+        return (ssize_t) len;
+    }
+
+    /* Unexpected errors and APR_EOF clean out the brigade.
+     * Subsequent calls will return APR_EOF.
+     */
+    apr_brigade_cleanup(ctxt->input_bb);
+    ctxt->input_bb = NULL;
+
+    if (APR_STATUS_IS_EOF(ctxt->input_rc) && len) {
+        /* Provide the results of this read pass,
+         * without resetting the BIO retry_read flag
+         */
+        return (ssize_t) len;
+    }
+
+    return -1;
+}
 
 
-    ap_get_brigade(ctxt->input_filter->next, ctxt->input_bb,
-                   AP_MODE_READBYTES, ctxt->input_block, len);
+static ssize_t write_flush(mod_gnutls_handle_t * ctxt)
+{
+    apr_bucket *e;
 
-    return len;
+    if (!(ctxt->output_blen || ctxt->output_length)) {
+        ctxt->output_rc = APR_SUCCESS;
+        return 1;
+    }
+
+    if (ctxt->output_blen) {
+        e = apr_bucket_transient_create(ctxt->output_buffer,
+                                        ctxt->output_blen,
+                                        ctxt->output_bb->bucket_alloc);
+        /* we filled this buffer first so add it to the
+         * head of the brigade
+         */
+        APR_BRIGADE_INSERT_HEAD(ctxt->output_bb, e);
+        ctxt->output_blen = 0;
+    }
+
+    ctxt->output_length = 0;
+    e = apr_bucket_flush_create(ctxt->output_bb->bucket_alloc);
+    APR_BRIGADE_INSERT_TAIL(ctxt->output_bb, e);
+
+    ctxt->output_rc = ap_pass_brigade(ctxt->output_filter->next,
+                                      ctxt->output_bb);
+    /* create new brigade ready for next time through */
+    ctxt->output_bb =
+        apr_brigade_create(ctxt->c->pool, ctxt->c->bucket_alloc);
+    return (ctxt->output_rc == APR_SUCCESS) ? 1 : -1;
 }
 
 ssize_t mod_gnutls_transport_write(gnutls_transport_ptr_t ptr,
@@ -297,11 +643,34 @@ ssize_t mod_gnutls_transport_write(gnutls_transport_ptr_t ptr,
 {
     mod_gnutls_handle_t *ctxt = ptr;
 
-//    apr_bucket *bucket = apr_bucket_transient_create(in, inl,
-//                                                     outctx->bb->
-//                                                     bucket_alloc);
+    if (!ctxt->output_length
+        && (len + ctxt->output_blen < sizeof(ctxt->output_buffer))) {
+        /* the first two SSL_writes (of 1024 and 261 bytes)
+         * need to be in the same packet (vec[0].iov_base)
+         */
+        /* XXX: could use apr_brigade_write() to make code look cleaner  
+         * but this way we avoid the malloc(APR_BUCKET_BUFF_SIZE)
+         * and free() of it later
+         */
+        memcpy(&ctxt->output_buffer[ctxt->output_blen], buffer, len);
+        ctxt->output_blen += len;
+    }
+    else {
+        /* pass along the encrypted data
+         * need to flush since we're using SSL's malloc-ed buffer
+         * which will be overwritten once we leave here
+         */
+        apr_bucket *bucket = apr_bucket_transient_create(buffer, len,
+                                                         ctxt->output_bb->
+                                                         bucket_alloc);
 
-    //  outctx->length += inl;
-    //APR_BRIGADE_INSERT_TAIL(outctx->bb, bucket);
-    return 0;
+        ctxt->output_length += len;
+        APR_BRIGADE_INSERT_TAIL(ctxt->output_bb, bucket);
+
+        if (write_flush(ctxt) < 0) {
+            return -1;
+        }
+    }
+
+    return len;
 }
