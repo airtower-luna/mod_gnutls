@@ -1,6 +1,6 @@
-
 AC_INIT(mod_gnutls, 0.1.0)
 OOO_CONFIG_NICE(config.nice)
+MOD_GNUTLS_VERSION=AC_PACKAGE_VERSION
 AC_PREREQ(2.53)
 AC_CONFIG_SRCDIR([src/mod_gnutls.c])
 AC_CONFIG_AUX_DIR(config)
@@ -9,6 +9,7 @@ AC_CANONICAL_TARGET
 AM_INIT_AUTOMAKE(AC_PACKAGE_NAME, AC_PACKAGE_VERSION)
 AM_CONFIG_HEADER(include/mod_gnutls_config.h:config.in)
 
+AC_SUBST(MOD_GNUTLS_VERSION)
 
 AC_PROG_CC
 AC_PROG_LD
@@ -41,9 +42,10 @@ AC_CONFIG_FILES([Makefile src/Makefile include/mod_gnutls.h])
 AC_OUTPUT
 
 echo "---"
-echo "Configuration summary for mod_gnutls"
+echo "Configuration summary for mod_gnutls:"
 echo ""
+echo "   * mod_gnutls version:		${MOD_GNUTLS_VERSION}"
 echo "   * Apache Modules directory:	${AP_LIBEXECDIR}"
-echo "   * GnuTLS Library Version:	${LIBGNUTLS_VERSION}"
+echo "   * GnuTLS Library version:	${LIBGNUTLS_VERSION}"
 echo ""
 echo "---"

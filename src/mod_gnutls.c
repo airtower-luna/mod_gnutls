@@ -189,6 +189,7 @@ static int mod_gnutls_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
             sc->cache_config = sc_base->cache_config;
 
             if (sc->cert_file != NULL && sc->key_file != NULL) {
+
                 rv = gnutls_certificate_set_x509_key_file(sc->certs, sc->cert_file,
                                                  sc->key_file,
                                                  GNUTLS_X509_FMT_PEM);
@@ -214,7 +215,7 @@ static int mod_gnutls_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
         }
     } /* first_run */
 
-    ap_add_version_component(p, "GnuTLS/" LIBGNUTLS_VERSION);
+    ap_add_version_component(p, "mod_gnutls/" MOD_GNUTLS_VERSION);
 
     return OK;
 }
@@ -266,6 +267,30 @@ static apr_port_t mod_gnutls_hook_default_port(const request_rec * r)
     return 443;
 }
 
+/* TODO: Complete support for Server Name Indication */
+static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st* ret) 
+{
+    char* server_name;
+    int server_type;
+    int data_len = 256;
+    mod_gnutls_handle_t *ctxt;    
+    ctxt = gnutls_transport_get_ptr(session);
+
+    ret->type = GNUTLS_CRT_X509;
+    ret->ncerts = 1;
+    server_name = apr_palloc(ctxt->c->pool, data_len);
+    if (gnutls_server_name_get(ctxt->session, server_name, &data_len, &server_type, 0) == 0) {
+        if (server_type == GNUTLS_NAME_DNS) {
+            ap_log_error(APLOG_MARK, APLOG_INFO, 0,
+                         ctxt->c->base_server,
+                         "GnuTLS: Virtual Host: "
+                         "%s", server_name);
+        }
+    }
+
+    return 0;
+}
+
 static mod_gnutls_handle_t* create_gnutls_handle(apr_pool_t* pool, conn_rec * c)
 {
     mod_gnutls_handle_t *ctxt;
@@ -299,13 +324,12 @@ static mod_gnutls_handle_t* create_gnutls_handle(apr_pool_t* pool, conn_rec * c)
 
     gnutls_credentials_set(ctxt->session, GNUTLS_CRD_CERTIFICATE, sc->certs);
 
-//  if(anon) {
-//    gnutls_credentials_set(ctxt->session, GNUTLS_CRD_ANON, sc->anoncred);
-//  }
-
     gnutls_certificate_server_set_request(ctxt->session, GNUTLS_CERT_IGNORE);
 
     mod_gnutls_cache_session_init(ctxt);
+
+    /* TODO: Finish Support for Server Name Indication */
+    /* gnutls_certificate_server_set_retrieve_function(sc->certs, cert_retrieve_fn); */
     return ctxt;
 }
 
@@ -341,7 +365,10 @@ static int mod_gnutls_hook_pre_connection(conn_rec * c, void *csd)
 
 static int mod_gnutls_hook_fixups(request_rec *r)
 {
+    unsigned char sbuf[GNUTLS_MAX_SESSION_ID];
+    char buf[GNUTLS_SESSION_ID_STRING_LEN];
     const char* tmp;
+    int len;
     mod_gnutls_handle_t *ctxt;
     apr_table_t *env = r->subprocess_env;
 
@@ -352,17 +379,30 @@ static int mod_gnutls_hook_fixups(request_rec *r)
     }
 
     apr_table_setn(env, "HTTPS", "on");
+
+    apr_table_setn(env, "GNUTLS_VERSION_INTERFACE", MOD_GNUTLS_VERSION);
+    apr_table_setn(env, "GNUTLS_VERSION_LIBRARY", LIBGNUTLS_VERSION);
+
     apr_table_setn(env, "SSL_PROTOCOL",
                    gnutls_protocol_get_name(gnutls_protocol_get_version(ctxt->session)));
+
     apr_table_setn(env, "SSL_CIPHER",
                    gnutls_cipher_get_name(gnutls_cipher_get(ctxt->session)));
+
+    apr_table_setn(env, "SSL_CLIENT_VERIFY", "NONE");
 
     tmp = apr_psprintf(r->pool, "%d",
               8 * gnutls_cipher_get_key_size(gnutls_cipher_get(ctxt->session)));
 
     apr_table_setn(env, "SSL_CIPHER_USEKEYSIZE", tmp);
+
     apr_table_setn(env, "SSL_CIPHER_ALGKEYSIZE", tmp);
 
+    len = sizeof(sbuf);
+    gnutls_session_get_id(ctxt->session, sbuf, &len);
+    tmp = mod_gnutls_session_id2sz(sbuf, len, buf, sizeof(buf));
+    apr_table_setn(env, "SSL_SESSION_ID", tmp);
+    
     return OK;
 }
 
@@ -384,6 +424,7 @@ static const char *gnutls_set_key_file(cmd_parms * parms, void *dummy,
         (mod_gnutls_srvconf_rec *) ap_get_module_config(parms->server->
                                                         module_config,
                                                         &gnutls_module);
+    
     sc->key_file = ap_server_root_relative(parms->pool, arg);
     return NULL;
 }
@@ -508,7 +549,6 @@ static void *gnutls_config_server_create(apr_pool_t * p, server_rec * s)
     sc->enabled = GNUTLS_ENABLED_FALSE;
 
     gnutls_certificate_allocate_credentials(&sc->certs);
-    gnutls_anon_allocate_server_credentials(&sc->anoncred);
     sc->key_file = NULL;
     sc->cert_file = NULL;
     sc->cache_timeout = apr_time_from_sec(3600);

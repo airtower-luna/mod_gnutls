@@ -271,6 +271,22 @@ static apr_status_t gnutls_io_input_read(mod_gnutls_handle_t * ctxt,
                              "GnuTLS: Error reading data. Client Requested a New Handshake."
                              " (%d) '%s'", rc, gnutls_strerror(rc));
             }
+            else if (rc == GNUTLS_E_WARNING_ALERT_RECEIVED) {
+                rc = gnutls_alert_get(ctxt->session);
+                ap_log_error(APLOG_MARK, APLOG_INFO, ctxt->input_rc,
+                             ctxt->c->base_server,
+                             "GnuTLS: Warning Alert From Client: "
+                             " (%d) '%s'", rc, gnutls_alert_get_name(rc)); 
+            }
+            else if (rc == GNUTLS_E_FATAL_ALERT_RECEIVED) {
+                rc = gnutls_alert_get(ctxt->session);
+                ap_log_error(APLOG_MARK, APLOG_INFO, ctxt->input_rc,
+                             ctxt->c->base_server,
+                             "GnuTLS: Fatal Alert From Client: "
+                             "(%d) '%s'", rc, gnutls_alert_get_name(rc));
+                ctxt->input_rc = APR_EGENERAL;
+                break;
+            }
             else {
                 /* Some Other Error. Report it. Die. */
                 if(gnutls_error_is_fatal(rc)) {
@@ -341,7 +357,7 @@ static apr_status_t gnutls_io_input_getline(mod_gnutls_handle_t * ctxt,
 static void gnutls_do_handshake(mod_gnutls_handle_t * ctxt)
 {
     int ret;
-
+    int errcode;
     if (ctxt->status != 0) {
         return;
     }
@@ -352,10 +368,10 @@ tryagain:
     if (ret < 0) {
         if (ret == GNUTLS_E_WARNING_ALERT_RECEIVED
             || ret == GNUTLS_E_FATAL_ALERT_RECEIVED) {
-            ret = gnutls_alert_get(ctxt->session);
+            errcode = gnutls_alert_get(ctxt->session);
             ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
-                         "GnuTLS: Hanshake Alert (%d) '%s'.\n", ret,
-                         gnutls_alert_get_name(ret));
+                         "GnuTLS: Hanshake Alert (%d) '%s'.", errcode,
+                         gnutls_alert_get_name(errcode));
         }
     
         if (!gnutls_error_is_fatal(ret)) {
@@ -398,7 +414,26 @@ apr_status_t mod_gnutls_filter_input(ap_filter_t* f,
     }
 
     if (ctxt->status == 0) {
+        char* server_name;
+        int server_type;
+        int data_len = 256;
+        
         gnutls_do_handshake(ctxt);
+        
+        /**
+         * Due to issues inside the GnuTLS API, we cannot currently do TLS 1.1
+         * Server Name Indication.
+         */
+        server_name = apr_palloc(ctxt->c->pool, data_len);
+        if (gnutls_server_name_get(ctxt->session, server_name, &data_len, &server_type, 0) == 0) {
+            if (server_type == GNUTLS_NAME_DNS) {
+                ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
+                             ctxt->c->base_server,
+                             "GnuTLS: TLS 1.1 Server Name: "
+                             "%s", server_name);
+                
+            }
+        }
     }
 
     if (ctxt->status < 0) {
@@ -449,6 +484,7 @@ apr_status_t mod_gnutls_filter_output(ap_filter_t * f,
                                       apr_bucket_brigade * bb)
 {
     apr_size_t ret;
+    apr_bucket* e;
     mod_gnutls_handle_t *ctxt = (mod_gnutls_handle_t *) f->ctx;
     apr_status_t status = APR_SUCCESS;
     apr_read_type_e rblock = APR_NONBLOCK_READ;
@@ -469,21 +505,34 @@ apr_status_t mod_gnutls_filter_output(ap_filter_t * f,
     while (!APR_BRIGADE_EMPTY(bb)) {
         apr_bucket *bucket = APR_BRIGADE_FIRST(bb);
         if (AP_BUCKET_IS_EOC(bucket)) {
+            do {
+                ret = gnutls_alert_send(ctxt->session, GNUTLS_AL_FATAL,
+                                        GNUTLS_A_CLOSE_NOTIFY);
+            } while(ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
 
-            gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
-            gnutls_deinit(ctxt->session);
-
-            if ((status = ap_pass_brigade(f->next, bb)) != APR_SUCCESS) {
+            apr_bucket_copy(bucket, &e);
+            APR_BRIGADE_INSERT_TAIL(ctxt->output_bb, e);
+            
+            if ((status = ap_pass_brigade(f->next, ctxt->output_bb)) != APR_SUCCESS) {
+                apr_brigade_cleanup(ctxt->output_bb);
                 return status;
             }
-            break;
+
+            apr_brigade_cleanup(ctxt->output_bb);
+            gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
+            gnutls_deinit(ctxt->session);
+            continue;
 
         } else if (APR_BUCKET_IS_FLUSH(bucket) || APR_BUCKET_IS_EOS(bucket)) {
 
+            apr_bucket_copy(bucket, &e);
+            APR_BRIGADE_INSERT_TAIL(ctxt->output_bb, e);
             if ((status = ap_pass_brigade(f->next, bb)) != APR_SUCCESS) {
+                apr_brigade_cleanup(ctxt->output_bb);
                 return status;
             }
-            break;
+            apr_brigade_cleanup(ctxt->output_bb);
+            continue;
         }
         else {
             /* filter output */
@@ -628,9 +677,9 @@ static ssize_t write_flush(mod_gnutls_handle_t * ctxt)
 
     ctxt->output_rc = ap_pass_brigade(ctxt->output_filter->next,
                                       ctxt->output_bb);
-    /* create new brigade ready for next time through */
-    ctxt->output_bb =
-        apr_brigade_create(ctxt->c->pool, ctxt->c->bucket_alloc);
+    /* clear the brigade to be ready for next time */
+    apr_brigade_cleanup(ctxt->output_bb);
+
     return (ctxt->output_rc == APR_SUCCESS) ? 1 : -1;
 }
 
@@ -639,19 +688,17 @@ ssize_t mod_gnutls_transport_write(gnutls_transport_ptr_t ptr,
 {
     mod_gnutls_handle_t *ctxt = ptr;
 
-        /* pass along the encrypted data
-         * need to flush since we're using SSL's malloc-ed buffer
-         * which will be overwritten once we leave here
-         */
-        apr_bucket *bucket = apr_bucket_transient_create(buffer, len,
-                                                         ctxt->output_bb->
-                                                         bucket_alloc);
+    /* pass along the encrypted data
+     * need to flush since we're using SSL's malloc-ed buffer
+     * which will be overwritten once we leave here
+     */
+    apr_bucket *bucket = apr_bucket_transient_create(buffer, len,
+                                                    ctxt->output_bb->bucket_alloc);
+    ctxt->output_length += len;
+    APR_BRIGADE_INSERT_TAIL(ctxt->output_bb, bucket);
 
-        ctxt->output_length += len;
-        APR_BRIGADE_INSERT_TAIL(ctxt->output_bb, bucket);
-
-        if (write_flush(ctxt) < 0) {
-            return -1;
-        }
+    if (write_flush(ctxt) < 0) {
+        return -1;
+    }
     return len;
 }

@@ -42,6 +42,8 @@ module AP_MODULE_DECLARE_DATA gnutls_module;
 #define GNUTLS_ENABLED_FALSE 0
 #define GNUTLS_ENABLED_TRUE  1
 
+#define MOD_GNUTLS_VERSION "@MOD_GNUTLS_VERSION@"
+
 typedef enum 
 {
     mod_gnutls_cache_none,
@@ -54,7 +56,6 @@ typedef enum
 typedef struct
 {
     gnutls_certificate_credentials_t certs;
-    gnutls_anon_server_credentials_t anoncred;
     char *key_file;
     char *cert_file;
     int enabled;
@@ -170,5 +171,18 @@ int mod_gnutls_cache_child_init(apr_pool_t *p, server_rec *s,
  * Setup the Session Caching
  */
 int mod_gnutls_cache_session_init(mod_gnutls_handle_t *ctxt);
+
+#define GNUTLS_SESSION_ID_STRING_LEN \
+    ((GNUTLS_MAX_SESSION_ID + 1) * 2)
+    
+/**
+ * Convert a SSL Session ID into a Null Terminated Hex Encoded String
+ * @param id raw SSL Session ID
+ * @param idlen Length of the raw Session ID
+ * @param str Location to store the Hex Encoded String
+ * @param strsize The Maximum Length that can be stored in str
+ */
+char *mod_gnutls_session_id2sz(unsigned char *id, int idlen,
+                                char *str, int strsize);
 
 #endif /*  __mod_gnutls_h_inc */

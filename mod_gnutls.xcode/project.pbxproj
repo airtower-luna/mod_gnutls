@@ -8,6 +8,8 @@
 		45B624630802F1E200CBFD9A = {
 			children = (
 				45B6246D0802F20D00CBFD9A,
+				45B6247D0802F85B00CBFD9A,
+				45B6247A0802F84500CBFD9A,
 				45B6246E0802F20D00CBFD9A,
 				45B6246F0802F20D00CBFD9A,
 			);
@@ -67,6 +69,24 @@
 			lastKnownFileType = sourcecode.c.c;
 			name = mod_gnutls.c;
 			path = src/mod_gnutls.c;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
+		45B6247A0802F84500CBFD9A = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = mod_gnutls.h;
+			path = include/mod_gnutls.h;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
+		45B6247D0802F85B00CBFD9A = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = text;
+			name = mod_gnutls.h.in;
+			path = include/mod_gnutls.h.in;
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
