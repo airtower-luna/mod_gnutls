@@ -15,9 +15,6 @@
  *
  */
 
-#ifndef __mod_gnutls_h_inc
-#define __mod_gnutls_h_inc
-
 #include "httpd.h"
 #include "http_config.h"
 #include "http_protocol.h"
@@ -29,7 +26,12 @@
 #include "apr_strings.h"
 #include "apr_tables.h"
 
+#ifndef __mod_gnutls_h_inc
+#define __mod_gnutls_h_inc
+
+#if HAVE_APR_MEMCACHE
 #include "apr_memcache.h"
+#endif
 
 #include <gcrypt.h>
 #include <gnutls/gnutls.h>
@@ -167,4 +169,5 @@ int mod_gnutls_cache_child_init(apr_pool_t *p, server_rec *s,
  * Setup the Session Caching
  */
 int mod_gnutls_cache_session_init(mod_gnutls_handle_t *ctxt);
+
 #endif /*  __mod_gnutls_h_inc */
