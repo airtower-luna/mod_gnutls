@@ -1,5 +1,5 @@
-/* ====================================================================
- *  Copyright 2004 Paul Querna
+/**
+ *  Copyright 2004-2005 Paul Querna
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -21,7 +21,16 @@
 #include "apr_memcache.h"
 #endif
 
+#include "apr_dbm.h"
+
 #include "ap_mpm.h"
+
+#include <unistd.h>
+#include <sys/types.h>
+
+#if !defined(OS2) && !defined(WIN32) && !defined(BEOS) && !defined(NETWARE)
+#include "unixd.h"
+#endif
 
 #define GNUTLS_SESSION_ID_STRING_LEN \
     ((GNUTLS_MAX_SESSION_ID + 1) * 2)
@@ -152,7 +161,7 @@ static int mc_cache_store(void* baton, gnutls_datum_t key,
     if(!strkey)
         return -1;
 
-    timeout = 3600;
+    timeout = ctxt->sc->cache_timeout;
 
     rv = apr_memcache_set(mc,  strkey, data.data, data.size, timeout, 0);
 
@@ -233,25 +242,239 @@ static int mc_cache_delete(void* baton, gnutls_datum_t key)
 
 #endif /* have_apr_memcache */
 
+#define SSL_DBM_FILE_MODE ( APR_UREAD | APR_UWRITE | APR_GREAD | APR_WREAD )
+
+static int dbm_cache_expire(mod_gnutls_handle_t *ctxt)
+{
+    apr_status_t rv;
+    apr_dbm_t *dbm;
+
+    rv = apr_dbm_open(&dbm, ctxt->sc->cache_config,
+	              APR_DBM_RWCREATE, SSL_DBM_FILE_MODE, ctxt->c->pool);
+    if (rv != APR_SUCCESS) {
+        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
+                     ctxt->c->base_server,
+                     "[gnutls_cache] error opening cache '%s'",
+                     ctxt->sc->cache_config);
+        return -1;
+    }
+    apr_dbm_close(dbm);
+
+    return 0;
+}
+
+static gnutls_datum_t dbm_cache_fetch(void* baton, gnutls_datum_t key)
+{
+    gnutls_datum_t data = { NULL, 0 };
+    apr_dbm_t *dbm;
+    apr_datum_t dbmkey;
+    apr_datum_t dbmval;
+    mod_gnutls_handle_t *ctxt = baton;
+    apr_status_t rv;
+
+    dbmkey.dptr  = key.data;
+    dbmkey.dsize = key.size;
+
+    rv = apr_dbm_open(&dbm, ctxt->sc->cache_config,
+	              APR_DBM_RWCREATE, SSL_DBM_FILE_MODE, ctxt->c->pool);
+    if (rv != APR_SUCCESS) {
+        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
+                     ctxt->c->base_server,
+                     "[gnutls_cache] error opening cache '%s'",
+                     ctxt->sc->cache_config);
+        return data;
+    }
+
+    rv = apr_dbm_fetch(dbm, dbmkey, &dbmval);
+
+    if (rv != APR_SUCCESS) {
+        apr_dbm_close(dbm);
+        return data;
+    }
+
+    if (dbmval.dptr == NULL || dbmval.dsize <= sizeof(apr_time_t)) {
+        apr_dbm_close(dbm);
+        return data;
+    }
+
+    data.data = gnutls_malloc(dbmval.dsize - sizeof(apr_time_t));
+    if (data.data == NULL)
+        return data;
+
+    data.size = dbmval.dsize - sizeof(apr_time_t);
+    memcpy(data.data, dbmval.dptr+sizeof(apr_time_t), data.size);
+
+    apr_dbm_close(dbm);
+    return data;
+}
+
+static int dbm_cache_store(void* baton, gnutls_datum_t key, 
+                          gnutls_datum_t data)
+{
+    apr_dbm_t *dbm;
+    apr_datum_t dbmkey;
+    apr_datum_t dbmval;
+    mod_gnutls_handle_t *ctxt = baton;
+    apr_status_t rv;
+    apr_time_t timeout;
+    
+    dbmkey.dptr  = (char *)key.data;
+    dbmkey.dsize = key.size;
+
+    /* create DBM value */
+    dbmval.dsize = data.size;
+    dbmval.dptr  = (char *)malloc(dbmval.dsize+sizeof(apr_time_t));
+
+    memcpy((char *)dbmval.dptr+sizeof(apr_time_t),
+           data.data, data.size);
+
+    rv = apr_dbm_open(&dbm, ctxt->sc->cache_config,
+	              APR_DBM_RWCREATE, SSL_DBM_FILE_MODE, ctxt->c->pool);
+    if (rv != APR_SUCCESS) {
+        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
+                     ctxt->c->base_server,
+                     "[gnutls_cache] error opening cache '%s'",
+                     ctxt->sc->cache_config);
+        free(dbmval.dptr);        
+        return -1;
+    }
+
+    rv = apr_dbm_store(dbm, dbmkey, dbmval);
+
+    if (rv != APR_SUCCESS) {
+        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
+                     ctxt->c->base_server,
+                     "[gnutls_cache] error storing in cache '%s'",
+                     ctxt->sc->cache_config);
+        apr_dbm_close(dbm);
+        free(dbmval.dptr);
+        return -1;
+    }
+
+    apr_dbm_close(dbm);
+
+    free(dbmval.dptr);
+    
+    return 0;
+}
+
+static int dbm_cache_delete(void* baton, gnutls_datum_t key)
+{
+    apr_dbm_t *dbm;
+    apr_datum_t dbmkey;
+    mod_gnutls_handle_t *ctxt = baton;
+    apr_status_t rv;
+    
+    dbmkey.dptr  = (char *)key.data;
+    dbmkey.dsize = key.size;
+
+    rv = apr_dbm_open(&dbm, ctxt->sc->cache_config,
+	              APR_DBM_RWCREATE, SSL_DBM_FILE_MODE, ctxt->c->pool);
+    if (rv != APR_SUCCESS) {
+        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
+                     ctxt->c->base_server,
+                     "[gnutls_cache] error opening cache '%s'",
+                     ctxt->sc->cache_config);
+        return -1;
+    }
+
+    rv = apr_dbm_delete(dbm, dbmkey);
+
+    if (rv != APR_SUCCESS) {
+        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
+                     ctxt->c->base_server,
+                     "[gnutls_cache] error storing in cache '%s'",
+                     ctxt->sc->cache_config);
+        apr_dbm_close(dbm);
+        return -1;
+    }
+
+    apr_dbm_close(dbm);
+
+    return 0;
+}
+
+static int dbm_cache_child_init(apr_pool_t *p, server_rec *s, 
+                                mod_gnutls_srvconf_rec *sc)
+{
+    apr_status_t rv;
+    apr_dbm_t *dbm;
+    const char* path1;
+    const char* path2;
+
+    rv = apr_dbm_open(&dbm, sc->cache_config, APR_DBM_RWCREATE, 
+                      SSL_DBM_FILE_MODE, p);
+
+    if (rv != APR_SUCCESS) {
+        ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
+                     "GnuTLS: Cannot create DBM Cache at `%s'", 
+                     sc->cache_config);
+        return rv; 
+    }
+
+    apr_dbm_close(dbm);
+
+    apr_dbm_get_usednames(p, sc->cache_config, &path1, &path2);
+
+    /* The Following Code takes logic directly from mod_ssl's DBM Cache */ 
+#if !defined(OS2) && !defined(WIN32) && !defined(BEOS) && !defined(NETWARE)
+    /* Running as Root */
+    if (geteuid() == 0)  {
+        chown(path1, unixd_config.user_id, -1);
+        if (path2 != NULL) { 
+            chown(path2, unixd_config.user_id, -1);
+        }
+    }
+#endif
+
+    return rv;
+}
+
+int mod_gnutls_cache_post_config(apr_pool_t *p, server_rec *s, 
+                                 mod_gnutls_srvconf_rec *sc)
+{
+    if (sc->cache_type == mod_gnutls_cache_dbm) {
+        return dbm_cache_child_init(p, s, sc);
+    }
+    return 0;
+}
+
 int mod_gnutls_cache_child_init(apr_pool_t *p, server_rec *s, 
                                 mod_gnutls_srvconf_rec *sc)
 {
+    if (sc->cache_type == mod_gnutls_cache_dbm) {
+        return 0;
+    }
 #if HAVE_APR_MEMCACHE
-    return mc_cache_child_init(p, s, sc);
-#else
-    return 0;
+    else if (sc->cache_type == mod_gnutls_cache_memcache) { 
+        return mc_cache_child_init(p, s, sc);
+    }
 #endif
+    return 0;
 }
+
+ #include <assert.h>
 
 int mod_gnutls_cache_session_init(mod_gnutls_handle_t *ctxt)
 {
+    printf("Type: %d Params: %s\n",ctxt->sc->cache_type, ctxt->sc->cache_config);
+    if (ctxt->sc->cache_type == mod_gnutls_cache_dbm) {
+        gnutls_db_set_retrieve_function(ctxt->session, dbm_cache_fetch);
+        gnutls_db_set_remove_function(ctxt->session, dbm_cache_delete);
+        gnutls_db_set_store_function(ctxt->session, dbm_cache_store);
+        gnutls_db_set_ptr(ctxt->session, ctxt);
+    }
 #if HAVE_APR_MEMCACHE
-    gnutls_db_set_retrieve_function(ctxt->session, mc_cache_fetch);
-    gnutls_db_set_remove_function(ctxt->session, mc_cache_delete);
-    gnutls_db_set_store_function(ctxt->session, mc_cache_store);
-    gnutls_db_set_ptr(ctxt->session, ctxt);
-#else
-    /* TODO: Alternative Cache Backends */
+    else if (ctxt->sc->cache_type == mod_gnutls_cache_memcache) { 
+        gnutls_db_set_retrieve_function(ctxt->session, mc_cache_fetch);
+        gnutls_db_set_remove_function(ctxt->session, mc_cache_delete);
+        gnutls_db_set_store_function(ctxt->session, mc_cache_store);
+        gnutls_db_set_ptr(ctxt->session, ctxt);
+    }
 #endif
+    else {
+        assert(1);
+        /* No Session Cache is Available. Opps. */
+    }
     return 0;
 }

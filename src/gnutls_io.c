@@ -1,5 +1,5 @@
-/* ====================================================================
- *  Copyright 2004 Paul Querna
+/**
+ *  Copyright 2004-2005 Paul Querna
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -342,33 +342,46 @@ static void gnutls_do_handshake(mod_gnutls_handle_t * ctxt)
 {
     int ret;
 
-    if (ctxt->status != 0)
+    if (ctxt->status != 0) {
         return;
-        ret = gnutls_handshake(ctxt->session);
-        if (ret < 0) {
-            if (ret == GNUTLS_E_WARNING_ALERT_RECEIVED
-                || ret == GNUTLS_E_FATAL_ALERT_RECEIVED) {
-                ret = gnutls_alert_get(ctxt->session);
-                ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
-                             "GnuTLS: Hanshake Alert (%d) '%s'.\n", ret,
-                             gnutls_alert_get_name(ret));
-            }
-    
-            gnutls_deinit(ctxt->session);
+    }
+
+tryagain:
+
+    ret = gnutls_handshake(ctxt->session);
+    if (ret < 0) {
+        if (ret == GNUTLS_E_WARNING_ALERT_RECEIVED
+            || ret == GNUTLS_E_FATAL_ALERT_RECEIVED) {
+            ret = gnutls_alert_get(ctxt->session);
             ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
-                             "GnuTLS: Handshake Failed (%d) '%s'", ret,
-                             gnutls_strerror(ret));
-                ctxt->status = -1;
-                return;
+                         "GnuTLS: Hanshake Alert (%d) '%s'.\n", ret,
+                         gnutls_alert_get_name(ret));
         }
-        else {
-            ctxt->status = 1;
-            return;             /* all done with the handshake */
+    
+        if (!gnutls_error_is_fatal(ret)) {
+            ap_log_error(APLOG_MARK, APLOG_INFO, 0, ctxt->c->base_server,
+                     "GnuTLS: Non-Fatal Handshake Error: (%d) '%s'", ret,
+                      gnutls_strerror(ret));
+            goto tryagain;
         }
+
+        ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
+                     "GnuTLS: Handshake Failed (%d) '%s'", ret,
+                      gnutls_strerror(ret));
+        ctxt->status = -1;
+        gnutls_alert_send(ctxt->session, GNUTLS_AL_FATAL, 
+                          gnutls_error_to_alert(ret, NULL));
+        gnutls_deinit(ctxt->session);
+        return;
+    }
+    else {
+        ctxt->status = 1;
+        return;             /* all done with the handshake */
+    }
 }
 
 
-apr_status_t mod_gnutls_filter_input(ap_filter_t * f,
+apr_status_t mod_gnutls_filter_input(ap_filter_t* f,
                                      apr_bucket_brigade * bb,
                                      ap_input_mode_t mode,
                                      apr_read_type_e block,
@@ -455,7 +468,7 @@ apr_status_t mod_gnutls_filter_output(ap_filter_t * f,
 
     while (!APR_BRIGADE_EMPTY(bb)) {
         apr_bucket *bucket = APR_BRIGADE_FIRST(bb);
-        if (APR_BUCKET_IS_EOS(bucket) || AP_BUCKET_IS_EOC(bucket)) {
+        if (AP_BUCKET_IS_EOC(bucket)) {
 
             gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
             gnutls_deinit(ctxt->session);
@@ -465,7 +478,7 @@ apr_status_t mod_gnutls_filter_output(ap_filter_t * f,
             }
             break;
 
-        } else if (APR_BUCKET_IS_FLUSH(bucket)) {
+        } else if (APR_BUCKET_IS_FLUSH(bucket) || APR_BUCKET_IS_EOS(bucket)) {
 
             if ((status = ap_pass_brigade(f->next, bb)) != APR_SUCCESS) {
                 return status;

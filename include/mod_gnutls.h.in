@@ -1,5 +1,5 @@
-/* ====================================================================
- *  Copyright 2004 Paul Querna
+/**
+ *  Copyright 2004-2005 Paul Querna
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -42,21 +42,14 @@ module AP_MODULE_DECLARE_DATA gnutls_module;
 #define GNUTLS_ENABLED_FALSE 0
 #define GNUTLS_ENABLED_TRUE  1
 
-
-/**
- * GnuTLS changed the names of several structures between 1.0.X and 1.1.X 
- * This is just a simple hack so we can compile with both versions.
- * There is a full list in <gnutls/compat.h>, But I am just 
- * doing this for a few types we use.
- */
-#ifndef gnutls_certificate_credentials_t
-#define gnutls_certificate_credentials_t    gnutls_certificate_credentials
-#define gnutls_anon_server_credentials_t    gnutls_anon_server_credentials
-#define gnutls_session_t                    gnutls_session
-#define gnutls_transport_ptr_t              gnutls_transport_ptr
-#define gnutls_dh_params_t                  gnutls_dh_params
-#define gnutls_rsa_params_t                 gnutls_rsa_params
+typedef enum 
+{
+    mod_gnutls_cache_none,
+    mod_gnutls_cache_dbm,
+#if HAVE_APR_MEMCACHE
+    mod_gnutls_cache_memcache
 #endif
+} mod_gnutls_cache_e;
 
 typedef struct
 {
@@ -70,7 +63,12 @@ typedef struct
     int macs[16];
     int protocol[16];
     int compression[16];
+    int cert_types[16];
+    apr_time_t cache_timeout;
+    mod_gnutls_cache_e cache_type;
     const char* cache_config;
+    const char* rsa_params_file;
+    const char* dh_params_file;
 } mod_gnutls_srvconf_rec;
 
 typedef struct {
@@ -158,6 +156,11 @@ ssize_t mod_gnutls_transport_write(gnutls_transport_ptr_t ptr,
                                    const void *buffer, size_t len);
 
 
+/**
+ * Init the Cache after Configuration is done
+ */
+int mod_gnutls_cache_post_config(apr_pool_t *p, server_rec *s, 
+                                 mod_gnutls_srvconf_rec *sc);
 /**
  * Init the Cache inside each Process
  */
