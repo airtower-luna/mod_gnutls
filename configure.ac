@@ -44,7 +44,7 @@ AC_OUTPUT
 echo "---"
 echo "Configuration summary for mod_gnutls:"
 echo ""
-echo "   * mod_gnutls version:		${MOD_GNUTLS_VERSION}"
+echo "   * mod_gnutls version:	${MOD_GNUTLS_VERSION}"
 echo "   * Apache Modules directory:	${AP_LIBEXECDIR}"
 echo "   * GnuTLS Library version:	${LIBGNUTLS_VERSION}"
 echo ""
