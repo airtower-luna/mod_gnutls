@@ -181,6 +181,32 @@ static int mod_gnutls_hook_pre_connection(conn_rec * c, void *csd)
     return OK;
 }
 
+static int mod_gnutls_hook_fixups(request_rec *r)
+{
+    const char* tmp;
+    mod_gnutls_handle_t *ctxt;
+    apr_table_t *env = r->subprocess_env;
+
+    ctxt = ap_get_module_config(r->connection->conn_config, &gnutls_module);
+
+    if(!ctxt) {
+        return DECLINED;
+    }
+    apr_table_setn(env, "HTTPS", "on");
+    apr_table_setn(env, "SSL_PROTOCOL",
+                   gnutls_protocol_get_name(gnutls_protocol_get_version(ctxt->session)));
+    apr_table_setn(env, "SSL_CIPHER",
+                   gnutls_cipher_get_name(gnutls_cipher_get(ctxt->session)));
+
+    tmp = apr_psprintf(r->pool, "%d",
+              8 * gnutls_cipher_get_key_size(gnutls_cipher_get(ctxt->session)));
+
+    apr_table_setn(env, "SSL_CIPHER_USEKEYSIZE", tmp);
+    apr_table_setn(env, "SSL_CIPHER_ALGKEYSIZE", tmp);
+
+    return OK;
+}
+
 static const char *gnutls_set_cert_file(cmd_parms * parms, void *dummy,
                                         const char *arg)
 {
@@ -259,6 +285,8 @@ static void gnutls_hooks(apr_pool_t * p)
     ap_hook_pre_config(mod_gnutls_hook_pre_config, NULL, NULL,
                        APR_HOOK_MIDDLE);
 
+    ap_hook_fixups(mod_gnutls_hook_fixups, NULL, NULL, APR_HOOK_MIDDLE);
+
     /* TODO: HTTP Upgrade Filter */
     /* ap_register_output_filter ("UPGRADE_FILTER", 
      *          ssl_io_filter_Upgrade, NULL, AP_FTYPE_PROTOCOL + 5);
@@ -284,7 +312,8 @@ static void *gnutls_config_server_create(apr_pool_t * p, server_rec * s)
     sc->cert_file = NULL;
 
     i = 0;
-    sc->ciphers[i++] = GNUTLS_CIPHER_RIJNDAEL_128_CBC;
+    sc->ciphers[i++] = GNUTLS_CIPHER_AES_256_CBC;
+    sc->ciphers[i++] = GNUTLS_CIPHER_AES_128_CBC;
     sc->ciphers[i++] = GNUTLS_CIPHER_ARCFOUR_128;
     sc->ciphers[i++] = GNUTLS_CIPHER_3DES_CBC;
     sc->ciphers[i++] = GNUTLS_CIPHER_ARCFOUR_40;
@@ -299,8 +328,8 @@ static void *gnutls_config_server_create(apr_pool_t * p, server_rec * s)
     sc->key_exchange[i] = 0;
 
     i = 0;
-    sc->macs[i++] = GNUTLS_MAC_MD5;
     sc->macs[i++] = GNUTLS_MAC_SHA;
+    sc->macs[i++] = GNUTLS_MAC_MD5;
     sc->macs[i++] = GNUTLS_MAC_RMD160;
     sc->macs[i] = 0;
 
