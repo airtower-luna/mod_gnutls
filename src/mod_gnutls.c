@@ -52,19 +52,34 @@ static int mod_gnutls_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
                                        server_rec * base_server)
 {
     mod_gnutls_srvconf_rec *sc;
+    void *data = NULL;
+    int first_run = 0;
     server_rec *s;
     gnutls_dh_params_t dh_params;
 #ifdef USE_RSA
     gnutls_rsa_params_t rsa_params;
 #endif
+    const char *userdata_key = "mod_gnutls_init";
+         
+    apr_pool_userdata_get(&data, userdata_key, base_server->process->pool);
+    if (data == NULL) {
+        first_run = 1;
+        apr_pool_userdata_set((const void *)1, userdata_key, 
+                              apr_pool_cleanup_null, 
+                              base_server->process->pool);
+    }
 
-    /* TODO: Should we regenerate these after X requests / X time ? */
-    gnutls_dh_params_init(&dh_params);
-    gnutls_dh_params_generate2(dh_params, DH_BITS);
+
+    if(first_run) {
+        /* TODO: Should we regenerate these after X requests / X time ? */
+        gnutls_dh_params_init(&dh_params);
+        gnutls_dh_params_generate2(dh_params, DH_BITS);
 #ifdef USE_RSA
-    gnutls_rsa_params_init(&rsa_params);
-    gnutls_rsa_params_generate2(rsa_params, RSA_BITS);
+        gnutls_rsa_params_init(&rsa_params);
+        gnutls_rsa_params_generate2(rsa_params, RSA_BITS);
 #endif
+    }
+
     for (s = base_server; s; s = s->next) {
         sc = (mod_gnutls_srvconf_rec *) ap_get_module_config(s->module_config,
                                                              &gnutls_module);
@@ -86,6 +101,7 @@ static int mod_gnutls_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 
 
     ap_add_version_component(p, "GnuTLS/" LIBGNUTLS_VERSION);
+
     return OK;
 }
 
