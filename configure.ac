@@ -13,22 +13,20 @@ AC_PROG_INSTALL
 AM_PROG_LIBTOOL
 
 
-AC_PATH_PROG(PKG_CONFIG, pkg-config, no)
-if test "x$PKG_CONFIG" = "xno"; then
-        AC_MSG_ERROR([You need to install pkg-config])
-fi
-
-PKG_PATH=
-
 AP_VERSION=2.0.40
 CHECK_APACHE(,$AP_VERSION,
     :,:,
     AC_MSG_ERROR([*** Apache version $AP_VERSION not found!])
 )
 
-MODULE_CFLAGS="${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES}"
+MIN_TLS_VERSION=1.1.0
+CHECK_LIBGNUTLS($MIN_TLS_VERSION)
+
+MODULE_CFLAGS="${LIBGNUTLS_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES}"
+MODULE_LIBS="${LIBGNUTLS_LIBS}"
 
 AC_SUBST(MODULE_CFLAGS)
+AC_SUBST(MODULE_LIBS)
 
 AC_CONFIG_FILES([Makefile src/Makefile])
 AC_OUTPUT
@@ -36,6 +34,7 @@ AC_OUTPUT
 echo "---"
 echo "Configuration summary for mod_gnutls"
 echo ""
-echo "   * Apache modules directory = ${AP_LIBEXECDIR}"
+echo "   * Apache Modules directory:	${AP_LIBEXECDIR}"
+echo "   * GnuTLS Library Version:	${LIBGNUTLS_VERSION}"
 echo ""
 echo "---"
