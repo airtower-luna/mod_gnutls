@@ -332,46 +332,12 @@ static apr_status_t gnutls_io_input_getline(mod_gnutls_handle_t * ctxt,
 }
 
 
-#define GNUTLS_HANDSHAKE_ATTEMPTS 10
-
 static void gnutls_do_handshake(mod_gnutls_handle_t * ctxt)
 {
-    int i, ret;
+    int ret;
 
     if (ctxt->status != 0)
         return;
-#if 0
-
-    for (i = GNUTLS_HANDSHAKE_ATTEMPTS; i > 0; i--) {
-        ret = gnutls_handshake(ctxt->session);
-        if (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN) {
-            continue;
-        }
-
-        if (ret < 0) {
-            if (ret == GNUTLS_E_WARNING_ALERT_RECEIVED
-                || ret == GNUTLS_E_FATAL_ALERT_RECEIVED) {
-                ret = gnutls_alert_get(ctxt->session);
-                ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
-                             "GnuTLS: Hanshake Alert (%d) '%s'.\n", ret,
-                             gnutls_alert_get_name(ret));
-            }
-
-            gnutls_deinit(ctxt->session);
-            ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
-                             "GnuTLS: Handshake Failed (%d) '%s'", ret,
-                             gnutls_strerror(ret));
-                ctxt->status = -1;
-                return;
-        }
-        else {
-            ctxt->status = 1;
-            return;             /* all done with the handshake */
-        }
-    }
-    ctxt->status = -1;
-    return;
-#else
         ret = gnutls_handshake(ctxt->session);
         if (ret < 0) {
             if (ret == GNUTLS_E_WARNING_ALERT_RECEIVED
@@ -393,8 +359,6 @@ static void gnutls_do_handshake(mod_gnutls_handle_t * ctxt)
             ctxt->status = 1;
             return;             /* all done with the handshake */
         }
-
-#endif
 }
 
 
@@ -465,7 +429,7 @@ apr_status_t mod_gnutls_filter_input(ap_filter_t * f,
 apr_status_t mod_gnutls_filter_output(ap_filter_t * f,
                                       apr_bucket_brigade * bb)
 {
-    int ret;
+    apr_size_t ret;
     mod_gnutls_handle_t *ctxt = (mod_gnutls_handle_t *) f->ctx;
     apr_status_t status = APR_SUCCESS;
     apr_read_type_e rblock = APR_NONBLOCK_READ;
@@ -513,7 +477,6 @@ apr_status_t mod_gnutls_filter_output(ap_filter_t * f,
 
         }
         else {
-
             /* filter output */
             const char *data;
             apr_size_t len;
@@ -546,20 +509,10 @@ apr_status_t mod_gnutls_filter_output(ap_filter_t * f,
                     ctxt->output_rc = APR_EGENERAL;
                 }
             }
-            else if ((apr_size_t) ret != len) {
-                //apr_bucket_split(bucket, ret);
-                //APR_BUCKET_REMOVE(bucket);
-                /* not all of the data was sent. */
-                /* mod_ssl basicly errors out here.. this doesn't seem right? */
-                ap_log_error(APLOG_MARK, APLOG_INFO, ctxt->output_rc,
-                             ctxt->c->base_server,
-                             "GnuTLS: failed to write %" APR_SSIZE_T_FMT
-                             " of %" APR_SIZE_T_FMT " bytes.",
-                             len - (apr_size_t) ret, len);
-                //continue;
-                if (ctxt->output_rc == APR_SUCCESS) {
-                    ctxt->output_rc = APR_EGENERAL;
-                }
+            else if (ret != len) {
+                /* Not able to send the entire bucket, 
+                   split it and send it again. */
+                apr_bucket_split(bucket, ret);
             }
 
             apr_bucket_delete(bucket);

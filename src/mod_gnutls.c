@@ -44,8 +44,9 @@ static int mod_gnutls_hook_pre_config(apr_pool_t * pconf,
 }
 
 #define DH_BITS 1024
+#ifdef USE_RSA
 #define RSA_BITS 512
-
+#endif
 static int mod_gnutls_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
                                        apr_pool_t * ptemp,
                                        server_rec * base_server)
@@ -53,15 +54,17 @@ static int mod_gnutls_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
     mod_gnutls_srvconf_rec *sc;
     server_rec *s;
     gnutls_dh_params_t dh_params;
+#ifdef USE_RSA
     gnutls_rsa_params_t rsa_params;
-
+#endif
 
     /* TODO: Should we regenerate these after X requests / X time ? */
     gnutls_dh_params_init(&dh_params);
     gnutls_dh_params_generate2(dh_params, DH_BITS);
-//    gnutls_rsa_params_init(&rsa_params);
-//    gnutls_rsa_params_generate2(rsa_params, RSA_BITS);
-
+#ifdef USE_RSA
+    gnutls_rsa_params_init(&rsa_params);
+    gnutls_rsa_params_generate2(rsa_params, RSA_BITS);
+#endif
     for (s = base_server; s; s = s->next) {
         sc = (mod_gnutls_srvconf_rec *) ap_get_module_config(s->module_config,
                                                              &gnutls_module);
@@ -69,7 +72,9 @@ static int mod_gnutls_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
             gnutls_certificate_set_x509_key_file(sc->certs, sc->cert_file,
                                                  sc->key_file,
                                                  GNUTLS_X509_FMT_PEM);
-//          gnutls_certificate_set_rsa_export_params(sc->certs, rsa_params);
+#ifdef USE_RSA
+          gnutls_certificate_set_rsa_export_params(sc->certs, rsa_params);
+#endif
           gnutls_certificate_set_dh_params(sc->certs, dh_params);
         }
         else if (sc->enabled == GNUTLS_ENABLED_TRUE) {

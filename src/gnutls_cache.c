@@ -21,5 +21,41 @@
  * GnuTLS Session Cache using libmemcached
  *
  */
+/*
+#include "memcache.h"
 
-#include "libmemcache/memcache.h"
+int mod_gnutls_cache_init()
+{
+  return 0;
+}
+static int cache_store((void* baton, gnutls_datum_t key, gnutls_datum_t data)
+{
+    mc_set(struct memcache *mc,
+           key->data, key->size,
+           data->data, data->size, 
+           3600, 0);
+  return 0;
+}
+
+static int cache_fetch(void* baton, gnutls_datum_t key)
+{
+    mod_gnutls_handle_t *ctxt = baton;
+  return 0;
+}
+
+static int cache_delete(void* baton, gnutls_datum_t key)
+{
+    mod_gnutls_handle_t *ctxt = baton;
+  return 0;
+}
+
+int mod_gnutls_cache_session_init(mod_gnutls_handle_t *ctxt)
+{
+    gnutls_db_set_cache_expiration
+    gnutls_db_set_retrieve_function(session, cache_fetch);
+    gnutls_db_set_remove_function(session, cache_delete);
+    gnutls_db_set_store_function(session, cache_store);
+    gnutls_db_set_ptr(session, NULL);
+  return 0;
+}
+*/
