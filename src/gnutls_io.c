@@ -372,7 +372,7 @@ static void gnutls_do_handshake(mod_gnutls_handle_t * ctxt)
     ctxt->status = -1;
     return;
 #else
-ret = gnutls_handshake(ctxt->session);
+        ret = gnutls_handshake(ctxt->session);
         if (ret < 0) {
             if (ret == GNUTLS_E_WARNING_ALERT_RECEIVED
                 || ret == GNUTLS_E_FATAL_ALERT_RECEIVED) {
@@ -419,7 +419,7 @@ apr_status_t mod_gnutls_filter_input(ap_filter_t * f,
     }
 
     if (ctxt->status < 0) {
-//        return ap_get_brigade(f->next, bb, mode, block, readbytes);
+        return ap_get_brigade(f->next, bb, mode, block, readbytes);
     }
 
     /* XXX: we don't currently support anything other than these modes. */
@@ -485,22 +485,35 @@ apr_status_t mod_gnutls_filter_output(ap_filter_t * f,
 
     while (!APR_BRIGADE_EMPTY(bb)) {
         apr_bucket *bucket = APR_BRIGADE_FIRST(bb);
-        if (APR_BUCKET_IS_EOS(bucket) || APR_BUCKET_IS_FLUSH(bucket)) {
-            /** TODO: GnuTLS doesn't have a special flush method? **/
-            if ((status = ap_pass_brigade(f->next, bb)) != APR_SUCCESS) {
-                return status;
-            }
-            break;
-        }
-        else if (AP_BUCKET_IS_EOC(bucket)) {
-            gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
+        if (APR_BUCKET_IS_EOS(bucket)) {
+
+            /* gnutls_bye(ctxt->session, GNUTLS_SHUT_RDWR); */
 
             if ((status = ap_pass_brigade(f->next, bb)) != APR_SUCCESS) {
                 return status;
             }
             break;
+
+        } else if (APR_BUCKET_IS_FLUSH(bucket)) {
+
+            if ((status = ap_pass_brigade(f->next, bb)) != APR_SUCCESS) {
+                return status;
+            }
+            break;
+
+        }
+        else if (AP_BUCKET_IS_EOC(bucket)) {
+
+            gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
+            gnutls_deinit(ctxt->session);
+            if ((status = ap_pass_brigade(f->next, bb)) != APR_SUCCESS) {
+                return status;
+            }
+            break;
+
         }
         else {
+
             /* filter output */
             const char *data;
             apr_size_t len;
@@ -518,7 +531,10 @@ apr_status_t mod_gnutls_filter_output(ap_filter_t * f,
                 break;
             }
 
-            ret = gnutls_record_send(ctxt->session, data, len);
+            do {
+                ret = gnutls_record_send(ctxt->session, data, len);
+            }
+            while(ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
 
             if (ret < 0) {
                 /* error sending output */
@@ -531,6 +547,8 @@ apr_status_t mod_gnutls_filter_output(ap_filter_t * f,
                 }
             }
             else if ((apr_size_t) ret != len) {
+                //apr_bucket_split(bucket, ret);
+                //APR_BUCKET_REMOVE(bucket);
                 /* not all of the data was sent. */
                 /* mod_ssl basicly errors out here.. this doesn't seem right? */
                 ap_log_error(APLOG_MARK, APLOG_INFO, ctxt->output_rc,
@@ -538,6 +556,7 @@ apr_status_t mod_gnutls_filter_output(ap_filter_t * f,
                              "GnuTLS: failed to write %" APR_SSIZE_T_FMT
                              " of %" APR_SIZE_T_FMT " bytes.",
                              len - (apr_size_t) ret, len);
+                //continue;
                 if (ctxt->output_rc == APR_SUCCESS) {
                     ctxt->output_rc = APR_EGENERAL;
                 }
