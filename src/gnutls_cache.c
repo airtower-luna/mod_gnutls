@@ -59,18 +59,26 @@ int mod_gnutls_cache_child_init(apr_pool_t *p, server_rec *s,
     split = apr_strtok(cache_config, " ", &tok);
     while (split) {
         apr_memcache_server_t* st;
-        char* split2;
         char* host_str;
-        char* port_str;
-        int port;
+        char* scope_id;
+        apr_port_t port;
 
-        host_str = apr_strtok(split,":", &split2);
-        port_str = apr_strtok(NULL,":", &split2);
-        if (!port_str) {
-            port = 11211; /* default port */
+        rv = apr_parse_addr_port(&host_str, &scope_id, &port, split, p);
+        if(rv != APR_SUCCESS) {
+            ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+                         "[gnutls_cache] Failed to Parse Server: '%s'", split);
+            return rv;
         }
-        else {
-            port = atoi(port_str);
+
+        if(host_str == NULL) {
+            ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+                         "[gnutls_cache] Failed to Parse Server, "
+                         "no hostname specified: '%s'", split);
+            return rv;
+        }
+
+        if (port == 0) {
+            port = 11211; /* default port */
         }
 
         /* Should Max Conns be (thread_limit / nservers) ? */
