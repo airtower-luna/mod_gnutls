@@ -29,9 +29,7 @@
 #ifndef __mod_gnutls_h_inc
 #define __mod_gnutls_h_inc
 
-#if HAVE_APR_MEMCACHE
-#include "apr_memcache.h"
-#endif
+#define HAVE_APR_MEMCACHE    @have_apr_memcache@
 
 #include <gcrypt.h>
 #include <gnutls/gnutls.h>

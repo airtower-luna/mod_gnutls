@@ -124,7 +124,7 @@ static void mod_gnutls_hook_child_init(apr_pool_t *p, server_rec *s)
     }
 }
 
-static const char *mod_gnutls_hook_http_method(const request_rec * r)
+static const char *mod_gnutls_hook_http_scheme(const request_rec * r)
 {
     mod_gnutls_srvconf_rec *sc =
         (mod_gnutls_srvconf_rec *) ap_get_module_config(r->server->
@@ -340,7 +340,7 @@ static void gnutls_hooks(apr_pool_t * p)
                         APR_HOOK_MIDDLE);
     ap_hook_child_init(mod_gnutls_hook_child_init, NULL, NULL,
                         APR_HOOK_MIDDLE);
-    ap_hook_http_method(mod_gnutls_hook_http_method, NULL, NULL,
+    ap_hook_http_scheme(mod_gnutls_hook_http_scheme, NULL, NULL,
                         APR_HOOK_MIDDLE);
     ap_hook_default_port(mod_gnutls_hook_default_port, NULL, NULL,
                          APR_HOOK_MIDDLE);

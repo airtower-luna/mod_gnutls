@@ -3,8 +3,8 @@
 # $Id: autogen.sh,v 1.1 2004/03/04 08:12:13 firechipmunk Exp $
 libtoolize --force --copy
 #libtoolize14  --force --copy
-aclocal -I m4
+aclocal-1.9 -I m4
 autoheader
-automake --add-missing --copy --foreign
+automake-1.9 --add-missing --copy --foreign
 autoconf
 rm -rf autom4te.cache

@@ -16,7 +16,37 @@
  */
 
 #include "mod_gnutls.h"
+
+#if HAVE_APR_MEMCACHE
+#include "apr_memcache.h"
+#endif
+
 #include "ap_mpm.h"
+
+#define GNUTLS_SESSION_ID_STRING_LEN \
+    ((GNUTLS_MAX_SESSION_ID + 1) * 2)
+#define MC_TAG "mod_gnutls:"
+#define MC_TAG_LEN \
+    (sizeof(MC_TAG))
+#define STR_SESSION_LEN (GNUTLS_SESSION_ID_STRING_LEN + MC_TAG_LEN)
+
+static char *gnutls_session_id2sz(unsigned char *id, int idlen,
+                        char *str, int strsize)
+{
+    char *cp;
+    int n;
+ 
+    cp = apr_cpystrn(str, MC_TAG, MC_TAG_LEN);
+    for (n = 0; n < idlen && n < GNUTLS_MAX_SESSION_ID; n++) {
+        apr_snprintf(cp, strsize - (cp-str), "%02X", id[n]);
+        cp += 2;
+    }
+    *cp = '\0';
+    return str;
+}
+
+
+#if HAVE_APR_MEMCACHE
 
 /**
  * GnuTLS Session Cache using libmemcached
@@ -26,7 +56,7 @@
 /* The underlying apr_memcache system is thread safe... woohoo */
 static apr_memcache_t* mc;
 
-int mod_gnutls_cache_child_init(apr_pool_t *p, server_rec *s, 
+int mc_cache_child_init(apr_pool_t *p, server_rec *s, 
                                 mod_gnutls_srvconf_rec *sc)
 {
     apr_status_t rv = APR_SUCCESS;
@@ -109,32 +139,8 @@ int mod_gnutls_cache_child_init(apr_pool_t *p, server_rec *s,
     return rv;
 }
 
-/* thanks mod_ssl */
-#define GNUTLS_SESSION_ID_STRING_LEN \
-    ((GNUTLS_MAX_SESSION_ID + 1) * 2)
-#define MC_TAG "mod_gnutls:"
-#define MC_TAG_LEN \
-    (sizeof(MC_TAG))
-#define STR_SESSION_LEN (GNUTLS_SESSION_ID_STRING_LEN + MC_TAG_LEN)
-
-
-static char *gnutls_session_id2sz(unsigned char *id, int idlen,
-                        char *str, int strsize)
-{
-    char *cp;
-    int n;
- 
-    cp = apr_cpystrn(str, MC_TAG, MC_TAG_LEN);
-    for (n = 0; n < idlen && n < GNUTLS_MAX_SESSION_ID; n++) {
-        apr_snprintf(cp, strsize - (cp-str), "%02X", id[n]);
-        cp += 2;
-    }
-    *cp = '\0';
-    return str;
-}
-
-
-static int cache_store(void* baton, gnutls_datum_t key, gnutls_datum_t data)
+static int mc_cache_store(void* baton, gnutls_datum_t key, 
+                          gnutls_datum_t data)
 {
     apr_status_t rv = APR_SUCCESS;
     mod_gnutls_handle_t *ctxt = baton;
@@ -161,7 +167,7 @@ static int cache_store(void* baton, gnutls_datum_t key, gnutls_datum_t data)
     return 0;
 }
 
-static gnutls_datum_t cache_fetch(void* baton, gnutls_datum_t key)
+static gnutls_datum_t mc_cache_fetch(void* baton, gnutls_datum_t key)
 {
     apr_status_t rv = APR_SUCCESS;
     mod_gnutls_handle_t *ctxt = baton;
@@ -190,7 +196,7 @@ static gnutls_datum_t cache_fetch(void* baton, gnutls_datum_t key)
         return data;
     }
 
-    /* TODO: Eliminate this memcpy. ffs. gnutls-- */
+    /* TODO: Eliminate this memcpy. gnutls-- */
     data.data = gnutls_malloc(value_len);
     if (data.data == NULL)
         return data;
@@ -201,7 +207,7 @@ static gnutls_datum_t cache_fetch(void* baton, gnutls_datum_t key)
     return data;
 }
 
-static int cache_delete(void* baton, gnutls_datum_t key)
+static int mc_cache_delete(void* baton, gnutls_datum_t key)
 {
     apr_status_t rv = APR_SUCCESS;
     mod_gnutls_handle_t *ctxt = baton;
@@ -225,11 +231,27 @@ static int cache_delete(void* baton, gnutls_datum_t key)
     return 0;
 }
 
+#endif /* have_apr_memcache */
+
+int mod_gnutls_cache_child_init(apr_pool_t *p, server_rec *s, 
+                                mod_gnutls_srvconf_rec *sc)
+{
+#if HAVE_APR_MEMCACHE
+    return mc_cache_child_init(p, s, sc);
+#else
+    return 0;
+#endif
+}
+
 int mod_gnutls_cache_session_init(mod_gnutls_handle_t *ctxt)
 {
-    gnutls_db_set_retrieve_function(ctxt->session, cache_fetch);
-    gnutls_db_set_remove_function(ctxt->session, cache_delete);
-    gnutls_db_set_store_function(ctxt->session, cache_store);
+#if HAVE_APR_MEMCACHE
+    gnutls_db_set_retrieve_function(ctxt->session, mc_cache_fetch);
+    gnutls_db_set_remove_function(ctxt->session, mc_cache_delete);
+    gnutls_db_set_store_function(ctxt->session, mc_cache_store);
     gnutls_db_set_ptr(ctxt->session, ctxt);
+#else
+    /* TODO: Alternative Cache Backends */
+#endif
     return 0;
 }
