@@ -29,6 +29,8 @@
 #include "apr_strings.h"
 #include "apr_tables.h"
 
+#include "apr_memcache.h"
+
 #include <gcrypt.h>
 #include <gnutls/gnutls.h>
 
@@ -68,6 +70,7 @@ typedef struct
     int macs[16];
     int protocol[16];
     int compression[16];
+    const char* cache_config;
 } mod_gnutls_srvconf_rec;
 
 typedef struct {
@@ -155,4 +158,13 @@ ssize_t mod_gnutls_transport_write(gnutls_transport_ptr_t ptr,
                                    const void *buffer, size_t len);
 
 
+/**
+ * Init the Cache inside each Process
+ */
+int mod_gnutls_cache_child_init(apr_pool_t *p, server_rec *s, 
+                                mod_gnutls_srvconf_rec *sc);
+/**
+ * Setup the Session Caching
+ */
+int mod_gnutls_cache_session_init(mod_gnutls_handle_t *ctxt);
 #endif /*  __mod_gnutls_h_inc */

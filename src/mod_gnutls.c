@@ -70,7 +70,7 @@ static int mod_gnutls_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
     }
 
 
-    if(first_run) {
+//    if(first_run) {
         /* TODO: Should we regenerate these after X requests / X time ? */
         gnutls_dh_params_init(&dh_params);
         gnutls_dh_params_generate2(dh_params, DH_BITS);
@@ -78,7 +78,7 @@ static int mod_gnutls_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
         gnutls_rsa_params_init(&rsa_params);
         gnutls_rsa_params_generate2(rsa_params, RSA_BITS);
 #endif
-    }
+//    }
 
     for (s = base_server; s; s = s->next) {
         sc = (mod_gnutls_srvconf_rec *) ap_get_module_config(s->module_config,
@@ -103,6 +103,25 @@ static int mod_gnutls_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
     ap_add_version_component(p, "GnuTLS/" LIBGNUTLS_VERSION);
 
     return OK;
+}
+
+static void mod_gnutls_hook_child_init(apr_pool_t *p, server_rec *s)
+{
+    apr_status_t rv = APR_SUCCESS;
+    mod_gnutls_srvconf_rec *sc = ap_get_module_config(s->module_config,
+                                                      &gnutls_module);
+
+    if(sc->cache_config != NULL) {
+        rv = mod_gnutls_cache_child_init(p, s, sc);
+        if(rv != APR_SUCCESS) {
+            ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
+                             "[GnuTLS] - Failed to run Cache Init");
+        }
+    }
+    else {
+            ap_log_error(APLOG_MARK, APLOG_CRIT, 0, s,
+                             "[GnuTLS] - No Cache Configured. Hint: GnuTLSCache");
+    }
 }
 
 static const char *mod_gnutls_hook_http_method(const request_rec * r)
@@ -172,6 +191,7 @@ static mod_gnutls_handle_t* create_gnutls_handle(apr_pool_t* pool, conn_rec * c)
 
     gnutls_dh_set_prime_bits(ctxt->session, DH_BITS);
 
+    mod_gnutls_cache_session_init(ctxt);
     return ctxt;
 }
 
@@ -250,6 +270,21 @@ static const char *gnutls_set_key_file(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
+static const char *gnutls_set_cache(cmd_parms * parms, void *dummy,
+                                       const char *arg)
+{
+    const char* err;
+    mod_gnutls_srvconf_rec *sc = ap_get_module_config(parms->server->
+                                                        module_config,
+                                                        &gnutls_module);
+    if ((err = ap_check_cmd_context(parms, GLOBAL_ONLY))) {
+        return err;
+    }
+
+    sc->cache_config = apr_pstrdup(parms->pool, arg);
+    return NULL;
+}
+
 static const char *gnutls_set_enabled(cmd_parms * parms, void *dummy,
                                       const char *arg)
 {
@@ -279,6 +314,10 @@ static const command_rec gnutls_cmds[] = {
                   NULL,
                   RSRC_CONF,
                   "SSL Server Certificate file"),
+    AP_INIT_TAKE1("GnuTLSCache", gnutls_set_cache,
+                  NULL,
+                  RSRC_CONF,
+                  "SSL Server Certificate file"),
     AP_INIT_TAKE1("GnuTLSEnable", gnutls_set_enabled,
                   NULL, RSRC_CONF,
                   "Whether this server has GnuTLS Enabled. Default: Off"),
@@ -298,6 +337,8 @@ static void gnutls_hooks(apr_pool_t * p)
     ap_hook_pre_connection(mod_gnutls_hook_pre_connection, NULL, NULL,
                            APR_HOOK_MIDDLE);
     ap_hook_post_config(mod_gnutls_hook_post_config, NULL, NULL,
+                        APR_HOOK_MIDDLE);
+    ap_hook_child_init(mod_gnutls_hook_child_init, NULL, NULL,
                         APR_HOOK_MIDDLE);
     ap_hook_http_method(mod_gnutls_hook_http_method, NULL, NULL,
                         APR_HOOK_MIDDLE);
@@ -331,6 +372,7 @@ static void *gnutls_config_server_create(apr_pool_t * p, server_rec * s)
     gnutls_anon_allocate_server_credentials(&sc->anoncred);
     sc->key_file = NULL;
     sc->cert_file = NULL;
+    sc->cache_config = NULL;
 
     i = 0;
     sc->ciphers[i++] = GNUTLS_CIPHER_AES_256_CBC;

@@ -273,10 +273,16 @@ static apr_status_t gnutls_io_input_read(mod_gnutls_handle_t * ctxt,
             }
             else {
                 /* Some Other Error. Report it. Die. */
-                ap_log_error(APLOG_MARK, APLOG_INFO, ctxt->input_rc,
-                             ctxt->c->base_server,
-                             "GnuTLS: Error reading data. (%d) '%s'", rc,
-                             gnutls_strerror(rc));
+                if(gnutls_error_is_fatal(rc)) {
+                    ap_log_error(APLOG_MARK, APLOG_INFO, ctxt->input_rc,
+                                 ctxt->c->base_server,
+                                 "GnuTLS: Error reading data. (%d) '%s'", rc,
+                                 gnutls_strerror(rc));
+                }
+                else if(*len > 0) {
+                    ctxt->input_rc = APR_SUCCESS;
+                    break;
+                }
             }
 
             if (ctxt->input_rc == APR_SUCCESS) {
@@ -449,9 +455,10 @@ apr_status_t mod_gnutls_filter_output(ap_filter_t * f,
 
     while (!APR_BRIGADE_EMPTY(bb)) {
         apr_bucket *bucket = APR_BRIGADE_FIRST(bb);
-        if (APR_BUCKET_IS_EOS(bucket)) {
+        if (APR_BUCKET_IS_EOS(bucket) || AP_BUCKET_IS_EOC(bucket)) {
 
-            /* gnutls_bye(ctxt->session, GNUTLS_SHUT_RDWR); */
+            gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
+            gnutls_deinit(ctxt->session);
 
             if ((status = ap_pass_brigade(f->next, bb)) != APR_SUCCESS) {
                 return status;
@@ -464,17 +471,6 @@ apr_status_t mod_gnutls_filter_output(ap_filter_t * f,
                 return status;
             }
             break;
-
-        }
-        else if (AP_BUCKET_IS_EOC(bucket)) {
-
-            gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
-            gnutls_deinit(ctxt->session);
-            if ((status = ap_pass_brigade(f->next, bb)) != APR_SUCCESS) {
-                return status;
-            }
-            break;
-
         }
         else {
             /* filter output */
