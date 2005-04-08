@@ -526,8 +526,13 @@ static void gnutls_hooks(apr_pool_t * p)
                         APR_HOOK_MIDDLE);
     ap_hook_child_init(mod_gnutls_hook_child_init, NULL, NULL,
                         APR_HOOK_MIDDLE);
+#if USING_2_1_RECENT
     ap_hook_http_scheme(mod_gnutls_hook_http_scheme, NULL, NULL,
                         APR_HOOK_MIDDLE);
+#else
+    ap_hook_http_method(mod_gnutls_hook_http_scheme, NULL, NULL,
+                        APR_HOOK_MIDDLE);
+#endif
     ap_hook_default_port(mod_gnutls_hook_default_port, NULL, NULL,
                          APR_HOOK_MIDDLE);
     ap_hook_pre_config(mod_gnutls_hook_pre_config, NULL, NULL,
