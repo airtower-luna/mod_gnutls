@@ -44,6 +44,8 @@ module AP_MODULE_DECLARE_DATA gnutls_module;
 
 #define MOD_GNUTLS_VERSION "@MOD_GNUTLS_VERSION@"
 
+#define MOD_GNUTLS_DEBUG @OOO_MAINTAIN@
+
 typedef enum 
 {
     mod_gnutls_cache_none,
