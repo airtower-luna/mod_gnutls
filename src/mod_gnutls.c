@@ -17,6 +17,8 @@
 
 #include "mod_gnutls.h"
 
+extern server_rec *ap_server_conf;
+
 #if APR_HAS_THREADS
 GCRY_THREAD_OPTION_PTHREAD_IMPL;
 #endif
@@ -97,7 +99,7 @@ static gnutls_datum load_params(const char* file, server_rec* s,
                      "GnuTLS failed to read params file at: %s", file);
         return ret;
     }
-
+    apr_file_close(fp);
     ret.data[br] = '\0';
     ret.size = br;
 
@@ -127,7 +129,7 @@ static int mod_gnutls_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
     }
 
 
-    if (!first_run) {
+    {
         gnutls_datum pdata;
         apr_pool_t* tpool;
         s = base_server;
@@ -194,32 +196,44 @@ static int mod_gnutls_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
             sc->cache_type = sc_base->cache_type;
             sc->cache_config = sc_base->cache_config;
 
-            if (sc->cert_file != NULL && sc->key_file != NULL) {
-
-                rv = gnutls_certificate_set_x509_key_file(sc->certs, sc->cert_file,
-                                                 sc->key_file,
-                                                 GNUTLS_X509_FMT_PEM);
-                if (rv != 0) {
-                    ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
-                         "[GnuTLS] - Host '%s:%d' has an invalid key or certificate:"
-                         "(%s,%s) (%d) %s",
-                         s->server_hostname, s->port, sc->cert_file, sc->key_file,
-                         rv, gnutls_strerror(rv));
-                }
-                else {
-                    gnutls_certificate_set_rsa_export_params(sc->certs, 
+            gnutls_certificate_set_rsa_export_params(sc->certs, 
                                                      rsa_params);
-                    gnutls_certificate_set_dh_params(sc->certs, dh_params);
-                }
-            }
-            else if (sc->enabled == GNUTLS_ENABLED_TRUE) {
+            gnutls_certificate_set_dh_params(sc->certs, dh_params);
+
+            if (sc->cert_x509 == NULL && sc->enabled == GNUTLS_ENABLED_TRUE) {
                 ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
                              "[GnuTLS] - Host '%s:%d' is missing a "
-                             "Cert and Key File!",
+                             "Certificate File!",
                          s->server_hostname, s->port);
+                exit(-1);
+            }
+            
+            if (sc->privkey_x509 == NULL && sc->enabled == GNUTLS_ENABLED_TRUE) {
+                ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
+                             "[GnuTLS] - Host '%s:%d' is missing a "
+                             "Private Key File!",
+                             s->server_hostname, s->port);
+                exit(-1);
+            }
+            {
+                int rv;
+                int data_len = 255;
+                char crt_name[255];
+                for (rv = 0; rv < data_len; rv++) {
+                    crt_name[rv] = '\0';
+                }
+                rv = gnutls_x509_crt_get_dn_by_oid(sc->cert_x509, 
+                                                   GNUTLS_OID_X520_COMMON_NAME, 0, 0,
+                                                   crt_name, &data_len);
+                
+            ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
+                         s,
+                         "GnuTLS: sni-x509 cn: %s/%d pk: %s s: 0x%08X sc: 0x%08X", crt_name, rv,
+                         gnutls_pk_algorithm_get_name(gnutls_x509_privkey_get_pk_algorithm(sc->privkey_x509)),
+                         (unsigned int)s, (unsigned int)sc);
             }
         }
-    } /* first_run */
+    }
 
     ap_add_version_component(p, "mod_gnutls/" MOD_GNUTLS_VERSION);
 
@@ -273,27 +287,112 @@ static apr_port_t mod_gnutls_hook_default_port(const request_rec * r)
     return 443;
 }
 
-/* TODO: Complete support for Server Name Indication */
+#define MAX_HOST_LEN 255
 static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st* ret) 
 {
-    char* server_name;
-    int server_type;
-    int data_len = 256;
-    mod_gnutls_handle_t *ctxt;    
+    int rv;
+    int sni_type;
+    int data_len = MAX_HOST_LEN;
+    char sni_name[MAX_HOST_LEN];
+    char crt_name[MAX_HOST_LEN];
+    mod_gnutls_handle_t *ctxt;
+    mod_gnutls_srvconf_rec *tsc;
+    server_rec* s;
+    
     ctxt = gnutls_transport_get_ptr(session);
+    
+    sni_type = gnutls_certificate_type_get(session);
+    if (sni_type != GNUTLS_CRT_X509) {
+        /* In theory, we could support OpenPGP Certificates. Theory != code. */
+        ap_log_error(APLOG_MARK, APLOG_CRIT, 0,
+                     ctxt->c->base_server,
+                     "GnuTLS: Only x509 Certificates are currently supported.");
+        return -1;
+    }
 
     ret->type = GNUTLS_CRT_X509;
     ret->ncerts = 1;
-    server_name = apr_palloc(ctxt->c->pool, data_len);
-    if (gnutls_server_name_get(ctxt->session, server_name, &data_len, &server_type, 0) == 0) {
-        if (server_type == GNUTLS_NAME_DNS) {
-            ap_log_error(APLOG_MARK, APLOG_INFO, 0,
+    ret->deinit_all = 0;
+    
+    rv = gnutls_server_name_get(ctxt->session, sni_name, 
+                                &data_len, &sni_type, 0);
+
+    if (rv != 0) {
+        goto use_default_crt;
+    }
+
+    if (sni_type != GNUTLS_NAME_DNS) {
+        ap_log_error(APLOG_MARK, APLOG_CRIT, 0,
+                     ctxt->c->base_server,
+                     "GnuTLS: Unknown type '%d' for SNI: "
+                     "'%s'", sni_type, sni_name);        
+        goto use_default_crt;
+    }
+    
+    /**
+     * Code in the Core already sets up the c->base_server as the base
+     * for this IP/Port combo.  Trust that the core did the 'right' thing.
+     */
+    for (s = ap_server_conf; s; s = s->next) {
+        
+        tsc = (mod_gnutls_srvconf_rec *) ap_get_module_config(s->module_config,
+                                                             &gnutls_module);
+        if (tsc->enabled != GNUTLS_ENABLED_TRUE) {
+            continue;
+        }
+        
+        data_len = MAX_HOST_LEN;
+        rv = gnutls_x509_crt_get_dn_by_oid(tsc->cert_x509, 
+                                           GNUTLS_OID_X520_COMMON_NAME, 0, 0,
+                                           crt_name, &data_len);
+        ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
+                     ctxt->c->base_server,
+                     "GnuTLS: sni-x509 cn: %s/%d pk: %s s: 0x%08X s->n: 0x%08X  sc: 0x%08X", crt_name, rv,
+                     gnutls_pk_algorithm_get_name(gnutls_x509_privkey_get_pk_algorithm(ctxt->sc->privkey_x509)),
+                     (unsigned int)s, (unsigned int)s->next, (unsigned int)tsc);
+
+        if (rv != 0) {
+            continue;
+        }
+            
+        /* The CN can contain a * -- this will match those too. */
+        if (ap_strcasecmp_match(sni_name, crt_name) == 0) {
+            /* found a match */
+            ret->cert.x509 = &tsc->cert_x509;
+            ret->key.x509 = tsc->privkey_x509;
+#if MOD_GNUTLS_DEBUG
+            ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
                          ctxt->c->base_server,
                          "GnuTLS: Virtual Host: "
-                         "%s", server_name);
+                         "'%s' == '%s'", crt_name, sni_name);
+#endif
+            return 0;
         }
     }
 
+    
+    /**
+     * If the client does not support the Server Name Indication, give the default 
+     * certificate for this server. 
+     */
+use_default_crt:
+    data_len = MAX_HOST_LEN;
+    rv = gnutls_x509_crt_get_dn_by_oid(ctxt->sc->cert_x509, 
+                                  GNUTLS_OID_X520_COMMON_NAME, 0, 0,
+                                  crt_name, &data_len);
+        
+    ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
+                     ctxt->c->base_server,
+                     "GnuTLS: x509 cn: %s/%d pk: %s", crt_name, rv,
+                 gnutls_pk_algorithm_get_name(gnutls_x509_privkey_get_pk_algorithm(ctxt->sc->privkey_x509)));
+    
+    ret->cert.x509 = &ctxt->sc->cert_x509;
+    ret->key.x509 = ctxt->sc->privkey_x509;
+#if MOD_GNUTLS_DEBUG
+    ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
+                 ctxt->c->base_server,
+                 "GnuTLS: Using Default Certificate.");
+#endif
     return 0;
 }
 
@@ -330,12 +429,12 @@ static mod_gnutls_handle_t* create_gnutls_handle(apr_pool_t* pool, conn_rec * c)
 
     gnutls_credentials_set(ctxt->session, GNUTLS_CRD_CERTIFICATE, sc->certs);
 
-    gnutls_certificate_server_set_request(ctxt->session, GNUTLS_CERT_IGNORE);
+    gnutls_certificate_server_set_request(ctxt->session, sc->client_verify_mode);
 
     mod_gnutls_cache_session_init(ctxt);
 
     /* TODO: Finish Support for Server Name Indication */
-    /* gnutls_certificate_server_set_retrieve_function(sc->certs, cert_retrieve_fn); */
+    gnutls_certificate_server_set_retrieve_function(sc->certs, cert_retrieve_fn);
     return ctxt;
 }
 
@@ -412,26 +511,101 @@ static int mod_gnutls_hook_fixups(request_rec *r)
     return OK;
 }
 
+static int load_datum_from_file(apr_pool_t* pool, 
+                                const char* file,
+                                gnutls_datum_t* data)
+{
+    apr_file_t* fp;
+    apr_finfo_t finfo;
+    apr_status_t rv;
+    apr_size_t br = 0;
+    
+    rv = apr_file_open(&fp, file, APR_READ|APR_BINARY, APR_OS_DEFAULT, 
+                       pool);
+    if (rv != APR_SUCCESS) {
+        return rv;
+    }
+    
+    rv = apr_file_info_get(&finfo, APR_FINFO_SIZE, fp);
+    
+    if (rv != APR_SUCCESS) {
+        return rv;
+    }
+    
+    data->data = apr_palloc(pool, finfo.size+1);
+    rv = apr_file_read_full(fp, data->data, finfo.size, &br);
+    
+    if (rv != APR_SUCCESS) {
+        return rv;
+    }
+    apr_file_close(fp);
+    
+    data->data[br] = '\0';
+    data->size = br;
+    
+    return 0;
+}
+
 static const char *gnutls_set_cert_file(cmd_parms * parms, void *dummy,
                                         const char *arg)
 {
+    int ret;
+    gnutls_datum_t data;
+    const char* file;
+    apr_pool_t* spool;
     mod_gnutls_srvconf_rec *sc =
         (mod_gnutls_srvconf_rec *) ap_get_module_config(parms->server->
                                                         module_config,
                                                         &gnutls_module);
-    sc->cert_file = ap_server_root_relative(parms->pool, arg);
+    apr_pool_create(&spool, parms->pool);
+    
+    file = ap_server_root_relative(spool, arg);
+
+    if (load_datum_from_file(spool, file, &data) != 0) {
+        return apr_psprintf(parms->pool, "GnuTLS: Error Reading "
+                            "Certificate '%s'", file);
+    }
+    
+    gnutls_x509_crt_init(&sc->cert_x509);
+    ret = gnutls_x509_crt_import(sc->cert_x509, &data, GNUTLS_X509_FMT_PEM);
+    if (ret != 0) {
+        return apr_psprintf(parms->pool, "GnuTLS: Failed to Import "
+                            "Certificate'%s': (%d) %s", file, ret, 
+                            gnutls_strerror(ret));
+    }
+    
+    //apr_pool_destroy(spool);
     return NULL;
 }
 
 static const char *gnutls_set_key_file(cmd_parms * parms, void *dummy,
                                        const char *arg)
 {
+    int ret;
+    gnutls_datum_t data;
+    const char* file;
+    apr_pool_t* spool;
     mod_gnutls_srvconf_rec *sc =
         (mod_gnutls_srvconf_rec *) ap_get_module_config(parms->server->
                                                         module_config,
                                                         &gnutls_module);
+    apr_pool_create(&spool, parms->pool);
     
-    sc->key_file = ap_server_root_relative(parms->pool, arg);
+    file = ap_server_root_relative(spool, arg);
+    
+    if (load_datum_from_file(spool, file, &data) != 0) {
+        return apr_psprintf(parms->pool, "GnuTLS: Error Reading "
+                            "Private Key '%s'", file);
+    }
+    
+    gnutls_x509_privkey_init(&sc->privkey_x509);
+    ret = gnutls_x509_privkey_import(sc->privkey_x509, &data, GNUTLS_X509_FMT_PEM);
+    if (ret != 0) {
+        return apr_psprintf(parms->pool, "GnuTLS: Failed to Import "
+                            "Private Key '%s': (%d) %s", file, ret, 
+                            gnutls_strerror(ret));
+    }
+    //apr_pool_destroy(spool);
     return NULL;
 }
 
@@ -471,6 +645,64 @@ static const char *gnutls_set_cache(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
+static const char *gnutls_set_cache_timeout(cmd_parms * parms, void *dummy,
+                                            const char *arg)
+{
+    int argint;
+    mod_gnutls_srvconf_rec *sc =
+    (mod_gnutls_srvconf_rec *) ap_get_module_config(parms->server->
+                                                    module_config,
+                                                    &gnutls_module);
+    
+    argint = atoi(arg);
+    
+    if (argint < 0) {
+        return "GnuTLSCacheTimeout: Invalid argument";
+    }
+    else if (argint == 0) {
+        sc->cache_timeout = 0;
+    }
+    else {
+        sc->cache_timeout = apr_time_from_sec(argint);
+    }
+    
+    return NULL;
+}
+
+
+static const char *gnutls_set_client_verify(cmd_parms * parms, void *dummy,
+                                            const char *arg)
+{
+    gnutls_certificate_request_t mode;
+
+    if (strcasecmp("none", arg) == 0  || strcasecmp("ignore", arg) == 0) {
+        mode = GNUTLS_CERT_IGNORE;
+    }
+    else if (strcasecmp("optional", arg) == 0 || strcasecmp("request", arg) == 0) {
+        mode = GNUTLS_CERT_REQUEST;
+    }
+    else if (strcasecmp("optional", arg) == 0) {
+        mode = GNUTLS_CERT_REQUIRE;
+    }
+    else {
+        return "GnuTLSClientVerify: Invalid argument";
+    }
+    
+    /* This was set from a directory context */
+    if (parms->path) {
+        mod_gnutls_dirconf_rec *dc = (mod_gnutls_dirconf_rec *)dummy;
+        dc->client_verify_mode = mode;
+    }
+    else {
+        mod_gnutls_srvconf_rec *sc =
+        (mod_gnutls_srvconf_rec *) ap_get_module_config(parms->server->
+                                                        module_config,
+                                                        &gnutls_module);        
+        sc->client_verify_mode = mode;
+    }
+
+    return NULL;
+}
 static const char *gnutls_set_enabled(cmd_parms * parms, void *dummy,
                                       const char *arg)
 {
@@ -492,6 +724,10 @@ static const char *gnutls_set_enabled(cmd_parms * parms, void *dummy,
 }
 
 static const command_rec gnutls_cmds[] = {
+    AP_INIT_TAKE1("GnuTLSClientVerify", gnutls_set_client_verify,
+                  NULL,
+                  RSRC_CONF|OR_AUTHCFG,
+                  "Set Verification Requirements of the Client Certificate"),
     AP_INIT_TAKE1("GnuTLSCertificateFile", gnutls_set_cert_file,
                   NULL,
                   RSRC_CONF,
@@ -500,6 +736,10 @@ static const command_rec gnutls_cmds[] = {
                   NULL,
                   RSRC_CONF,
                   "SSL Server Certificate file"),
+    AP_INIT_TAKE1("GnuTLSCacheTimeout", gnutls_set_cache_timeout,
+                  NULL,
+                  RSRC_CONF,
+                  "Cache Timeout"),
     AP_INIT_TAKE2("GnuTLSCache", gnutls_set_cache,
                   NULL,
                   RSRC_CONF,
@@ -517,6 +757,29 @@ static const command_rec gnutls_cmds[] = {
  *                 RSRC_CONF,
  *                 "CA"),
  */
+
+int mod_gnutls_hook_authz(request_rec *r)
+{
+    return OK;
+#if 0
+    mod_gnutls_handle_t *ctxt;
+    mod_gnutls_dirconf_rec *dc = ap_get_module_config(r->per_dir_config,
+                                                      &gnutls_module);
+    
+    ctxt = ap_get_module_config(r->connection->conn_config, &gnutls_module);
+
+    if (dc->client_verify_mode == -1 || 
+        dc->client_verify_mode == GNUTLS_CERT_IGNORE ||
+        ctxt->sc->client_verify_mode > dc->client_verify_mode) {
+        return DECLINED;
+    }
+
+    gnutls_certificate_server_set_request(ctxt->session, dc->client_verify_mode);
+    if (mod_gnutls_rehandshake(ctxt) != 0) {
+        return HTTP_FORBIDDEN;
+    }
+#endif    
+}
 
 static void gnutls_hooks(apr_pool_t * p)
 {
@@ -537,8 +800,10 @@ static void gnutls_hooks(apr_pool_t * p)
                          APR_HOOK_MIDDLE);
     ap_hook_pre_config(mod_gnutls_hook_pre_config, NULL, NULL,
                        APR_HOOK_MIDDLE);
-
-    ap_hook_fixups(mod_gnutls_hook_fixups, NULL, NULL, APR_HOOK_MIDDLE);
+    
+    ap_hook_auth_checker(mod_gnutls_hook_authz, NULL, NULL, APR_HOOK_MIDDLE);
+    
+    ap_hook_fixups(mod_gnutls_hook_fixups, NULL, NULL, APR_HOOK_REALLY_FIRST);
 
     /* TODO: HTTP Upgrade Filter */
     /* ap_register_output_filter ("UPGRADE_FILTER", 
@@ -560,18 +825,21 @@ static void *gnutls_config_server_create(apr_pool_t * p, server_rec * s)
     sc->enabled = GNUTLS_ENABLED_FALSE;
 
     gnutls_certificate_allocate_credentials(&sc->certs);
-    sc->key_file = NULL;
-    sc->cert_file = NULL;
-    sc->cache_timeout = apr_time_from_sec(3600);
+    sc->privkey_x509 = NULL;
+    sc->cert_x509 = NULL;
+    sc->cache_timeout = apr_time_from_sec(300);
     sc->cache_type = mod_gnutls_cache_dbm;
     sc->cache_config = ap_server_root_relative(p, "conf/gnutls_cache");
 
-    /* TODO: Make this Configurable ! */
+    /* TODO: Make this Configurable. But it isn't configurable in mod_ssl? */
     sc->dh_params_file = ap_server_root_relative(p, "conf/dhfile");
     sc->rsa_params_file = ap_server_root_relative(p, "conf/rsafile");
 
+    /* Finish SSL Client Certificate Support */
+    sc->client_verify_mode = GNUTLS_CERT_IGNORE;
+
     /* TODO: Make this Configurable ! */
-    /* meh. mod_ssl uses a flex based parser for this part.. sigh */
+    /* mod_ssl uses a flex based parser for this part.. sigh */
     i = 0;
     sc->ciphers[i++] = GNUTLS_CIPHER_AES_256_CBC;
     sc->ciphers[i++] = GNUTLS_CIPHER_AES_128_CBC;
@@ -616,11 +884,18 @@ static void *gnutls_config_server_create(apr_pool_t * p, server_rec * s)
     return sc;
 }
 
+void *gnutls_config_dir_create(apr_pool_t *p, char *dir)
+{
+    mod_gnutls_dirconf_rec *dc = apr_palloc(p, sizeof(*dc));
 
+    dc->client_verify_mode = -1;
+    
+    return dc;
+}
 
 module AP_MODULE_DECLARE_DATA gnutls_module = {
     STANDARD20_MODULE_STUFF,
-    NULL,
+    gnutls_config_dir_create,
     NULL,
     gnutls_config_server_create,
     NULL,

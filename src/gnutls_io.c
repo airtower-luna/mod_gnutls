@@ -353,13 +353,12 @@ static apr_status_t gnutls_io_input_getline(mod_gnutls_handle_t * ctxt,
     return APR_SUCCESS;
 }
 
-
-static void gnutls_do_handshake(mod_gnutls_handle_t * ctxt)
+static int gnutls_do_handshake(mod_gnutls_handle_t * ctxt)
 {
     int ret;
     int errcode;
     if (ctxt->status != 0) {
-        return;
+        return 0;
     }
 
 tryagain:
@@ -388,11 +387,37 @@ tryagain:
         gnutls_alert_send(ctxt->session, GNUTLS_AL_FATAL, 
                           gnutls_error_to_alert(ret, NULL));
         gnutls_deinit(ctxt->session);
-        return;
+        return ret;
     }
     else {
+        /* all done with the handshake */
         ctxt->status = 1;
-        return;             /* all done with the handshake */
+        return ret;
+    }
+}
+
+int mod_gnutls_rehandshake(mod_gnutls_handle_t * ctxt)
+{
+    int rv;
+
+    rv = gnutls_rehandshake(ctxt->session);
+    
+    if (rv != 0) {
+        /* the client did not want to rehandshake. goodbye */
+        ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
+                     "GnuTLS: Client Refused Rehandshake request.");
+        return -1;
+    }
+    
+    ctxt->status = 0;
+
+    gnutls_do_handshake(ctxt);
+    
+    if (ctxt->status == 1) {
+        return 0;
+    }
+    else {
+        return -1;
     }
 }
 
@@ -414,26 +439,7 @@ apr_status_t mod_gnutls_filter_input(ap_filter_t* f,
     }
 
     if (ctxt->status == 0) {
-        char* server_name;
-        int server_type;
-        int data_len = 256;
-        
         gnutls_do_handshake(ctxt);
-        
-        /**
-         * Due to issues inside the GnuTLS API, we cannot currently do TLS 1.1
-         * Server Name Indication.
-         */
-        server_name = apr_palloc(ctxt->c->pool, data_len);
-        if (gnutls_server_name_get(ctxt->session, server_name, &data_len, &server_type, 0) == 0) {
-            if (server_type == GNUTLS_NAME_DNS) {
-                ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
-                             ctxt->c->base_server,
-                             "GnuTLS: TLS 1.1 Server Name: "
-                             "%s", server_name);
-                
-            }
-        }
     }
 
     if (ctxt->status < 0) {

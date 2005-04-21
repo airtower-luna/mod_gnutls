@@ -27,13 +27,14 @@
 #include "apr_tables.h"
 #include "ap_release.h"
 
+#include <gcrypt.h>
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
+
 #ifndef __mod_gnutls_h_inc
 #define __mod_gnutls_h_inc
 
 #define HAVE_APR_MEMCACHE    @have_apr_memcache@
-
-#include <gcrypt.h>
-#include <gnutls/gnutls.h>
 
 module AP_MODULE_DECLARE_DATA gnutls_module;
 
@@ -70,9 +71,14 @@ typedef enum
 
 typedef struct
 {
+    gnutls_certificate_request_t client_verify_mode;
+} mod_gnutls_dirconf_rec;
+
+typedef struct
+{
     gnutls_certificate_credentials_t certs;
-    char *key_file;
-    char *cert_file;
+    gnutls_x509_crt_t cert_x509;
+    gnutls_x509_privkey_t privkey_x509;
     int enabled;
     int ciphers[16];
     int key_exchange[16];
@@ -85,6 +91,7 @@ typedef struct
     const char* cache_config;
     const char* rsa_params_file;
     const char* dh_params_file;
+    gnutls_certificate_request_t client_verify_mode;
 } mod_gnutls_srvconf_rec;
 
 typedef struct {
