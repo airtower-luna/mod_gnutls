@@ -358,12 +358,14 @@ static int gnutls_do_handshake(mod_gnutls_handle_t * ctxt)
     int ret;
     int errcode;
     if (ctxt->status != 0) {
-        return 0;
+        return -1;
     }
 
 tryagain:
-
-    ret = gnutls_handshake(ctxt->session);
+    do {
+        ret = gnutls_handshake(ctxt->session);
+    } while (ret == GNUTLS_E_AGAIN);
+    
     if (ret < 0) {
         if (ret == GNUTLS_E_WARNING_ALERT_RECEIVED
             || ret == GNUTLS_E_FATAL_ALERT_RECEIVED) {
@@ -392,7 +394,7 @@ tryagain:
     else {
         /* all done with the handshake */
         ctxt->status = 1;
-        return ret;
+        return 0;
     }
 }
 
@@ -411,14 +413,9 @@ int mod_gnutls_rehandshake(mod_gnutls_handle_t * ctxt)
     
     ctxt->status = 0;
 
-    gnutls_do_handshake(ctxt);
-    
-    if (ctxt->status == 1) {
-        return 0;
-    }
-    else {
-        return -1;
-    }
+    rv = gnutls_do_handshake(ctxt);
+
+    return rv;
 }
 
 

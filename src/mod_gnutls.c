@@ -16,6 +16,7 @@
  */
 
 #include "mod_gnutls.h"
+#include "http_vhost.h"
 
 extern server_rec *ap_server_conf;
 
@@ -111,6 +112,7 @@ static int mod_gnutls_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
                                        server_rec * base_server)
 {
     int rv;
+    int data_len;
     server_rec *s;
     gnutls_dh_params_t dh_params;
     gnutls_rsa_params_t rsa_params;
@@ -215,23 +217,26 @@ static int mod_gnutls_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
                              s->server_hostname, s->port);
                 exit(-1);
             }
-            {
-                int rv;
-                int data_len = 255;
-                char crt_name[255];
-                for (rv = 0; rv < data_len; rv++) {
-                    crt_name[rv] = '\0';
-                }
-                rv = gnutls_x509_crt_get_dn_by_oid(sc->cert_x509, 
-                                                   GNUTLS_OID_X520_COMMON_NAME, 0, 0,
-                                                   crt_name, &data_len);
-                
+            
+            rv = gnutls_x509_crt_get_dn_by_oid(sc->cert_x509, 
+                                               GNUTLS_OID_X520_COMMON_NAME, 0, 0,
+                                               NULL, &data_len);
+            
+            if (data_len < 1) {
+                sc->enabled = GNUTLS_ENABLED_FALSE;
+                sc->cert_cn = NULL;
+                continue;
+            }
+            
+            sc->cert_cn = apr_palloc(p, data_len);
+            rv = gnutls_x509_crt_get_dn_by_oid(sc->cert_x509, 
+                                               GNUTLS_OID_X520_COMMON_NAME, 0, 0,
+                                               sc->cert_cn, &data_len);
             ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
                          s,
-                         "GnuTLS: sni-x509 cn: %s/%d pk: %s s: 0x%08X sc: 0x%08X", crt_name, rv,
+                         "GnuTLS: sni-x509 cn: %s/%d pk: %s s: 0x%08X sc: 0x%08X", sc->cert_cn, rv,
                          gnutls_pk_algorithm_get_name(gnutls_x509_privkey_get_pk_algorithm(sc->privkey_x509)),
                          (unsigned int)s, (unsigned int)sc);
-            }
         }
     }
 
@@ -287,17 +292,69 @@ static apr_port_t mod_gnutls_hook_default_port(const request_rec * r)
     return 443;
 }
 
+static void mod_gnutls_changed_servers(mod_gnutls_handle_t *ctxt)
+{
+    gnutls_credentials_set(ctxt->session, GNUTLS_CRD_CERTIFICATE, ctxt->sc->certs);
+    gnutls_certificate_server_set_request(ctxt->session, ctxt->sc->client_verify_mode);
+}
+
 #define MAX_HOST_LEN 255
+
+#if USING_2_1_RECENT
+typedef struct
+{
+    mod_gnutls_handle_t *ctxt;
+    gnutls_retr_st* ret;
+    const char* sni_name;
+} vhost_cb_rec;
+
+int vhost_cb (void* baton, conn_rec* conn, server_rec* s)
+{
+    mod_gnutls_srvconf_rec *tsc;
+    vhost_cb_rec* x = baton;
+
+    tsc = (mod_gnutls_srvconf_rec *) ap_get_module_config(s->module_config,
+                                                          &gnutls_module);
+    
+    if (tsc->enabled != GNUTLS_ENABLED_TRUE || tsc->cert_cn == NULL) {
+        return 0;
+    }
+    
+    /* The CN can contain a * -- this will match those too. */
+    if (ap_strcasecmp_match(x->sni_name, tsc->cert_cn) == 0) {
+        /* found a match */
+        x->ret->cert.x509 = &tsc->cert_x509;
+        x->ret->key.x509 = tsc->privkey_x509;
+#if MOD_GNUTLS_DEBUG
+        ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
+                     x->ctxt->c->base_server,
+                     "GnuTLS: Virtual Host CB: "
+                     "'%s' == '%s'", tsc->cert_cn, x->sni_name);
+#endif
+        /* Because we actually change the server used here, we need to reset
+         * things like ClientVerify.
+         */
+        x->ctxt->sc = tsc;
+        mod_gnutls_changed_servers(x->ctxt);
+        return 1;
+    }
+    return 0;
+}
+#endif
+
 static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st* ret) 
 {
     int rv;
     int sni_type;
     int data_len = MAX_HOST_LEN;
     char sni_name[MAX_HOST_LEN];
-    char crt_name[MAX_HOST_LEN];
     mod_gnutls_handle_t *ctxt;
-    mod_gnutls_srvconf_rec *tsc;
+#if USING_2_1_RECENT
+    vhost_cb_rec cbx;
+#else
     server_rec* s;
+    mod_gnutls_srvconf_rec *tsc;    
+#endif
     
     ctxt = gnutls_transport_get_ptr(session);
     
@@ -333,6 +390,16 @@ static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st* ret)
      * Code in the Core already sets up the c->base_server as the base
      * for this IP/Port combo.  Trust that the core did the 'right' thing.
      */
+#if USING_2_1_RECENT
+    cbx.ctxt = ctxt;
+    cbx.ret = ret;
+    cbx.sni_name = sni_name;
+
+    rv = ap_vhost_iterate_given_conn(ctxt->c, vhost_cb, &cbx);
+    if (rv == 1) {
+        return 0;
+    }
+#else
     for (s = ap_server_conf; s; s = s->next) {
         
         tsc = (mod_gnutls_srvconf_rec *) ap_get_module_config(s->module_config,
@@ -340,23 +407,15 @@ static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st* ret)
         if (tsc->enabled != GNUTLS_ENABLED_TRUE) {
             continue;
         }
-        
-        data_len = MAX_HOST_LEN;
-        rv = gnutls_x509_crt_get_dn_by_oid(tsc->cert_x509, 
-                                           GNUTLS_OID_X520_COMMON_NAME, 0, 0,
-                                           crt_name, &data_len);
+#if MOD_GNUTLS_DEBUG
         ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
                      ctxt->c->base_server,
-                     "GnuTLS: sni-x509 cn: %s/%d pk: %s s: 0x%08X s->n: 0x%08X  sc: 0x%08X", crt_name, rv,
+                     "GnuTLS: sni-x509 cn: %s/%d pk: %s s: 0x%08X s->n: 0x%08X  sc: 0x%08X", tsc->cert_cn, rv,
                      gnutls_pk_algorithm_get_name(gnutls_x509_privkey_get_pk_algorithm(ctxt->sc->privkey_x509)),
                      (unsigned int)s, (unsigned int)s->next, (unsigned int)tsc);
-
-        if (rv != 0) {
-            continue;
-        }
-            
+#endif            
         /* The CN can contain a * -- this will match those too. */
-        if (ap_strcasecmp_match(sni_name, crt_name) == 0) {
+        if (ap_strcasecmp_match(sni_name, tsc->cert_cn) == 0) {
             /* found a match */
             ret->cert.x509 = &tsc->cert_x509;
             ret->key.x509 = tsc->privkey_x509;
@@ -364,28 +423,20 @@ static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st* ret)
             ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
                          ctxt->c->base_server,
                          "GnuTLS: Virtual Host: "
-                         "'%s' == '%s'", crt_name, sni_name);
+                         "'%s' == '%s'", tsc->cert_cn, sni_name);
 #endif
+            ctxt->sc = tsc;
+            mod_gnutls_changed_servers(ctxt);
             return 0;
         }
     }
-
+#endif
     
     /**
      * If the client does not support the Server Name Indication, give the default 
      * certificate for this server. 
      */
 use_default_crt:
-    data_len = MAX_HOST_LEN;
-    rv = gnutls_x509_crt_get_dn_by_oid(ctxt->sc->cert_x509, 
-                                  GNUTLS_OID_X520_COMMON_NAME, 0, 0,
-                                  crt_name, &data_len);
-        
-    ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
-                     ctxt->c->base_server,
-                     "GnuTLS: x509 cn: %s/%d pk: %s", crt_name, rv,
-                 gnutls_pk_algorithm_get_name(gnutls_x509_privkey_get_pk_algorithm(ctxt->sc->privkey_x509)));
-    
     ret->cert.x509 = &ctxt->sc->cert_x509;
     ret->key.x509 = ctxt->sc->privkey_x509;
 #if MOD_GNUTLS_DEBUG
@@ -427,14 +478,11 @@ static mod_gnutls_handle_t* create_gnutls_handle(apr_pool_t* pool, conn_rec * c)
     gnutls_mac_set_priority(ctxt->session, sc->macs);
     gnutls_certificate_type_set_priority(ctxt->session, sc->cert_types);
 
-    gnutls_credentials_set(ctxt->session, GNUTLS_CRD_CERTIFICATE, sc->certs);
-
-    gnutls_certificate_server_set_request(ctxt->session, sc->client_verify_mode);
-
     mod_gnutls_cache_session_init(ctxt);
 
-    /* TODO: Finish Support for Server Name Indication */
     gnutls_certificate_server_set_retrieve_function(sc->certs, cert_retrieve_fn);
+
+    mod_gnutls_changed_servers(ctxt);
     return ctxt;
 }
 
@@ -574,7 +622,7 @@ static const char *gnutls_set_cert_file(cmd_parms * parms, void *dummy,
                             gnutls_strerror(ret));
     }
     
-    //apr_pool_destroy(spool);
+    apr_pool_destroy(spool);
     return NULL;
 }
 
@@ -605,7 +653,7 @@ static const char *gnutls_set_key_file(cmd_parms * parms, void *dummy,
                             "Private Key '%s': (%d) %s", file, ret, 
                             gnutls_strerror(ret));
     }
-    //apr_pool_destroy(spool);
+    apr_pool_destroy(spool);
     return NULL;
 }
 
@@ -673,15 +721,15 @@ static const char *gnutls_set_cache_timeout(cmd_parms * parms, void *dummy,
 static const char *gnutls_set_client_verify(cmd_parms * parms, void *dummy,
                                             const char *arg)
 {
-    gnutls_certificate_request_t mode;
+    int mode;
 
-    if (strcasecmp("none", arg) == 0  || strcasecmp("ignore", arg) == 0) {
+    if (strcasecmp("none", arg) == 0 || strcasecmp("ignore", arg) == 0) {
         mode = GNUTLS_CERT_IGNORE;
     }
     else if (strcasecmp("optional", arg) == 0 || strcasecmp("request", arg) == 0) {
         mode = GNUTLS_CERT_REQUEST;
     }
-    else if (strcasecmp("optional", arg) == 0) {
+    else if (strcasecmp("require", arg) == 0) {
         mode = GNUTLS_CERT_REQUIRE;
     }
     else {
@@ -703,6 +751,29 @@ static const char *gnutls_set_client_verify(cmd_parms * parms, void *dummy,
 
     return NULL;
 }
+
+static const char *gnutls_set_client_ca_file(cmd_parms * parms, void *dummy,
+                                            const char *arg)
+{
+    int rv;
+    const char* file;
+    mod_gnutls_srvconf_rec *sc = 
+        (mod_gnutls_srvconf_rec *) ap_get_module_config(parms->server->
+                                                        module_config,
+                                                        &gnutls_module);        
+    file = ap_server_root_relative(parms->pool, arg);
+    rv = gnutls_certificate_set_x509_trust_file(sc->certs, 
+                                                file, GNUTLS_X509_FMT_PEM);
+    
+    if (rv < 0) {
+        return apr_psprintf(parms->pool, "GnuTLS: Failed to load "
+                            "Client CA File '%s': (%d) %s", file, rv, 
+                            gnutls_strerror(rv));   
+    }
+    return NULL;
+}
+
+
 static const char *gnutls_set_enabled(cmd_parms * parms, void *dummy,
                                       const char *arg)
 {
@@ -728,6 +799,10 @@ static const command_rec gnutls_cmds[] = {
                   NULL,
                   RSRC_CONF|OR_AUTHCFG,
                   "Set Verification Requirements of the Client Certificate"),
+    AP_INIT_TAKE1("GnuTLSClientCAFile", gnutls_set_client_ca_file,
+                  NULL,
+                  RSRC_CONF,
+                  "Set the CA File for Client Certificates"),
     AP_INIT_TAKE1("GnuTLSCertificateFile", gnutls_set_cert_file,
                   NULL,
                   RSRC_CONF,
@@ -751,34 +826,86 @@ static const command_rec gnutls_cmds[] = {
     {NULL}
 };
 
-/* TODO: CACertificateFile & Client Authentication
- *    AP_INIT_TAKE1("GnuTLSCACertificateFile", ap_set_server_string_slot,
- *                 (void *) APR_OFFSETOF(gnutls_srvconf_rec, key_file), NULL,
- *                 RSRC_CONF,
- *                 "CA"),
- */
-
 int mod_gnutls_hook_authz(request_rec *r)
 {
-    return OK;
-#if 0
+    int rv;
+    int status;
     mod_gnutls_handle_t *ctxt;
     mod_gnutls_dirconf_rec *dc = ap_get_module_config(r->per_dir_config,
                                                       &gnutls_module);
     
     ctxt = ap_get_module_config(r->connection->conn_config, &gnutls_module);
 
-    if (dc->client_verify_mode == -1 || 
-        dc->client_verify_mode == GNUTLS_CERT_IGNORE ||
-        ctxt->sc->client_verify_mode > dc->client_verify_mode) {
+    if (dc->client_verify_mode == GNUTLS_CERT_IGNORE) {
+        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, 
+                      "GnuTLS: Ignoring Client Certificate!");
         return DECLINED;
     }
 
-    gnutls_certificate_server_set_request(ctxt->session, dc->client_verify_mode);
-    if (mod_gnutls_rehandshake(ctxt) != 0) {
+    if (ctxt->sc->client_verify_mode < dc->client_verify_mode) {
+        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, 
+                     "GnuTLS: Attempting to rehandshake with peer. %d %d",
+                      ctxt->sc->client_verify_mode, dc->client_verify_mode);
+        
+        gnutls_certificate_server_set_request(ctxt->session,
+                                              dc->client_verify_mode);
+    
+        if (mod_gnutls_rehandshake(ctxt) != 0) {
+            return HTTP_FORBIDDEN;
+        }
+    }
+    else if (ctxt->sc->client_verify_mode == GNUTLS_CERT_IGNORE) {
+        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
+                      "GnuTLS: Peer is set to IGNORE");
+        return DECLINED;
+    }
+    
+    rv = gnutls_certificate_verify_peers2(ctxt->session, &status);
+
+    if (rv < 0) {
+        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
+                     "GnuTLS: Failed to Verify Peer: (%d) %s", 
+                     rv, gnutls_strerror(rv));
         return HTTP_FORBIDDEN;
     }
-#endif    
+    
+    if (status < 0) {
+        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
+                     "GnuTLS: Peer Status is invalid."); 
+        return HTTP_FORBIDDEN;
+    }
+    
+    if (status & GNUTLS_CERT_SIGNER_NOT_FOUND) {
+        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
+                     "GnuTLS: Could not find Signer for Peer Certificate"); 
+    }
+    
+    if (status & GNUTLS_CERT_SIGNER_NOT_CA) {
+        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
+                     "GnuTLS: Could not find CA for Peer Certificate"); 
+    }
+    
+    if (status & GNUTLS_CERT_INVALID) {
+        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
+                     "GnuTLS: Peer Certificate is invalid."); 
+        return HTTP_FORBIDDEN;
+    }
+    else if (status & GNUTLS_CERT_REVOKED) {
+        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
+                     "GnuTLS: Peer Certificate is revoked."); 
+        return HTTP_FORBIDDEN;
+    }
+    
+    /* TODO: OpenPGP Certificates */
+    if (gnutls_certificate_type_get(ctxt->session) != GNUTLS_CRT_X509) {
+        ap_log_rerror(APLOG_MARK, APLOG_CRIT, 0, r, 
+                     "GnuTLS: Only x509 is supported for client certificates");         
+        return HTTP_FORBIDDEN;
+    }
+    /* TODO: Further Verification. */
+    ap_log_rerror(APLOG_MARK, APLOG_CRIT, 0, r, 
+                 "GnuTLS: Verified Peer.");             
+    return OK;
 }
 
 static void gnutls_hooks(apr_pool_t * p)
@@ -801,8 +928,8 @@ static void gnutls_hooks(apr_pool_t * p)
     ap_hook_pre_config(mod_gnutls_hook_pre_config, NULL, NULL,
                        APR_HOOK_MIDDLE);
     
-    ap_hook_auth_checker(mod_gnutls_hook_authz, NULL, NULL, APR_HOOK_MIDDLE);
-    
+    ap_hook_access_checker(mod_gnutls_hook_authz, NULL, NULL, APR_HOOK_REALLY_FIRST);
+
     ap_hook_fixups(mod_gnutls_hook_fixups, NULL, NULL, APR_HOOK_REALLY_FIRST);
 
     /* TODO: HTTP Upgrade Filter */

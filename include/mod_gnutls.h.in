@@ -71,12 +71,13 @@ typedef enum
 
 typedef struct
 {
-    gnutls_certificate_request_t client_verify_mode;
+    int client_verify_mode;
 } mod_gnutls_dirconf_rec;
 
 typedef struct
 {
     gnutls_certificate_credentials_t certs;
+    char* cert_cn;
     gnutls_x509_crt_t cert_x509;
     gnutls_x509_privkey_t privkey_x509;
     int enabled;
@@ -91,7 +92,7 @@ typedef struct
     const char* cache_config;
     const char* rsa_params_file;
     const char* dh_params_file;
-    gnutls_certificate_request_t client_verify_mode;
+    int client_verify_mode;
 } mod_gnutls_srvconf_rec;
 
 typedef struct {
@@ -177,6 +178,10 @@ ssize_t mod_gnutls_transport_read(gnutls_transport_ptr_t ptr,
  */
 ssize_t mod_gnutls_transport_write(gnutls_transport_ptr_t ptr,
                                    const void *buffer, size_t len);
+
+
+int mod_gnutls_rehandshake(mod_gnutls_handle_t * ctxt);
+
 
 
 /**
