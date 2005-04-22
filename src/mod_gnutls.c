@@ -294,7 +294,6 @@ static apr_port_t mod_gnutls_hook_default_port(const request_rec * r)
 
 static void mod_gnutls_changed_servers(mod_gnutls_handle_t *ctxt)
 {
-    gnutls_credentials_set(ctxt->session, GNUTLS_CRD_CERTIFICATE, ctxt->sc->certs);
     gnutls_certificate_server_set_request(ctxt->session, ctxt->sc->client_verify_mode);
 }
 
@@ -479,9 +478,11 @@ static mod_gnutls_handle_t* create_gnutls_handle(apr_pool_t* pool, conn_rec * c)
     gnutls_certificate_type_set_priority(ctxt->session, sc->cert_types);
 
     mod_gnutls_cache_session_init(ctxt);
+    
+    gnutls_credentials_set(ctxt->session, GNUTLS_CRD_CERTIFICATE, ctxt->sc->certs);
 
     gnutls_certificate_server_set_retrieve_function(sc->certs, cert_retrieve_fn);
-
+    
     mod_gnutls_changed_servers(ctxt);
     return ctxt;
 }
@@ -838,7 +839,7 @@ int mod_gnutls_hook_authz(request_rec *r)
 
     if (dc->client_verify_mode == GNUTLS_CERT_IGNORE) {
         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, 
-                      "GnuTLS: Ignoring Client Certificate!");
+                      "GnuTLS: Directory set to Ignore Client Certificate!");
         return DECLINED;
     }
 
@@ -855,8 +856,10 @@ int mod_gnutls_hook_authz(request_rec *r)
         }
     }
     else if (ctxt->sc->client_verify_mode == GNUTLS_CERT_IGNORE) {
+#if MOD_GNUTLS_DEBUG
         ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
                       "GnuTLS: Peer is set to IGNORE");
+#endif
         return DECLINED;
     }
     

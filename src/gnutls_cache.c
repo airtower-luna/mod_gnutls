@@ -209,11 +209,12 @@ static gnutls_datum_t mc_cache_fetch(void* baton, gnutls_datum_t key)
                            &value, &value_len, NULL);
 
     if (rv != APR_SUCCESS) {
+#if MOD_GNUTLS_DEBUG
         ap_log_error(APLOG_MARK, APLOG_DEBUG, rv,
                      ctxt->c->base_server,
                      "[gnutls_cache] error fetching key '%s' ",
                      strkey);
-
+#endif
         data.size = 0;
         data.data = NULL;
         return data;

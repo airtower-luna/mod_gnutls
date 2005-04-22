@@ -381,10 +381,15 @@ tryagain:
                       gnutls_strerror(ret));
             goto tryagain;
         }
-
-        ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
+#if USING_2_1_RECENT
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, ctxt->c,
                      "GnuTLS: Handshake Failed (%d) '%s'", ret,
                       gnutls_strerror(ret));
+#else
+        ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
+                     "GnuTLS: Handshake Failed (%d) '%s'", ret,
+                     gnutls_strerror(ret));
+#endif
         ctxt->status = -1;
         gnutls_alert_send(ctxt->session, GNUTLS_AL_FATAL, 
                           gnutls_error_to_alert(ret, NULL));
