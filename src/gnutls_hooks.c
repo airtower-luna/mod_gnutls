@@ -524,7 +524,7 @@ int mgs_hook_fixups(request_rec *r)
     const char* tmp;
     int len;
     mgs_handle_t *ctxt;
-    int rv;
+    int rv = OK;
     
     apr_table_t *env = r->subprocess_env;
 
@@ -561,41 +561,16 @@ int mgs_hook_fixups(request_rec *r)
 
     /* TODO: There are many other env vars that we need to add */
     {
-        const gnutls_datum *certs;
-        gnutls_x509_crt cert;
-
-        certs = gnutls_certificate_get_ours(ctxt->session);
-        if (certs) {
-
-            rv = gnutls_x509_crt_init(&cert);
-            if (rv < 0) {
-                goto end_fixups;
-            }
-            
-            rv = gnutls_x509_crt_import(cert, &certs[0], GNUTLS_X509_FMT_DER);
-            if (rv < 0) {
-                gnutls_x509_crt_deinit(cert);
-                goto end_fixups;
-            }
-            
-            len = sizeof(buf);
-            gnutls_x509_crt_get_dn(cert, buf, &len);
-            apr_table_setn(env, "SSL_SERVER_S_DN", buf);
-            
-            len = sizeof(buf);
-            gnutls_x509_crt_get_issuer_dn(cert, buf, &len);
-            apr_table_setn(env, "SSL_SERVER_I_DN", buf);
-            
-            gnutls_x509_crt_deinit(cert);
-        }
-        else {
-            apr_table_setn(env, "SSL_SERVER_S_DN", "Unknown");
-            apr_table_setn(env, "SSL_SERVER_I_DN", "Unknown");
-        }
+        len = sizeof(buf);
+        gnutls_x509_crt_get_dn(ctxt->sc->cert_x509, buf, &len);
+        apr_table_setn(env, "SSL_SERVER_S_DN", buf);
+           
+        len = sizeof(buf);
+        gnutls_x509_crt_get_issuer_dn(ctxt->sc->cert_x509, buf, &len);
+        apr_table_setn(env, "SSL_SERVER_I_DN", buf);
     }
     
-end_fixups:
-    return OK;
+    return rv;
 }
 
 int mgs_hook_authz(request_rec *r)
