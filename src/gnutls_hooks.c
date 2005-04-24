@@ -579,16 +579,18 @@ int mgs_hook_fixups(request_rec *r)
             }
             
             len = sizeof(buf);
-            if (gnutls_x509_crt_get_dn(cert, buf, &len) == 0) {
-                apr_table_setn(env, "SSL_SERVER_S_DN", buf);
-            }
+            gnutls_x509_crt_get_dn(cert, buf, &len);
+            apr_table_setn(env, "SSL_SERVER_S_DN", buf);
             
             len = sizeof(buf);
-            if (gnutls_x509_crt_get_issuer_dn(cert, buf, &len) == 0) {
-                apr_table_setn(env, "SSL_SERVER_I_DN", buf);
-            }
+            gnutls_x509_crt_get_issuer_dn(cert, buf, &len);
+            apr_table_setn(env, "SSL_SERVER_I_DN", buf);
             
             gnutls_x509_crt_deinit(cert);
+        }
+        else {
+            apr_table_setn(env, "SSL_SERVER_S_DN", "Unknown");
+            apr_table_setn(env, "SSL_SERVER_I_DN", "Unknown");
         }
     }
     
