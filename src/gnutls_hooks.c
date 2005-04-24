@@ -557,17 +557,17 @@ int mgs_hook_fixups(request_rec *r)
     len = sizeof(sbuf);
     gnutls_session_get_id(ctxt->session, sbuf, &len);
     tmp = mgs_session_id2sz(sbuf, len, buf, sizeof(buf));
-    apr_table_setn(env, "SSL_SESSION_ID", tmp);
+    apr_table_setn(env, "SSL_SESSION_ID", apr_pstrdup(r->pool, tmp));
 
     /* TODO: There are many other env vars that we need to add */
     {
         len = sizeof(buf);
         gnutls_x509_crt_get_dn(ctxt->sc->cert_x509, buf, &len);
-        apr_table_setn(env, "SSL_SERVER_S_DN", buf);
+        apr_table_setn(env, "SSL_SERVER_S_DN", apr_pstrmemdup(r->pool, buf, len));
            
         len = sizeof(buf);
         gnutls_x509_crt_get_issuer_dn(ctxt->sc->cert_x509, buf, &len);
-        apr_table_setn(env, "SSL_SERVER_I_DN", buf);
+        apr_table_setn(env, "SSL_SERVER_I_DN", apr_pstrmemdup(r->pool, buf, len));
     }
     
     return rv;
