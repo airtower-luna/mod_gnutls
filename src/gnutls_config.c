@@ -59,8 +59,8 @@ const char *mgs_set_cert_file(cmd_parms * parms, void *dummy,
     gnutls_datum_t data;
     const char* file;
     apr_pool_t* spool;
-    mod_gnutls_srvconf_rec *sc =
-        (mod_gnutls_srvconf_rec *) ap_get_module_config(parms->server->
+    mgs_srvconf_rec *sc =
+        (mgs_srvconf_rec *) ap_get_module_config(parms->server->
                                                         module_config,
                                                         &gnutls_module);
     apr_pool_create(&spool, parms->pool);
@@ -91,8 +91,8 @@ const char *mgs_set_key_file(cmd_parms * parms, void *dummy,
     gnutls_datum_t data;
     const char* file;
     apr_pool_t* spool;
-    mod_gnutls_srvconf_rec *sc =
-        (mod_gnutls_srvconf_rec *) ap_get_module_config(parms->server->
+    mgs_srvconf_rec *sc =
+        (mgs_srvconf_rec *) ap_get_module_config(parms->server->
                                                         module_config,
                                                         &gnutls_module);
     apr_pool_create(&spool, parms->pool);
@@ -119,7 +119,7 @@ const char *mgs_set_cache(cmd_parms * parms, void *dummy,
                                        const char *type, const char* arg)
 {
     const char* err;
-    mod_gnutls_srvconf_rec *sc = ap_get_module_config(parms->server->
+    mgs_srvconf_rec *sc = ap_get_module_config(parms->server->
                                                         module_config,
                                                         &gnutls_module);
     if ((err = ap_check_cmd_context(parms, GLOBAL_ONLY))) {
@@ -127,21 +127,21 @@ const char *mgs_set_cache(cmd_parms * parms, void *dummy,
     }
 
     if (strcasecmp("none", type) == 0) {
-        sc->cache_type = mod_gnutls_cache_none;
+        sc->cache_type = mgs_cache_none;
     }
     else if (strcasecmp("dbm", type) == 0) {
-        sc->cache_type = mod_gnutls_cache_dbm;
+        sc->cache_type = mgs_cache_dbm;
     }
 #if HAVE_APR_MEMCACHE
     else if (strcasecmp("memcache", type) == 0) {
-        sc->cache_type = mod_gnutls_cache_memcache;
+        sc->cache_type = mgs_cache_memcache;
     }
 #endif
     else {
         return "Invalid Type for GnuTLSCache!";
     }
 
-    if (sc->cache_type == mod_gnutls_cache_dbm) {
+    if (sc->cache_type == mgs_cache_dbm) {
         sc->cache_config = ap_server_root_relative(parms->pool, arg);
     }
     else {
@@ -155,8 +155,8 @@ const char *mgs_set_cache_timeout(cmd_parms * parms, void *dummy,
                                             const char *arg)
 {
     int argint;
-    mod_gnutls_srvconf_rec *sc =
-    (mod_gnutls_srvconf_rec *) ap_get_module_config(parms->server->
+    mgs_srvconf_rec *sc =
+    (mgs_srvconf_rec *) ap_get_module_config(parms->server->
                                                     module_config,
                                                     &gnutls_module);
     
@@ -195,12 +195,12 @@ const char *mgs_set_client_verify(cmd_parms * parms, void *dummy,
     
     /* This was set from a directory context */
     if (parms->path) {
-        mod_gnutls_dirconf_rec *dc = (mod_gnutls_dirconf_rec *)dummy;
+        mgs_dirconf_rec *dc = (mgs_dirconf_rec *)dummy;
         dc->client_verify_mode = mode;
     }
     else {
-        mod_gnutls_srvconf_rec *sc =
-        (mod_gnutls_srvconf_rec *) ap_get_module_config(parms->server->
+        mgs_srvconf_rec *sc =
+        (mgs_srvconf_rec *) ap_get_module_config(parms->server->
                                                         module_config,
                                                         &gnutls_module);        
         sc->client_verify_mode = mode;
@@ -214,8 +214,8 @@ const char *mgs_set_client_ca_file(cmd_parms * parms, void *dummy,
 {
     int rv;
     const char* file;
-    mod_gnutls_srvconf_rec *sc = 
-        (mod_gnutls_srvconf_rec *) ap_get_module_config(parms->server->
+    mgs_srvconf_rec *sc = 
+        (mgs_srvconf_rec *) ap_get_module_config(parms->server->
                                                         module_config,
                                                         &gnutls_module);        
     file = ap_server_root_relative(parms->pool, arg);
@@ -233,8 +233,8 @@ const char *mgs_set_client_ca_file(cmd_parms * parms, void *dummy,
 const char *mgs_set_enabled(cmd_parms * parms, void *dummy,
                                       const char *arg)
 {
-    mod_gnutls_srvconf_rec *sc =
-        (mod_gnutls_srvconf_rec *) ap_get_module_config(parms->server->
+    mgs_srvconf_rec *sc =
+        (mgs_srvconf_rec *) ap_get_module_config(parms->server->
                                                         module_config,
                                                         &gnutls_module);
     if (!strcasecmp(arg, "On")) {
@@ -253,7 +253,7 @@ const char *mgs_set_enabled(cmd_parms * parms, void *dummy,
 void *mgs_config_server_create(apr_pool_t * p, server_rec * s)
 {
     int i;
-    mod_gnutls_srvconf_rec *sc = apr_pcalloc(p, sizeof(*sc));
+    mgs_srvconf_rec *sc = apr_pcalloc(p, sizeof(*sc));
     
     sc->enabled = GNUTLS_ENABLED_FALSE;
     
@@ -261,7 +261,7 @@ void *mgs_config_server_create(apr_pool_t * p, server_rec * s)
     sc->privkey_x509 = NULL;
     sc->cert_x509 = NULL;
     sc->cache_timeout = apr_time_from_sec(300);
-    sc->cache_type = mod_gnutls_cache_dbm;
+    sc->cache_type = mgs_cache_dbm;
     sc->cache_config = ap_server_root_relative(p, "conf/gnutls_cache");
     
     /* TODO: Make this Configurable. But it isn't configurable in mod_ssl? */
@@ -319,7 +319,7 @@ void *mgs_config_server_create(apr_pool_t * p, server_rec * s)
 
 void *mgs_config_dir_create(apr_pool_t *p, char *dir)
 {
-    mod_gnutls_dirconf_rec *dc = apr_palloc(p, sizeof(*dc));
+    mgs_dirconf_rec *dc = apr_palloc(p, sizeof(*dc));
     
     dc->client_verify_mode = -1;
     

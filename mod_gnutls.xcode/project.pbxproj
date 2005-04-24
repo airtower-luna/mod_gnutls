@@ -14,9 +14,19 @@
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
+		4541F3C5081C4F2B007457C1 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.c;
+			name = gnutls_hooks.c;
+			path = src/gnutls_hooks.c;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
 		45B624630802F1E200CBFD9A = {
 			children = (
 				4541F3BA081C4B1A007457C1,
+				4541F3C5081C4F2B007457C1,
 				45B6246D0802F20D00CBFD9A,
 				45B6247D0802F85B00CBFD9A,
 				45B6247A0802F84500CBFD9A,

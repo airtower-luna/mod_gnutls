@@ -1,6 +1,6 @@
 CLEANFILES = .libs/libmod_gnutls *~
 
-libmod_gnutls_la_SOURCES = mod_gnutls.c gnutls_io.c gnutls_cache.c gnutls_config.c
+libmod_gnutls_la_SOURCES = mod_gnutls.c gnutls_io.c gnutls_cache.c gnutls_config.c gnutls_hooks.c
 libmod_gnutls_la_CFLAGS = -Wall ${MODULE_CFLAGS}
 libmod_gnutls_la_LDFLAGS = -rpath ${AP_LIBEXECDIR} -module -avoid-version ${MODULE_LIBS}
 

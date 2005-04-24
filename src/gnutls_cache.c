@@ -53,7 +53,7 @@ static char *gnutls_session_id2sz(unsigned char *id, int idlen,
     return str;
 }
 
-char *mod_gnutls_session_id2sz(unsigned char *id, int idlen,
+char *mgs_session_id2sz(unsigned char *id, int idlen,
                                char *str, int strsize)
 {
     char *cp;
@@ -80,7 +80,7 @@ char *mod_gnutls_session_id2sz(unsigned char *id, int idlen,
 static apr_memcache_t* mc;
 
 static int mc_cache_child_init(apr_pool_t *p, server_rec *s, 
-                                mod_gnutls_srvconf_rec *sc)
+                                mgs_srvconf_rec *sc)
 {
     apr_status_t rv = APR_SUCCESS;
     int thread_limit = 0;
@@ -166,7 +166,7 @@ static int mc_cache_store(void* baton, gnutls_datum_t key,
                           gnutls_datum_t data)
 {
     apr_status_t rv = APR_SUCCESS;
-    mod_gnutls_handle_t *ctxt = baton;
+    mgs_handle_t *ctxt = baton;
     char buf[STR_SESSION_LEN];
     char* strkey = NULL;
     apr_uint32_t timeout;
@@ -193,7 +193,7 @@ static int mc_cache_store(void* baton, gnutls_datum_t key,
 static gnutls_datum_t mc_cache_fetch(void* baton, gnutls_datum_t key)
 {
     apr_status_t rv = APR_SUCCESS;
-    mod_gnutls_handle_t *ctxt = baton;
+    mgs_handle_t *ctxt = baton;
     char buf[STR_SESSION_LEN];
     char* strkey = NULL;
     char* value;
@@ -234,7 +234,7 @@ static gnutls_datum_t mc_cache_fetch(void* baton, gnutls_datum_t key)
 static int mc_cache_delete(void* baton, gnutls_datum_t key)
 {
     apr_status_t rv = APR_SUCCESS;
-    mod_gnutls_handle_t *ctxt = baton;
+    mgs_handle_t *ctxt = baton;
     char buf[STR_SESSION_LEN];
     char* strkey = NULL;
 
@@ -259,7 +259,7 @@ static int mc_cache_delete(void* baton, gnutls_datum_t key)
 
 #define SSL_DBM_FILE_MODE ( APR_UREAD | APR_UWRITE | APR_GREAD | APR_WREAD )
 
-static int dbm_cache_expire(mod_gnutls_handle_t *ctxt)
+static int dbm_cache_expire(mgs_handle_t *ctxt)
 {
     apr_status_t rv;
     apr_dbm_t *dbm;
@@ -346,7 +346,7 @@ static gnutls_datum_t dbm_cache_fetch(void* baton, gnutls_datum_t key)
     apr_dbm_t *dbm;
     apr_datum_t dbmkey;
     apr_datum_t dbmval;
-    mod_gnutls_handle_t *ctxt = baton;
+    mgs_handle_t *ctxt = baton;
     apr_status_t rv;
 
     dbmkey.dptr  = key.data;
@@ -395,7 +395,7 @@ static int dbm_cache_store(void* baton, gnutls_datum_t key,
     apr_dbm_t *dbm;
     apr_datum_t dbmkey;
     apr_datum_t dbmval;
-    mod_gnutls_handle_t *ctxt = baton;
+    mgs_handle_t *ctxt = baton;
     apr_status_t rv;
     apr_time_t expiry;
     
@@ -448,7 +448,7 @@ static int dbm_cache_delete(void* baton, gnutls_datum_t key)
 {
     apr_dbm_t *dbm;
     apr_datum_t dbmkey;
-    mod_gnutls_handle_t *ctxt = baton;
+    mgs_handle_t *ctxt = baton;
     apr_status_t rv;
     
     dbmkey.dptr  = (char *)key.data;
@@ -483,7 +483,7 @@ static int dbm_cache_delete(void* baton, gnutls_datum_t key)
 }
 
 static int dbm_cache_post_config(apr_pool_t *p, server_rec *s, 
-                                mod_gnutls_srvconf_rec *sc)
+                                mgs_srvconf_rec *sc)
 {
     apr_status_t rv;
     apr_dbm_t *dbm;
@@ -518,23 +518,23 @@ static int dbm_cache_post_config(apr_pool_t *p, server_rec *s,
     return rv;
 }
 
-int mod_gnutls_cache_post_config(apr_pool_t *p, server_rec *s, 
-                                 mod_gnutls_srvconf_rec *sc)
+int mgs_cache_post_config(apr_pool_t *p, server_rec *s, 
+                                 mgs_srvconf_rec *sc)
 {
-    if (sc->cache_type == mod_gnutls_cache_dbm) {
+    if (sc->cache_type == mgs_cache_dbm) {
         return dbm_cache_post_config(p, s, sc);
     }
     return 0;
 }
 
-int mod_gnutls_cache_child_init(apr_pool_t *p, server_rec *s, 
-                                mod_gnutls_srvconf_rec *sc)
+int mgs_cache_child_init(apr_pool_t *p, server_rec *s, 
+                                mgs_srvconf_rec *sc)
 {
-    if (sc->cache_type == mod_gnutls_cache_dbm) {
+    if (sc->cache_type == mgs_cache_dbm) {
         return 0;
     }
 #if HAVE_APR_MEMCACHE
-    else if (sc->cache_type == mod_gnutls_cache_memcache) { 
+    else if (sc->cache_type == mgs_cache_memcache) { 
         return mc_cache_child_init(p, s, sc);
     }
 #endif
@@ -543,16 +543,16 @@ int mod_gnutls_cache_child_init(apr_pool_t *p, server_rec *s,
 
  #include <assert.h>
 
-int mod_gnutls_cache_session_init(mod_gnutls_handle_t *ctxt)
+int mgs_cache_session_init(mgs_handle_t *ctxt)
 {
-    if (ctxt->sc->cache_type == mod_gnutls_cache_dbm) {
+    if (ctxt->sc->cache_type == mgs_cache_dbm) {
         gnutls_db_set_retrieve_function(ctxt->session, dbm_cache_fetch);
         gnutls_db_set_remove_function(ctxt->session, dbm_cache_delete);
         gnutls_db_set_store_function(ctxt->session, dbm_cache_store);
         gnutls_db_set_ptr(ctxt->session, ctxt);
     }
 #if HAVE_APR_MEMCACHE
-    else if (ctxt->sc->cache_type == mod_gnutls_cache_memcache) { 
+    else if (ctxt->sc->cache_type == mgs_cache_memcache) { 
         gnutls_db_set_retrieve_function(ctxt->session, mc_cache_fetch);
         gnutls_db_set_remove_function(ctxt->session, mc_cache_delete);
         gnutls_db_set_store_function(ctxt->session, mc_cache_store);

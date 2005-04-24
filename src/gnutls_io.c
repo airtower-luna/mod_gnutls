@@ -35,7 +35,7 @@ static apr_status_t gnutls_io_filter_error(ap_filter_t * f,
                                            apr_bucket_brigade * bb,
                                            apr_status_t status)
 {
-    mod_gnutls_handle_t *ctxt = (mod_gnutls_handle_t *) f->ctx;
+    mgs_handle_t *ctxt = (mgs_handle_t *) f->ctx;
     apr_bucket *bucket;
 
     switch (status) {
@@ -63,7 +63,7 @@ static apr_status_t gnutls_io_filter_error(ap_filter_t * f,
     return APR_SUCCESS;
 }
 
-static int char_buffer_read(mod_gnutls_char_buffer_t * buffer, char *in,
+static int char_buffer_read(mgs_char_buffer_t * buffer, char *in,
                             int inl)
 {
     if (!buffer->length) {
@@ -87,7 +87,7 @@ static int char_buffer_read(mod_gnutls_char_buffer_t * buffer, char *in,
     return inl;
 }
 
-static int char_buffer_write(mod_gnutls_char_buffer_t * buffer, char *in,
+static int char_buffer_write(mgs_char_buffer_t * buffer, char *in,
                              int inl)
 {
     buffer->value = in;
@@ -181,7 +181,7 @@ static apr_status_t brigade_consume(apr_bucket_brigade * bb,
 }
 
 
-static apr_status_t gnutls_io_input_read(mod_gnutls_handle_t * ctxt,
+static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
                                          char *buf, apr_size_t * len)
 {
     apr_size_t wanted = *len;
@@ -310,7 +310,7 @@ static apr_status_t gnutls_io_input_read(mod_gnutls_handle_t * ctxt,
     return ctxt->input_rc;
 }
 
-static apr_status_t gnutls_io_input_getline(mod_gnutls_handle_t * ctxt,
+static apr_status_t gnutls_io_input_getline(mgs_handle_t * ctxt,
                                             char *buf, apr_size_t * len)
 {
     const char *pos = NULL;
@@ -353,7 +353,7 @@ static apr_status_t gnutls_io_input_getline(mod_gnutls_handle_t * ctxt,
     return APR_SUCCESS;
 }
 
-static int gnutls_do_handshake(mod_gnutls_handle_t * ctxt)
+static int gnutls_do_handshake(mgs_handle_t * ctxt)
 {
     int ret;
     int errcode;
@@ -403,7 +403,7 @@ tryagain:
     }
 }
 
-int mod_gnutls_rehandshake(mod_gnutls_handle_t * ctxt)
+int mgs_rehandshake(mgs_handle_t * ctxt)
 {
     int rv;
 
@@ -424,14 +424,14 @@ int mod_gnutls_rehandshake(mod_gnutls_handle_t * ctxt)
 }
 
 
-apr_status_t mod_gnutls_filter_input(ap_filter_t* f,
+apr_status_t mgs_filter_input(ap_filter_t* f,
                                      apr_bucket_brigade * bb,
                                      ap_input_mode_t mode,
                                      apr_read_type_e block,
                                      apr_off_t readbytes)
 {
     apr_status_t status = APR_SUCCESS;
-    mod_gnutls_handle_t *ctxt = (mod_gnutls_handle_t *) f->ctx;
+    mgs_handle_t *ctxt = (mgs_handle_t *) f->ctx;
     apr_size_t len = sizeof(ctxt->input_buffer);
 
     if (f->c->aborted) {
@@ -488,12 +488,12 @@ apr_status_t mod_gnutls_filter_input(ap_filter_t* f,
     return status;
 }
 
-apr_status_t mod_gnutls_filter_output(ap_filter_t * f,
+apr_status_t mgs_filter_output(ap_filter_t * f,
                                       apr_bucket_brigade * bb)
 {
     apr_size_t ret;
     apr_bucket* e;
-    mod_gnutls_handle_t *ctxt = (mod_gnutls_handle_t *) f->ctx;
+    mgs_handle_t *ctxt = (mgs_handle_t *) f->ctx;
     apr_status_t status = APR_SUCCESS;
     apr_read_type_e rblock = APR_NONBLOCK_READ;
 
@@ -592,10 +592,10 @@ apr_status_t mod_gnutls_filter_output(ap_filter_t * f,
     return status;
 }
 
-ssize_t mod_gnutls_transport_read(gnutls_transport_ptr_t ptr,
+ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
                                   void *buffer, size_t len)
 {
-    mod_gnutls_handle_t *ctxt = ptr;
+    mgs_handle_t *ctxt = ptr;
     apr_status_t rc;
     apr_size_t in = len;
     apr_read_type_e block = ctxt->input_block;
@@ -659,7 +659,7 @@ ssize_t mod_gnutls_transport_read(gnutls_transport_ptr_t ptr,
 }
 
 
-static ssize_t write_flush(mod_gnutls_handle_t * ctxt)
+static ssize_t write_flush(mgs_handle_t * ctxt)
 {
     apr_bucket *e;
 
@@ -691,10 +691,10 @@ static ssize_t write_flush(mod_gnutls_handle_t * ctxt)
     return (ctxt->output_rc == APR_SUCCESS) ? 1 : -1;
 }
 
-ssize_t mod_gnutls_transport_write(gnutls_transport_ptr_t ptr,
+ssize_t mgs_transport_write(gnutls_transport_ptr_t ptr,
                                    const void *buffer, size_t len)
 {
-    mod_gnutls_handle_t *ctxt = ptr;
+    mgs_handle_t *ctxt = ptr;
 
     /* pass along the encrypted data
      * need to flush since we're using SSL's malloc-ed buffer
