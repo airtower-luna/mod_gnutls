@@ -520,10 +520,12 @@ int mgs_hook_pre_connection(conn_rec * c, void *csd)
 int mgs_hook_fixups(request_rec *r)
 {
     unsigned char sbuf[GNUTLS_MAX_SESSION_ID];
-    char buf[GNUTLS_SESSION_ID_STRING_LEN];
+    char buf[AP_IOBUFSIZE];
     const char* tmp;
     int len;
     mgs_handle_t *ctxt;
+    int rv;
+    
     apr_table_t *env = r->subprocess_env;
 
     ctxt = ap_get_module_config(r->connection->conn_config, &gnutls_module);
@@ -556,7 +558,41 @@ int mgs_hook_fixups(request_rec *r)
     gnutls_session_get_id(ctxt->session, sbuf, &len);
     tmp = mgs_session_id2sz(sbuf, len, buf, sizeof(buf));
     apr_table_setn(env, "SSL_SESSION_ID", tmp);
+
+    /* TODO: There are many other env vars that we need to add */
+    {
+        const gnutls_datum *certs;
+        gnutls_x509_crt cert;
+
+        certs = gnutls_certificate_get_ours(ctxt->session);
+        if (certs) {
+
+            rv = gnutls_x509_crt_init(&cert);
+            if (rv < 0) {
+                goto end_fixups;
+            }
+            
+            rv = gnutls_x509_crt_import(cert, &certs[0], GNUTLS_X509_FMT_DER);
+            if (rv < 0) {
+                gnutls_x509_crt_deinit(cert);
+                goto end_fixups;
+            }
+            
+            len = sizeof(buf);
+            if (gnutls_x509_crt_get_dn(cert, buf, &len) == 0) {
+                apr_table_setn(env, "SSL_SERVER_S_DN", buf);
+            }
+            
+            len = sizeof(buf);
+            if (gnutls_x509_crt_get_issuer_dn(cert, buf, &len) == 0) {
+                apr_table_setn(env, "SSL_SERVER_I_DN", buf);
+            }
+            
+            gnutls_x509_crt_deinit(cert);
+        }
+    }
     
+end_fixups:
     return OK;
 }
 
