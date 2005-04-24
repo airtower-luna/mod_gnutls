@@ -79,7 +79,7 @@ char *mod_gnutls_session_id2sz(unsigned char *id, int idlen,
 /* The underlying apr_memcache system is thread safe... woohoo */
 static apr_memcache_t* mc;
 
-int mc_cache_child_init(apr_pool_t *p, server_rec *s, 
+static int mc_cache_child_init(apr_pool_t *p, server_rec *s, 
                                 mod_gnutls_srvconf_rec *sc)
 {
     apr_status_t rv = APR_SUCCESS;
