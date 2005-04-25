@@ -300,7 +300,7 @@ apr_port_t mgs_hook_default_port(const request_rec * r)
 typedef struct
 {
     mgs_handle_t *ctxt;
-    gnutls_retr_st* ret;
+    mgs_srvconf_rec *sc;
     const char* sni_name;
 } vhost_cb_rec;
 
@@ -319,8 +319,6 @@ static int vhost_cb (void* baton, conn_rec* conn, server_rec* s)
     /* The CN can contain a * -- this will match those too. */
     if (ap_strcasecmp_match(x->sni_name, tsc->cert_cn) == 0) {
         /* found a match */
-        x->ret->cert.x509 = &tsc->cert_x509;
-        x->ret->key.x509 = tsc->privkey_x509;
 #if MOD_GNUTLS_DEBUG
         ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
                      x->ctxt->c->base_server,
@@ -330,19 +328,18 @@ static int vhost_cb (void* baton, conn_rec* conn, server_rec* s)
         /* Because we actually change the server used here, we need to reset
          * things like ClientVerify.
          */
-        x->ctxt->sc = tsc;
+        x->sc = tsc;
         /* Shit. Crap. Dammit. We *really* should rehandshake here, as our
          * certificate structure *should* change when the server changes. 
          * acccckkkkkk. 
          */
-        gnutls_certificate_server_set_request(x->ctxt->session, x->ctxt->sc->client_verify_mode);
         return 1;
     }
     return 0;
 }
 #endif
 
-static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st* ret) 
+mgs_srvconf_rec* mgs_find_sni_server(gnutls_session_t session) 
 {
     int rv;
     int sni_type;
@@ -364,26 +361,22 @@ static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st* ret)
         ap_log_error(APLOG_MARK, APLOG_CRIT, 0,
                      ctxt->c->base_server,
                      "GnuTLS: Only x509 Certificates are currently supported.");
-        return -1;
+        return NULL;
     }
-
-    ret->type = GNUTLS_CRT_X509;
-    ret->ncerts = 1;
-    ret->deinit_all = 0;
     
     rv = gnutls_server_name_get(ctxt->session, sni_name, 
                                 &data_len, &sni_type, 0);
-
+    
     if (rv != 0) {
-        goto use_default_crt;
+        return NULL;
     }
-
+    
     if (sni_type != GNUTLS_NAME_DNS) {
         ap_log_error(APLOG_MARK, APLOG_CRIT, 0,
                      ctxt->c->base_server,
                      "GnuTLS: Unknown type '%d' for SNI: "
-                     "'%s'", sni_type, sni_name);        
-        goto use_default_crt;
+                     "'%s'", sni_type, sni_name);
+        return NULL;
     }
     
     /**
@@ -392,18 +385,18 @@ static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st* ret)
      */
 #if USING_2_1_RECENT
     cbx.ctxt = ctxt;
-    cbx.ret = ret;
+    cbx.sc = NULL;
     cbx.sni_name = sni_name;
-
+    
     rv = ap_vhost_iterate_given_conn(ctxt->c, vhost_cb, &cbx);
     if (rv == 1) {
-        return 0;
+        return cbx.sc;
     }
 #else
     for (s = ap_server_conf; s; s = s->next) {
         
         tsc = (mgs_srvconf_rec *) ap_get_module_config(s->module_config,
-                                                             &gnutls_module);
+                                                       &gnutls_module);
         if (tsc->enabled != GNUTLS_ENABLED_TRUE) {
             continue;
         }
@@ -416,34 +409,40 @@ static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st* ret)
 #endif            
         /* The CN can contain a * -- this will match those too. */
         if (ap_strcasecmp_match(sni_name, tsc->cert_cn) == 0) {
-            /* found a match */
-            ret->cert.x509 = &tsc->cert_x509;
-            ret->key.x509 = tsc->privkey_x509;
 #if MOD_GNUTLS_DEBUG
             ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
                          ctxt->c->base_server,
                          "GnuTLS: Virtual Host: "
                          "'%s' == '%s'", tsc->cert_cn, sni_name);
 #endif
-            ctxt->sc = tsc;
-            gnutls_certificate_server_set_request(ctxt->session, ctxt->sc->client_verify_mode);
-            return 0;
+            return tsc;
         }
     }
 #endif
+    return NULL;
+}
+
+
+static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st* ret) 
+{
+    mgs_handle_t *ctxt;
+    mgs_srvconf_rec *tsc;
     
-    /**
-     * If the client does not support the Server Name Indication, give the default 
-     * certificate for this server. 
-     */
-use_default_crt:
+    ctxt = gnutls_transport_get_ptr(session);
+
+    ret->type = GNUTLS_CRT_X509;
+    ret->ncerts = 1;
+    ret->deinit_all = 0;
+
+    tsc = mgs_find_sni_server(session);
+    
+    if (tsc != NULL) {
+        ctxt->sc = tsc;
+        gnutls_certificate_server_set_request(ctxt->session, ctxt->sc->client_verify_mode);
+    }
+    
     ret->cert.x509 = &ctxt->sc->cert_x509;
     ret->key.x509 = ctxt->sc->privkey_x509;
-#if MOD_GNUTLS_DEBUG
-    ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
-                 ctxt->c->base_server,
-                 "GnuTLS: Using Default Certificate.");
-#endif
     return 0;
 }
 
