@@ -17,6 +17,7 @@
 
 #include "mod_gnutls.h"
 #include "http_vhost.h"
+#include "ap_mpm.h"
 
 #if !USING_2_1_RECENT
 extern server_rec *ap_server_conf;
@@ -29,6 +30,8 @@ GCRY_THREAD_OPTION_PTHREAD_IMPL;
 #if MOD_GNUTLS_DEBUG
 static apr_file_t* debug_log_fp;
 #endif
+
+static int mpm_is_threaded;
 
 static apr_status_t mgs_cleanup_pre_config(void *data)
 {
@@ -48,8 +51,12 @@ int mgs_hook_pre_config(apr_pool_t * pconf,
 {
 
 #if APR_HAS_THREADS
-    /* TODO: Check MPM Type here */
-    gcry_control(GCRYCTL_SET_THREAD_CBS, &gcry_threads_pthread);
+    ap_mpm_query(AP_MPMQ_IS_THREADED, &mpm_is_threaded);
+    if (mpm_is_threaded) {
+        gcry_control(GCRYCTL_SET_THREAD_CBS, &gcry_threads_pthread);
+    }
+#else
+    mpm_is_threaded = 0;
 #endif
 
     gnutls_global_init();
@@ -234,11 +241,6 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
             rv = gnutls_x509_crt_get_dn_by_oid(sc->cert_x509, 
                                                GNUTLS_OID_X520_COMMON_NAME, 0, 0,
                                                sc->cert_cn, &data_len);
-            ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
-                         s,
-                         "GnuTLS: sni-x509 cn: %s/%d pk: %s s: 0x%08X sc: 0x%08X", sc->cert_cn, rv,
-                         gnutls_pk_algorithm_get_name(gnutls_x509_privkey_get_pk_algorithm(sc->privkey_x509)),
-                         (unsigned int)s, (unsigned int)sc);
         }
     }
 
@@ -568,7 +570,6 @@ int mgs_hook_fixups(request_rec *r)
         gnutls_x509_crt_get_issuer_dn(ctxt->sc->cert_x509, buf, &len);
         apr_table_setn(env, "SSL_SERVER_I_DN", apr_pstrmemdup(r->pool, buf, len));
     }
-    
     return rv;
 }
 
@@ -585,11 +586,14 @@ int mgs_hook_authz(request_rec *r)
     if (!ctxt) {
         return DECLINED;
     }
-    
-    if (!dc) {
-        dc = mgs_config_dir_create(r->pool, NULL);
+    ap_add_common_vars(r);
+    mgs_hook_fixups(r);
+    status = mgs_authz_lua(r);
+    if (status != 0) {
+        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, 
+                      "GnuTLS: FAILED Lua Authorization Test");
+        return HTTP_FORBIDDEN;
     }
-
     if (dc->client_verify_mode == GNUTLS_CERT_IGNORE) {
         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, 
                       "GnuTLS: Directory set to Ignore Client Certificate!");

@@ -54,7 +54,6 @@ static void gnutls_hooks(apr_pool_t * p)
                               AP_FTYPE_CONNECTION + 5);
 }
 
-
 static const command_rec mgs_config_cmds[] = {
     AP_INIT_TAKE1("GnuTLSClientVerify", mgs_set_client_verify,
                   NULL,
@@ -81,16 +80,24 @@ static const command_rec mgs_config_cmds[] = {
                   RSRC_CONF,
                   "Cache Configuration"),
     AP_INIT_TAKE1("GnuTLSEnable", mgs_set_enabled,
-                  NULL, RSRC_CONF,
+                  NULL,
+                  RSRC_CONF,
                   "Whether this server has GnuTLS Enabled. Default: Off"),
-    
+    AP_INIT_RAW_ARGS("<GnuTLSRequire", mgs_set_require_section,
+                  NULL,
+                  EXEC_ON_READ|OR_ALL,
+                  "Whether this server has GnuTLS Enabled. Default: Off"),
+    AP_INIT_RAW_ARGS("GnuTLSRequireByteCode", mgs_set_require_bytecode,
+                     NULL,
+                     OR_ALL,
+                     "Internal Command for reading Lua Bytecode."),
     {NULL}
 };
 
 module AP_MODULE_DECLARE_DATA gnutls_module = {
     STANDARD20_MODULE_STUFF,
     mgs_config_dir_create,
-    NULL,
+    mgs_config_dir_merge,
     mgs_config_server_create,
     NULL,
     mgs_config_cmds,

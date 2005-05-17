@@ -23,8 +23,18 @@
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
+		4541F3CF081DC7F1007457C1 = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.c;
+			name = gnutls_lua.c;
+			path = src/gnutls_lua.c;
+			refType = 4;
+			sourceTree = "<group>";
+		};
 		45B624630802F1E200CBFD9A = {
 			children = (
+				4541F3CF081DC7F1007457C1,
 				4541F3BA081C4B1A007457C1,
 				4541F3C5081C4F2B007457C1,
 				45B6246D0802F20D00CBFD9A,

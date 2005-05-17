@@ -29,6 +29,8 @@ AC_SUBST(LIBTOOL)
 MIN_TLS_VERSION=1.2.0
 CHECK_LIBGNUTLS($MIN_TLS_VERSION)
 
+CHECK_LUA()
+
 have_apr_memcache=0
 CHECK_APR_MEMCACHE([have_apr_memcache=1], [have_apr_memcache=0])
 AC_SUBST(have_apr_memcache)
