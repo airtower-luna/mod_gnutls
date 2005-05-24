@@ -44,8 +44,9 @@ static void gnutls_hooks(apr_pool_t * p)
     
     /* TODO: HTTP Upgrade Filter */
     /* ap_register_output_filter ("UPGRADE_FILTER", 
-        *          ssl_io_filter_Upgrade, NULL, AP_FTYPE_PROTOCOL + 5);
-*/
+     *          ssl_io_filter_Upgrade, NULL, AP_FTYPE_PROTOCOL + 5);
+     */
+
     ap_register_input_filter(GNUTLS_INPUT_FILTER_NAME,
                              mgs_filter_input, NULL,
                              AP_FTYPE_CONNECTION + 5);

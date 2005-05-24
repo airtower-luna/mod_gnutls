@@ -586,41 +586,66 @@ int mgs_hook_authz(request_rec *r)
     if (!ctxt) {
         return DECLINED;
     }
-    ap_add_common_vars(r);
-    mgs_hook_fixups(r);
-    status = mgs_authz_lua(r);
-    if (status != 0) {
-        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, 
-                      "GnuTLS: FAILED Lua Authorization Test");
-        return HTTP_FORBIDDEN;
-    }
+
     if (dc->client_verify_mode == GNUTLS_CERT_IGNORE) {
         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, 
                       "GnuTLS: Directory set to Ignore Client Certificate!");
-        return DECLINED;
     }
-
-    if (ctxt->sc->client_verify_mode < dc->client_verify_mode) {
-        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, 
-                     "GnuTLS: Attempting to rehandshake with peer. %d %d",
-                      ctxt->sc->client_verify_mode, dc->client_verify_mode);
+    else {
+        if (ctxt->sc->client_verify_mode < dc->client_verify_mode) {
+            ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, 
+                          "GnuTLS: Attempting to rehandshake with peer. %d %d",
+                          ctxt->sc->client_verify_mode, dc->client_verify_mode);
         
-        gnutls_certificate_server_set_request(ctxt->session,
+            gnutls_certificate_server_set_request(ctxt->session,
                                               dc->client_verify_mode);
     
-        if (mgs_rehandshake(ctxt) != 0) {
-            return HTTP_FORBIDDEN;
+            if (mgs_rehandshake(ctxt) != 0) {
+                return HTTP_FORBIDDEN;
+            }
         }
-    }
-    else if (ctxt->sc->client_verify_mode == GNUTLS_CERT_IGNORE) {
+        else if (ctxt->sc->client_verify_mode == GNUTLS_CERT_IGNORE) {
 #if MOD_GNUTLS_DEBUG
         ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
                       "GnuTLS: Peer is set to IGNORE");
 #endif
-        return DECLINED;
+        }
+        else {
+            rv = mgs_cert_verify(r, ctxt);
+            if (rv != DECLINED) {
+                return rv;
+            }
+        }
+
+
+static int mgs_cert_verify(request_rec *r, mgs_handle_t *ctxt)
+{
+    const gnutls_datum_t* cert_list;
+    int cert_list_size;
+    gnutls_x509_crt_t cert;
+
+
+    cert_list = gnutls_certificate_get_peers(ctxt->session, &cert_list_size);
+
+    if (cert_list == NULL || cert_list_size == 0) {
+        /* no certificate provided by the client, but one was required. */
+        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
+                         "GnuTLS: Failed to Verify Peer: "
+                         "Client did not submit a certificate");
+        return HTTP_FORBIDDEN;
     }
-    
-    rv = gnutls_certificate_verify_peers2(ctxt->session, &status);
+
+    if (cert_list_size > 1) {
+        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
+                         "GnuTLS: Failed to Verify Peer: "
+                         "Chained Client Certificates are not supported.");
+        return HTTP_FORBIDDEN;
+    }
+
+    gnutls_x509_crt_init(&cert);
+    gnutls_x509_crt_import(cert, &cert_chain[0], GNUTLS_X509_FMT_DER);
+
+    rv = gnutls_x509_crt_verify(cert, ctxt->sc->ca_list, ctxt->sc->ca_list_size, 0, &status);
 
     if (rv < 0) {
         ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
@@ -629,42 +654,56 @@ int mgs_hook_authz(request_rec *r)
         return HTTP_FORBIDDEN;
     }
     
-    if (status < 0) {
-        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
-                     "GnuTLS: Peer Status is invalid."); 
-        return HTTP_FORBIDDEN;
-    }
+        if (status < 0) {
+            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
+                         "GnuTLS: Peer Status is invalid."); 
+            return HTTP_FORBIDDEN;
+        }
     
-    if (status & GNUTLS_CERT_SIGNER_NOT_FOUND) {
-        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
-                     "GnuTLS: Could not find Signer for Peer Certificate"); 
-    }
+        if (status & GNUTLS_CERT_SIGNER_NOT_FOUND) {
+            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
+                         "GnuTLS: Could not find Signer for Peer Certificate"); 
+        }
     
-    if (status & GNUTLS_CERT_SIGNER_NOT_CA) {
-        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
-                     "GnuTLS: Could not find CA for Peer Certificate"); 
-    }
+        if (status & GNUTLS_CERT_SIGNER_NOT_CA) {
+            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
+                         "GnuTLS: Could not find CA for Peer Certificate"); 
+        }
     
-    if (status & GNUTLS_CERT_INVALID) {
-        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
-                     "GnuTLS: Peer Certificate is invalid."); 
-        return HTTP_FORBIDDEN;
-    }
-    else if (status & GNUTLS_CERT_REVOKED) {
-        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
-                     "GnuTLS: Peer Certificate is revoked."); 
-        return HTTP_FORBIDDEN;
-    }
+        if (status & GNUTLS_CERT_INVALID) {
+            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
+                         "GnuTLS: Peer Certificate is invalid."); 
+            return HTTP_FORBIDDEN;
+        }
+        else if (status & GNUTLS_CERT_REVOKED) {
+            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, 
+                         "GnuTLS: Peer Certificate is revoked."); 
+            return HTTP_FORBIDDEN;
+        }
     
-    /* TODO: OpenPGP Certificates */
-    if (gnutls_certificate_type_get(ctxt->session) != GNUTLS_CRT_X509) {
+        /* TODO: OpenPGP Certificates */
+        if (gnutls_certificate_type_get(ctxt->session) != GNUTLS_CRT_X509) {
+            ap_log_rerror(APLOG_MARK, APLOG_CRIT, 0, r, 
+                         "GnuTLS: Only x509 is supported for client certificates");         
+            return HTTP_FORBIDDEN;
+        }
+        /* TODO: Further Verification. */
+//        gnutls_x509_crt_get_expiration_time() < time 
+//        gnutls_x509_crt_get_activation_time() > time
+/// ret = gnutls_x509_crt_check_revocation(crt, crl_list, crl_list_size);
         ap_log_rerror(APLOG_MARK, APLOG_CRIT, 0, r, 
-                     "GnuTLS: Only x509 is supported for client certificates");         
+                 "GnuTLS: Verified Peer.");     
+    }
+
+    ap_add_common_vars(r);
+    mgs_hook_fixups(r);
+    status = mgs_authz_lua(r);
+
+    if (status != 0) {
+        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, 
+                      "GnuTLS: FAILED Authorization Test");
         return HTTP_FORBIDDEN;
     }
-    /* TODO: Further Verification. */
-    ap_log_rerror(APLOG_MARK, APLOG_CRIT, 0, r, 
-                 "GnuTLS: Verified Peer.");             
-    return OK;
+
 }
 
