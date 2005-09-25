@@ -353,10 +353,13 @@ static apr_status_t gnutls_io_input_getline(mgs_handle_t * ctxt,
     return APR_SUCCESS;
 }
 
+#define HANDSHAKE_MAX_TRIES 100
 static int gnutls_do_handshake(mgs_handle_t * ctxt)
 {
     int ret;
     int errcode;
+    int maxtries = HANDSHAKE_MAX_TRIES;
+
     if (ctxt->status != 0) {
         return -1;
     }
@@ -364,8 +367,24 @@ static int gnutls_do_handshake(mgs_handle_t * ctxt)
 tryagain:
     do {
         ret = gnutls_handshake(ctxt->session);
-    } while (ret == GNUTLS_E_AGAIN);
-    
+        maxtries--;
+    } while (ret == GNUTLS_E_AGAIN && maxtries > 0);
+
+    if (maxtries < 1) {
+        ctxt->status = -1;
+#if USING_2_1_RECENT
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, ctxt->c,
+                     "GnuTLS: Handshake Failed. Hit Maximum Attempts");
+#else
+        ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
+                     "GnuTLS: Handshake Failed. Hit Maximum Attempts");
+#endif
+        gnutls_alert_send(ctxt->session, GNUTLS_AL_FATAL, 
+                          gnutls_error_to_alert(ret, NULL));
+        gnutls_deinit(ctxt->session);
+        return -1;
+    }
+
     if (ret < 0) {
         if (ret == GNUTLS_E_WARNING_ALERT_RECEIVED
             || ret == GNUTLS_E_FATAL_ALERT_RECEIVED) {
