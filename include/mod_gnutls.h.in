@@ -76,24 +76,35 @@ typedef struct
     apr_size_t lua_bytecode_len;
 } mgs_dirconf_rec;
 
+
+/* The maximum number of client CA certificates allowed.
+ */
+#define MAX_CA_CRTS 128
+#define MAX_CIPHERS 16
+
 typedef struct
 {
     gnutls_certificate_credentials_t certs;
+    gnutls_srp_server_credentials_t srp_creds;
+    gnutls_anon_server_credentials_t anon_creds;
     char* cert_cn;
     gnutls_x509_crt_t cert_x509;
     gnutls_x509_privkey_t privkey_x509;
     int enabled;
-    int ciphers[16];
-    int key_exchange[16];
-    int macs[16];
-    int protocol[16];
-    int compression[16];
-    int cert_types[16];
-    apr_time_t cache_timeout;
+    /* whether to send the PEM encoded certificates
+     * to CGIs
+     */
+    int export_certificates_enabled;
+    gnutls_priority_t priorities;
+    int cache_timeout;
     mgs_cache_e cache_type;
     const char* cache_config;
     const char* rsa_params_file;
     const char* dh_params_file;
+    const char* srp_tpasswd_file;
+    const char* srp_tpasswd_conf_file;
+    gnutls_x509_crt_t ca_list[MAX_CA_CRTS];
+    unsigned int ca_list_size;
     int client_verify_mode;
 } mgs_srvconf_rec;
 
@@ -214,9 +225,25 @@ int mgs_cache_session_init(mgs_handle_t *ctxt);
 char *mgs_session_id2sz(unsigned char *id, int idlen,
                                 char *str, int strsize);
 
+/**
+ * Convert a time_t into a Null Terminated String
+ * @param t time_t time
+ * @param str Location to store the Hex Encoded String
+ * @param strsize The Maximum Length that can be stored in str
+ */
+char *mgs_time2sz(time_t t, char *str, int strsize);
+
 
 /* Configuration Functions */
 
+const char *mgs_set_srp_tpasswd_conf_file(cmd_parms * parms, void *dummy,
+                                        const char *arg);
+const char *mgs_set_srp_tpasswd_file(cmd_parms * parms, void *dummy,
+                                        const char *arg);
+const char *mgs_set_dh_file(cmd_parms * parms, void *dummy,
+                                        const char *arg);
+const char *mgs_set_rsa_export_file(cmd_parms * parms, void *dummy,
+                                        const char *arg);
 const char *mgs_set_cert_file(cmd_parms * parms, void *dummy,
                                         const char *arg);
 
@@ -236,6 +263,10 @@ const char *mgs_set_client_ca_file(cmd_parms * parms, void *dummy,
                                    const char *arg);
 
 const char *mgs_set_enabled(cmd_parms * parms, void *dummy,
+                            const char *arg);
+const char *mgs_set_export_certificates_enabled(cmd_parms * parms, void *dummy,
+                            const char *arg);
+const char *mgs_set_priorities(cmd_parms * parms, void *dummy,
                             const char *arg);
                             
 const char *mgs_set_require_section(cmd_parms *cmd, 

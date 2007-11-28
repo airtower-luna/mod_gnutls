@@ -543,8 +543,7 @@ apr_status_t mgs_filter_output(ap_filter_t * f,
         apr_bucket *bucket = APR_BRIGADE_FIRST(bb);
         if (AP_BUCKET_IS_EOC(bucket)) {
             do {
-                ret = gnutls_alert_send(ctxt->session, GNUTLS_AL_FATAL,
-                                        GNUTLS_A_CLOSE_NOTIFY);
+                ret = gnutls_bye( ctxt->session, GNUTLS_SHUT_WR);
             } while(ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
 
             apr_bucket_copy(bucket, &e);
@@ -556,7 +555,6 @@ apr_status_t mgs_filter_output(ap_filter_t * f,
             }
 
             apr_brigade_cleanup(ctxt->output_bb);
-            gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
             gnutls_deinit(ctxt->session);
             continue;
 
@@ -568,6 +566,7 @@ apr_status_t mgs_filter_output(ap_filter_t * f,
                 apr_brigade_cleanup(ctxt->output_bb);
                 return status;
             }
+
             apr_brigade_cleanup(ctxt->output_bb);
             continue;
         }
@@ -599,7 +598,7 @@ apr_status_t mgs_filter_output(ap_filter_t * f,
                 ap_log_error(APLOG_MARK, APLOG_INFO, ctxt->output_rc,
                              ctxt->c->base_server,
                              "GnuTLS: Error writing data."
-                             " (%d) '%s'", ret, gnutls_strerror(ret));
+                             " (%d) '%s'", (int)ret, gnutls_strerror(ret));
                 if (ctxt->output_rc == APR_SUCCESS) {
                     ctxt->output_rc = APR_EGENERAL;
                 }
