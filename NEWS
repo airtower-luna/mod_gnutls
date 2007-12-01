@@ -1,0 +1,4 @@
+** Version 0.4.1 (unreleased)
+
+- Added support for subject alternative names in certificates.
+Only one per certificate is supported.
