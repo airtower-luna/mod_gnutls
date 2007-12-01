@@ -332,7 +332,7 @@ const char *mgs_set_export_certificates_enabled(cmd_parms * parms, void *dummy,
 const char *mgs_set_priorities(cmd_parms * parms, void *dummy, const char *arg)
 {
     int ret;
-    char *err;
+    const char *err;
     mgs_srvconf_rec *sc =
 	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
 						 module_config,
