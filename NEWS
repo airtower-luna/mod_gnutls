@@ -8,3 +8,7 @@ SSL_CLIENT_S_TYPE, SSL_SERVER_M_VERSION, SSL_SERVER_S_SAN%, SSL_SERVER_S_TYPE
 
 - The compatibility mode can now be enabled explicitely with the
 %COMPAT keyword at the GnuTLSPriorities string. It is no longer the default.
+
+- Check for GnuTLSPriorities directive.
+
+- No longer default paths for RSA and DH parameter files.
