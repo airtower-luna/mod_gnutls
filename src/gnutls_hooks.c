@@ -631,11 +631,6 @@ static mgs_handle_t *create_gnutls_handle(apr_pool_t * pool, conn_rec * c)
 
     gnutls_init(&ctxt->session, GNUTLS_SERVER);
 
-    /* This is not very good as it trades security for compatibility,
-     * but it is the only way to be ultra-portable.
-     */
-    gnutls_session_enable_compatibility_mode(ctxt->session);
-
     /* because we don't set any default priorities here (we set later at
      * the user hello callback) we need to at least set this in order for
      * gnutls to be able to read packets.

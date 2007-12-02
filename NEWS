@@ -5,3 +5,6 @@ Only one per certificate is supported.
 
 - New enviroment variables: SSL_CLIENT_M_VERSION, SSL_CLIENT_S_SAN%, 
 SSL_CLIENT_S_TYPE, SSL_SERVER_M_VERSION, SSL_SERVER_S_SAN%, SSL_SERVER_S_TYPE
+
+- The compatibility mode can now be enabled explicitely with the
+%COMPAT keyword at the GnuTLSPriorities string. It is no longer the default.
