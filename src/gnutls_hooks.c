@@ -222,11 +222,10 @@ static int read_crt_cn(apr_pool_t * p, gnutls_x509_crt cert,
 				       GNUTLS_OID_X520_COMMON_NAME,
 				       0, 0, NULL, &data_len);
 
-    if (rv >= 0 && data_len > 1) {
+    if (rv == GNUTLS_E_SHORT_MEMORY_BUFFER && data_len > 1) {
 	*cert_cn = apr_palloc(p, data_len);
 	rv = gnutls_x509_crt_get_dn_by_oid(cert,
-					   GNUTLS_OID_X520_COMMON_NAME, 0,
-					   0, *cert_cn, &data_len);
+                  GNUTLS_OID_X520_COMMON_NAME, 0, 0, *cert_cn, &data_len);
     } else {			/* No CN return subject alternative name */
 
 	/* read subject alternative name */
@@ -356,11 +355,16 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 
 	    if (sc->srp_tpasswd_conf_file != NULL
 		&& sc->srp_tpasswd_file != NULL) {
-		gnutls_srp_set_server_credentials_file(sc->srp_creds,
-						       sc->
-						       srp_tpasswd_file,
-						       sc->
-						       srp_tpasswd_conf_file);
+		rv = gnutls_srp_set_server_credentials_file(sc->srp_creds,
+		       sc->srp_tpasswd_file, sc->srp_tpasswd_conf_file);
+                
+                if (rv < 0 && sc->enabled == GNUTLS_ENABLED_TRUE) {
+		  ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
+			     "[GnuTLS] - Host '%s:%d' is missing a "
+			     "SRP password or conf File!", s->server_hostname,
+			     s->port);
+                  exit(-1);
+                }
 	    }
 
 	    if (sc->cert_x509 == NULL
@@ -384,6 +388,9 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 	    if (sc->enabled == GNUTLS_ENABLED_TRUE) {
 		rv = read_crt_cn(p, sc->cert_x509, &sc->cert_cn);
 		if (rv < 0) {
+  		    ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
+			     "[GnuTLS] - Cannot find a certificate for host '%s:%d'! Disabling TLS.",
+			     s->server_hostname, s->port);
 		    sc->enabled = GNUTLS_ENABLED_FALSE;
 		    sc->cert_cn = NULL;
 		    continue;
