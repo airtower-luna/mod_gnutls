@@ -891,19 +891,19 @@ mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt cert, int side,
 
 	    if (ret == GNUTLS_SAN_DNSNAME) {
 		apr_table_setn(env,
-		       apr_psprintf(r->pool, "%s_SAN%u", MGS_SIDE, i), 
+		       apr_psprintf(r->pool, "%s_S_SAN%u", MGS_SIDE, i), 
 		       apr_psprintf(r->pool, "DNSNAME:%s", tmp2));
 	    } else if (ret == GNUTLS_SAN_RFC822NAME) {
 		apr_table_setn(env,
-		       apr_psprintf(r->pool, "%s_SAN%u", MGS_SIDE, i), 
+		       apr_psprintf(r->pool, "%s_S_SAN%u", MGS_SIDE, i), 
 		       apr_psprintf(r->pool, "RFC822NAME:%s", tmp2));
 	    } else if (ret == GNUTLS_SAN_URI) {
 		apr_table_setn(env,
-		       apr_psprintf(r->pool, "%s_SAN%u", MGS_SIDE, i), 
+		       apr_psprintf(r->pool, "%s_S_SAN%u", MGS_SIDE, i), 
 		       apr_psprintf(r->pool, "URI:%s", tmp2));
             } else {
 		apr_table_setn(env,
-		       apr_psprintf(r->pool, "%s_SAN%u", MGS_SIDE, i), 
+		       apr_psprintf(r->pool, "%s_S_SAN%u", MGS_SIDE, i), 
 		       "UNSUPPORTED");
             }
 	}
