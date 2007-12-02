@@ -209,8 +209,8 @@ const char static_dh_params[] = "-----BEGIN DH PARAMETERS-----\n"
  *
  * Returns negative on error.
  */
-static int read_crt_cn(server_rec *s, apr_pool_t * p, gnutls_x509_crt cert,
-		       char **cert_cn)
+static int read_crt_cn(server_rec * s, apr_pool_t * p,
+		       gnutls_x509_crt cert, char **cert_cn)
 {
     int rv = 0, i;
     size_t data_len;
@@ -225,33 +225,37 @@ static int read_crt_cn(server_rec *s, apr_pool_t * p, gnutls_x509_crt cert,
     if (rv == GNUTLS_E_SHORT_MEMORY_BUFFER && data_len > 1) {
 	*cert_cn = apr_palloc(p, data_len);
 	rv = gnutls_x509_crt_get_dn_by_oid(cert,
-                  GNUTLS_OID_X520_COMMON_NAME, 0, 0, *cert_cn, &data_len);
+					   GNUTLS_OID_X520_COMMON_NAME, 0,
+					   0, *cert_cn, &data_len);
     } else {			/* No CN return subject alternative name */
 	ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
-		     "No common name found in certificate for '%s:%d'. Looking for subject alternative name.", 
+		     "No common name found in certificate for '%s:%d'. Looking for subject alternative name.",
 		     s->server_hostname, s->port);
-        rv = 0;
+	rv = 0;
 	/* read subject alternative name */
 	for (i = 0; !(rv < 0); i++) {
+	    data_len = 0;
 	    rv = gnutls_x509_crt_get_subject_alt_name(cert, i,
-		    NULL, &data_len, NULL);
+						      NULL, &data_len,
+						      NULL);
 
-            if (rv == GNUTLS_E_SHORT_MEMORY_BUFFER && data_len > 1) {
-                /* FIXME: not very efficient. What if we have several alt names
-                 * before DNSName?
-                 */
-                *cert_cn = apr_palloc(p, data_len+1);
-               
-                rv = gnutls_x509_crt_get_subject_alt_name(cert, i,
-	          *cert_cn, &data_len, NULL);
-                (*cert_cn)[data_len]=0;
+	    if (rv == GNUTLS_E_SHORT_MEMORY_BUFFER && data_len > 1) {
+		/* FIXME: not very efficient. What if we have several alt names
+		 * before DNSName?
+		 */
+		*cert_cn = apr_palloc(p, data_len + 1);
 
-    	        if (rv == GNUTLS_SAN_DNSNAME)
-                  break;
-            }
+		rv = gnutls_x509_crt_get_subject_alt_name(cert, i,
+							  *cert_cn,
+							  &data_len, NULL);
+		(*cert_cn)[data_len] = 0;
+
+		if (rv == GNUTLS_SAN_DNSNAME)
+		    break;
+	    }
 	}
     }
-    
+
     return rv;
 
 }
@@ -365,15 +369,18 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 	    if (sc->srp_tpasswd_conf_file != NULL
 		&& sc->srp_tpasswd_file != NULL) {
 		rv = gnutls_srp_set_server_credentials_file(sc->srp_creds,
-		       sc->srp_tpasswd_file, sc->srp_tpasswd_conf_file);
-                
-                if (rv < 0 && sc->enabled == GNUTLS_ENABLED_TRUE) {
-		  ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
-			     "[GnuTLS] - Host '%s:%d' is missing a "
-			     "SRP password or conf File!", s->server_hostname,
-			     s->port);
-                  exit(-1);
-                }
+							    sc->
+							    srp_tpasswd_file,
+							    sc->
+							    srp_tpasswd_conf_file);
+
+		if (rv < 0 && sc->enabled == GNUTLS_ENABLED_TRUE) {
+		    ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
+				 "[GnuTLS] - Host '%s:%d' is missing a "
+				 "SRP password or conf File!",
+				 s->server_hostname, s->port);
+		    exit(-1);
+		}
 	    }
 
 	    if (sc->cert_x509 == NULL
@@ -397,9 +404,9 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 	    if (sc->enabled == GNUTLS_ENABLED_TRUE) {
 		rv = read_crt_cn(s, p, sc->cert_x509, &sc->cert_cn);
 		if (rv < 0) {
-  		    ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
-			     "[GnuTLS] - Cannot find a certificate for host '%s:%d'!",
-			     s->server_hostname, s->port);
+		    ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
+				 "[GnuTLS] - Cannot find a certificate for host '%s:%d'!",
+				 s->server_hostname, s->port);
 		    sc->cert_cn = NULL;
 		    continue;
 		}
@@ -502,7 +509,7 @@ static int vhost_cb(void *baton, conn_rec * conn, server_rec * s)
 		     "GnuTLS: Virtual Host CB: "
 		     "'%s' != '%s'", tsc->cert_cn, x->sni_name);
 #endif
-    
+
     }
     return 0;
 }
@@ -801,8 +808,9 @@ mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt cert, int side,
     unsigned char sbuf[64];	/* buffer to hold serials */
     char buf[AP_IOBUFSIZE];
     const char *tmp;
+    char *tmp2;
     size_t len;
-    int alg;
+    int ret, i;
 
     apr_table_t *env = r->subprocess_env;
 
@@ -834,10 +842,11 @@ mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt cert, int side,
     apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_M_SERIAL", NULL),
 		   apr_pstrdup(r->pool, tmp));
 
-    alg = gnutls_x509_crt_get_version(cert);
-    if (alg > 0)
-      apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_M_VERSION", NULL),
-		   apr_psprintf(r->pool, "%u", alg));
+    ret = gnutls_x509_crt_get_version(cert);
+    if (ret > 0)
+	apr_table_setn(env,
+		       apr_pstrcat(r->pool, MGS_SIDE, "_M_VERSION", NULL),
+		       apr_psprintf(r->pool, "%u", ret));
 
     tmp =
 	mgs_time2sz(gnutls_x509_crt_get_expiration_time
@@ -851,16 +860,50 @@ mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt cert, int side,
     apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_V_START", NULL),
 		   apr_pstrdup(r->pool, tmp));
 
-    alg = gnutls_x509_crt_get_signature_algorithm(cert);
-    if (alg >= 0) {
+    ret = gnutls_x509_crt_get_signature_algorithm(cert);
+    if (ret >= 0) {
 	apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_A_SIG", NULL),
-		       gnutls_sign_algorithm_get_name(alg));
+		       gnutls_sign_algorithm_get_name(ret));
     }
 
-    alg = gnutls_x509_crt_get_pk_algorithm(cert, NULL);
-    if (alg >= 0) {
+    ret = gnutls_x509_crt_get_pk_algorithm(cert, NULL);
+    if (ret >= 0) {
 	apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_A_KEY", NULL),
-		       gnutls_pk_algorithm_get_name(alg));
+		       gnutls_pk_algorithm_get_name(ret));
+    }
+
+    /* export all the alternative names (DNS, RFC822 and URI) */
+    for (i = 0; !(ret < 0); i++) {
+	len = 0;
+	ret = gnutls_x509_crt_get_subject_alt_name(cert, i,
+						   NULL, &len, NULL);
+
+	if (ret == GNUTLS_E_SHORT_MEMORY_BUFFER && len > 1) {
+	    tmp2 = apr_palloc(r->pool, len + 1);
+
+	    ret =
+		gnutls_x509_crt_get_subject_alt_name(cert, i, tmp2, &len,
+						     NULL);
+	    tmp2[len] = 0;
+
+	    if (ret == GNUTLS_SAN_DNSNAME) {
+		apr_table_setn(env,
+		       apr_psprintf(r->pool, "%s_SAN%u", MGS_SIDE, i), 
+		       apr_psprintf(r->pool, "DNSNAME:%s", tmp2));
+	    } else if (ret == GNUTLS_SAN_RFC822NAME) {
+		apr_table_setn(env,
+		       apr_psprintf(r->pool, "%s_SAN%u", MGS_SIDE, i), 
+		       apr_psprintf(r->pool, "RFC822NAME:%s", tmp2));
+	    } else if (ret == GNUTLS_SAN_URI) {
+		apr_table_setn(env,
+		       apr_psprintf(r->pool, "%s_SAN%u", MGS_SIDE, i), 
+		       apr_psprintf(r->pool, "URI:%s", tmp2));
+            } else {
+		apr_table_setn(env,
+		       apr_psprintf(r->pool, "%s_SAN%u", MGS_SIDE, i), 
+		       "UNSUPPORTED");
+            }
+	}
     }
 
 
