@@ -367,9 +367,6 @@ void *mgs_config_server_create(apr_pool_t * p, server_rec * s)
     sc->cache_type = mgs_cache_dbm;
     sc->cache_config = ap_server_root_relative(p, "conf/gnutls_cache");
 
-    sc->dh_params_file = ap_server_root_relative(p, "conf/dhfile");
-    sc->rsa_params_file = ap_server_root_relative(p, "conf/rsafile");
-
     sc->client_verify_mode = GNUTLS_CERT_IGNORE;
 
     return sc;

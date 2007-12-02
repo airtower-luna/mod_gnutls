@@ -97,7 +97,7 @@ load_params(const char *file, server_rec * s, apr_pool_t * pool)
     rv = apr_file_open(&fp, file, APR_READ | APR_BINARY, APR_OS_DEFAULT,
 		       pool);
     if (rv != APR_SUCCESS) {
-	ap_log_error(APLOG_MARK, APLOG_INFO, rv, s,
+	ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, s,
 		     "GnuTLS failed to load params file at: %s. Will use internal params.",
 		     file);
 	return ret;
@@ -106,7 +106,7 @@ load_params(const char *file, server_rec * s, apr_pool_t * pool)
     rv = apr_file_info_get(&finfo, APR_FINFO_SIZE, fp);
 
     if (rv != APR_SUCCESS) {
-	ap_log_error(APLOG_MARK, APLOG_INFO, rv, s,
+	ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, s,
 		     "GnuTLS failed to stat params file at: %s", file);
 	return ret;
     }
@@ -115,7 +115,7 @@ load_params(const char *file, server_rec * s, apr_pool_t * pool)
     rv = apr_file_read_full(fp, ret.data, finfo.size, &br);
 
     if (rv != APR_SUCCESS) {
-	ap_log_error(APLOG_MARK, APLOG_INFO, rv, s,
+	ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, s,
 		     "GnuTLS failed to read params file at: %s", file);
 	return ret;
     }
@@ -266,8 +266,8 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 {
     int rv;
     server_rec *s;
-    gnutls_dh_params_t dh_params;
-    gnutls_rsa_params_t rsa_params;
+    gnutls_dh_params_t dh_params = NULL;
+    gnutls_rsa_params_t rsa_params = NULL;
     mgs_srvconf_rec *sc;
     mgs_srvconf_rec *sc_base;
     void *data = NULL;
@@ -284,7 +284,7 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 
 
     {
-	gnutls_datum pdata;
+	gnutls_datum pdata = { NULL, 0 };
 	apr_pool_t *tpool;
 	s = base_server;
 	sc_base =
@@ -293,9 +293,11 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 
 	apr_pool_create(&tpool, p);
 
+
 	gnutls_dh_params_init(&dh_params);
 
-	pdata = load_params(sc_base->dh_params_file, s, tpool);
+	if (sc_base->dh_params_file)
+  	    pdata = load_params(sc_base->dh_params_file, s, tpool);
 
 	if (pdata.size != 0) {
 	    rv = gnutls_dh_params_import_pkcs3(dh_params, &pdata,
@@ -323,9 +325,11 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 	}
 	apr_pool_clear(tpool);
 
-	rsa_params = NULL;
+	pdata.data = NULL;
+	pdata.size = 0;
 
-	pdata = load_params(sc_base->rsa_params_file, s, tpool);
+	if (sc_base->rsa_params_file)
+  	    pdata = load_params(sc_base->rsa_params_file, s, tpool);
 
 	if (pdata.size != 0) {
 	    gnutls_rsa_params_init(&rsa_params);
@@ -356,10 +360,21 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 	    sc->cache_type = sc_base->cache_type;
 	    sc->cache_config = sc_base->cache_config;
 
+            /* Check if the priorities have been set */
+            if (sc->priorities == NULL) {
+                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+		     "GnuTLS: Host '%s:%d' is missing the GnuTLSPriorities directive!",
+			     s->server_hostname, s->port);
+		exit(-1);
+            }
+
 	    if (rsa_params != NULL)
 		gnutls_certificate_set_rsa_export_params(sc->certs,
 							 rsa_params);
-	    gnutls_certificate_set_dh_params(sc->certs, dh_params);
+            
+            if (dh_params != NULL) /* not needed but anyway */
+	        gnutls_certificate_set_dh_params(sc->certs, dh_params);
+
 
 	    gnutls_anon_set_server_dh_params(sc->anon_creds, dh_params);
 
