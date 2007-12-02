@@ -2,3 +2,6 @@
 
 - Added support for subject alternative names in certificates.
 Only one per certificate is supported.
+
+- New enviroment variables: SSL_CLIENT_M_VERSION, SSL_CLIENT_SAN%, 
+SSL_SERVER_M_VERSION, SSL_SERVER_SAN%
