@@ -97,7 +97,7 @@ load_params(const char *file, server_rec * s, apr_pool_t * pool)
     rv = apr_file_open(&fp, file, APR_READ | APR_BINARY, APR_OS_DEFAULT,
 		       pool);
     if (rv != APR_SUCCESS) {
-	ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, s,
+	ap_log_error(APLOG_MARK, APLOG_INFO, rv, s,
 		     "GnuTLS failed to load params file at: %s. Will use internal params.",
 		     file);
 	return ret;
@@ -106,7 +106,7 @@ load_params(const char *file, server_rec * s, apr_pool_t * pool)
     rv = apr_file_info_get(&finfo, APR_FINFO_SIZE, fp);
 
     if (rv != APR_SUCCESS) {
-	ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, s,
+	ap_log_error(APLOG_MARK, APLOG_INFO, rv, s,
 		     "GnuTLS failed to stat params file at: %s", file);
 	return ret;
     }
@@ -115,7 +115,7 @@ load_params(const char *file, server_rec * s, apr_pool_t * pool)
     rv = apr_file_read_full(fp, ret.data, finfo.size, &br);
 
     if (rv != APR_SUCCESS) {
-	ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, s,
+	ap_log_error(APLOG_MARK, APLOG_INFO, rv, s,
 		     "GnuTLS failed to read params file at: %s", file);
 	return ret;
     }
@@ -209,7 +209,7 @@ const char static_dh_params[] = "-----BEGIN DH PARAMETERS-----\n"
  *
  * Returns negative on error.
  */
-static int read_crt_cn(apr_pool_t * p, gnutls_x509_crt cert,
+static int read_crt_cn(server_rec *s, apr_pool_t * p, gnutls_x509_crt cert,
 		       char **cert_cn)
 {
     int rv = 0, i;
@@ -227,19 +227,28 @@ static int read_crt_cn(apr_pool_t * p, gnutls_x509_crt cert,
 	rv = gnutls_x509_crt_get_dn_by_oid(cert,
                   GNUTLS_OID_X520_COMMON_NAME, 0, 0, *cert_cn, &data_len);
     } else {			/* No CN return subject alternative name */
-
+	ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
+		     "No common name found in certificate for '%s:%d'. Looking for subject alternative name.", 
+		     s->server_hostname, s->port);
+        rv = 0;
 	/* read subject alternative name */
 	for (i = 0; !(rv < 0); i++) {
 	    rv = gnutls_x509_crt_get_subject_alt_name(cert, i,
 		    NULL, &data_len, NULL);
-		    
-	    if (rv == GNUTLS_SAN_DNSNAME) {
-		*cert_cn = apr_palloc(p, data_len);
-		rv = gnutls_x509_crt_get_subject_alt_name(cert, i,
-		    *cert_cn, &data_len, NULL);
-                break;
 
-	    }
+            if (rv == GNUTLS_E_SHORT_MEMORY_BUFFER && data_len > 1) {
+                /* FIXME: not very efficient. What if we have several alt names
+                 * before DNSName?
+                 */
+                *cert_cn = apr_palloc(p, data_len+1);
+               
+                rv = gnutls_x509_crt_get_subject_alt_name(cert, i,
+	          *cert_cn, &data_len, NULL);
+                (*cert_cn)[data_len]=0;
+
+    	        if (rv == GNUTLS_SAN_DNSNAME)
+                  break;
+            }
 	}
     }
     
@@ -386,12 +395,11 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 	    }
 
 	    if (sc->enabled == GNUTLS_ENABLED_TRUE) {
-		rv = read_crt_cn(p, sc->cert_x509, &sc->cert_cn);
+		rv = read_crt_cn(s, p, sc->cert_x509, &sc->cert_cn);
 		if (rv < 0) {
   		    ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
-			     "[GnuTLS] - Cannot find a certificate for host '%s:%d'! Disabling TLS.",
+			     "[GnuTLS] - Cannot find a certificate for host '%s:%d'!",
 			     s->server_hostname, s->port);
-		    sc->enabled = GNUTLS_ENABLED_FALSE;
 		    sc->cert_cn = NULL;
 		    continue;
 		}
@@ -487,6 +495,14 @@ static int vhost_cb(void *baton, conn_rec * conn, server_rec * s)
 	 * acccckkkkkk. 
 	 */
 	return 1;
+    } else {
+#if MOD_GNUTLS_DEBUG
+	ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
+		     x->ctxt->c->base_server,
+		     "GnuTLS: Virtual Host CB: "
+		     "'%s' != '%s'", tsc->cert_cn, x->sni_name);
+#endif
+    
     }
     return 0;
 }
