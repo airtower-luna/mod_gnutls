@@ -361,7 +361,7 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 	    sc->cache_config = sc_base->cache_config;
 
             /* Check if the priorities have been set */
-            if (sc->priorities == NULL) {
+            if (sc->priorities == NULL && sc->enabled == GNUTLS_ENABLED_TRUE) {
                 ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
 		     "GnuTLS: Host '%s:%d' is missing the GnuTLSPriorities directive!",
 			     s->server_hostname, s->port);
