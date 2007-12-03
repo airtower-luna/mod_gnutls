@@ -54,12 +54,34 @@ static int load_datum_from_file(apr_pool_t * pool,
 const char *mgs_set_dh_file(cmd_parms * parms, void *dummy,
 			    const char *arg)
 {
+    int ret;
+    gnutls_datum_t data;
+    const char *file;
+    apr_pool_t *spool;
     mgs_srvconf_rec *sc =
 	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
 						 module_config,
 						 &gnutls_module);
 
-    sc->dh_params_file = ap_server_root_relative(parms->pool, arg);
+    apr_pool_create(&spool, parms->pool);
+
+    file = ap_server_root_relative(spool, arg);
+
+    if (load_datum_from_file(spool, file, &data) != 0) {
+	return apr_psprintf(parms->pool, "GnuTLS: Error Reading "
+			    "DH params '%s'", file);
+    }
+
+    gnutls_dh_params_init(&sc->dh_params);
+    ret =
+	gnutls_dh_params_import_pkcs3(sc->dh_params, &data, GNUTLS_X509_FMT_PEM);
+    if (ret != 0) {
+	return apr_psprintf(parms->pool, "GnuTLS: Failed to Import "
+			    "DH params '%s': (%d) %s", file, ret,
+			    gnutls_strerror(ret));
+    }
+
+    apr_pool_destroy(spool);
 
     return NULL;
 }
@@ -67,13 +89,34 @@ const char *mgs_set_dh_file(cmd_parms * parms, void *dummy,
 const char *mgs_set_rsa_export_file(cmd_parms * parms, void *dummy,
 				    const char *arg)
 {
+    int ret;
+    gnutls_datum_t data;
+    const char *file;
+    apr_pool_t *spool;
     mgs_srvconf_rec *sc =
 	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
 						 module_config,
 						 &gnutls_module);
 
-    sc->rsa_params_file = ap_server_root_relative(parms->pool, arg);
+    apr_pool_create(&spool, parms->pool);
 
+    file = ap_server_root_relative(spool, arg);
+
+    if (load_datum_from_file(spool, file, &data) != 0) {
+	return apr_psprintf(parms->pool, "GnuTLS: Error Reading "
+			    "RSA params '%s'", file);
+    }
+
+    gnutls_rsa_params_init(&sc->rsa_params);
+    ret =
+	gnutls_rsa_params_import_pkcs1(sc->rsa_params, &data, GNUTLS_X509_FMT_PEM);
+    if (ret != 0) {
+	return apr_psprintf(parms->pool, "GnuTLS: Failed to Import "
+			    "RSA params '%s': (%d) %s", file, ret,
+			    gnutls_strerror(ret));
+    }
+
+    apr_pool_destroy(spool);
     return NULL;
 }
 
@@ -103,7 +146,7 @@ const char *mgs_set_cert_file(cmd_parms * parms, void *dummy,
 	gnutls_x509_crt_import(sc->cert_x509, &data, GNUTLS_X509_FMT_PEM);
     if (ret != 0) {
 	return apr_psprintf(parms->pool, "GnuTLS: Failed to Import "
-			    "Certificate'%s': (%d) %s", file, ret,
+			    "Certificate '%s': (%d) %s", file, ret,
 			    gnutls_strerror(ret));
     }
 

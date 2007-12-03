@@ -96,11 +96,11 @@ typedef struct
      */
     int export_certificates_enabled;
     gnutls_priority_t priorities;
+    gnutls_rsa_params_t rsa_params;
+    gnutls_dh_params_t dh_params;
     int cache_timeout;
     mgs_cache_e cache_type;
     const char* cache_config;
-    const char* rsa_params_file;
-    const char* dh_params_file;
     const char* srp_tpasswd_file;
     const char* srp_tpasswd_conf_file;
     gnutls_x509_crt_t ca_list[MAX_CA_CRTS];

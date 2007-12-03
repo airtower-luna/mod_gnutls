@@ -84,48 +84,6 @@ mgs_hook_pre_config(apr_pool_t * pconf,
     return OK;
 }
 
-
-static gnutls_datum
-load_params(const char *file, server_rec * s, apr_pool_t * pool)
-{
-    gnutls_datum ret = { NULL, 0 };
-    apr_file_t *fp;
-    apr_finfo_t finfo;
-    apr_status_t rv;
-    apr_size_t br = 0;
-
-    rv = apr_file_open(&fp, file, APR_READ | APR_BINARY, APR_OS_DEFAULT,
-		       pool);
-    if (rv != APR_SUCCESS) {
-	ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, s,
-		     "GnuTLS failed to load params file at: %s. Will use internal params.",
-		     file);
-	return ret;
-    }
-
-    rv = apr_file_info_get(&finfo, APR_FINFO_SIZE, fp);
-
-    if (rv != APR_SUCCESS) {
-	ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, s,
-		     "GnuTLS failed to stat params file at: %s", file);
-	return ret;
-    }
-
-    ret.data = apr_palloc(pool, finfo.size + 1);
-    rv = apr_file_read_full(fp, ret.data, finfo.size, &br);
-
-    if (rv != APR_SUCCESS) {
-	ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, s,
-		     "GnuTLS failed to read params file at: %s", file);
-	return ret;
-    }
-    apr_file_close(fp);
-    ret.data[br] = '\0';
-    ret.size = br;
-
-    return ret;
-}
-
 /* We don't support openpgp certificates, yet */
 const static int cert_type_prio[2] = { GNUTLS_CRT_X509, 0 };
 
@@ -284,68 +242,33 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 
 
     {
-	gnutls_datum pdata = { NULL, 0 };
-	apr_pool_t *tpool;
 	s = base_server;
 	sc_base =
 	    (mgs_srvconf_rec *) ap_get_module_config(s->module_config,
 						     &gnutls_module);
 
-	apr_pool_create(&tpool, p);
-
-
 	gnutls_dh_params_init(&dh_params);
 
-	if (sc_base->dh_params_file)
-  	    pdata = load_params(sc_base->dh_params_file, s, tpool);
-
-	if (pdata.size != 0) {
-	    rv = gnutls_dh_params_import_pkcs3(dh_params, &pdata,
-					       GNUTLS_X509_FMT_PEM);
-	    if (rv != 0) {
-		ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			     "GnuTLS: Unable to load DH Params: (%d) %s",
-			     rv, gnutls_strerror(rv));
-		exit(rv);
-	    }
-	} else {
-	    /* If the file does not exist use internal parameters
-	     */
-	    pdata.data = (void *) static_dh_params;
-	    pdata.size = sizeof(static_dh_params);
-	    rv = gnutls_dh_params_import_pkcs3(dh_params, &pdata,
+	if (sc_base->dh_params == NULL) {
+	    gnutls_datum pdata = { (void *) static_dh_params, sizeof(static_dh_params) };
+            /* loading defaults */
+            rv = gnutls_dh_params_import_pkcs3(dh_params, &pdata,
 					       GNUTLS_X509_FMT_PEM);
 
-	    if (rv < 0) {
-		ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			     "GnuTLS: Unable to load internal DH Params."
-			     " Shutting down.");
-		exit(-1);
-	    }
-	}
-	apr_pool_clear(tpool);
+            if (rv < 0) {
+  	        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+		     "GnuTLS: Unable to load DH Params: (%d) %s",
+		     rv, gnutls_strerror(rv));
+                exit(rv);
+            }
+        } else dh_params = sc_base->dh_params;
 
-	pdata.data = NULL;
-	pdata.size = 0;
+        if (sc_base->rsa_params != NULL) 
+            rsa_params = sc_base->rsa_params;
 
-	if (sc_base->rsa_params_file)
-  	    pdata = load_params(sc_base->rsa_params_file, s, tpool);
-
-	if (pdata.size != 0) {
-	    gnutls_rsa_params_init(&rsa_params);
-	    rv = gnutls_rsa_params_import_pkcs1(rsa_params, &pdata,
-						GNUTLS_X509_FMT_PEM);
-	    if (rv != 0) {
-		ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			     "GnuTLS: Unable to load RSA Params: (%d) %s",
-			     rv, gnutls_strerror(rv));
-		exit(rv);
-	    }
-	}
-	/* not an error but RSA-EXPORT ciphersuites are not available 
+	/* else not an error but RSA-EXPORT ciphersuites are not available 
 	 */
 
-	apr_pool_destroy(tpool);
 	rv = mgs_cache_post_config(p, s, sc_base);
 	if (rv != 0) {
 	    ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, s,
@@ -355,6 +278,7 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 	}
 
 	for (s = base_server; s; s = s->next) {
+	    void *load = NULL;
 	    sc = (mgs_srvconf_rec *) ap_get_module_config(s->module_config,
 							  &gnutls_module);
 	    sc->cache_type = sc_base->cache_type;
@@ -367,16 +291,25 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 			     s->server_hostname, s->port);
 		exit(-1);
             }
-
-	    if (rsa_params != NULL)
-		gnutls_certificate_set_rsa_export_params(sc->certs,
-							 rsa_params);
             
-            if (dh_params != NULL) /* not needed but anyway */
-	        gnutls_certificate_set_dh_params(sc->certs, dh_params);
+            /* Check if DH or RSA params have been set per host */
+            if (sc->rsa_params != NULL)
+                load = sc->rsa_params;
+            else if (rsa_params) load = rsa_params;
+            
+            if (load != NULL)
+		gnutls_certificate_set_rsa_export_params(sc->certs, load);
 
 
-	    gnutls_anon_set_server_dh_params(sc->anon_creds, dh_params);
+            load = NULL;
+            if (sc->dh_params != NULL)
+                load = sc->dh_params;
+            else if (dh_params) load = dh_params;
+            
+            if (load != NULL) { /* not needed but anyway */
+	        gnutls_certificate_set_dh_params(sc->certs, load);
+	        gnutls_anon_set_server_dh_params(sc->anon_creds, load);
+            }
 
 	    gnutls_certificate_server_set_retrieve_function(sc->certs,
 							    cert_retrieve_fn);
