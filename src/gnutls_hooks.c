@@ -57,6 +57,7 @@ int
 mgs_hook_pre_config(apr_pool_t * pconf,
 		    apr_pool_t * plog, apr_pool_t * ptemp)
 {
+int ret;
 
 #if APR_HAS_THREADS
     ap_mpm_query(AP_MPMQ_IS_THREADED, &mpm_is_threaded);
@@ -67,8 +68,10 @@ mgs_hook_pre_config(apr_pool_t * pconf,
     mpm_is_threaded = 0;
 #endif
 
-    gnutls_global_init();
-
+    ret = gnutls_global_init();
+    if (ret < 0) /* FIXME: can we print here? */
+        exit(ret);
+                                            
     apr_pool_cleanup_register(pconf, NULL, mgs_cleanup_pre_config,
 			      apr_pool_cleanup_null);
 

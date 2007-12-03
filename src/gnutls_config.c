@@ -72,10 +72,15 @@ const char *mgs_set_dh_file(cmd_parms * parms, void *dummy,
 			    "DH params '%s'", file);
     }
 
-    gnutls_dh_params_init(&sc->dh_params);
+    ret = gnutls_dh_params_init(&sc->dh_params);
+    if (ret < 0) {
+	return apr_psprintf(parms->pool, "GnuTLS: Failed to initialize"
+			    ": (%d) %s", ret, gnutls_strerror(ret));
+    }
+
     ret =
 	gnutls_dh_params_import_pkcs3(sc->dh_params, &data, GNUTLS_X509_FMT_PEM);
-    if (ret != 0) {
+    if (ret < 0) {
 	return apr_psprintf(parms->pool, "GnuTLS: Failed to Import "
 			    "DH params '%s': (%d) %s", file, ret,
 			    gnutls_strerror(ret));
@@ -107,7 +112,12 @@ const char *mgs_set_rsa_export_file(cmd_parms * parms, void *dummy,
 			    "RSA params '%s'", file);
     }
 
-    gnutls_rsa_params_init(&sc->rsa_params);
+    ret = gnutls_rsa_params_init(&sc->rsa_params);
+    if (ret < 0) {
+	return apr_psprintf(parms->pool, "GnuTLS: Failed to initialize"
+			    ": (%d) %s", ret, gnutls_strerror(ret));
+    }
+
     ret =
 	gnutls_rsa_params_import_pkcs1(sc->rsa_params, &data, GNUTLS_X509_FMT_PEM);
     if (ret != 0) {
@@ -141,7 +151,12 @@ const char *mgs_set_cert_file(cmd_parms * parms, void *dummy,
 			    "Certificate '%s'", file);
     }
 
-    gnutls_x509_crt_init(&sc->cert_x509);
+    ret = gnutls_x509_crt_init(&sc->cert_x509);
+    if (ret < 0) {
+	return apr_psprintf(parms->pool, "GnuTLS: Failed to initialize"
+			    ": (%d) %s", ret, gnutls_strerror(ret));
+    }
+
     ret =
 	gnutls_x509_crt_import(sc->cert_x509, &data, GNUTLS_X509_FMT_PEM);
     if (ret != 0) {
@@ -174,7 +189,12 @@ const char *mgs_set_key_file(cmd_parms * parms, void *dummy,
 			    "Private Key '%s'", file);
     }
 
-    gnutls_x509_privkey_init(&sc->privkey_x509);
+    ret = gnutls_x509_privkey_init(&sc->privkey_x509);
+    if (ret < 0) {
+	return apr_psprintf(parms->pool, "GnuTLS: Failed to initialize"
+			    ": (%d) %s", ret, gnutls_strerror(ret));
+    }
+
     ret =
 	gnutls_x509_privkey_import(sc->privkey_x509, &data,
 				   GNUTLS_X509_FMT_PEM);
@@ -395,12 +415,27 @@ const char *mgs_set_priorities(cmd_parms * parms, void *dummy, const char *arg)
 void *mgs_config_server_create(apr_pool_t * p, server_rec * s)
 {
     mgs_srvconf_rec *sc = apr_pcalloc(p, sizeof(*sc));
-
+    int ret;
+    
     sc->enabled = GNUTLS_ENABLED_FALSE;
 
-    gnutls_certificate_allocate_credentials(&sc->certs);
-    gnutls_anon_allocate_server_credentials(&sc->anon_creds);
-    gnutls_srp_allocate_server_credentials(&sc->srp_creds);
+    ret = gnutls_certificate_allocate_credentials(&sc->certs);
+    if (ret < 0) {
+	return apr_psprintf(p, "GnuTLS: Failed to initialize"
+			    ": (%d) %s", ret, gnutls_strerror(ret));
+    }
+
+    ret = gnutls_anon_allocate_server_credentials(&sc->anon_creds);
+    if (ret < 0) {
+	return apr_psprintf(p, "GnuTLS: Failed to initialize"
+			    ": (%d) %s", ret, gnutls_strerror(ret));
+    }
+
+    ret = gnutls_srp_allocate_server_credentials(&sc->srp_creds);
+    if (ret < 0) {
+	return apr_psprintf(p, "GnuTLS: Failed to initialize"
+			    ": (%d) %s", ret, gnutls_strerror(ret));
+    }
 
     sc->srp_tpasswd_conf_file = NULL;
     sc->srp_tpasswd_file = NULL;
