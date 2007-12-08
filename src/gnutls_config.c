@@ -151,15 +151,10 @@ const char *mgs_set_cert_file(cmd_parms * parms, void *dummy,
 			    "Certificate '%s'", file);
     }
 
-    ret = gnutls_x509_crt_init(&sc->cert_x509);
-    if (ret < 0) {
-	return apr_psprintf(parms->pool, "GnuTLS: Failed to initialize"
-			    ": (%d) %s", ret, gnutls_strerror(ret));
-    }
-
+    sc->certs_x509_num = MAX_CHAIN_SIZE;
     ret =
-	gnutls_x509_crt_import(sc->cert_x509, &data, GNUTLS_X509_FMT_PEM);
-    if (ret != 0) {
+	gnutls_x509_crt_list_import(sc->certs_x509, &sc->certs_x509_num, &data, GNUTLS_X509_FMT_PEM, 0);
+    if (ret < 0) {
 	return apr_psprintf(parms->pool, "GnuTLS: Failed to Import "
 			    "Certificate '%s': (%d) %s", file, ret,
 			    gnutls_strerror(ret));
@@ -440,7 +435,8 @@ void *mgs_config_server_create(apr_pool_t * p, server_rec * s)
     sc->srp_tpasswd_conf_file = NULL;
     sc->srp_tpasswd_file = NULL;
     sc->privkey_x509 = NULL;
-    sc->cert_x509 = NULL;
+    memset( sc->certs_x509, 0, sizeof(sc->certs_x509));
+    sc->certs_x509_num = 0;
     sc->cache_timeout = apr_time_from_sec(300);
     sc->cache_type = mgs_cache_dbm;
     sc->cache_config = ap_server_root_relative(p, "conf/gnutls_cache");

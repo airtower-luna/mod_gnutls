@@ -148,10 +148,10 @@ static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st * ret)
     ctxt = gnutls_transport_get_ptr(session);
 
     ret->type = GNUTLS_CRT_X509;
-    ret->ncerts = 1;
+    ret->ncerts = ctxt->sc->certs_x509_num;
     ret->deinit_all = 0;
 
-    ret->cert.x509 = &ctxt->sc->cert_x509;
+    ret->cert.x509 = ctxt->sc->certs_x509;
     ret->key.x509 = ctxt->sc->privkey_x509;
     return 0;
 }
@@ -334,7 +334,7 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 		}
 	    }
 
-	    if (sc->cert_x509 == NULL
+	    if (sc->certs_x509[0] == NULL
 		&& sc->enabled == GNUTLS_ENABLED_TRUE) {
 		ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
 			     "[GnuTLS] - Host '%s:%d' is missing a "
@@ -353,7 +353,7 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 	    }
 
 	    if (sc->enabled == GNUTLS_ENABLED_TRUE) {
-		rv = read_crt_cn(s, p, sc->cert_x509, &sc->cert_cn);
+		rv = read_crt_cn(s, p, sc->certs_x509[0], &sc->cert_cn);
 		if (rv < 0) {
 		    ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
 				 "[GnuTLS] - Cannot find a certificate for host '%s:%d'!",
@@ -686,7 +686,7 @@ int mgs_hook_fixups(request_rec * r)
     tmp = mgs_session_id2sz(sbuf, len, buf, sizeof(buf));
     apr_table_setn(env, "SSL_SESSION_ID", apr_pstrdup(r->pool, tmp));
 
-    mgs_add_common_cert_vars(r, ctxt->sc->cert_x509, 0,
+    mgs_add_common_cert_vars(r, ctxt->sc->certs_x509[0], 0,
 			     ctxt->sc->export_certificates_enabled);
 
     return rv;
