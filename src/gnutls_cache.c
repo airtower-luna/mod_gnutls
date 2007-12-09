@@ -54,7 +54,7 @@ char *mgs_session_id2sz(unsigned char *id, int idlen,
 
 
 /* Name the Session ID as:
- * IP:port.SessionID
+ * server:port.SessionID
  * to disallow resuming sessions on different servers
  */
 static int mgs_session_id2dbm(conn_rec* c, unsigned char *id, int idlen,
@@ -67,7 +67,7 @@ char *sz;
     if (sz == NULL)
       return -1;
       
-    dbmkey->dptr = apr_psprintf(c->pool, "%s:%d.%s", c->local_ip, c->base_server->port, sz);
+    dbmkey->dptr = apr_psprintf(c->pool, "%s:%d.%s", c->base_server->server_hostname, c->base_server->port, sz);
     dbmkey->dsize = strlen( dbmkey->dptr);
     
     return 0;
@@ -90,7 +90,7 @@ char *mgs_time2sz(time_t in_time, char *str, int strsize)
 
 #if HAVE_APR_MEMCACHE
 /* Name the Session ID as:
- * IP:port.SessionID
+ * server:port.SessionID
  * to disallow resuming sessions on different servers
  */
 static char* mgs_session_id2mc(conn_rec* c, unsigned char *id, int idlen)
@@ -102,7 +102,7 @@ char *sz;
     if (sz == NULL)
       return NULL;
       
-    return apr_psprintf(c->pool, MC_TAG"%s:%d.%s", c->local_ip, c->base_server->port, sz);
+    return apr_psprintf(c->pool, MC_TAG"%s:%d.%s", c->base_server->server_hostname, c->base_server->port, sz);
 }
 
 /**
