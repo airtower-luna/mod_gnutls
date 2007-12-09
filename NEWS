@@ -2,6 +2,8 @@
 
 - Added support for sending a certificate chain.
 
+- Corrected bug which did not allow the TLS session cache to be used.
+
 ** Version 0.4.1 (2007-12-03)
 
 - Added support for subject alternative names in certificates.

@@ -133,10 +133,6 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session)
     if (ret < 0)
 	return ret;
 
-    /* allow separate caches per virtual host. Actually allowing the same is a
-     * bad idea, since they might have different security requirements.
-     */
-    mgs_cache_session_init(ctxt);
 
     return 0;
 }
@@ -590,6 +586,8 @@ static mgs_handle_t *create_gnutls_handle(apr_pool_t * pool, conn_rec * c)
 
     gnutls_handshake_set_post_client_hello_function(ctxt->session,
 						    mgs_select_virtual_server_cb);
+
+    mgs_cache_session_init(ctxt);
 
     return ctxt;
 }
