@@ -34,18 +34,16 @@
 
 
 #define MC_TAG "mod_gnutls:"
-#define MC_TAG_LEN \
-    (sizeof(MC_TAG))
+#define MC_TAG_LEN sizeof(MC_TAG)
 #define STR_SESSION_LEN (GNUTLS_SESSION_ID_STRING_LEN + MC_TAG_LEN)
 
-#if 0
-static char *gnutls_session_id2sz(unsigned char *id, int idlen,
+char *mgs_session_id2sz(unsigned char *id, int idlen,
                                char *str, int strsize)
 {
     char *cp;
     int n;
- 
-    cp = apr_cpystrn(str, MC_TAG, MC_TAG_LEN);
+
+    cp = str; 
     for (n = 0; n < idlen && n < GNUTLS_MAX_SESSION_ID; n++) {
         apr_snprintf(cp, strsize - (cp-str), "%02X", id[n]);
         cp += 2;
@@ -53,7 +51,27 @@ static char *gnutls_session_id2sz(unsigned char *id, int idlen,
     *cp = '\0';
     return str;
 }
-#endif
+
+
+/* Name the Session ID as:
+ * IP:port.SessionID
+ * to disallow resuming sessions on different servers
+ */
+static int mgs_session_id2dbm(conn_rec* c, unsigned char *id, int idlen,
+                               apr_datum_t* dbmkey)
+{
+char buf[STR_SESSION_LEN];
+char *sz;
+    
+    sz = mgs_session_id2sz(id, idlen, buf, sizeof(buf));
+    if (sz == NULL)
+      return -1;
+      
+    dbmkey->dptr = apr_psprintf(c->pool, "%s:%d.%s", c->local_ip, c->base_server->port, sz);
+    dbmkey->dsize = strlen( dbmkey->dptr);
+    
+    return 0;
+}
 
 #define CTIME "%b %d %k:%M:%S %Y %Z"
 char *mgs_time2sz(time_t in_time, char *str, int strsize)
@@ -70,23 +88,22 @@ char *mgs_time2sz(time_t in_time, char *str, int strsize)
     return str;
 }
 
-char *mgs_session_id2sz(unsigned char *id, int idlen,
-                               char *str, int strsize)
-{
-    char *cp;
-    int n;
-    
-    cp = str;
-    for (n = 0; n < idlen && n < GNUTLS_MAX_SESSION_ID; n++) {
-        apr_snprintf(cp, strsize - (cp-str), "%02X", id[n]);
-        cp += 2;
-    }
-    *cp = '\0';
-    return str;
-}
-
-
 #if HAVE_APR_MEMCACHE
+/* Name the Session ID as:
+ * IP:port.SessionID
+ * to disallow resuming sessions on different servers
+ */
+static char* mgs_session_id2mc(conn_rec* c, unsigned char *id, int idlen)
+{
+char buf[STR_SESSION_LEN];
+char *sz;
+    
+    sz = mgs_session_id2sz(id, idlen, buf, sizeof(buf));
+    if (sz == NULL)
+      return NULL;
+      
+    return apr_psprintf(c->pool, MC_TAG"%s:%d.%s", c->local_ip, c->base_server->port, sz);
+}
 
 /**
  * GnuTLS Session Cache using libmemcached
@@ -184,11 +201,10 @@ static int mc_cache_store(void* baton, gnutls_datum_t key,
 {
     apr_status_t rv = APR_SUCCESS;
     mgs_handle_t *ctxt = baton;
-    char buf[STR_SESSION_LEN];
     char* strkey = NULL;
     apr_uint32_t timeout;
 
-    strkey = gnutls_session_id2sz(key.data, key.size, buf, sizeof(buf));
+    strkey = mgs_session_id2mc(ctxt->c, key.data, key.size);
     if(!strkey)
         return -1;
 
@@ -211,13 +227,12 @@ static gnutls_datum_t mc_cache_fetch(void* baton, gnutls_datum_t key)
 {
     apr_status_t rv = APR_SUCCESS;
     mgs_handle_t *ctxt = baton;
-    char buf[STR_SESSION_LEN];
     char* strkey = NULL;
     char* value;
     apr_size_t value_len;
     gnutls_datum_t data = { NULL, 0 };
 
-    strkey = gnutls_session_id2sz(key.data, key.size, buf, sizeof(buf));
+    strkey = mgs_session_id2mc(ctxt->c, key.data, key.size);
     if (!strkey) {
         return data;
     }
@@ -252,10 +267,9 @@ static int mc_cache_delete(void* baton, gnutls_datum_t key)
 {
     apr_status_t rv = APR_SUCCESS;
     mgs_handle_t *ctxt = baton;
-    char buf[STR_SESSION_LEN];
     char* strkey = NULL;
 
-    strkey = gnutls_session_id2sz(key.data, key.size, buf, sizeof(buf));
+    strkey = mgs_session_id2mc(ctxt->c, key.data, key.size);
     if(!strkey)
         return -1;
 
@@ -366,8 +380,8 @@ static gnutls_datum_t dbm_cache_fetch(void* baton, gnutls_datum_t key)
     mgs_handle_t *ctxt = baton;
     apr_status_t rv;
 
-    dbmkey.dptr  = (void*)key.data;
-    dbmkey.dsize = key.size;
+    if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
+        return data;
 
     rv = apr_dbm_open(&dbm, ctxt->sc->cache_config,
 	              APR_DBM_RWCREATE, SSL_DBM_FILE_MODE, ctxt->c->pool);
@@ -413,9 +427,9 @@ static int dbm_cache_store(void* baton, gnutls_datum_t key,
     mgs_handle_t *ctxt = baton;
     apr_status_t rv;
     apr_time_t expiry;
-    
-    dbmkey.dptr  = (char *)key.data;
-    dbmkey.dsize = key.size;
+
+    if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
+        return -1;
 
     /* create DBM value */
     dbmval.dsize = data.size + sizeof(apr_time_t);
@@ -467,9 +481,9 @@ static int dbm_cache_delete(void* baton, gnutls_datum_t key)
     apr_datum_t dbmkey;
     mgs_handle_t *ctxt = baton;
     apr_status_t rv;
-    
-    dbmkey.dptr  = (char *)key.data;
-    dbmkey.dsize = key.size;
+
+    if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
+        return -1;
 
     rv = apr_dbm_open(&dbm, ctxt->sc->cache_config,
 	              APR_DBM_RWCREATE, SSL_DBM_FILE_MODE, ctxt->c->pool);
