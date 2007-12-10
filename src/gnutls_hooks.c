@@ -794,10 +794,6 @@ mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt cert, int side,
 
     apr_table_setn(env,
        apr_pstrcat(r->pool, MGS_SIDE, "_CERT_TYPE", NULL), "X.509");
-#ifdef COMPAT
-    apr_table_setn(env,
-       apr_pstrcat(r->pool, MGS_SIDE, "_S_TYPE", NULL), "X.509");
-#endif
 
     tmp =
 	mgs_time2sz(gnutls_x509_crt_get_expiration_time
