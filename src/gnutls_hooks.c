@@ -793,7 +793,11 @@ mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt cert, int side,
 		       apr_psprintf(r->pool, "%u", ret));
 
     apr_table_setn(env,
+       apr_pstrcat(r->pool, MGS_SIDE, "_CERT_TYPE", NULL), "X.509");
+#ifdef COMPAT
+    apr_table_setn(env,
        apr_pstrcat(r->pool, MGS_SIDE, "_S_TYPE", NULL), "X.509");
+#endif
 
     tmp =
 	mgs_time2sz(gnutls_x509_crt_get_expiration_time
@@ -835,19 +839,19 @@ mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt cert, int side,
 
 	    if (ret == GNUTLS_SAN_DNSNAME) {
 		apr_table_setn(env,
-		       apr_psprintf(r->pool, "%s_S_SAN%u", MGS_SIDE, i), 
+		       apr_psprintf(r->pool, "%s_S_AN%u", MGS_SIDE, i), 
 		       apr_psprintf(r->pool, "DNSNAME:%s", tmp2));
 	    } else if (ret == GNUTLS_SAN_RFC822NAME) {
 		apr_table_setn(env,
-		       apr_psprintf(r->pool, "%s_S_SAN%u", MGS_SIDE, i), 
+		       apr_psprintf(r->pool, "%s_S_AN%u", MGS_SIDE, i), 
 		       apr_psprintf(r->pool, "RFC822NAME:%s", tmp2));
 	    } else if (ret == GNUTLS_SAN_URI) {
 		apr_table_setn(env,
-		       apr_psprintf(r->pool, "%s_S_SAN%u", MGS_SIDE, i), 
+		       apr_psprintf(r->pool, "%s_S_AN%u", MGS_SIDE, i), 
 		       apr_psprintf(r->pool, "URI:%s", tmp2));
             } else {
 		apr_table_setn(env,
-		       apr_psprintf(r->pool, "%s_S_SAN%u", MGS_SIDE, i), 
+		       apr_psprintf(r->pool, "%s_S_AN%u", MGS_SIDE, i), 
 		       "UNSUPPORTED");
             }
 	}
