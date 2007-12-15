@@ -27,4 +27,3 @@ to David Hrbáč.
 - Better handling of GnuTLSDHFile and GnuTLSRSAFile.
 
 - No longer default paths for RSA and DH parameter files.
-[5~
