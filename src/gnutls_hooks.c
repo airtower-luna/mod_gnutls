@@ -72,12 +72,16 @@ int ret;
 #endif
 
     ret = gnutls_global_init();
-    if (ret < 0) /* FIXME: can we print here? */
-        exit(ret);
+    if (ret < 0) /* FIXME: can we print here? */ {
+        fprintf(stderr, "gnutls_global_init: %s\n", gnutls_strerror(ret));
+        return -3;
+    }
 
     ret = gnutls_global_init_extra();
-    if (ret < 0) /* FIXME: can we print here? */
-        exit(ret);
+    if (ret < 0) { /* FIXME: can we print here? */
+        fprintf(stderr, "gnutls_global_init_extra: %s\n", gnutls_strerror(ret));
+        return -3;
+    }
                                             
     apr_pool_cleanup_register(pconf, NULL, mgs_cleanup_pre_config,
 			      apr_pool_cleanup_null);
