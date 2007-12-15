@@ -36,7 +36,10 @@ static int mpm_is_threaded;
 
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt);
 /* use side==0 for server and side==1 for client */
-static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt cert,
+static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert,
+				     int side,
+				     int export_certificates_enabled);
+static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t cert,
 				     int side,
 				     int export_certificates_enabled);
 
@@ -71,6 +74,10 @@ int ret;
     ret = gnutls_global_init();
     if (ret < 0) /* FIXME: can we print here? */
         exit(ret);
+
+    ret = gnutls_global_init_extra();
+    if (ret < 0) /* FIXME: can we print here? */
+        exit(ret);
                                             
     apr_pool_cleanup_register(pconf, NULL, mgs_cleanup_pre_config,
 			      apr_pool_cleanup_null);
@@ -87,14 +94,12 @@ int ret;
     return OK;
 }
 
-/* We don't support openpgp certificates, yet */
-const static int cert_type_prio[2] = { GNUTLS_CRT_X509, 0 };
-
 static int mgs_select_virtual_server_cb(gnutls_session_t session)
 {
     mgs_handle_t *ctxt;
     mgs_srvconf_rec *tsc;
     int ret;
+    int cprio[3] = { GNUTLS_CRT_X509, GNUTLS_CRT_OPENPGP, 0 };
 
     ctxt = gnutls_transport_get_ptr(session);
 
@@ -126,8 +131,20 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session)
      * negotiation.
      */
     ret = gnutls_priority_set(session, ctxt->sc->priorities);
-    gnutls_certificate_type_set_priority(session, cert_type_prio);
 
+    /* Do not allow the user to override certificate priorities. We know
+     * better if the certificate of certain type is enabled. */
+    if (ctxt->sc->cert_pgp != NULL && ctxt->sc->certs_x509[0] != NULL) {
+        gnutls_certificate_type_set_priority( session, cprio);
+    } else if (ctxt->sc->certs_x509[0] != NULL) {
+        cprio[0] = GNUTLS_CRT_X509;
+        cprio[1] = 0;
+        gnutls_certificate_type_set_priority( session, cprio);
+    } else if (ctxt->sc->cert_pgp != NULL) {
+        cprio[0] = GNUTLS_CRT_OPENPGP;
+        cprio[1] = 0;
+        gnutls_certificate_type_set_priority( session, cprio);
+    }
 
     /* actually it shouldn't fail since we have checked at startup */
     if (ret < 0)
@@ -143,13 +160,28 @@ static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st * ret)
 
     ctxt = gnutls_transport_get_ptr(session);
 
-    ret->type = GNUTLS_CRT_X509;
-    ret->ncerts = ctxt->sc->certs_x509_num;
-    ret->deinit_all = 0;
+    if (gnutls_certificate_type_get( session) == GNUTLS_CRT_X509) {
+        ret->type = GNUTLS_CRT_X509;
+        ret->ncerts = ctxt->sc->certs_x509_num;
+        ret->deinit_all = 0;
 
-    ret->cert.x509 = ctxt->sc->certs_x509;
-    ret->key.x509 = ctxt->sc->privkey_x509;
-    return 0;
+        ret->cert.x509 = ctxt->sc->certs_x509;
+        ret->key.x509 = ctxt->sc->privkey_x509;
+        
+        return 0;
+    } else if (gnutls_certificate_type_get( session) == GNUTLS_CRT_OPENPGP) {
+        ret->type = GNUTLS_CRT_OPENPGP;
+        ret->ncerts = 1;
+        ret->deinit_all = 0;
+
+        ret->cert.pgp = ctxt->sc->cert_pgp;
+        ret->key.pgp = ctxt->sc->privkey_pgp;
+
+        return 0;
+    
+    }
+
+    return GNUTLS_E_INTERNAL_ERROR;
 }
 
 const char static_dh_params[] = "-----BEGIN DH PARAMETERS-----\n"
@@ -167,7 +199,7 @@ const char static_dh_params[] = "-----BEGIN DH PARAMETERS-----\n"
  * Returns negative on error.
  */
 static int read_crt_cn(server_rec * s, apr_pool_t * p,
-		       gnutls_x509_crt cert, char **cert_cn)
+		       gnutls_x509_crt_t cert, char **cert_cn)
 {
     int rv = 0, i;
     size_t data_len;
@@ -175,6 +207,7 @@ static int read_crt_cn(server_rec * s, apr_pool_t * p,
 
     *cert_cn = NULL;
 
+    data_len = 0;
     rv = gnutls_x509_crt_get_dn_by_oid(cert,
 				       GNUTLS_OID_X520_COMMON_NAME,
 				       0, 0, NULL, &data_len);
@@ -186,7 +219,7 @@ static int read_crt_cn(server_rec * s, apr_pool_t * p,
 					   0, *cert_cn, &data_len);
     } else {			/* No CN return subject alternative name */
 	ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
-		     "No common name found in certificate for '%s:%d'. Looking for subject alternative name.",
+		     "No common name found in certificate for '%s:%d'. Looking for subject alternative name...",
 		     s->server_hostname, s->port);
 	rv = 0;
 	/* read subject alternative name */
@@ -214,8 +247,32 @@ static int read_crt_cn(server_rec * s, apr_pool_t * p,
     }
 
     return rv;
-
 }
+
+static int read_pgpcrt_cn(server_rec * s, apr_pool_t * p,
+		       gnutls_openpgp_crt_t cert, char **cert_cn)
+{
+    int rv = 0;
+    size_t data_len;
+
+
+    *cert_cn = NULL;
+
+    data_len = 0;
+    rv = gnutls_openpgp_crt_get_name(cert, 0, NULL, &data_len);
+
+    if (rv == GNUTLS_E_SHORT_MEMORY_BUFFER && data_len > 1) {
+	*cert_cn = apr_palloc(p, data_len);
+	rv = gnutls_openpgp_crt_get_name(cert, 0, *cert_cn, &data_len);
+    } else {			/* No CN return subject alternative name */
+	ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
+		     "No name found in PGP certificate for '%s:%d'.",
+		     s->server_hostname, s->port);
+    }
+
+    return rv;
+}
+
 
 int
 mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
@@ -350,6 +407,9 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 
 	    if (sc->enabled == GNUTLS_ENABLED_TRUE) {
 		rv = read_crt_cn(s, p, sc->certs_x509[0], &sc->cert_cn);
+		if (rv < 0)  /* try openpgp certificate */
+    		    rv = read_pgpcrt_cn(s, p, sc->cert_pgp, &sc->cert_cn);
+
 		if (rv < 0) {
 		    ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
 				 "[GnuTLS] - Cannot find a certificate for host '%s:%d'!",
@@ -477,15 +537,6 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
 #endif
 
     ctxt = gnutls_transport_get_ptr(session);
-
-    sni_type = gnutls_certificate_type_get(session);
-    if (sni_type != GNUTLS_CRT_X509) {
-	/* In theory, we could support OpenPGP Certificates. Theory != code. */
-	ap_log_error(APLOG_MARK, APLOG_CRIT, 0,
-		     ctxt->c->base_server,
-		     "GnuTLS: Only x509 Certificates are currently supported.");
-	return NULL;
-    }
 
     rv = gnutls_server_name_get(ctxt->session, sni_name,
 				&data_len, &sni_type, 0);
@@ -684,7 +735,11 @@ int mgs_hook_fixups(request_rec * r)
     tmp = mgs_session_id2sz(sbuf, len, buf, sizeof(buf));
     apr_table_setn(env, "SSL_SESSION_ID", apr_pstrdup(r->pool, tmp));
 
-    mgs_add_common_cert_vars(r, ctxt->sc->certs_x509[0], 0,
+    if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_X509)
+        mgs_add_common_cert_vars(r, ctxt->sc->certs_x509[0], 0,
+			     ctxt->sc->export_certificates_enabled);
+    else if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_OPENPGP)
+        mgs_add_common_pgpcert_vars(r, ctxt->sc->cert_pgp, 0,
 			     ctxt->sc->export_certificates_enabled);
 
     return rv;
@@ -746,7 +801,7 @@ int mgs_hook_authz(request_rec * r)
  */
 #define MGS_SIDE ((side==0)?"SSL_SERVER":"SSL_CLIENT")
 static void
-mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt cert, int side,
+mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, int side,
 			 int export_certificates_enabled)
 {
     unsigned char sbuf[64];	/* buffer to hold serials */
@@ -852,17 +907,82 @@ mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt cert, int side,
             }
 	}
     }
+}
 
+static void
+mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t cert, int side,
+			 int export_certificates_enabled)
+{
+    unsigned char sbuf[64];	/* buffer to hold serials */
+    char buf[AP_IOBUFSIZE];
+    const char *tmp;
+    size_t len;
+    int ret;
+
+    apr_table_t *env = r->subprocess_env;
+
+    if (export_certificates_enabled != 0) {
+	char cert_buf[10 * 1024];
+	len = sizeof(cert_buf);
+
+	if (gnutls_openpgp_crt_export
+	    (cert, GNUTLS_OPENPGP_FMT_BASE64, cert_buf, &len) >= 0)
+	    apr_table_setn(env,
+			   apr_pstrcat(r->pool, MGS_SIDE, "_CERT", NULL),
+			   apr_pstrmemdup(r->pool, cert_buf, len));
+
+    }
+
+    len = sizeof(buf);
+    gnutls_openpgp_crt_get_name(cert, 0, buf, &len);
+    apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_NAME", NULL),
+		   apr_pstrmemdup(r->pool, buf, len));
+
+    len = sizeof(sbuf);
+    gnutls_openpgp_crt_get_fingerprint(cert, sbuf, &len);
+    tmp = mgs_session_id2sz(sbuf, len, buf, sizeof(buf));
+    apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_FINGERPRINT", NULL),
+		   apr_pstrdup(r->pool, tmp));
+
+    ret = gnutls_openpgp_crt_get_version(cert);
+    if (ret > 0)
+	apr_table_setn(env,
+		       apr_pstrcat(r->pool, MGS_SIDE, "_M_VERSION", NULL),
+		       apr_psprintf(r->pool, "%u", ret));
+
+    apr_table_setn(env,
+       apr_pstrcat(r->pool, MGS_SIDE, "_CERT_TYPE", NULL), "OPENPGP");
+
+    tmp =
+	mgs_time2sz(gnutls_openpgp_crt_get_expiration_time
+		    (cert), buf, sizeof(buf));
+    apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_V_END", NULL),
+		   apr_pstrdup(r->pool, tmp));
+
+    tmp =
+	mgs_time2sz(gnutls_openpgp_crt_get_creation_time
+		    (cert), buf, sizeof(buf));
+    apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_V_START", NULL),
+		   apr_pstrdup(r->pool, tmp));
+
+    ret = gnutls_openpgp_crt_get_pk_algorithm(cert, NULL);
+    if (ret >= 0) {
+	apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_A_KEY", NULL),
+		       gnutls_pk_algorithm_get_name(ret));
+    }
 
 }
 
-
+/* FIXME: Allow client sending a certificate chain */
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
 {
     const gnutls_datum_t *cert_list;
     unsigned int cert_list_size, status, expired;
     int rv, ret;
-    gnutls_x509_crt_t cert;
+    union {
+      gnutls_x509_crt_t x509;
+      gnutls_openpgp_crt_t pgp;
+    } cert;
     apr_time_t activation_time, expiration_time, cur_time;
 
     cert_list =
@@ -888,23 +1008,40 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
 	return HTTP_FORBIDDEN;
     }
 
-    gnutls_x509_crt_init(&cert);
-    rv = gnutls_x509_crt_import(cert, &cert_list[0], GNUTLS_X509_FMT_DER);
+    if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_X509) {
+        gnutls_x509_crt_init(&cert.x509);
+        rv = gnutls_x509_crt_import(cert.x509, &cert_list[0], GNUTLS_X509_FMT_DER);
+    } else if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_OPENPGP) {
+        gnutls_openpgp_crt_init(&cert.pgp);
+        rv = gnutls_openpgp_crt_import(cert.pgp, &cert_list[0], GNUTLS_OPENPGP_FMT_RAW);
+    } else return HTTP_FORBIDDEN;
+ 
     if (rv < 0) {
-	ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+       ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
 		      "GnuTLS: Failed to Verify Peer: "
 		      "Failed to import peer certificates.");
-	ret = HTTP_FORBIDDEN;
-	goto exit;
+       ret = HTTP_FORBIDDEN;
+       goto exit;
     }
 
-    apr_time_ansi_put(&expiration_time,
-		      gnutls_x509_crt_get_expiration_time(cert));
-    apr_time_ansi_put(&activation_time,
-		      gnutls_x509_crt_get_activation_time(cert));
+    if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_X509) {
+        apr_time_ansi_put(&expiration_time,
+		      gnutls_x509_crt_get_expiration_time(cert.x509));
+        apr_time_ansi_put(&activation_time,
+		      gnutls_x509_crt_get_activation_time(cert.x509));
 
-    rv = gnutls_x509_crt_verify(cert, ctxt->sc->ca_list,
+        rv = gnutls_x509_crt_verify(cert.x509, ctxt->sc->ca_list,
 				ctxt->sc->ca_list_size, 0, &status);
+    } else {
+        apr_time_ansi_put(&expiration_time,
+		      gnutls_openpgp_crt_get_expiration_time(cert.pgp));
+        apr_time_ansi_put(&activation_time,
+		      gnutls_openpgp_crt_get_creation_time(cert.pgp));
+
+        rv = gnutls_openpgp_crt_verify_ring(cert.pgp, ctxt->sc->pgp_list,
+                      0, &status);
+    }
+
 
     if (rv < 0) {
 	ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
@@ -957,7 +1094,11 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
 //    mgs_hook_fixups(r);
 //    rv = mgs_authz_lua(r);
 
-    mgs_add_common_cert_vars(r, cert, 1,
+    if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_X509)
+        mgs_add_common_cert_vars(r, cert.x509, 1,
+			     ctxt->sc->export_certificates_enabled);
+    else if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_OPENPGP)
+        mgs_add_common_pgpcert_vars(r, cert.pgp, 1,
 			     ctxt->sc->export_certificates_enabled);
 
     {
@@ -981,7 +1122,10 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
     }
 
   exit:
-    gnutls_x509_crt_deinit(cert);
+    if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_X509)
+        gnutls_x509_crt_deinit(cert.x509);
+    else if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_OPENPGP)
+        gnutls_openpgp_crt_deinit(cert.pgp);
     return ret;
 
 

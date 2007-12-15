@@ -1,3 +1,7 @@
+** Version 0.5.0
+
+- Added support for OpenPGP keys.
+
 ** Version 0.4.2 (2007-12-10)
 
 - Added support for sending a certificate chain.
@@ -23,3 +27,4 @@ to David Hrbáč.
 - Better handling of GnuTLSDHFile and GnuTLSRSAFile.
 
 - No longer default paths for RSA and DH parameter files.
+[5~
