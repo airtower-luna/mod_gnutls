@@ -229,7 +229,7 @@ static int read_crt_cn(server_rec * s, apr_pool_t * p,
 					   GNUTLS_OID_X520_COMMON_NAME, 0,
 					   0, *cert_cn, &data_len);
     } else {			/* No CN return subject alternative name */
-	ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
+	ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
 		     "No common name found in certificate for '%s:%d'. Looking for subject alternative name...",
 		     s->server_hostname, s->port);
 	rv = 0;
