@@ -1,5 +1,6 @@
 /**
  *  Copyright 2004-2005 Paul Querna
+ *  Copyright 2007 Nikos Mavrogiannopoulos
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -229,7 +230,6 @@ const char *mgs_set_pgpcert_file(cmd_parms * parms, void *dummy,
 			    gnutls_strerror(ret));
     }
       
-
     ret =
 	gnutls_openpgp_crt_import(sc->cert_pgp, &data, GNUTLS_OPENPGP_FMT_BASE64);
     if (ret < 0) {
@@ -448,6 +448,12 @@ const char *mgs_set_keyring_file(cmd_parms * parms, void *dummy,
     if (load_datum_from_file(spool, file, &data) != 0) {
 	return apr_psprintf(parms->pool, "GnuTLS: Error Reading "
 			    "Keyring File '%s'", file);
+    }
+
+    rv = gnutls_openpgp_keyring_init(&sc->pgp_list);
+    if (rv < 0) {
+	return apr_psprintf(parms->pool, "GnuTLS: Failed to initialize"
+			    "keyring: (%d) %s", rv, gnutls_strerror(rv));
     }
 
     rv = gnutls_openpgp_keyring_import(sc->pgp_list, &data, GNUTLS_OPENPGP_FMT_BASE64);

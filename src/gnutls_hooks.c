@@ -71,14 +71,20 @@ int ret;
     mpm_is_threaded = 0;
 #endif
 
+    if (gnutls_check_version(LIBGNUTLS_VERSION)==NULL) {
+        fprintf(stderr, "gnutls_check_version() failed. Required: gnutls-%s Found: gnutls-%s\n", 
+          LIBGNUTLS_VERSION, gnutls_check_version(NULL));
+        return -3;
+    }
+
     ret = gnutls_global_init();
-    if (ret < 0) /* FIXME: can we print here? */ {
+    if (ret < 0) {
         fprintf(stderr, "gnutls_global_init: %s\n", gnutls_strerror(ret));
         return -3;
     }
 
     ret = gnutls_global_init_extra();
-    if (ret < 0) { /* FIXME: can we print here? */
+    if (ret < 0) {
         fprintf(stderr, "gnutls_global_init_extra: %s\n", gnutls_strerror(ret));
         return -3;
     }
@@ -93,6 +99,7 @@ int ret;
 
     gnutls_global_set_log_level(9);
     gnutls_global_set_log_function(gnutls_debug_log_all);
+    apr_file_printf(debug_log_fp, "gnutls: %s\n", gnutls_check_version(NULL));
 #endif
 
     return OK;
@@ -103,7 +110,7 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session)
     mgs_handle_t *ctxt;
     mgs_srvconf_rec *tsc;
     int ret;
-    int cprio[3] = { GNUTLS_CRT_X509, GNUTLS_CRT_OPENPGP, 0 };
+    int cprio[2];
 
     ctxt = gnutls_transport_get_ptr(session);
 
@@ -135,24 +142,23 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session)
      * negotiation.
      */
     ret = gnutls_priority_set(session, ctxt->sc->priorities);
+    /* actually it shouldn't fail since we have checked at startup */
+    if (ret < 0)
+	return ret;
 
-    /* Do not allow the user to override certificate priorities. We know
-     * better if the certificate of certain type is enabled. */
-    if (ctxt->sc->cert_pgp != NULL && ctxt->sc->certs_x509[0] != NULL) {
-        gnutls_certificate_type_set_priority( session, cprio);
-    } else if (ctxt->sc->certs_x509[0] != NULL) {
+    /* If both certificate types are not present disallow them from
+     * being negotiated.
+     */
+    if (ctxt->sc->certs_x509[0] != NULL && ctxt->sc->cert_pgp == NULL) {
         cprio[0] = GNUTLS_CRT_X509;
         cprio[1] = 0;
         gnutls_certificate_type_set_priority( session, cprio);
-    } else if (ctxt->sc->cert_pgp != NULL) {
+    } else if (ctxt->sc->cert_pgp != NULL && ctxt->sc->certs_x509[0]==NULL) {
         cprio[0] = GNUTLS_CRT_OPENPGP;
         cprio[1] = 0;
         gnutls_certificate_type_set_priority( session, cprio);
     }
 
-    /* actually it shouldn't fail since we have checked at startup */
-    if (ret < 0)
-	return ret;
 
 
     return 0;
@@ -188,6 +194,7 @@ static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st * ret)
     return GNUTLS_E_INTERNAL_ERROR;
 }
 
+/* 2048-bit group parameters from SRP specification */
 const char static_dh_params[] = "-----BEGIN DH PARAMETERS-----\n"
     "MIIBBwKCAQCsa9tBMkqam/Fm3l4TiVgvr3K2ZRmH7gf8MZKUPbVgUKNzKcu0oJnt\n"
     "gZPgdXdnoT3VIxKrSwMxDc1/SKnaBP1Q6Ag5ae23Z7DPYJUXmhY6s2YaBfvV+qro\n"
@@ -411,7 +418,7 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 
 	    if (sc->enabled == GNUTLS_ENABLED_TRUE) {
 		rv = read_crt_cn(s, p, sc->certs_x509[0], &sc->cert_cn);
-		if (rv < 0)  /* try openpgp certificate */
+		if (rv < 0 && sc->cert_pgp != NULL)  /* try openpgp certificate */
     		    rv = read_pgpcrt_cn(s, p, sc->cert_pgp, &sc->cert_cn);
 
 		if (rv < 0) {
@@ -977,7 +984,7 @@ mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t cert, int side
 
 }
 
-/* FIXME: Allow client sending a certificate chain */
+/* TODO: Allow client sending a X.509 certificate chain */
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
 {
     const gnutls_datum_t *cert_list;
@@ -1046,14 +1053,21 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
                       0, &status);
     }
 
-
     if (rv < 0) {
 	ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
 		      "GnuTLS: Failed to Verify Peer certificate: (%d) %s",
 		      rv, gnutls_strerror(rv));
+	if (rv == GNUTLS_E_NO_CERTIFICATE_FOUND)
+	    ap_log_rerror(APLOG_MARK, APLOG_EMERG, 0, r,
+		      "GnuTLS: No certificate was found for verification. Did you set the GnuTLSX509CAFile or GnuTLSPGPKeyringFile directives?");
 	ret = HTTP_FORBIDDEN;
 	goto exit;
     }
+
+    /* TODO: X509 CRL Verification. */
+    /* May add later if anyone needs it.
+     */
+    /* ret = gnutls_x509_crt_check_revocation(crt, crl_list, crl_list_size); */
 
     expired = 0;
     cur_time = apr_time_now();
@@ -1088,15 +1102,6 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
 	ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
 		      "GnuTLS: Peer Certificate is revoked.");
     }
-
-    /* TODO: Further Verification. */
-    /* Revocation is X.509 non workable paradigm, I really doubt implementation
-     * is worth doing --nmav
-     */
-/// ret = gnutls_x509_crt_check_revocation(crt, crl_list, crl_list_size);
-
-//    mgs_hook_fixups(r);
-//    rv = mgs_authz_lua(r);
 
     if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_X509)
         mgs_add_common_cert_vars(r, cert.x509, 1,

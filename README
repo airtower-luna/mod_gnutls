@@ -54,10 +54,10 @@ GnuTLSCache dbm conf/gnutls_cache
     GnuTLSEnable On
 
     # This is the Private key for your server.
-    GnuTLSKeyFile conf/server.key
+    GnuTLSX509KeyFile conf/server.key
 
     # This is the Server Certificate.  
-    GnuTLSCertificateFile conf/server.cert
+    GnuTLSX509CertificateFile conf/server.cert
 </VirtualHost>
 
 
@@ -73,8 +73,8 @@ NameVirtualHost 1.2.3.4:443
 # To export exactly the same environment variables as mod_ssl to CGI scripts.
 	GNUTLSExportCertificates on
 
-	GnuTLSCertificateFile /etc/apache2/server-cert.pem
-	GnuTLSKeyFile /etc/apache2/server-key.pem
+	GnuTLSX509CertificateFile /etc/apache2/server-cert.pem
+	GnuTLSX509KeyFile /etc/apache2/server-key.pem
 
 # To enable SRP you must have these files installed. Check the gnutls srptool.
 	GnuTLSSRPPasswdFile /etc/apache2/tpasswd
@@ -84,6 +84,6 @@ NameVirtualHost 1.2.3.4:443
 # GnuTLSClientVerify could be ignore or require. The GnuTLSClientCAFile
 # contains the CAs to verify client certificates.
 	GnuTLSClientVerify request
-	GnuTLSClientCAFile ca.pem
+	GnuTLSX509CAFile ca.pem
 	...
 </VirtualHost>
