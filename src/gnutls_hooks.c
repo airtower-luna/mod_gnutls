@@ -159,8 +159,6 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session)
         gnutls_certificate_type_set_priority( session, cprio);
     }
 
-
-
     return 0;
 }
 

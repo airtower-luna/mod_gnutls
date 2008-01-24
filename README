@@ -60,7 +60,6 @@ GnuTLSCache dbm conf/gnutls_cache
     GnuTLSX509CertificateFile conf/server.cert
 </VirtualHost>
 
-
 # a more advanced configuration
 GnuTLSCache dbm "/var/cache/www-tls-cache/cache"
 GnuTLSCacheTimeout 600
@@ -86,4 +85,27 @@ NameVirtualHost 1.2.3.4:443
 	GnuTLSClientVerify request
 	GnuTLSX509CAFile ca.pem
 	...
+</VirtualHost>
+
+# A setup for OpenPGP and X.509 authentication
+<VirtualHost 1.2.3.4:443>
+	Servername crystal.lan:443
+        GnuTLSEnable on
+	GnuTLSPriorities NORMAL:+COMP-NULL
+
+# setup the openpgp keys
+	GnuTLSPGPCertificateFile /etc/apache2/test.pub.asc
+	GnuTLSPGPKeyFile /etc/apache2/test.sec.asc
+
+# and the X.509 keys
+	GnuTLSCertificateFile /etc/apache2/server-cert.pem
+	GnuTLSKeyFile /etc/apache2/server-key.pem
+	GnuTLSClientVerify ignore
+
+# To avoid using the default DH params
+	GnuTLSDHFile /etc/apache2/dh.pem
+
+# these are only needed if GnuTLSClientVerify != ignore
+	GnuTLSClientCAFile ca.pem
+	GnuTLSPGPKeyringFile /etc/apache2/ring.asc
 </VirtualHost>
