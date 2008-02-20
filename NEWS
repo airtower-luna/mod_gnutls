@@ -1,3 +1,9 @@
+** Version 0.5.1
+
+- Added --disable-srp configure option
+
+- Better check for memcache (patch by Guillaume Rousse)
+
 ** Version 0.5.0-alpha (2008-01-24)
 
 - Added support for OpenPGP keys. The new directives are:
