@@ -131,11 +131,13 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session)
 
     gnutls_credentials_set(session, GNUTLS_CRD_ANON, ctxt->sc->anon_creds);
 
+#ifdef ENABLE_SRP
     if (ctxt->sc->srp_tpasswd_conf_file != NULL
 	&& ctxt->sc->srp_tpasswd_file != NULL) {
 	gnutls_credentials_set(session, GNUTLS_CRD_SRP,
 			       ctxt->sc->srp_creds);
     }
+#endif
 
     /* update the priorities - to avoid negotiating a ciphersuite that is not
      * enabled on this virtual server. Note that here we ignore the version
@@ -379,6 +381,7 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 	    gnutls_certificate_server_set_retrieve_function(sc->certs,
 							    cert_retrieve_fn);
 
+#ifdef ENABLE_SRP
 	    if (sc->srp_tpasswd_conf_file != NULL
 		&& sc->srp_tpasswd_file != NULL) {
 		rv = gnutls_srp_set_server_credentials_file(sc->srp_creds,
@@ -395,6 +398,7 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 		    exit(-1);
 		}
 	    }
+#endif
 
 	    if (sc->certs_x509[0] == NULL
 		&& sc->enabled == GNUTLS_ENABLED_TRUE) {
@@ -722,8 +726,10 @@ int mgs_hook_fixups(request_rec * r)
 		   gnutls_compression_get_name(gnutls_compression_get
 					       (ctxt->session)));
 
+#ifdef ENABLE_SRP
     apr_table_setn(env, "SSL_SRP_USER",
 		   gnutls_srp_server_get_username(ctxt->session));
+#endif
 
     if (apr_table_get(env, "SSL_CLIENT_VERIFY") == NULL)
 	apr_table_setn(env, "SSL_CLIENT_VERIFY", "NONE");

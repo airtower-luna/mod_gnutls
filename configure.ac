@@ -1,5 +1,5 @@
 dnl 
-AC_INIT(mod_gnutls, 0.5.0-alpha)
+AC_INIT(mod_gnutls, 0.5.1)
 OOO_CONFIG_NICE(config.nice)
 MOD_GNUTLS_VERSION=AC_PACKAGE_VERSION
 AC_PREREQ(2.53)
@@ -36,6 +36,16 @@ AM_PATH_LIBGNUTLS_EXTRA($MIN_TLS_VERSION,,
 *** http://www.gnutls.org/
 ***
 ]]))
+
+AC_ARG_ENABLE(srp,
+       AS_HELP_STRING([--disable-srp],
+               [unconditionally disable the SRP functionality]),
+       use_srp=$enableval, use_srp=yes)
+if test "$use_srp" != "no"; then
+	AC_DEFINE_UNQUOTED(ENABLE_SRP, 1, [whether to enable SRP])
+fi
+AC_MSG_CHECKING([whether to enable SRP functionality])
+AC_MSG_RESULT($use_srp)
 
 dnl CHECK_LUA()
 
