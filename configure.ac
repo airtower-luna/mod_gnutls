@@ -41,8 +41,10 @@ AC_ARG_ENABLE(srp,
        AS_HELP_STRING([--disable-srp],
                [unconditionally disable the SRP functionality]),
        use_srp=$enableval, use_srp=yes)
+
+SRP_CFLAGS=""
 if test "$use_srp" != "no"; then
-	AC_DEFINE_UNQUOTED(ENABLE_SRP, 1, [whether to enable SRP])
+ 	SRP_CFLAGS="-DENABLE_SRP=1"
 fi
 AC_MSG_CHECKING([whether to enable SRP functionality])
 AC_MSG_RESULT($use_srp)
@@ -53,7 +55,7 @@ have_apr_memcache=0
 CHECK_APR_MEMCACHE([have_apr_memcache=1], [have_apr_memcache=0])
 AC_SUBST(have_apr_memcache)
 
-MODULE_CFLAGS="${LIBGNUTLS_EXTRA_CFLAGS} ${APR_MEMCACHE_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES}"
+MODULE_CFLAGS="${LIBGNUTLS_EXTRA_CFLAGS} ${SRP_CFLAGS} ${APR_MEMCACHE_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES}"
 MODULE_LIBS="${APR_MEMCACHE_LIBS} ${LIBGNUTLS_EXTRA_LIBS}"
 
 AC_SUBST(MODULE_CFLAGS)
@@ -68,5 +70,6 @@ echo ""
 echo "   * mod_gnutls version:	${MOD_GNUTLS_VERSION}"
 echo "   * Apache Modules directory:	${AP_LIBEXECDIR}"
 echo "   * GnuTLS Library version:	${LIBGNUTLS_VERSION}"
+echo "   * SRP Authentication:          ${use_srp}"
 echo ""
 echo "---"

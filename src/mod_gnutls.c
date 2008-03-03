@@ -17,7 +17,6 @@
 
 #include "mod_gnutls.h"
 
-
 static void gnutls_hooks(apr_pool_t * p)
 {
     ap_hook_pre_connection(mgs_hook_pre_connection, NULL, NULL,
