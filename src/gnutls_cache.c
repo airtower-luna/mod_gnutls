@@ -466,7 +466,7 @@ static int dbm_cache_store(void* baton, gnutls_datum_t key,
     rv = apr_dbm_store(dbm, dbmkey, dbmval);
     
     if (rv != APR_SUCCESS) {
-        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
+        ap_log_error(APLOG_MARK, APLOG_DEBUG, rv,
                      ctxt->c->base_server,
                      "[gnutls_cache] error storing in cache '%s'",
                      ctxt->sc->cache_config);
