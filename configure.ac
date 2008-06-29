@@ -28,11 +28,11 @@ CHECK_APACHE(,$AP_VERSION,
 dnl LIBTOOL="`${APR_CONFIG} --apr-libtool`"
 dnl AC_SUBST(LIBTOOL)
 
-MIN_TLS_VERSION=2.2.1
-AM_PATH_LIBGNUTLS_EXTRA($MIN_TLS_VERSION,,
+MIN_TLS_VERSION=2.4.0
+AM_PATH_LIBGNUTLS($MIN_TLS_VERSION,,
  	AC_MSG_ERROR([[
 ***  
-*** libgnutls and libgnutls-extra were not found. You may want to get it from
+*** libgnutls was not found. You may want to get it from
 *** http://www.gnutls.org/
 ***
 ]]))
