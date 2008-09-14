@@ -164,6 +164,9 @@ static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st * ret)
 
     ctxt = gnutls_transport_get_ptr(session);
 
+    if (ctxt == NULL)
+        return GNUTLS_E_INTERNAL_ERROR;
+
     if (gnutls_certificate_type_get( session) == GNUTLS_CRT_X509) {
         ret->type = GNUTLS_CRT_X509;
         ret->ncerts = ctxt->sc->certs_x509_num;
