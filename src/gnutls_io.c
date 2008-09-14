@@ -72,13 +72,13 @@ static int char_buffer_read(mgs_char_buffer_t * buffer, char *in,
 
     if (buffer->length > inl) {
         /* we have have enough to fill the caller's buffer */
-        memcpy(in, buffer->value, inl);
+        memmove(in, buffer->value, inl);
         buffer->value += inl;
         buffer->length -= inl;
     }
     else {
         /* swallow remainder of the buffer */
-        memcpy(in, buffer->value, buffer->length);
+        memmove(in, buffer->value, buffer->length);
         inl = buffer->length;
         buffer->value = NULL;
         buffer->length = 0;
