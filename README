@@ -109,3 +109,22 @@ NameVirtualHost 1.2.3.4:443
 	GnuTLSClientCAFile ca.pem
 	GnuTLSPGPKeyringFile /etc/apache2/ring.asc
 </VirtualHost>
+
+Create OpenPGP credentials for the server:
+
+IMPORTANT: mod_gnutls currently cannot read encrypted OpenPGP credentials. That
+is, when you generate a key with gpg and gpg prompts you for a passphrase, just
+press enter. Then press enter again, to confirm an empty passphrase.
+http://news.gmane.org/gmane.comp.apache.outoforder.modules
+
+These instructions are from the GnuTLS manual:
+http://www.gnu.org/software/gnutls/manual/html_node/Invoking-gnutls_002dserv.html#Invoking-gnutls_002dserv
+
+     $ gpg --gen-key
+     ...enter whatever details you want, use 'test.gnutls.org' as name...
+
+Make a note of the OpenPGP key identifier of the newly generated key, here it
+was 5D1D14D8. You will need to export the key for GnuTLS to be able to use it.
+
+     $ gpg -a --export 5D1D14D8 > openpgp-server.txt
+     $ gpg -a --export-secret-keys 5D1D14D8 > openpgp-server-key.txt
