@@ -409,8 +409,9 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 	    }
 #endif
 
-	    if (sc->certs_x509[0] == NULL
-		&& sc->enabled == GNUTLS_ENABLED_TRUE) {
+	    if (sc->certs_x509[0] == NULL &&
+	        sc->cert_pgp == NULL &&
+		sc->enabled == GNUTLS_ENABLED_TRUE) {
 		ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
 			     "[GnuTLS] - Host '%s:%d' is missing a "
 			     "Certificate File!", s->server_hostname,
@@ -418,8 +419,9 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 		exit(-1);
 	    }
 
-	    if (sc->privkey_x509 == NULL
-		&& sc->enabled == GNUTLS_ENABLED_TRUE) {
+	    if (sc->enabled == GNUTLS_ENABLED_TRUE && 
+	      ((sc->certs_x509[0] != NULL && sc->privkey_x509 == NULL) ||
+	      (sc->cert_pgp != NULL && sc->privkey_pgp == NULL))) {
 		ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
 			     "[GnuTLS] - Host '%s:%d' is missing a "
 			     "Private Key File!",
