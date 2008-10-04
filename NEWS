@@ -1,3 +1,7 @@
+** Version 0.5.3 (unreleased)
+
+- Corrected bug to allow having an OpenPGP-only web site
+
 ** Version 0.5.2 (2008-06-29)
 
 - Depend on gnutls 2.4 which has openpgp support in main library.
