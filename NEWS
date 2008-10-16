@@ -1,6 +1,8 @@
-** Version 0.5.3 (unreleased)
+** Version 0.5.3 (2008-10-16)
 
-- Corrected bug to allow having an OpenPGP-only web site
+- Corrected bug to allow having an OpenPGP-only web site.
+
+- Increased Max handshake tries due to interrupted system calls.
 
 ** Version 0.5.2 (2008-06-29)
 
