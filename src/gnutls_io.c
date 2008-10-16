@@ -353,7 +353,7 @@ static apr_status_t gnutls_io_input_getline(mgs_handle_t * ctxt,
     return APR_SUCCESS;
 }
 
-#define HANDSHAKE_MAX_TRIES 100
+#define HANDSHAKE_MAX_TRIES 1024
 static int gnutls_do_handshake(mgs_handle_t * ctxt)
 {
     int ret;
