@@ -1,3 +1,8 @@
+** Verison 0.5.4 (unreleased)
+
+- mod_gnutls.h: modified definition to extern to avoid compilation
+  errors in darwin.
+
 ** Version 0.5.3 (2008-10-16)
 
 - Corrected bug to allow having an OpenPGP-only web site.
