@@ -686,6 +686,10 @@ int mgs_hook_pre_connection(conn_rec * c, void *csd)
 	return DECLINED;
     }
 
+    if(c->remote_addr->hostname)
+      /* Connection initiated by Apache (mod_proxy) => ignore */
+      return OK;
+
     ctxt = create_gnutls_handle(c->pool, c);
 
     ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
