@@ -398,6 +398,7 @@ const char *mgs_set_client_verify(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
+#define INIT_CA_SIZE 128
 const char *mgs_set_client_ca_file(cmd_parms * parms, void *dummy,
 				   const char *arg)
 {
@@ -419,14 +420,35 @@ const char *mgs_set_client_ca_file(cmd_parms * parms, void *dummy,
 			    "Client CA File '%s'", file);
     }
 
-    sc->ca_list_size = MAX_CA_CRTS;
+    sc->ca_list_size = INIT_CA_SIZE;
+    sc->ca_list = malloc(sc->ca_list_size * sizeof(*sc->ca_list));
+    if (sc->ca_list == NULL) {
+		return apr_psprintf(parms->pool, "mod_gnutls: Memory allocation error");
+    }
+
     rv = gnutls_x509_crt_list_import(sc->ca_list, &sc->ca_list_size,
-				     &data, GNUTLS_X509_FMT_PEM,
-				     GNUTLS_X509_CRT_LIST_IMPORT_FAIL_IF_EXCEED);
-    if (rv < 0) {
-	return apr_psprintf(parms->pool, "GnuTLS: Failed to load "
+				     &data, GNUTLS_X509_FMT_PEM, GNUTLS_X509_CRT_LIST_IMPORT_FAIL_IF_EXCEED);
+    if (rv < 0 && rv != GNUTLS_E_SHORT_MEMORY_BUFFER) {
+			return apr_psprintf(parms->pool, "GnuTLS: Failed to load "
 			    "Client CA File '%s': (%d) %s", file, rv,
 			    gnutls_strerror(rv));
+    }
+    
+    if (INIT_CA_SIZE < sc->ca_list_size) {
+		    sc->ca_list = realloc(sc->ca_list, sc->ca_list_size*sizeof(*sc->ca_list));
+		    if (sc->ca_list == NULL) {
+				return apr_psprintf(parms->pool, "mod_gnutls: Memory allocation error");
+		    }
+
+    		/* re-read */
+    		rv = gnutls_x509_crt_list_import(sc->ca_list, &sc->ca_list_size,
+				     &data, GNUTLS_X509_FMT_PEM, 0);
+
+		    if (rv < 0) {
+					return apr_psprintf(parms->pool, "GnuTLS: Failed to load "
+					    "Client CA File '%s': (%d) %s", file, rv,
+					    gnutls_strerror(rv));
+		    }
     }
 
     apr_pool_destroy(spool);

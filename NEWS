@@ -1,4 +1,9 @@
-** Verison 0.5.4 (2009-01-04)
+** Version 0.5.5 (unreleased)
+
+- Removed limits on CA certificate loading. Reported by
+  Sander Marechal and Jack Bates.
+
+** Version 0.5.4 (2009-01-04)
 
 - mod_gnutls.h: modified definition to extern to avoid compilation
   errors in darwin.
