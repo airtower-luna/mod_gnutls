@@ -194,7 +194,12 @@ const char *mgs_set_key_file(cmd_parms * parms, void *dummy,
     ret =
 	gnutls_x509_privkey_import(sc->privkey_x509, &data,
 				   GNUTLS_X509_FMT_PEM);
-    if (ret != 0) {
+
+    if (ret < 0)
+        ret = gnutls_x509_privkey_import_pkcs8 (sc->privkey_x509, &data, GNUTLS_X509_FMT_PEM,
+                                                        NULL, GNUTLS_PKCS_PLAIN);
+
+    if (ret < 0) {
 	return apr_psprintf(parms->pool, "GnuTLS: Failed to Import "
 			    "Private Key '%s': (%d) %s", file, ret,
 			    gnutls_strerror(ret));
