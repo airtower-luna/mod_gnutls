@@ -1109,11 +1109,13 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
 	expired = 1;
     }
 
-    if (expiration_time < cur_time) {
-	ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+    if (gnutls_certificate_type_get( ctxt->session) != GNUTLS_CRT_OPENPGP || expiration_time != 0) {
+        if (expiration_time < cur_time) {
+	    ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
 		      "GnuTLS: Failed to Verify Peer: "
 		      "Peer Certificate is expired.");
-	expired = 1;
+            expired = 1;
+        }
     }
 
     if (status & GNUTLS_CERT_SIGNER_NOT_FOUND) {
