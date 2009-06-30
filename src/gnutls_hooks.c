@@ -808,6 +808,12 @@ int mgs_hook_authz(request_rec * r)
 			  ctxt->sc->client_verify_mode,
 			  dc->client_verify_mode);
 
+            /* If we already have a client certificate, there's no point in
+             * re-handshaking... */
+            rv = mgs_cert_verify(r, ctxt);
+            if (rv != DECLINED && rv != HTTP_FORBIDDEN)
+                return rv;
+
 	    gnutls_certificate_server_set_request(ctxt->session,
 						  dc->client_verify_mode);
 
