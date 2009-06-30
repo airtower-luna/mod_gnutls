@@ -381,7 +381,8 @@ tryagain:
 #endif
         gnutls_alert_send(ctxt->session, GNUTLS_AL_FATAL, 
                           gnutls_error_to_alert(ret, NULL));
-        gnutls_deinit(ctxt->session);
+        if (ctxt->session) gnutls_deinit(ctxt->session);
+        ctxt->session = NULL;
         return -1;
     }
 
@@ -412,7 +413,8 @@ tryagain:
         ctxt->status = -1;
         gnutls_alert_send(ctxt->session, GNUTLS_AL_FATAL, 
                           gnutls_error_to_alert(ret, NULL));
-        gnutls_deinit(ctxt->session);
+        if (ctxt->session) gnutls_deinit(ctxt->session);
+        ctxt->session = NULL;
         return ret;
     }
     else {
@@ -555,7 +557,8 @@ apr_status_t mgs_filter_output(ap_filter_t * f,
             }
 
             apr_brigade_cleanup(ctxt->output_bb);
-            gnutls_deinit(ctxt->session);
+            if (ctxt->session) gnutls_deinit(ctxt->session);
+            ctxt->session = NULL;
             continue;
 
         } else if (APR_BUCKET_IS_FLUSH(bucket) || APR_BUCKET_IS_EOS(bucket)) {
