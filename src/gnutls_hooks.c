@@ -123,7 +123,7 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session)
 	ctxt->sc = tsc;
 
     gnutls_certificate_server_set_request(session,
-					  ctxt->sc->client_verify_mode);
+					      ctxt->sc->client_verify_mode);
 
     /* set the new server credentials 
      */
@@ -819,11 +819,13 @@ int mgs_hook_authz(request_rec * r)
 	    ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
 			  "GnuTLS: Peer is set to IGNORE");
 #endif
-	} else {
-	    rv = mgs_cert_verify(r, ctxt);
-	    if (rv != DECLINED) {
-		return rv;
-	    }
+	    return DECLINED;
+	}
+	rv = mgs_cert_verify(r, ctxt);
+	if (rv != DECLINED &&
+	    (rv != HTTP_FORBIDDEN ||
+	     dc->client_verify_mode == GNUTLS_CERT_REQUIRE)) {
+	    return rv;
 	}
     }
 
