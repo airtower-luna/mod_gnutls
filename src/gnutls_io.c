@@ -379,9 +379,11 @@ tryagain:
         ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
                      "GnuTLS: Handshake Failed. Hit Maximum Attempts");
 #endif
-        gnutls_alert_send(ctxt->session, GNUTLS_AL_FATAL, 
+        if (ctxt->session) {
+            gnutls_alert_send(ctxt->session, GNUTLS_AL_FATAL, 
                           gnutls_error_to_alert(ret, NULL));
-        if (ctxt->session) gnutls_deinit(ctxt->session);
+            gnutls_deinit(ctxt->session);
+        }
         ctxt->session = NULL;
         return -1;
     }
@@ -411,9 +413,11 @@ tryagain:
                      gnutls_strerror(ret));
 #endif
         ctxt->status = -1;
-        gnutls_alert_send(ctxt->session, GNUTLS_AL_FATAL, 
+        if (ctxt->session) {
+            gnutls_alert_send(ctxt->session, GNUTLS_AL_FATAL, 
                           gnutls_error_to_alert(ret, NULL));
-        if (ctxt->session) gnutls_deinit(ctxt->session);
+            gnutls_deinit(ctxt->session);
+        }
         ctxt->session = NULL;
         return ret;
     }
@@ -559,8 +563,10 @@ apr_status_t mgs_filter_output(ap_filter_t * f,
             }
 
             apr_brigade_cleanup(ctxt->output_bb);
-            if (ctxt->session) gnutls_deinit(ctxt->session);
-            ctxt->session = NULL;
+            if (APR_BUCKET_IS_EOS(bucket) && ctxt->session) {
+                gnutls_deinit(ctxt->session);
+                ctxt->session = NULL;
+            }
             continue;
 
         } else if (APR_BUCKET_IS_FLUSH(bucket) || APR_BUCKET_IS_EOS(bucket)) {
