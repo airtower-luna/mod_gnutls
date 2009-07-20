@@ -544,9 +544,11 @@ apr_status_t mgs_filter_output(ap_filter_t * f,
     while (!APR_BRIGADE_EMPTY(bb)) {
         apr_bucket *bucket = APR_BRIGADE_FIRST(bb);
         if (AP_BUCKET_IS_EOC(bucket)) {
-            do {
-                ret = gnutls_bye( ctxt->session, GNUTLS_SHUT_WR);
-            } while(ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
+            if (ctxt->session != NULL) {
+                do {
+                    ret = gnutls_bye( ctxt->session, GNUTLS_SHUT_WR);
+                } while(ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
+            }
 
             apr_bucket_copy(bucket, &e);
             APR_BRIGADE_INSERT_TAIL(ctxt->output_bb, e);
