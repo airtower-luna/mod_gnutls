@@ -368,7 +368,7 @@ tryagain:
     do {
         ret = gnutls_handshake(ctxt->session);
         maxtries--;
-    } while (ret == GNUTLS_E_AGAIN && maxtries > 0);
+    } while ((ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN) && maxtries > 0);
 
     if (maxtries < 1) {
         ctxt->status = -1;
@@ -381,7 +381,7 @@ tryagain:
 #endif
         if (ctxt->session) {
             gnutls_alert_send(ctxt->session, GNUTLS_AL_FATAL, 
-                          gnutls_error_to_alert(ret, NULL));
+                          gnutls_error_to_alert(GNUTLS_E_INTERNAL_ERROR, NULL));
             gnutls_deinit(ctxt->session);
         }
         ctxt->session = NULL;
@@ -547,7 +547,16 @@ apr_status_t mgs_filter_output(ap_filter_t * f,
 
     while (!APR_BRIGADE_EMPTY(bb)) {
         apr_bucket *bucket = APR_BRIGADE_FIRST(bb);
-        if (AP_BUCKET_IS_EOC(bucket)) {
+        
+        if (AP_BUCKET_IS_EOC(bucket) || APR_BUCKET_IS_EOS(bucket)) {
+            apr_bucket_brigade * tmpb;
+            
+            if (APR_BUCKET_IS_EOS(bucket)) {
+                tmpb = bb;
+            } else {
+                tmpb = ctxt->output_bb;
+            }
+            
             if (ctxt->session != NULL) {
                 do {
                     ret = gnutls_bye( ctxt->session, GNUTLS_SHUT_WR);
@@ -557,7 +566,7 @@ apr_status_t mgs_filter_output(ap_filter_t * f,
             apr_bucket_copy(bucket, &e);
             APR_BRIGADE_INSERT_TAIL(ctxt->output_bb, e);
             
-            if ((status = ap_pass_brigade(f->next, ctxt->output_bb)) != APR_SUCCESS) {
+            if ((status = ap_pass_brigade(f->next, tmpb)) != APR_SUCCESS) {
                 apr_brigade_cleanup(ctxt->output_bb);
                 return status;
             }
@@ -568,8 +577,7 @@ apr_status_t mgs_filter_output(ap_filter_t * f,
                 ctxt->session = NULL;
             }
             continue;
-
-        } else if (APR_BUCKET_IS_FLUSH(bucket) || APR_BUCKET_IS_EOS(bucket)) {
+        } else if (APR_BUCKET_IS_FLUSH(bucket)) {
 
             apr_bucket_copy(bucket, &e);
             APR_BRIGADE_INSERT_TAIL(ctxt->output_bb, e);
