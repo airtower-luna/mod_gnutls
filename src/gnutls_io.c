@@ -563,7 +563,7 @@ apr_status_t mgs_filter_output(ap_filter_t * f,
             }
 
             apr_brigade_cleanup(ctxt->output_bb);
-            if (APR_BUCKET_IS_EOS(bucket) && ctxt->session) {
+            if (ctxt->session) {
                 gnutls_deinit(ctxt->session);
                 ctxt->session = NULL;
             }
