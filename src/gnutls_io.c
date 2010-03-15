@@ -670,8 +670,15 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
          */
         if (APR_STATUS_IS_EAGAIN(rc) || APR_STATUS_IS_EINTR(rc)
             || (rc == APR_SUCCESS && APR_BRIGADE_EMPTY(ctxt->input_bb))) {
-            return 0;
+            
+            if (APR_STATUS_IS_EOF(ctxt->input_rc)) {
+                return 0;
+            } else {
+                gnutls_transport_set_errno(ctxt->session, EINTR);
+                return -1;
+            }
         }
+        
 
         if (rc != APR_SUCCESS) {
             /* Unexpected errors discard the brigade */
@@ -689,6 +696,11 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
 
     if (APR_STATUS_IS_EAGAIN(ctxt->input_rc)
         || APR_STATUS_IS_EINTR(ctxt->input_rc)) {
+        if (len == 0) {
+            gnutls_transport_set_errno(ctxt->session, EINTR);
+            return -1;
+        }
+
         return (ssize_t) len;
     }
 

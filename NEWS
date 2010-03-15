@@ -1,7 +1,19 @@
-** Version 0.5.5 (unreleased)
+** Version 0.5.6
+- Corrected issue with firefox and long POST data (by
+  handling EINTR and EAGAIN errors in read).
+
+- Added support for chained client certificates
+
+- Corrected more issues related to double frees
+http://issues.outoforder.cc/view.php?id=102
+
+** Version 0.5.5 (2009-06-13)
 
 - Removed limits on CA certificate loading. Reported by
   Sander Marechal and Jack Bates.
+
+- Do not allow sending empty TLS packets even when instructed to.
+  This had the side effect of clients closing connection.
 
 ** Version 0.5.4 (2009-01-04)
 
