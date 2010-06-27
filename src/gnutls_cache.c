@@ -309,8 +309,14 @@ static int dbm_cache_expire(mgs_handle_t *ctxt)
     int keyidx = 0;
     int should_delete = 0;
 
-    apr_pool_create(&spool, ctxt->c->pool);
     ex = apr_time_now();
+
+    if (ex - ctxt->sc->last_cache_check < 900)
+      return 0;
+
+    ctxt->sc->last_cache_check = ex;
+
+    apr_pool_create(&spool, ctxt->c->pool);
     
     rv = apr_dbm_open(&dbm, ctxt->sc->cache_config, APR_DBM_READONLY,
                       SSL_DBM_FILE_MODE, spool);
