@@ -33,6 +33,7 @@ static apr_file_t *debug_log_fp;
 #endif
 
 static int mpm_is_threaded;
+static gnutls_datum session_ticket_key = { NULL, 0 };
 
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt);
 /* use side==0 for server and side==1 for client */
@@ -97,6 +98,11 @@ int ret;
         _gnutls_log(debug_log_fp, "gnutls_global_init: %s\n", gnutls_strerror(ret));
         return -3;
     }
+    
+    ret = gnutls_session_ticket_key_generate( &session_ticket_key);
+    if (ret < 0) {
+        _gnutls_log(debug_log_fp, "gnutls_session_ticket_key_generate: %s\n", gnutls_strerror(ret));
+    }
 
     apr_pool_cleanup_register(pconf, NULL, mgs_cleanup_pre_config,
 			      apr_pool_cleanup_null);
@@ -144,7 +150,7 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session)
     /* update the priorities - to avoid negotiating a ciphersuite that is not
      * enabled on this virtual server. Note that here we ignore the version
      * negotiation.
-     */
+     */   
     ret = gnutls_priority_set(session, ctxt->sc->priorities);
     /* actually it shouldn't fail since we have checked at startup */
     if (ret < 0)
@@ -658,6 +664,8 @@ static mgs_handle_t *create_gnutls_handle(apr_pool_t * pool, conn_rec * c)
     ctxt->output_length = 0;
 
     gnutls_init(&ctxt->session, GNUTLS_SERVER);
+    if (session_ticket_key.data != NULL)
+        gnutls_session_ticket_enable_server(ctxt->session, &session_ticket_key);
 
     /* because we don't set any default priorities here (we set later at
      * the user hello callback) we need to at least set this in order for
