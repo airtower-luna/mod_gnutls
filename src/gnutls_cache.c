@@ -390,7 +390,7 @@ static gnutls_datum_t dbm_cache_fetch(void* baton, gnutls_datum_t key)
         return data;
 
     rv = apr_dbm_open(&dbm, ctxt->sc->cache_config,
-	              APR_DBM_RWCREATE, SSL_DBM_FILE_MODE, ctxt->c->pool);
+	              APR_DBM_READONLY, SSL_DBM_FILE_MODE, ctxt->c->pool);
     if (rv != APR_SUCCESS) {
         ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
                      ctxt->c->base_server,
