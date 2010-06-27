@@ -46,6 +46,9 @@ static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t ce
 
 static apr_status_t mgs_cleanup_pre_config(void *data)
 {
+    gnutls_free(session_ticket_key.data);
+    session_ticket_key.data = NULL;
+    session_ticket_key.size = 0;
     gnutls_global_deinit();
     return APR_SUCCESS;
 }
@@ -1035,7 +1038,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
 {
     const gnutls_datum_t *cert_list;
     unsigned int cert_list_size, status, expired;
-    int rv, ret;
+    int rv = GNUTLS_E_NO_CERTIFICATE_FOUND, ret;
     unsigned int ch_size = 0;
     union {
       gnutls_x509_crt_t x509[MAX_CHAIN_SIZE];
@@ -1064,7 +1067,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
             "GnuTLS: A Chain of %d certificate(s) was provided for validation", cert_list_size);
 
-        for (ch_size =0; ch_size<cert_list_size; ch_size++) {
+        for (ch_size = 0; ch_size<cert_list_size; ch_size++) {
             gnutls_x509_crt_init(&cert.x509[ch_size]);
             rv = gnutls_x509_crt_import(cert.x509[ch_size], &cert_list[ch_size], GNUTLS_X509_FMT_DER);
             // When failure to import, leave the loop
