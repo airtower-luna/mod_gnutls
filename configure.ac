@@ -28,7 +28,8 @@ CHECK_APACHE(,$AP_VERSION,
 dnl LIBTOOL="`${APR_CONFIG} --apr-libtool`"
 dnl AC_SUBST(LIBTOOL)
 
-MIN_TLS_VERSION=2.4.0
+dnl Depend on 2.10.0 due to safe renegotiation addition.
+MIN_TLS_VERSION=2.10.0
 AM_PATH_LIBGNUTLS($MIN_TLS_VERSION,,
  	AC_MSG_ERROR([[
 ***  
