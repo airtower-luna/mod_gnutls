@@ -20,6 +20,10 @@
 #include "http_vhost.h"
 #include "ap_mpm.h"
 
+#if GNUTLS_VERSION_MAJOR <= 2 && GNUTLS_VERSION_MINOR < 11
+#include <gcrypt.h>
+#endif
+
 #if !USING_2_1_RECENT
 extern server_rec *ap_server_conf;
 #endif
@@ -83,12 +87,15 @@ int ret;
 
 #if APR_HAS_THREADS
     ap_mpm_query(AP_MPMQ_IS_THREADED, &mpm_is_threaded);
+#if (GNUTLS_VERSION_MAJOR == 2 && GNUTLS_VERSION_MINOR < 11) || GNUTLS_VERSION_MAJOR < 2
     if (mpm_is_threaded) {
 	gcry_control(GCRYCTL_SET_THREAD_CBS, &gcry_threads_pthread);
     }
+#endif
 #else
     mpm_is_threaded = 0;
 #endif
+
 
     if (gnutls_check_version(LIBGNUTLS_VERSION)==NULL) {
         _gnutls_log(debug_log_fp, "gnutls_check_version() failed. Required: gnutls-%s Found: gnutls-%s\n", 

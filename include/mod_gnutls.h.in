@@ -27,7 +27,6 @@
 #include "apr_tables.h"
 #include "ap_release.h"
 
-#include <gcrypt.h>
 #include <gnutls/gnutls.h>
 #include <gnutls/extra.h>
 #include <gnutls/openpgp.h>
