@@ -108,6 +108,7 @@ typedef struct
     gnutls_openpgp_keyring_t pgp_list;
     unsigned int ca_list_size;
     int client_verify_mode;
+    apr_time_t last_cache_check;
 } mgs_srvconf_rec;
 
 typedef struct {
