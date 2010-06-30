@@ -20,16 +20,15 @@
 #include "http_vhost.h"
 #include "ap_mpm.h"
 
-#if GNUTLS_VERSION_MAJOR <= 2 && GNUTLS_VERSION_MINOR < 11
+#if APR_HAS_THREADS
+# if GNUTLS_VERSION_MAJOR <= 2 && GNUTLS_VERSION_MINOR < 11
 #include <gcrypt.h>
+GCRY_THREAD_OPTION_PTHREAD_IMPL;
+# endif
 #endif
 
 #if !USING_2_1_RECENT
 extern server_rec *ap_server_conf;
-#endif
-
-#if APR_HAS_THREADS
-GCRY_THREAD_OPTION_PTHREAD_IMPL;
 #endif
 
 #if MOD_GNUTLS_DEBUG
