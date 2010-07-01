@@ -285,6 +285,22 @@ const char *mgs_set_pgpkey_file(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
+const char *mgs_set_tickets(cmd_parms * parms, void *dummy,
+				     const char *arg)
+{
+    mgs_srvconf_rec *sc =
+	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
+						 module_config,
+						 &gnutls_module);
+
+    sc->tickets = 0;
+    if (strcasecmp("on", arg) == 0) {
+	sc->tickets = 1;
+    }
+
+    return NULL;
+}
+
 
 #ifdef ENABLE_SRP
 

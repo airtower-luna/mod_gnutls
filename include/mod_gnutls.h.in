@@ -109,6 +109,7 @@ typedef struct
     unsigned int ca_list_size;
     int client_verify_mode;
     apr_time_t last_cache_check;
+    int tickets; /* whether session tickets are allowed */
 } mgs_srvconf_rec;
 
 typedef struct {
@@ -279,6 +280,8 @@ const char *mgs_set_enabled(cmd_parms * parms, void *dummy,
 const char *mgs_set_export_certificates_enabled(cmd_parms * parms, void *dummy,
                             const char *arg);
 const char *mgs_set_priorities(cmd_parms * parms, void *dummy,
+                            const char *arg);
+const char *mgs_set_tickets(cmd_parms * parms, void *dummy,
                             const char *arg);
                             
 const char *mgs_set_require_section(cmd_parms *cmd, 

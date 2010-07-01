@@ -673,7 +673,7 @@ static mgs_handle_t *create_gnutls_handle(apr_pool_t * pool, conn_rec * c)
     ctxt->output_length = 0;
 
     gnutls_init(&ctxt->session, GNUTLS_SERVER);
-    if (session_ticket_key.data != NULL)
+    if (session_ticket_key.data != NULL && ctxt->sc->tickets != 0)
         gnutls_session_ticket_enable_server(ctxt->session, &session_ticket_key);
 
     /* because we don't set any default priorities here (we set later at
