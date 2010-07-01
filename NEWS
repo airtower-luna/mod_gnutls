@@ -1,4 +1,4 @@
-** Version 0.5.7
+** Version 0.5.7 (2010-07-01)
 - Force usage of SDBM. For some reason the default in
   my system had issues after reaching a limit of entries.
   SDBM seems stable so force it.
