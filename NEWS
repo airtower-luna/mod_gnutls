@@ -1,3 +1,6 @@
+** Version 0.5.8 (unreleased)
+- Session tickets are enabled by default.
+
 ** Version 0.5.7 (2010-07-01)
 - Force usage of SDBM. For some reason the default in
   my system had issues after reaching a limit of entries.
