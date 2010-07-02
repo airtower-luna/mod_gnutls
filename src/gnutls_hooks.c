@@ -1043,14 +1043,14 @@ mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t cert, int side
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
 {
     const gnutls_datum_t *cert_list;
-    unsigned int cert_list_size, status, expired;
+    unsigned int cert_list_size, status;
     int rv = GNUTLS_E_NO_CERTIFICATE_FOUND, ret;
     unsigned int ch_size = 0;
     union {
       gnutls_x509_crt_t x509[MAX_CHAIN_SIZE];
       gnutls_openpgp_crt_t pgp;
     } cert;
-    apr_time_t activation_time, expiration_time, cur_time;
+    apr_time_t expiration_time, cur_time;
 
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
     cert_list =
@@ -1116,8 +1116,6 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
     if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_X509) {
         apr_time_ansi_put(&expiration_time,
 		      gnutls_x509_crt_get_expiration_time(cert.x509[0]));
-        apr_time_ansi_put(&activation_time,
-		      gnutls_x509_crt_get_activation_time(cert.x509[0]));
 
         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
             "GnuTLS: Verifying list of  %d certificate(s)", ch_size);
@@ -1127,8 +1125,6 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
     } else {
         apr_time_ansi_put(&expiration_time,
 		      gnutls_openpgp_crt_get_expiration_time(cert.pgp));
-        apr_time_ansi_put(&activation_time,
-		      gnutls_openpgp_crt_get_creation_time(cert.pgp));
 
         rv = gnutls_openpgp_crt_verify_ring(cert.pgp, ctxt->sc->pgp_list,
                       0, &status);
@@ -1150,23 +1146,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
      */
     /* ret = gnutls_x509_crt_check_revocation(crt, crl_list, crl_list_size); */
 
-    expired = 0;
     cur_time = apr_time_now();
-    if (activation_time > cur_time) {
-	ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-		      "GnuTLS: Failed to Verify Peer: "
-		      "Peer Certificate is not yet activated.");
-	expired = 1;
-    }
-
-    if (gnutls_certificate_type_get( ctxt->session) != GNUTLS_CRT_OPENPGP || expiration_time != 0) {
-        if (expiration_time < cur_time) {
-	    ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-		      "GnuTLS: Failed to Verify Peer: "
-		      "Peer Certificate is expired.");
-            expired = 1;
-        }
-    }
 
     if (status & GNUTLS_CERT_SIGNER_NOT_FOUND) {
 	ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
@@ -1176,6 +1156,16 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
     if (status & GNUTLS_CERT_SIGNER_NOT_CA) {
 	ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
 		      "GnuTLS: Peer's Certificate signer is not a CA");
+    }
+
+    if (status & GNUTLS_CERT_INSECURE_ALGORITHM) {
+	ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+		      "GnuTLS: Peer's Certificate is using insecure algorithms");
+    }
+
+    if (status & GNUTLS_CERT_EXPIRED || status & GNUTLS_CERT_NOT_ACTIVATED) {
+	ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+		      "GnuTLS: Peer's Certificate signer is expired or not yet activated");
     }
 
     if (status & GNUTLS_CERT_INVALID) {
@@ -1202,7 +1192,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
 		       apr_psprintf(r->pool, "%lu", remain));
     }
 
-    if (status == 0 && expired == 0) {
+    if (status == 0) {
 	apr_table_setn(r->subprocess_env, "SSL_CLIENT_VERIFY", "SUCCESS");
 	ret = OK;
     } else {
