@@ -1,3 +1,7 @@
+** Version 0.5.9 (unreleased)
+- Corrected behavior in Keep-Alive connections (do not
+  terminate the connection prematurely)
+
 ** Version 0.5.8 (2010-08-18)
 - Session tickets are enabled by default.
 
