@@ -35,8 +35,6 @@
 
 /* it seems the default has some strange errors. Use SDBM 
  */
-#define ODB "SDBM"
-
 #define MC_TAG "mod_gnutls:"
 #define MC_TAG_LEN sizeof(MC_TAG)
 #define STR_SESSION_LEN (GNUTLS_SESSION_ID_STRING_LEN + MC_TAG_LEN)
@@ -296,6 +294,14 @@ static int mc_cache_delete(void* baton, gnutls_datum_t key)
 
 #endif /* have_apr_memcache */
 
+const char* db_type(mgs_srvconf_rec * sc)
+{
+        if (sc->cache_type == mgs_cache_sdbm)
+                return "sdbm";
+        else
+                return "default";
+}
+
 #define SSL_DBM_FILE_MODE ( APR_UREAD | APR_UWRITE | APR_GREAD | APR_WREAD )
 
 static void dbm_cache_expire(mgs_handle_t *ctxt)
@@ -321,7 +327,7 @@ static void dbm_cache_expire(mgs_handle_t *ctxt)
     total = 0;
     deleted = 0;
 
-    rv = apr_dbm_open_ex(&dbm, ODB, ctxt->sc->cache_config, APR_DBM_RWCREATE,
+    rv = apr_dbm_open_ex(&dbm, db_type(ctxt->sc), ctxt->sc->cache_config, APR_DBM_RWCREATE,
                       SSL_DBM_FILE_MODE, spool);
     if (rv != APR_SUCCESS) {
         ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
@@ -374,7 +380,7 @@ static gnutls_datum_t dbm_cache_fetch(void* baton, gnutls_datum_t key)
     if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
         return data;
 
-    rv = apr_dbm_open_ex(&dbm, ODB, ctxt->sc->cache_config,
+    rv = apr_dbm_open_ex(&dbm, db_type(ctxt->sc), ctxt->sc->cache_config,
 	              APR_DBM_READONLY, SSL_DBM_FILE_MODE, ctxt->c->pool);
     if (rv != APR_SUCCESS) {
         ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
@@ -444,7 +450,7 @@ static int dbm_cache_store(void* baton, gnutls_datum_t key,
     memcpy((char *)dbmval.dptr+sizeof(apr_time_t),
            data.data, data.size);
 
-    rv = apr_dbm_open_ex(&dbm, ODB, ctxt->sc->cache_config,
+    rv = apr_dbm_open_ex(&dbm, db_type(ctxt->sc), ctxt->sc->cache_config,
 	              APR_DBM_RWCREATE, SSL_DBM_FILE_MODE, ctxt->c->pool);
     if (rv != APR_SUCCESS) {
         ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
@@ -484,7 +490,7 @@ static int dbm_cache_delete(void* baton, gnutls_datum_t key)
     if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
         return -1;
 
-    rv = apr_dbm_open_ex(&dbm, ODB, ctxt->sc->cache_config,
+    rv = apr_dbm_open_ex(&dbm, db_type(ctxt->sc), ctxt->sc->cache_config,
 	              APR_DBM_RWCREATE, SSL_DBM_FILE_MODE, ctxt->c->pool);
     if (rv != APR_SUCCESS) {
         ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
@@ -518,7 +524,7 @@ static int dbm_cache_post_config(apr_pool_t *p, server_rec *s,
     const char* path1;
     const char* path2;
 
-    rv = apr_dbm_open_ex(&dbm, ODB, sc->cache_config, APR_DBM_RWCREATE, 
+    rv = apr_dbm_open_ex(&dbm, db_type(sc), sc->cache_config, APR_DBM_RWCREATE, 
                       SSL_DBM_FILE_MODE, p);
 
     if (rv != APR_SUCCESS) {
@@ -530,7 +536,7 @@ static int dbm_cache_post_config(apr_pool_t *p, server_rec *s,
 
     apr_dbm_close(dbm);
 
-    apr_dbm_get_usednames_ex(p, ODB, sc->cache_config, &path1, &path2);
+    apr_dbm_get_usednames_ex(p, db_type(sc), sc->cache_config, &path1, &path2);
 
     /* The Following Code takes logic directly from mod_ssl's DBM Cache */ 
 #if !defined(OS2) && !defined(WIN32) && !defined(BEOS) && !defined(NETWARE)
@@ -549,7 +555,7 @@ static int dbm_cache_post_config(apr_pool_t *p, server_rec *s,
 int mgs_cache_post_config(apr_pool_t *p, server_rec *s, 
                                  mgs_srvconf_rec *sc)
 {
-    if (sc->cache_type == mgs_cache_dbm) {
+    if (sc->cache_type == mgs_cache_dbm || sc->cache_type == mgs_cache_sdbm) {
         return dbm_cache_post_config(p, s, sc);
     }
     return 0;
@@ -558,7 +564,7 @@ int mgs_cache_post_config(apr_pool_t *p, server_rec *s,
 int mgs_cache_child_init(apr_pool_t *p, server_rec *s, 
                                 mgs_srvconf_rec *sc)
 {
-    if (sc->cache_type == mgs_cache_dbm) {
+    if (sc->cache_type == mgs_cache_dbm || sc->cache_type == mgs_cache_sdbm) {
         return 0;
     }
 #if HAVE_APR_MEMCACHE
@@ -573,7 +579,7 @@ int mgs_cache_child_init(apr_pool_t *p, server_rec *s,
 
 int mgs_cache_session_init(mgs_handle_t *ctxt)
 {
-    if (ctxt->sc->cache_type == mgs_cache_dbm) {
+    if (ctxt->sc->cache_type == mgs_cache_dbm || ctxt->sc->cache_type == mgs_cache_sdbm) {
         gnutls_db_set_retrieve_function(ctxt->session, dbm_cache_fetch);
         gnutls_db_set_remove_function(ctxt->session, dbm_cache_delete);
         gnutls_db_set_store_function(ctxt->session, dbm_cache_store);
