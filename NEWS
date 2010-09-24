@@ -1,4 +1,4 @@
-** Version 0.5.9 (unreleased)
+** Version 0.5.9 (2010-09-24)
 - Corrected behavior in Keep-Alive connections (do not
   terminate the connection prematurely)
 
