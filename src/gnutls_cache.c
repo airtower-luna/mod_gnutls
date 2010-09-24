@@ -296,10 +296,10 @@ static int mc_cache_delete(void* baton, gnutls_datum_t key)
 
 const char* db_type(mgs_srvconf_rec * sc)
 {
-        if (sc->cache_type == mgs_cache_sdbm)
-                return "sdbm";
+        if (sc->cache_type == mgs_cache_gdbm)
+                return "gdbm";
         else
-                return "default";
+                return "db";
 }
 
 #define SSL_DBM_FILE_MODE ( APR_UREAD | APR_UWRITE | APR_GREAD | APR_WREAD )
@@ -555,7 +555,7 @@ static int dbm_cache_post_config(apr_pool_t *p, server_rec *s,
 int mgs_cache_post_config(apr_pool_t *p, server_rec *s, 
                                  mgs_srvconf_rec *sc)
 {
-    if (sc->cache_type == mgs_cache_dbm || sc->cache_type == mgs_cache_sdbm) {
+    if (sc->cache_type == mgs_cache_dbm || sc->cache_type == mgs_cache_gdbm) {
         return dbm_cache_post_config(p, s, sc);
     }
     return 0;
@@ -564,7 +564,7 @@ int mgs_cache_post_config(apr_pool_t *p, server_rec *s,
 int mgs_cache_child_init(apr_pool_t *p, server_rec *s, 
                                 mgs_srvconf_rec *sc)
 {
-    if (sc->cache_type == mgs_cache_dbm || sc->cache_type == mgs_cache_sdbm) {
+    if (sc->cache_type == mgs_cache_dbm || sc->cache_type == mgs_cache_gdbm) {
         return 0;
     }
 #if HAVE_APR_MEMCACHE
@@ -579,7 +579,7 @@ int mgs_cache_child_init(apr_pool_t *p, server_rec *s,
 
 int mgs_cache_session_init(mgs_handle_t *ctxt)
 {
-    if (ctxt->sc->cache_type == mgs_cache_dbm || ctxt->sc->cache_type == mgs_cache_sdbm) {
+    if (ctxt->sc->cache_type == mgs_cache_dbm || ctxt->sc->cache_type == mgs_cache_gdbm) {
         gnutls_db_set_retrieve_function(ctxt->session, dbm_cache_fetch);
         gnutls_db_set_remove_function(ctxt->session, dbm_cache_delete);
         gnutls_db_set_store_function(ctxt->session, dbm_cache_store);

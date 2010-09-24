@@ -3,8 +3,9 @@
   terminate the connection prematurely)
 
 - The GnuTLSCache variable now can be given the specific
-  option "sdbm" instead of "dbm". "dbm" will use the default
-  dbm type of libapr while sdbm will force sdbm to be used.
+  option "gdbm" instead of "dbm". "dbm" will use the berkeley
+  db type of libapr while gdbm will force gdbm to be used.
+  sdbm is no longer being used due to serious limitations.
 
 ** Version 0.5.8 (2010-08-18)
 - Session tickets are enabled by default.

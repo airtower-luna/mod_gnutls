@@ -63,7 +63,7 @@ typedef enum
 {
     mgs_cache_none,
     mgs_cache_dbm,
-    mgs_cache_sdbm,
+    mgs_cache_gdbm,
 #if HAVE_APR_MEMCACHE
     mgs_cache_memcache
 #endif
