@@ -396,7 +396,7 @@ tryagain:
         if (ret == GNUTLS_E_WARNING_ALERT_RECEIVED
             || ret == GNUTLS_E_FATAL_ALERT_RECEIVED) {
             errcode = gnutls_alert_get(ctxt->session);
-            ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
+            ap_log_error(APLOG_MARK, APLOG_INFO, 0, ctxt->c->base_server,
                          "GnuTLS: Hanshake Alert (%d) '%s'.", errcode,
                          gnutls_alert_get_name(errcode));
         }
@@ -408,11 +408,11 @@ tryagain:
             goto tryagain;
         }
 #if USING_2_1_RECENT
-        ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, ctxt->c,
+        ap_log_cerror(APLOG_MARK, APLOG_INFO, 0, ctxt->c,
                      "GnuTLS: Handshake Failed (%d) '%s'", ret,
                       gnutls_strerror(ret));
 #else
-        ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
+        ap_log_error(APLOG_MARK, APLOG_INFO, 0, ctxt->c->base_server,
                      "GnuTLS: Handshake Failed (%d) '%s'", ret,
                      gnutls_strerror(ret));
 #endif
@@ -453,7 +453,7 @@ int mgs_rehandshake(mgs_handle_t * ctxt)
     
     if (rv != 0) {
         /* the client did not want to rehandshake. goodbye */
-        ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
+        ap_log_error(APLOG_MARK, APLOG_WARNING, 0, ctxt->c->base_server,
                      "GnuTLS: Client Refused Rehandshake request.");
         return -1;
     }
