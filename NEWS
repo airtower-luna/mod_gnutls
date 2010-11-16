@@ -1,3 +1,6 @@
+** Version 0.6.0
+- GnuTLSCache none is now an allowed option.
+
 ** Version 0.5.9 (2010-09-24)
 - Corrected behavior in Keep-Alive connections (do not
   terminate the connection prematurely)

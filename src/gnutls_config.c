@@ -370,6 +370,8 @@ const char *mgs_set_cache(cmd_parms * parms, void *dummy,
 
 	if (strcasecmp("none", type) == 0) {
 		sc->cache_type = mgs_cache_none;
+		sc->cache_config = NULL;
+		return NULL;
 	} else if (strcasecmp("dbm", type) == 0) {
 		sc->cache_type = mgs_cache_dbm;
 	} else if (strcasecmp("gdbm", type) == 0) {
@@ -383,6 +385,9 @@ const char *mgs_set_cache(cmd_parms * parms, void *dummy,
 	else {
 		return "Invalid Type for GnuTLSCache!";
 	}
+	
+	if (arg == NULL)
+		return "Invalid argument 2 for GnuTLSCache!";
 
 	if (sc->cache_type == mgs_cache_dbm
 	    || sc->cache_type == mgs_cache_gdbm) {

@@ -506,9 +506,6 @@ void mgs_hook_child_init(apr_pool_t * p, server_rec * s)
 			ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
 				     "[GnuTLS] - Failed to run Cache Init");
 		}
-	} else {
-		ap_log_error(APLOG_MARK, APLOG_CRIT, 0, s,
-			     "[GnuTLS] - No Cache Configured. Hint: GnuTLSCache");
 	}
 }
 
