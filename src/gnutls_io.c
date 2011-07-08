@@ -561,7 +561,7 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb)
 	while (!APR_BRIGADE_EMPTY(bb)) {
 		apr_bucket *bucket = APR_BRIGADE_FIRST(bb);
 
-                if (AP_BUCKET_IS_EOS(bucket)) {
+                if (APR_BUCKET_IS_EOS(bucket)) {
                         return ap_pass_brigade(f->next, bb);
 		} else if (APR_BUCKET_IS_FLUSH(bucket)) {
                 /* Try Flush */
