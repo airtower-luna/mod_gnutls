@@ -666,9 +666,9 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
 	ctxt->input_rc = APR_SUCCESS;
 
 	/* If Len = 0, we don't do anything. */
-	if (!len)
-		return 0;
-
+	if (!len || buffer == NULL) {
+                return 0;
+        }
 	if (!ctxt->input_bb) {
 		ctxt->input_rc = APR_EOF;
 		return -1;

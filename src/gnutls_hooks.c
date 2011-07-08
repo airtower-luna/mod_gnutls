@@ -738,8 +738,9 @@ int mgs_hook_pre_connection(conn_rec * c, void *csd)
 
 	_gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
 
-	if (c == NULL)
-		return DECLINED;
+	if (c == NULL) {
+                return DECLINED;
+        }
 
 	sc = (mgs_srvconf_rec *) ap_get_module_config(c->base_server->
 						      module_config,
@@ -749,10 +750,11 @@ int mgs_hook_pre_connection(conn_rec * c, void *csd)
 		return DECLINED;
 	}
 
-	if (c->remote_addr->hostname)
-		/* Connection initiated by Apache (mod_proxy) => ignore */
-		return OK;
-
+	if (c->remote_addr->hostname || apr_strnatcmp(c->remote_ip,c->local_ip) == 0) {
+        /* Connection initiated by Apache (mod_proxy) => ignore */
+                return OK;
+        }
+		
 	ctxt = create_gnutls_handle(c->pool, c);
 
 	ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
