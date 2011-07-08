@@ -541,7 +541,6 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
 apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb)
 {
 	apr_size_t ret;
-	apr_bucket *e;
 	mgs_handle_t *ctxt = (mgs_handle_t *) f->ctx;
 	apr_status_t status = APR_SUCCESS;
 	apr_read_type_e rblock = APR_NONBLOCK_READ;
@@ -562,48 +561,32 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb)
 	while (!APR_BRIGADE_EMPTY(bb)) {
 		apr_bucket *bucket = APR_BRIGADE_FIRST(bb);
 
-		if (AP_BUCKET_IS_EOC(bucket)) {
-			if (ctxt->session != NULL) {
-				do {
-					ret =
-					    gnutls_bye(ctxt->session,
-						       GNUTLS_SHUT_WR);
-				} while (ret == GNUTLS_E_INTERRUPTED
-					 || ret == GNUTLS_E_AGAIN);
-			}
-
-			apr_bucket_copy(bucket, &e);
-			APR_BRIGADE_INSERT_TAIL(ctxt->output_bb, e);
-
-			if ((status =
-			     ap_pass_brigade(f->next,
-					     ctxt->output_bb)) !=
-			    APR_SUCCESS) {
-				apr_brigade_cleanup(ctxt->output_bb);
-				return status;
-			}
-
-			apr_brigade_cleanup(ctxt->output_bb);
-			if (ctxt->session) {
-				gnutls_deinit(ctxt->session);
-				ctxt->session = NULL;
-			}
-			continue;
-		} else if (APR_BUCKET_IS_FLUSH(bucket)
-			   || APR_BUCKET_IS_EOS(bucket)) {
-
-			apr_bucket_copy(bucket, &e);
-			APR_BRIGADE_INSERT_TAIL(ctxt->output_bb, e);
-			if ((status =
-			     ap_pass_brigade(f->next,
-					     bb)) != APR_SUCCESS) {
-				apr_brigade_cleanup(ctxt->output_bb);
-				return status;
-			}
-
-			apr_brigade_cleanup(ctxt->output_bb);
-			continue;
-		} else {
+                if (AP_BUCKET_IS_EOS(bucket)) {
+                        return ap_pass_brigade(f->next, bb);
+		} else if (APR_BUCKET_IS_FLUSH(bucket)) {
+                /* Try Flush */
+                        if( write_flush(ctxt) < 0) {
+                        /* Flush Error */
+                                return ctxt->output_rc;
+                        }
+                        /* cleanup! */
+                        apr_bucket_delete(bucket);
+		} else if (AP_BUCKET_IS_EOC(bucket)) {
+                /* End Of Connection */
+                        if (ctxt->session != NULL) {
+                        /* Try A Clean Shutdown */
+                                do {
+                                         ret = gnutls_bye( ctxt->session, 
+                                                 GNUTLS_SHUT_WR);
+                                } while(ret == GNUTLS_E_INTERRUPTED || 
+                                        ret == GNUTLS_E_AGAIN);
+                        /* De-Initialize Session */
+                                gnutls_deinit(ctxt->session);
+                                ctxt->session = NULL;
+                        }
+                        /* Pass next brigade! */
+                        return ap_pass_brigade(f->next, bb);
+                } else {
 			/* filter output */
 			const char *data;
 			apr_size_t len;
@@ -612,15 +595,20 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb)
 			    apr_bucket_read(bucket, &data, &len, rblock);
 
 			if (APR_STATUS_IS_EAGAIN(status)) {
-				rblock = APR_BLOCK_READ;
-				continue;	/* and try again with a blocking read. */
+                        /* No data available so Flush! */
+                                if (write_flush(ctxt) < 0) {
+                                        return ctxt->output_rc;
+                                }
+                        /* Try again with a blocking read. */
+                                rblock = APR_BLOCK_READ;
+				continue;	
 			}
 
 			rblock = APR_NONBLOCK_READ;
 
 			if (!APR_STATUS_IS_EOF(status)
 			    && (status != APR_SUCCESS)) {
-				break;
+				return status;
 			}
 
 			if (len > 0) {
@@ -651,6 +639,7 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb)
 					if (ctxt->output_rc == APR_SUCCESS) {
 						ctxt->output_rc =
 						    APR_EGENERAL;
+                                                return ctxt->output_rc;
 					}
 				} else if (ret != len) {
 					/* Not able to send the entire bucket, 
@@ -660,10 +649,6 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb)
 			}
 
 			apr_bucket_delete(bucket);
-
-			if (ctxt->output_rc != APR_SUCCESS) {
-				break;
-			}
 		}
 	}
 
