@@ -1,0 +1,915 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="../../../../../xsl/projects.xsl"?>
+<ooo title="mod_gnutls Documentation" path="/projects/apache/mod_gnutls/docs/">
+ <section title="Documentation">
+    <content type="xhtml">
+    <div xmlns="http://www.w3.org/1999/xhtml">
+    <div id="compilation">
+    <h3>Compilation</h3>
+    <p>
+      <code>mod_gnutls</code> uses the "<code>configure/make/make install</code>"
+      mechanism common to many Open Source programs.
+      Most of the dirty work is handled by either configure or 
+      Apache's apxs utility. If you have built Apache modules before, there
+      shouldn't be any surprises for you.
+    </p>
+    <p>
+      The interesting options you can pass to configure are:</p>
+      <ul>
+        <li><code>--with-apxs=/path/to/apache/dir/bin/apxs</code>
+	  <p>
+	    This option is used to specify the location of the
+	    apxs utility that was installed as part of apache.
+	    Specify the location of the binary, not the directory
+	    it is located in.
+	  </p>
+        </li>
+        <li><code>--with-libgnutls=PATH</code>
+          <p>Full path to the <code>libgnutls-config</code> program.</p>
+        </li>
+        <li><code>--with-apr-memcache=PREFIX</code>
+          <p>Prefix to where <code><a href="/projects/libs/apr_memcache">apr_memcache</a></code> is installed.</p>
+        </li>
+        <li><code>--help</code>
+          <p>Provides a list of available configure options.</p>
+        </li>
+      </ul>
+<pre class="example">./configure --with-apxs=/usr/sbin/apxs2 --with-libgnutls=/usr
+make
+make install
+</pre>
+  </div>
+  <div id="integration">
+    <h3>Integration into Apache</h3>
+    <p>To activate <code>mod_gnutls</code> Just add<br /><br />
+    <code>LoadModule gnutls_module modules/mod_gnutls.so</code>
+      to your <code>httpd.conf</code> and restart Apache.
+    </p>
+  </div>
+  <div id="index">
+    <h3>Examples</h3>
+<p>Some example configuration and the exported variables to scripts can be
+    found in the following sections:</p>
+       <ul>
+         <li><a href="#example">Simple example</a></li>
+         <li><a href="#sni-example">Example with Server Name Indication</a></li>
+         <li><a href="#performance-example">Performance Issues</a></li>
+         <li><a href="#environment-variables">Environment variables</a></li>
+       </ul>
+  </div>
+  <div id="configuration">
+    <h3>Configuring with Apache</h3>
+<p><code>mod_gnutls</code> has the following directives:</p>
+       <ul>
+         <li><a href="#GnuTLSCache">GnuTLSCache</a></li>
+         <li><a href="#GnuTLSCacheTimeout">GnuTLSCacheTimeout</a></li>
+         <li><a href="#GnuTLSSessionTickets">GnuTLSSessionTickets</a></li>
+         <li><a href="#GnuTLSCertificateFile">GnuTLSCertificateFile</a></li>
+         <li><a href="#GnuTLSKeyFile">GnuTLSKeyFile</a></li>
+         <li><a href="#GnuTLSPGPCertificateFile">GnuTLSPGPCertificateFile</a></li>
+         <li><a href="#GnuTLSPGPKeyFile">GnuTLSPGPKeyFile</a></li>
+         <li><a href="#GnuTLSClientVerify">GnuTLSClientVerify</a></li>
+         <li><a href="#GnuTLSClientCAFile">GnuTLSClientCAFile</a></li>
+         <li><a href="#GnuTLSPGPKeyringFile">GnuTLSPGPKeyringFile</a></li>
+         <li><a href="#GnuTLSEnable">GnuTLSEnable</a></li>
+         <li><a href="#GnuTLSDHFile">GnuTLSDHFile</a></li>
+         <li><a href="#GnuTLSRSAFile">GnuTLSRSAFile</a></li>
+         <li><a href="#GnuTLSSRPPasswdFile">GnuTLSSRPPasswdFile</a></li>
+         <li><a href="#GnuTLSSRPPasswdConfFile">GnuTLSSRPPasswdConfFile</a></li>
+         <li><a href="#GnuTLSPriorities">GnuTLSPriorities</a></li>
+         <li><a href="#GnuTLSExportCertificates">GnuTLSExportCertificates</a></li>
+       </ul>
+  </div>
+  <div id="example">
+    <h3>Standard SSL Example</h3>
+<p>The following is an example of standard SSL Hosting, using one IP Addresses for each virtual host:</p>
+<pre class="example">
+# Load the module into Apache.
+LoadModule gnutls_module modules/mod_gnutls.so
+
+GnuTLSCache dbm /var/cache/www-tls-cache
+GnuTLSCacheTimeout 500
+
+# With normal SSL Websites, you need one IP Address per-site.
+Listen 1.2.3.1:443
+Listen 1.2.3.2:443
+Listen 1.2.3.3:443
+Listen 1.2.3.4:443
+
+&lt;VirtualHost 1.2.3.1:443&gt;
+    GnuTLSEnable on
+    GnuTLSPriorities NONE:+AES-128-CBC:+3DES-CBC:+ARCFOUR-128:+RSA:+DHE-RSA:+DHE-DSS:+SHA1:+MD5:+COMP-NULL
+    DocumentRoot /www/site1.example.com/html
+    ServerName site1.example.com:443
+    GnuTLSCertificateFile conf/ssl/site1.crt
+    GnuTLSKeyFile conf/ss/site1.key
+&lt;/VirtualHost&gt;
+&lt;VirtualHost 1.2.3.2:443&gt;
+# This virtual host enables SRP authentication
+    GnuTLSEnable on
+    GnuTLSPriorities NORMAL:+SRP
+    DocumentRoot /www/site2.example.com/html
+    ServerName site2.example.com:443
+    GnuTLSSRPPasswdFile conf/ssl/tpasswd.site2
+    GnuTLSSRPPasswdConfFile conf/ssl/tpasswd.site2.conf
+&lt;/VirtualHost&gt;
+&lt;VirtualHost 1.2.3.3:443&gt;
+# This server enables SRP, OpenPGP and X.509 authentication.
+    GnuTLSEnable on
+    GnuTLSPriorities NORMAL:+SRP:+SRP-RSA:+SRP-DSS
+    DocumentRoot /www/site3.example.com/html
+    ServerName site3.example.com:443
+    GnuTLSCertificateFile conf/ssl/site3.crt
+    GnuTLSKeyFile conf/ss/site3.key
+    GnuTLSClientVerify ignore
+    GnuTLSPGPCertificateFile conf/ss/site3.pub.asc
+    GnuTLSPGPKeyFile conf/ss/site3.sec.asc
+    GnuTLSSRPPasswdFile conf/ssl/tpasswd.site3
+    GnuTLSSRPPasswdConfFile conf/ssl/tpasswd.site3.conf
+&lt;/VirtualHost&gt;
+&lt;VirtualHost 1.2.3.4:443&gt;
+    GnuTLSEnable on
+# %COMPAT disables some security features to enable maximum compatibility with clients.
+    GnuTLSPriorities NONE:+AES-128-CBC:+ARCFOUR-128:+RSA:+SHA1:+MD5:+COMP-NULL:%COMPAT
+    DocumentRoot /www/site4.example.com/html
+    ServerName site4.example.com:443
+    GnuTLSCertificateFile conf/ssl/site4.crt
+    GnuTLSKeyFile conf/ss/site4.key
+&lt;/VirtualHost&gt;
+</pre>
+</div>
+  <div id="sni-example">
+    <h3>Server Name Indication Example</h3>
+<p><code>mod_gnutls</code> can also use 'Server Name Indication', as specified in 
+<a href="http://www.zvon.org/tmRFC/RFC3546/Output/chapter3.html#sub1">RFC 3546</a>.  This allows hosting many SSL Websites, with a Single IP Address. Currently all the recent
+browsers support this standard. Here is an example, using SNI:
+</p>
+<pre class="example">
+# Load the module into Apache.
+LoadModule gnutls_module modules/mod_gnutls.so
+
+# With normal SSL Websites, you need one IP Address per-site.
+Listen 1.2.3.1:443
+# This could also be 'Listen *:443',
+# just like '*:80' is common for non-https
+
+# No caching. Enable session tickets. Timeout is still used for
+# ticket expiration.
+GnuTLSCacheTimeout 600
+
+# This tells apache, that for this IP/Port combination, we want to use
+# Name Based Virtual Hosting.  In the case of Server Name Indication,
+# it lets mod_gnutls pick the correct Server Certificate.
+NameVirtualHost 1.2.3.1:443
+
+&lt;VirtualHost 1.2.3.1:443&gt;
+    GnuTLSEnable on
+    GnuTLSSessionTickets on
+    GnuTLSPriorities NORMAL
+    DocumentRoot /www/site1.example.com/html
+    ServerName site1.example.com:443
+    GnuTLSCertificateFile conf/ssl/site1.crt
+    GnuTLSKeyFile conf/ss/site1.key
+&lt;/VirtualHost&gt;
+&lt;VirtualHost 1.2.3.1:443&gt;
+    GnuTLSEnable on
+    GnuTLSPriorities NORMAL
+    DocumentRoot /www/site2.example.com/html
+    ServerName site2.example.com:443
+    GnuTLSCertificateFile conf/ssl/site2.crt
+    GnuTLSKeyFile conf/ss/site2.key
+&lt;/VirtualHost&gt;
+&lt;VirtualHost 1.2.3.1:443&gt;
+    GnuTLSEnable on
+    GnuTLSPriorities NORMAL
+    DocumentRoot /www/site3.example.com/html
+    ServerName site3.example.com:443
+    GnuTLSCertificateFile conf/ssl/site3.crt
+    GnuTLSKeyFile conf/ss/site3.key
+&lt;/VirtualHost&gt;
+&lt;VirtualHost 1.2.3.1:443&gt;
+    GnuTLSEnable on
+    GnuTLSPriorities NORMAL
+    DocumentRoot /www/site4.example.com/html
+    ServerName site4.example.com:443
+    GnuTLSCertificateFile conf/ssl/site4.crt
+    GnuTLSKeyFile conf/ss/site4.key
+&lt;/VirtualHost&gt;
+</pre>
+  </div>
+  <div id="performance-example">
+    <h3>Performance Issues</h3>
+<p><code>mod_gnutls</code> by default uses conservative settings for the
+    server. You can fine tune the configuration to reduce the load on a busy
+    server. The following examples do exactly this.
+</p>
+<pre class="example">
+# Load the module into Apache.
+LoadModule gnutls_module modules/mod_gnutls.so
+
+# Using 4 memcache servers to distribute the SSL Session Cache.
+GnuTLSCache memcache "mc1.example.com mc2.example.com mc3.example.com mc4.example.com"
+GnuTLSCacheTimeout 600
+
+Listen 1.2.3.1:443
+NameVirtualHost 1.2.3.1:443
+
+&lt;VirtualHost 1.2.3.1:443&gt;
+    GnuTLSEnable on
+# Here we disable the Perfect forward secrecy ciphersuites (DHE)
+# and disallow AES-256 since AES-128 is just fine.
+    GnuTLSPriorities NORMAL:!DHE-RSA:!DHE-DSS:!AES-256-CBC:%COMPAT
+    DocumentRoot /www/site1.example.com/html
+    ServerName site1.example.com:443
+    GnuTLSCertificateFile conf/ssl/site1.crt
+    GnuTLSKeyFile conf/ss/site1.key
+&lt;/VirtualHost&gt;
+&lt;VirtualHost 1.2.3.1:443&gt;
+    GnuTLSEnable on
+# Here we instead of disabling the DHE ciphersuites we use
+# Diffie Hellman parameters of smaller size than the default (2048 bits).
+# Using small numbers from 768 to 1024 bits should be ok once they are
+# regenerated every few hours.
+# Use "certtool --generate-dh-params --bits 1024" to get those
+    GnuTLSDHFile /etc/apache2/dh.params
+    GnuTLSPriorities NORMAL:!AES-256-CBC:%COMPAT
+    DocumentRoot /www/site2.example.com/html
+    ServerName site2.example.com:443
+    GnuTLSCertificateFile conf/ssl/site2.crt
+    GnuTLSKeyFile conf/ss/site2.key
+&lt;/VirtualHost&gt;
+</pre>
+  </div>
+
+  <div id="environment-variables">
+    <h3>Environment variables</h3>
+<p><code>mod_gnutls</code> exports the following environment variables to
+    scripts.
+</p>
+
+<table class="directive">
+<tr><th>HTTPS:</th><td>can be "on" or "off"</td></tr>
+<tr><th>SSL_VERSION_LIBRARY:</th><td> The version of the gnutls library</td></tr>
+<tr><th>SSL_VERSION_INTERFACE:</th><td> The version of this module</td></tr>
+<tr><th>SSL_PROTOCOL:</th><td> The SSL or TLS protocol name (such as "TLS 1.0" etc.)</td></tr>
+<tr><th>SSL_CIPHER:</th><td> The SSL or TLS cipher suite name.</td></tr>
+<tr><th>SSL_COMPRESS_METHOD:</th><td> The negotiated compression method (NULL or DEFLATE)</td></tr>
+<tr><th>SSL_SRP_USER:</th><td> The SRP username used for authentication.</td></tr>
+<tr><th>SSL_CIPHER_USEKEYSIZE and SSL_CIPHER_ALGKEYSIZE:</th><td> The number if bits used in the used cipher
+  algorithm. This does not fully reflect the security level since the size of 
+  RSA or DHE key exchange parameters affect the security level too.</td></tr>
+<tr><th>SSL_CIPHER_EXPORT:</th><td> true or false. Whether the cipher suite negotiated is an export one.</td></tr>
+<tr><th>SSL_SESSION_ID:</th><td> The session ID negotiated in this session. Can be the same during
+  client reloads.</td></tr>
+<tr><th>SSL_CLIENT_V_REMAIN:</th><td> The number of days until the client's certificate is expired.</td></tr>
+<tr><th>SSL_CLIENT_V_START:</th><td> The activation time of client's certificate.</td></tr>
+<tr><th>SSL_CLIENT_V_END:</th><td> The expiration time of client's certificate.</td></tr>
+<tr><th>SSL_CLIENT_S_DN:</th><td> The distinguished name of client's certificate in RFC2253 format.</td></tr>
+<tr><th>SSL_CLIENT_I_DN:</th><td> The distinguished name of client's issuer certificate in RFC2253 format.</td></tr>
+<tr><th>SSL_CLIENT_S_AN%:</th><td> These will contain the alternative names of the client certificate 
+  (% is a number starting from zero). The values will be prepended by "DNSNAME:", 
+  "RFC822NAME:" or "URI:" depending on the type. If it is not supported the value 
+  "UNSUPPORTED" will be set.</td></tr>
+<tr><th>SSL_CLIENT_M_SERIAL:</th><td> The serial number of the client's certificate.</td></tr>
+<tr><th>SSL_CLIENT_M_VERSION:</th><td> The version of the client's certificate.</td></tr>
+<tr><th>SSL_CLIENT_A_SIG:</th><td> The algorithm used for the signature in client's certificate.</td></tr>
+<tr><th>SSL_CLIENT_A_KEY:</th><td> The public key algorithm in client's certificate.</td></tr>
+<tr><th>SSL_CLIENT_CERT:</th><td> The PEM-encoded client certificate</td></tr>
+<tr><th>SSL_CLIENT_VERIFY:</th><td> whether the client's certificate was verified. (NONE if none was sent, or SUCCESS or FAILED)</td></tr>
+<tr><th>SSL_CLIENT_CERT_TYPE:</th><td> The certificate type can be X.509 or OPENPGP.</td></tr>
+<tr><th>SSL_SERVER_V_START:</th><td> The activation time of server's certificate.</td></tr>
+<tr><th>SSL_SERVER_V_END:</th><td> The expiration time of server's certificate.</td></tr>
+<tr><th>SSL_SERVER_S_DN:</th><td> The distinguished name of the server's certificate in RFC2253 format.</td></tr>
+<tr><th>SSL_SERVER_I_DN:</th><td> The distinguished name of the server's issuer certificate in RFC2253 format.</td></tr>
+<tr><th>SSL_SERVER_S_AN%:</th><td> These will contain the alternative names of the server certificate 
+  (% is a number starting from zero). The values will be prepended by "DNSNAME:", 
+  "RFC822NAME:" or "URI:" depending on the type. If it is not supported the value 
+  "UNSUPPORTED" will be set.</td></tr>
+<tr><th>SSL_SERVER_M_SERIAL:</th><td> The serial number of the server's certificate.</td></tr>
+<tr><th>SSL_SERVER_M_VERSION:</th><td> The version of the server's certificate.</td></tr>
+<tr><th>SSL_SERVER_A_SIG:</th><td> The algorithm used for the signature in server's certificate.</td></tr>
+<tr><th>SSL_SERVER_A_KEY:</th><td> The public key algorithm in server's certificate.</td></tr>
+<tr><th>SSL_SERVER_CERT:</th><td> The PEM-encoded server certificate</td></tr>
+<tr><th>SSL_SERVER_CERT_TYPE:</th><td> The certificate type can be X.509 or
+OPENPGP.</td></tr>
+</table>
+  </div>
+
+  <div id="GnuTLSCache" class="apache_directive">
+    <h3>GnuTLSCache</h3>
+    <table class="directive">
+      <tr>
+        <th>Description:</th>
+        <td>Configure SSL Session Cache</td>
+      </tr>
+      <tr>
+        <th>Syntax:</th>
+        <td><code>GnuTLSCache <var>[dbm|gdbm|memcache|none]</var> <var>[path|server list|-]</var></code></td>
+      </tr>
+      <tr>
+        <th>Default:</th>
+        <td><code>dbm "conf/gnutls_cache"</code></td>
+      </tr>
+      <tr>
+        <th>Context:</th>
+        <td>
+          global config
+        </td>
+      </tr>
+    </table>
+      <p>This directive configures the SSL Session Cache for <code>mod_gnutls</code>.  
+      This could be shared between machines of different architectures.  
+      </p>
+      <dl>
+        <dt>dbm</dt>
+        <dd>
+        Uses the default Berkeley DB backend of APR DBM to cache SSL Sessions results. The argument is a relative or absolute path to be used
+        as the DBM Cache file.  This is compatible with most operating systems.
+        </dd>
+
+        <dt>gdbm</dt>
+        <dd>
+        Uses the GDBM backend of APR DBM to cache SSL Sessions results. The argument is a relative or absolute path to be used
+        as the DBM Cache file.  
+        </dd>
+
+        <dt>memcache</dt>
+        <dd>
+        Uses a <a href="http://www.danga.com/memcached/">memcached</a> server to cache the SSL Session.
+        The argument is a space separated list of servers.  If no port number is supplied, 
+        the default of 11211 is used.  This can be used to share a session cache between all servers in a cluster.
+        </dd>
+
+        <dt>None</dt>
+        <dd>
+        Turns off all caching of SSL Sessions.  This can significantly reduce the performance of <code>mod_gnutls</code>
+        since even followup connections by a client must renegotiate
+        parameters instead of reusing old ones.
+        </dd>
+      </dl>
+Example Usage:
+<pre class="example">GnuTLSCache memcache "10.0.0.1 10.0.0.2 10.0.0.3"</pre>
+  </div>
+
+  <div id="GnuTLSCacheTimeout" class="apache_directive">
+    <h3>GnuTLSCacheTimeout</h3>
+    <table class="directive">
+      <tr>
+        <th>Description:</th>
+        <td>Timeout for SSL Session Cache expiration.</td>
+      </tr>
+      <tr>
+        <th>Syntax:</th>
+        <td><code>GnuTLSCacheTimeout <var>seconds</var></code></td>
+      </tr>
+      <tr>
+        <th>Default:</th>
+        <td><code>300</code></td>
+      </tr>
+      <tr>
+        <th>Context:</th>
+        <td>
+          global config
+        </td>
+      </tr>
+    </table>
+      <p>
+      Sets the timeout for SSL Session Cache entries expiration. This directive 
+        is valid even if Session Tickets are used, and indicates the
+        expiration time of the ticket.
+      </p>
+  </div>
+
+  <div id="GnuTLSSessionTickets" class="apache_directive">
+    <h3>GnuTLSSessionTickets</h3>
+    <table class="directive">
+      <tr>
+        <th>Description:</th>
+        <td>Enable Session Tickets for the server.</td>
+      </tr>
+      <tr>
+        <th>Syntax:</th>
+        <td><code>GnuTLSSessionTickets <var>[on|off]</var></code></td>
+      </tr>
+      <tr>
+        <th>Default:</th>
+        <td><code>off</code></td>
+      </tr>
+      <tr>
+        <th>Context:</th>
+        <td>
+          server config,
+          virtual host.
+        </td>
+      </tr>
+    </table>
+      <p>
+        To avoid storing data for TLS session resumption it is allowed
+        to provide client with a ticket, to use on return. Use for servers
+        with limited storage, and don't combine with GnuTLSCache. For a pool
+        of servers this option is not recommended since the tickets are
+        unique for the issuing server only.
+      </p>
+  </div>
+
+  <div id="GnuTLSCertificateFile" class="apache_directive">
+    <h3>GnuTLSCertificateFile</h3>
+    <table class="directive">
+      <tr>
+        <th>Description:</th>
+        <td>Set to the PEM Encoded Server Certificate.</td>
+      </tr>
+      <tr>
+        <th>Syntax:</th>
+        <td><code>GnuTLSCertificateFile <var>file-path</var></code></td>
+      </tr>
+      <tr>
+        <th>Default:</th>
+        <td><code>none</code></td>
+      </tr>
+      <tr>
+        <th>Context:</th>
+        <td>
+          server config,
+          virtual host.
+        </td>
+      </tr>
+    </table>
+      <p>Takes an absolute or relative path to a PEM Encoded Certificate to use as this Server's
+      Certificate.
+      </p>
+Example Usage:
+<pre class="example">GnuTLSCertificateFile conf/ssl/server.crt</pre>
+  </div>
+
+  <div id="GnuTLSPGPCertificateFile" class="apache_directive">
+    <h3>GnuTLSPGPCertificateFile</h3>
+    <table class="directive">
+      <tr>
+        <th>Description:</th>
+        <td>Set to a base64 Encoded Server OpenPGP Certificate.</td>
+      </tr>
+      <tr>
+        <th>Syntax:</th>
+        <td><code>GnuTLSPGPCertificateFile <var>file-path</var></code></td>
+      </tr>
+      <tr>
+        <th>Default:</th>
+        <td><code>none</code></td>
+      </tr>
+      <tr>
+        <th>Context:</th>
+        <td>
+          server config,
+          virtual host.
+        </td>
+      </tr>
+    </table>
+      <p>Takes an absolute or relative path to a base64 Encoded OpenPGP Certificate to use as this Server's
+      Certificate.
+      </p>
+Example Usage:
+<pre class="example">GnuTLSPGPCertificateFile conf/ssl/server.asc</pre>
+  </div>
+
+
+  <div id="GnuTLSClientVerify" class="apache_directive">
+    <h3>GnuTLSClientVerify</h3>
+    <table class="directive">
+      <tr>
+        <th>Description:</th>
+        <td>Enable Client Certificate Verification </td>
+      </tr>
+      <tr>
+        <th>Syntax:</th>
+        <td><code>GnuTLSClientVerify <var>[ignore|request|require|</var></code></td>
+      </tr>
+      <tr>
+        <th>Default:</th>
+        <td><code>ignore</code></td>
+      </tr>
+      <tr>
+        <th>Context:</th>
+        <td>
+          server config,
+          virtual host,
+          directory,
+          .htaccess
+        </td>
+      </tr>
+    </table>
+      <p>This directive controls the use of SSL Client Certificate Authentication.  If used in the <code>.htaccess</code>
+      context, it can force TLS re-negotiation.
+      </p>
+      <dl>
+        <dt>ignore</dt>
+        <dd><code>mod_gnutls</code> will ignore the contents of any SSL Client Certificates sent.
+        It will not request that the client sends a certificate.
+        </dd>
+
+        <dt>request</dt>
+        <dd>The client certificate will be requested, but not required.  The Certificate will be validated if sent. The output of the validation status will be stored in the <code>SSL_CLIENT_VERIFY</code> environment variable and can be "SUCCESS", "FAILED" or "NONE".</dd>
+
+        <dt>require</dt>
+        <dd>A Client certificate will be required. Any requests without a valid client certificate will be denied. The <code>SSL_CLIENT_VERIFY</code> environment variable will only be set to "SUCCESS".</dd>
+      </dl>
+    <pre class="example">&lt;Directory "/path/to/my/docroot"&gt;
+    GnuTLSClientVerify require
+&lt;/Directory&gt;</pre>
+  </div>
+
+  <div id="GnuTLSClientCAFile" class="apache_directive">
+    <h3>GnuTLSClientCAFile</h3>
+    <table class="directive">
+      <tr>
+        <th>Description:</th>
+        <td>Set to the PEM Encoded Certificate Authority Certificate.</td>
+      </tr>
+      <tr>
+        <th>Syntax:</th>
+        <td><code>GnuTLSClientCAFile <var>file-path</var></code></td>
+      </tr>
+      <tr>
+        <th>Default:</th>
+        <td><code>none</code></td>
+      </tr>
+      <tr>
+        <th>Context:</th>
+        <td>
+          server config,
+          virtual host.
+        </td>
+      </tr>
+    </table>
+      <p>Takes an absolute or relative path to a PEM Encoded Certificate to use as a Certificate Authority with Client Certificate Authentication. This file may contain a list of trusted authorities.
+      </p>
+Example Usage:
+<pre class="example">GnuTLSClientCAFile conf/ssl/ca.crt</pre>
+  </div>
+
+  <div id="GnuTLSPGPKeyringFile" class="apache_directive">
+    <h3>GnuTLSPGPKeyringFile</h3>
+    <table class="directive">
+      <tr>
+        <th>Description:</th>
+        <td>Set to a base64 Encoded key ring.</td>
+      </tr>
+      <tr>
+        <th>Syntax:</th>
+        <td><code>GnuTLSPGPKeyringFile <var>file-path</var></code></td>
+      </tr>
+      <tr>
+        <th>Default:</th>
+        <td><code>none</code></td>
+      </tr>
+      <tr>
+        <th>Context:</th>
+        <td>
+          server config,
+          virtual host.
+        </td>
+      </tr>
+    </table>
+      <p>Takes an absolute or relative path to a base64 Encoded Certificate
+    list (key ring) to use as a means of verification of Client
+      Certificates. This file should contain a list of trusted signers.
+      </p>
+Example Usage:
+<pre class="example">GnuTLSPGPKeyringFile conf/ssl/ring.asc</pre>
+  </div>
+
+  <div id="GnuTLSEnable" class="apache_directive">
+    <h3>GnuTLSEnable</h3>
+    <table class="directive">
+      <tr>
+        <th>Description:</th>
+        <td>Enable GnuTLS for this virtual host.</td>
+      </tr>
+      <tr>
+        <th>Syntax:</th>
+        <td><code>GnuTLSEnable <var>[on|off]</var></code></td>
+      </tr>
+      <tr>
+        <th>Default:</th>
+        <td><code>off</code></td>
+      </tr>
+      <tr>
+        <th>Context:</th>
+        <td>
+          virtual host
+        </td>
+      </tr>
+    </table>
+      <p>This directive enables SSL/TLS Encryption for a Virtual Host.
+      </p>
+<pre class="example">&lt;VirtualHost 1.2.3.4:443&gt;
+    GnuTLSEnable on
+    # other directives for the Virtual Host.
+&lt;/VirtualHost&gt;</pre>
+  </div>
+  
+    <div id="GnuTLSExportCertificates" class="apache_directive">
+    <h3>GnuTLSExportCertificates</h3>
+    <table class="directive">
+      <tr>
+        <th>Description:</th>
+        <td>Export the PEM encoded certificates to CGIs.</td>
+      </tr>
+      <tr>
+        <th>Syntax:</th>
+        <td><code>GnuTLSExportCertificates <var>[on|off]</var></code></td>
+      </tr>
+      <tr>
+        <th>Default:</th>
+        <td><code>off</code></td>
+      </tr>
+      <tr>
+        <th>Context:</th>
+        <td>
+          virtual host
+        </td>
+      </tr>
+    </table>
+      <p>This directive enables exporting the full PEM encoded certificates of
+	      the server and the client to CGIs. This makes <code>mod_gnutls</code> export exactly the same environment variables as <code>mod_ssl</code>.
+      </p>
+<pre class="example">&lt;VirtualHost 1.2.3.4:443&gt;
+    GnuTLSExportCertificates on
+    # other directives for the Virtual Host.
+&lt;/VirtualHost&gt;</pre>
+  </div>
+
+
+  <div id="GnuTLSKeyFile" class="apache_directive">
+    <h3>GnuTLSKeyFile</h3>
+    <table class="directive">
+      <tr>
+        <th>Description:</th>
+        <td>Set to the Server Private Key.</td>
+      </tr>
+      <tr>
+        <th>Syntax:</th>
+        <td><code>GnuTLSKeyFile <var>file-path</var></code></td>
+      </tr>
+      <tr>
+        <th>Default:</th>
+        <td><code>none</code></td>
+      </tr>
+      <tr>
+        <th>Context:</th>
+        <td>
+          server config,
+          virtual host.
+        </td>
+      </tr>
+    </table>
+      <p>Takes an absolute or relative path to the Server Private Key.  This key cannot currently be password protected.
+      </p>
+Example Usage:
+<pre class="example">GnuTLSKeyFile conf/ssl/server.key</pre>
+      <div class="warning">
+        <strong>Security Warning</strong>: This private key must be protected.  It is read while Apache is still running as root,
+        and does not need to be readable by the <code>nobody</code> or <code>apache</code> user.
+      </div>
+  </div>
+  
+  <div id="GnuTLSPGPKeyFile" class="apache_directive">
+    <h3>GnuTLSPGPKeyFile</h3>
+    <table class="directive">
+      <tr>
+        <th>Description:</th>
+        <td>Set to the Server OpenPGP Secret Key.</td>
+      </tr>
+      <tr>
+        <th>Syntax:</th>
+        <td><code>GnuTLSPGPKeyFile <var>file-path</var></code></td>
+      </tr>
+      <tr>
+        <th>Default:</th>
+        <td><code>none</code></td>
+      </tr>
+      <tr>
+        <th>Context:</th>
+        <td>
+          server config,
+          virtual host.
+        </td>
+      </tr>
+    </table>
+      <p>Takes an absolute or relative path to the Server Private Key.  This key cannot currently be password protected.
+      </p>
+Example Usage:
+<pre class="example">GnuTLSPGPKeyFile conf/ssl/server.asc</pre>
+      <div class="warning">
+        <strong>Security Warning</strong>: This private key must be protected.  It is read while Apache is still running as root,
+        and does not need to be readable by the <code>nobody</code> or <code>apache</code> user.
+      </div>
+  </div>
+  
+  
+    <div id="GnuTLSDHFile" class="apache_directive">
+    <h3>GnuTLSDHFile</h3>
+    <table class="directive">
+      <tr>
+        <th>Description:</th>
+        <td>Set to the PKCS #3 encoded Diffie Hellman parameters.</td>
+      </tr>
+      <tr>
+        <th>Syntax:</th>
+        <td><code>GnuTLSDHFile <var>file-path</var></code></td>
+      </tr>
+      <tr>
+        <th>Default:</th>
+        <td><code>none</code></td>
+      </tr>
+      <tr>
+        <th>Context:</th>
+        <td>
+          server config,
+          virtual host.
+        </td>
+      </tr>
+    </table>
+      <p>Takes an absolute or relative path to a PKCS #3 encoded DH parameters. Those are used when the DHE key exchange method is enabled. You can generate this file using
+	"certtool --generate-dh-params --bits 2048". If not set <code>mod_gnutls</code> will use the included parameters.
+      </p>
+Example Usage:
+<pre class="example">GnuTLSDHFile conf/ssl/dhparams</pre>
+  </div>
+
+    <div id="GnuTLSRSAFile" class="apache_directive">
+    <h3>GnuTLSRSAFile</h3>
+    <table class="directive">
+      <tr>
+        <th>Description:</th>
+        <td>Set to the PKCS #1 encoded RSA parameters for 'EXPORT' ciphersuites.</td>
+      </tr>
+      <tr>
+        <th>Syntax:</th>
+        <td><code>GnuTLSRSAFile <var>file-path</var></code></td>
+      </tr>
+      <tr>
+        <th>Default:</th>
+        <td><code>none</code></td>
+      </tr>
+      <tr>
+        <th>Context:</th>
+        <td>
+          server config,
+          virtual host.
+        </td>
+      </tr>
+    </table>
+      <p>Takes an absolute or relative path to a PKCS #1 encoded RSA parameters. Those are used when the RSA-EXPORT key exchange method is enabled. You can generate this file using "certtool --generate-privkey --bits 512". These parameters should not contain key of longer of 512 bits (due to the export restrictions). If not set <code>mod_gnutls</code> will not negotiate the 'EXPORT' ciphersuites. It is recommended not to enable those ciphersuites. If you do make sure you regenerate this file at every few hours. 
+      </p>
+Example Usage:
+<pre class="example">GnuTLSRSAFile conf/ssl/rsaparams</pre>
+  </div>
+
+    <div id="GnuTLSSRPPasswdFile" class="apache_directive">
+    <h3>GnuTLSSRPPasswdFile</h3>
+    <table class="directive">
+      <tr>
+        <th>Description:</th>
+        <td>Set to the SRP password file for SRP ciphersuites.</td>
+      </tr>
+      <tr>
+        <th>Syntax:</th>
+        <td><code>GnuTLSSRPPasswdFile <var>file-path</var></code></td>
+      </tr>
+      <tr>
+        <th>Default:</th>
+        <td><code>none</code></td>
+      </tr>
+      <tr>
+        <th>Context:</th>
+        <td>
+          server config,
+          virtual host.
+        </td>
+      </tr>
+    </table>
+      <p>Takes an absolute or relative path to an SRP password file. This is the same format as used in libsrp. You can generate such file using the command "srptool --passwd /etc/tpasswd --passwd-conf /etc/tpasswd.conf -u test" to set a password for user test. This password file holds the username, a password verifier and the dependency to the SRP parameters.
+      </p>
+Example Usage:
+<pre class="example">GnuTLSSRPPasswdFile conf/ssl/tpasswd</pre>
+  </div>
+  
+    <div id="GnuTLSSRPPasswdConfFile" class="apache_directive">
+    <h3>GnuTLSSRPPasswdConfFile</h3>
+    <table class="directive">
+      <tr>
+        <th>Description:</th>
+        <td>Set to the SRP password.conf file for SRP ciphersuites.</td>
+      </tr>
+      <tr>
+        <th>Syntax:</th>
+        <td><code>GnuTLSSRPPasswdConfFile <var>file-path</var></code></td>
+      </tr>
+      <tr>
+        <th>Default:</th>
+        <td><code>none</code></td>
+      </tr>
+      <tr>
+        <th>Context:</th>
+        <td>
+          server config,
+          virtual host.
+        </td>
+      </tr>
+    </table>
+      <p>Takes an absolute or relative path to an SRP password.conf file. This is the same format as used in libsrp. You can generate such file using the command "srptool --create-conf /etc/tpasswd.conf". This file holds the SRP parameters and is associate with the password file (the verifiers depends on these parameters).
+      </p>
+Example Usage:
+<pre class="example">GnuTLSSRPPasswdConfFile conf/ssl/tpasswd.conf</pre>
+  </div>
+  
+    <div id="GnuTLSPriorities" class="apache_directive">
+    <h3>GnuTLSPriorities</h3>
+    <table class="directive">
+      <tr>
+        <th>Description:</th>
+        <td>Set the allowed ciphers, key exchange algorithms, MACs and
+        compression methods.</td>
+      </tr>
+      <tr>
+        <th>Syntax:</th>
+        <td><code>GnuTLSPriorities <var>+cipher0:+cipher1:...:+cipherN</var></code></td>
+      </tr>
+      <tr>
+        <th>Default:</th>
+        <td><code>none</code></td>
+      </tr>
+      <tr>
+        <th>Context:</th>
+        <td>
+          server config,
+          virtual host.
+        </td>
+      </tr>
+    </table>
+      <p>Takes a semi-colon separated list of ciphers, key exchange methods
+    Message authentication codes and compression methods to enable. The
+      allowed keywords are specified in the <code>gnutls_priority_init()</code>
+      function of <code>GnuTLS</code>. It's documentation can be found at 
+      <a
+      href="http://www.gnu.org/software/gnutls/manual/html_node/Core-functions.html#Core-functions">Core
+      GnuTLS functions.</a>
+      </p><p>
+      In brief you can specify a set of ciphersuites from the choices:
+      <ul>
+	      <li>NONE: The empty list.</li>
+	      <li>EXPORT: A list with all the supported cipher combinations
+      including the "EXPORT" strength algorithms.</li>
+	      <li>PERFORMANCE: A list with all the secure cipher combinations
+      sorted in terms of performance.</li>
+	      <li>NORMAL: A list with all the secure cipher combinations
+      sorted with respect to security margin (subjective term).</li>
+	      <li>SECURE: A list with all the secure cipher combinations including the
+      256-bit ciphers sorted with respect to security margin.</li>
+      </ul>
+      Additionally you can add or remove algorithms using the "+" and "!"
+      prefixes respectively. That is in order to disable the ARCFOUR cipher
+      from the "NORMAL" set you can use the string
+      <code>NORMAL:!ARCFOUR-128</code>. Other options such as the protocol
+      version and the compression method can be specified using the
+      <code>VERS-</code> and <code>COMP-</code> prefixes. So in order to
+      remove or add a specific TLS version from the "NORMAL" set use
+      <code>NORMAL:!VERS-SSL3.0</code>. To enable       
+      zlib compression use <code>NORMAL:+COMP-DEFLATE</code>.
+      However it is recommended not to add compression at this level.
+      With the "NONE" set, in order to be usable, you have to specify a complete
+      set of combinations of protocol versions, cipher algorithms
+      (AES-128-CBC), key exchange algorithms (RSA), message authentication
+      codes (SHA1) and compression methods (COMP-NULL).
+      </p><p>
+      All the supported algorithms are:
+      <ul>
+      <li>Ciphers: AES-256-CBC, AES-128-CBC, CAMELLIA-256-CBC,
+      CAMELLIA-128-CBC, ARCFOUR-128, 3DES-CBC, ARCFOUR-40</li>
+      <li>Key exchange methods: RSA, DHE-RSA, DHE-DSS, SRP, SRP-RSA,
+      SRP-DSS, ANON-DH</li>
+      <li>Message authentication codes: SHA1, MD5</li>
+      <li>Compression methods: COMP-DEFLATE, COMP-NULL</li>
+      <li>Protocol versions: VERS-TLS1.1, VERS-TLS1.0, VERS-SSL3.0</li>
+      </ul>
+      </p>
+      <p>The special keyword "%COMPAT" will disable some security features
+      such as protection against statistical attacks to ciphertext data in
+      order to achieve maximum compatibility (some broken mobile clients need
+      this).
+      </p>
+Example Usage:
+<pre class="example">GnuTLSPriorities NORMAL:!AES-256-CBC:!DHE-RSA</pre>
+<pre class="example">GnuTLSPriorities EXPORT:!VERS-TLS1.0:+COMP-DEFLATE:+CTYPE-OPENPGP</pre>
+<pre class="example">GnuTLSPriorities NONE:+VERS-TLS1.0:+AES-128-CBC:+RSA:+SHA1:+COMP-NULL</pre>
+<pre class="example">GnuTLSPriorities NORMAL:+COMP-DEFLATE</pre>
+<pre class="example">GnuTLSPriorities NORMAL:%COMPAT</pre>
+<pre class="example">GnuTLSPriorities NORMAL:+ANON-DH</pre>
+</div>
+
+   </div>
+    </content>
+ </section>
+</ooo>
+
