@@ -319,6 +319,4 @@ int mgs_hook_fixups(request_rec *r);
 
 int mgs_hook_authz(request_rec *r);
 
-int mgs_authz_lua(request_rec* r);
-
 #endif /*  __mod_gnutls_h_inc */
