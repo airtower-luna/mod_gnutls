@@ -28,15 +28,9 @@ CHECK_APACHE(,$AP_VERSION,
 dnl LIBTOOL="`${APR_CONFIG} --apr-libtool`"
 dnl AC_SUBST(LIBTOOL)
 
-dnl Depend on 2.10.0 due to safe renegotiation addition.
-MIN_TLS_VERSION=2.10.0
-AM_PATH_LIBGNUTLS($MIN_TLS_VERSION,,
- 	AC_MSG_ERROR([[
-***  
-*** libgnutls was not found. You may want to get it from
-*** http://www.gnutls.org/
-***
-]]))
+PKG_CHECK_MODULES(LIBGNUTLS, [gnutls >= 2.12.6])
+
+LIBGNUTLS_VERSION=`pkg-config --modversion gnutls`
 
 AC_ARG_ENABLE(srp,
        AS_HELP_STRING([--disable-srp],
@@ -49,8 +43,6 @@ if test "$use_srp" != "no"; then
 fi
 AC_MSG_CHECKING([whether to enable SRP functionality])
 AC_MSG_RESULT($use_srp)
-
-dnl CHECK_LUA()
 
 have_apr_memcache=0
 CHECK_APR_MEMCACHE([have_apr_memcache=1], [have_apr_memcache=0])
