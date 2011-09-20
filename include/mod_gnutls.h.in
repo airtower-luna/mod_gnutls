@@ -49,15 +49,13 @@ extern module AP_MODULE_DECLARE_DATA gnutls_module;
 
 #define MOD_GNUTLS_DEBUG @OOO_MAINTAIN@
 
+#define USING_2_1_RECENT 0
+
 /* Recent Versions of 2.1 renamed several hooks. This allows us to 
    compile on 2.0.xx  */
 #if AP_SERVER_MINORVERSION_NUMBER >= 2 || (AP_SERVER_MINORVERSION_NUMBER == 1 && AP_SERVER_PATCHLEVEL_NUMBER >= 3)
 #define USING_2_1_RECENT 1
 #endif 
-
-#ifndef USING_2_1_RECENT
-#define USING_2_1_RECENT 0
-#endif
 
 typedef enum 
 {
