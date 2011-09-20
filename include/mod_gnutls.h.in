@@ -37,8 +37,6 @@
 
 #define HAVE_APR_MEMCACHE    @have_apr_memcache@
 
-#define ENABLE_SRP @enable_srp@
-
 extern module AP_MODULE_DECLARE_DATA gnutls_module;
 
 #define GNUTLS_OUTPUT_FILTER_NAME "gnutls_output_filter"

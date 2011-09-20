@@ -38,13 +38,10 @@ AC_ARG_ENABLE(srp,
                [unconditionally disable the SRP functionality]),
        use_srp=$enableval, use_srp=yes)
 
-enable_srp=0
 SRP_CFLAGS=""
 if test "$use_srp" != "no"; then
  	SRP_CFLAGS="-DENABLE_SRP=1"
-        enable_srp=1
 fi
-AC_SUBST(enable_srp)
 
 AC_MSG_CHECKING([whether to enable SRP functionality])
 AC_MSG_RESULT($use_srp)
