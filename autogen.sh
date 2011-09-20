@@ -1,10 +1,5 @@
 #!/bin/sh
 
-if [ -z $AUTORECONF ]; then
-	AUTORECONF=autoreconf
-fi
+autoreconf -f -v -i
 
-#rm -rf autom4te.cache
-$AUTORECONF -f -v -i
-#touch stamp-h.in
 
