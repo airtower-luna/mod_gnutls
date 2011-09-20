@@ -538,6 +538,39 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
 	return status;
 }
 
+static ssize_t write_flush(mgs_handle_t * ctxt)
+{
+	apr_bucket *e;
+
+	if (!(ctxt->output_blen || ctxt->output_length)) {
+		ctxt->output_rc = APR_SUCCESS;
+		return 1;
+	}
+
+	if (ctxt->output_blen) {
+		e = apr_bucket_transient_create(ctxt->output_buffer,
+						ctxt->output_blen,
+						ctxt->output_bb->
+						bucket_alloc);
+		/* we filled this buffer first so add it to the
+ * 		 * head of the brigade
+ * 		 		 */
+		APR_BRIGADE_INSERT_HEAD(ctxt->output_bb, e);
+		ctxt->output_blen = 0;
+	}
+
+	ctxt->output_length = 0;
+	e = apr_bucket_flush_create(ctxt->output_bb->bucket_alloc);
+	APR_BRIGADE_INSERT_TAIL(ctxt->output_bb, e);
+
+	ctxt->output_rc = ap_pass_brigade(ctxt->output_filter->next,
+					  ctxt->output_bb);
+	/* clear the brigade to be ready for next time */
+	apr_brigade_cleanup(ctxt->output_bb);
+
+	return (ctxt->output_rc == APR_SUCCESS) ? 1 : -1;
+}
+
 apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb)
 {
 	apr_size_t ret;
@@ -739,40 +772,6 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
 	}
 
 	return -1;
-}
-
-
-static ssize_t write_flush(mgs_handle_t * ctxt)
-{
-	apr_bucket *e;
-
-	if (!(ctxt->output_blen || ctxt->output_length)) {
-		ctxt->output_rc = APR_SUCCESS;
-		return 1;
-	}
-
-	if (ctxt->output_blen) {
-		e = apr_bucket_transient_create(ctxt->output_buffer,
-						ctxt->output_blen,
-						ctxt->output_bb->
-						bucket_alloc);
-		/* we filled this buffer first so add it to the
-		 * head of the brigade
-		 */
-		APR_BRIGADE_INSERT_HEAD(ctxt->output_bb, e);
-		ctxt->output_blen = 0;
-	}
-
-	ctxt->output_length = 0;
-	e = apr_bucket_flush_create(ctxt->output_bb->bucket_alloc);
-	APR_BRIGADE_INSERT_TAIL(ctxt->output_bb, e);
-
-	ctxt->output_rc = ap_pass_brigade(ctxt->output_filter->next,
-					  ctxt->output_bb);
-	/* clear the brigade to be ready for next time */
-	apr_brigade_cleanup(ctxt->output_bb);
-
-	return (ctxt->output_rc == APR_SUCCESS) ? 1 : -1;
 }
 
 ssize_t mgs_transport_write(gnutls_transport_ptr_t ptr,

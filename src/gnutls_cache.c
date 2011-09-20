@@ -220,7 +220,7 @@ static int mc_cache_store(void *baton, gnutls_datum_t key,
 
 	timeout = apr_time_sec(ctxt->sc->cache_timeout);
 
-	rv = apr_memcache_set(mc, strkey, data.data, data.size, timeout,
+	rv = apr_memcache_set(mc, strkey,(char *)data.data, data.size, timeout,
 			      0);
 
 	if (rv != APR_SUCCESS) {
