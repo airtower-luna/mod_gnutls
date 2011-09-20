@@ -141,7 +141,7 @@ static const command_rec mgs_config_cmds[] = {
     NULL,
     RSRC_CONF,
     "Whether to export PEM encoded certificates to CGIs. Default: Off"),
-    NULL
+    { NULL }
 };
 
 module AP_MODULE_DECLARE_DATA gnutls_module = {
