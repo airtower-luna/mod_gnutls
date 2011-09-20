@@ -19,16 +19,17 @@ AC_PROG_LD
 AC_PROG_INSTALL
 AC_PROG_LIBTOOL
 
+AC_CONFIG_MACRO_DIR([m4])
+
 AP_VERSION=2.0.40
 CHECK_APACHE(,$AP_VERSION,
     :,:,
     AC_MSG_ERROR([*** Apache version $AP_VERSION not found!])
 )
 
-dnl LIBTOOL="`${APR_CONFIG} --apr-libtool`"
-dnl AC_SUBST(LIBTOOL)
-
-PKG_CHECK_MODULES(LIBGNUTLS, [gnutls >= 2.12.6],[AC_DEFINE([LIBGNUTLS_2], [1])])
+PKG_CHECK_MODULES(LIBGNUTLS, [gnutls >= 2.12.6],
+    AC_DEFINE([LIBGNUTLS_2], [1], [Using GnuTLS 2.12.x])
+)
 
 LIBGNUTLS_VERSION=`pkg-config --modversion gnutls`
 
