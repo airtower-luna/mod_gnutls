@@ -1,10 +1,15 @@
-** Version 0.6.0
-- GnuTLSCache none is now an allowed option.
+** Version 0.6 (2011-00-00)
+-Major Legacy Code Cleanup.
+-Included Pdf & Html Manuals.
+
+** Version 0.5.10 (2011-07-12)
+-Patched a bug responsible for excessive memory consumption by mod_gnutls.
+-Support for proxying from SSL to plain HTTP was added (ie. proxy termination).
 
 ** Version 0.5.9 (2010-09-24)
+- GnuTLSCache none is now an allowed option.
 - Corrected behavior in Keep-Alive connections (do not
   terminate the connection prematurely)
-
 - The GnuTLSCache variable now can be given the specific
   option "gdbm" instead of "dbm". "dbm" will use the berkeley
   db type of libapr while gdbm will force gdbm to be used.
