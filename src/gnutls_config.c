@@ -672,9 +672,6 @@ void *mgs_config_dir_merge(apr_pool_t * p, void *basev, void *addv)
 	mgs_dirconf_rec *add = (mgs_dirconf_rec *) addv;
 
 	new = (mgs_dirconf_rec *) apr_pcalloc(p, sizeof(mgs_dirconf_rec));
-	new->lua_bytecode = apr_pstrmemdup(p, add->lua_bytecode,
-					   add->lua_bytecode_len);
-	new->lua_bytecode_len = add->lua_bytecode_len;
 	new->client_verify_mode = add->client_verify_mode;
 	return new;
 }
@@ -682,9 +679,6 @@ void *mgs_config_dir_merge(apr_pool_t * p, void *basev, void *addv)
 void *mgs_config_dir_create(apr_pool_t * p, char *dir)
 {
 	mgs_dirconf_rec *dc = apr_palloc(p, sizeof(*dc));
-
 	dc->client_verify_mode = -1;
-	dc->lua_bytecode = NULL;
-	dc->lua_bytecode_len = 0;
 	return dc;
 }
