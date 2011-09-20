@@ -140,16 +140,6 @@ static const command_rec mgs_config_cmds[] = {
 		      NULL,
 		      RSRC_CONF,
 		      "Whether to export PEM encoded certificates to CGIs. Default: Off"),
-#if 0
-	AP_INIT_RAW_ARGS("<GnuTLSRequire", mgs_set_require_section,
-			 NULL,
-			 EXEC_ON_READ | OR_ALL,
-			 "Whether this server has GnuTLS Enabled. Default: Off"),
-	AP_INIT_RAW_ARGS("GnuTLSRequireByteCode", mgs_set_require_bytecode,
-			 NULL,
-			 OR_ALL,
-			 "Internal Command for reading Lua Bytecode."),
-#endif
 	{NULL}
 };
 
