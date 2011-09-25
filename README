@@ -8,10 +8,12 @@ Contents:
 
      I. ABOUT
     II. AUTHORS
-   III. LICENSE
-    IV. STATUS
-     V. BASIC CONFIGURATION
-    VI. CREATE OPENPGP CREDENTIALS FOR THE SERVER
+   III. MAINTAINERS
+    IV. LICENSE
+     V. PREREQUISITES
+    VI. INSTALLATION
+   VII. BASIC CONFIGURATION
+  VIII. CREATE OPENPGP CREDENTIALS FOR THE SERVER
 
 
 
@@ -41,31 +43,38 @@ I.    ABOUT
 
 II.   AUTHORS
 
-      Paul Querna <chip force-elite.com>
-      Nikos Mavrogiannopoulos <nmav gnutls.org>
-      Dash Shendy <neuromancer dash.za.net>
+      Paul Querna <chip at force-elite.com>
+      Nikos Mavrogiannopoulos <nmav at gnutls.org>
+      Dash Shendy <neuromancer at dash.za.net>
 
+III.  MAINTAINERS
 
+      Dash Shendy <neuromancer at dash.za.net>
+      Execute `autoreconf -v -i -f` to Auto-generate files
 
-III.  LICENSE
+IV.   LICENSE
 
       Apache License, Version 2.0 (see the LICENSE file for details)
 
+V.    PREREQUISITES
+
+      * GnuTLS          >= 2.12.6 <http://www.gnu.org/software/gnutls/>
+      * Apache HTTPD    >= 2.0.42 <http://httpd.apache.org/>
+      *                 >= 2.1.5-dev 
+      * ARP Memcache    >= 0.7.0 (Optinal)
 
 
-IV.   STATUS
+VI.   INSTALLATION
 
-      * SSL and TLS connections with all popular browsers work!
-      * Sets environmental vars for scripts (compatible with mod_ssl vars)
-      * Supports memcached as a distributed SSL session cache
-      * Supports DBM as a local SSL session cache
-      * Support for server name indication (SNI), RFC3546
-      * Support for client certificates
-      * Support for secure remote password (SRP), RFC5054
+      * tar xzvf mod_gnutls-version.tar.gz
+      * cd mod_gnutls-version/
+      * ./configure --with-apxs=PATH --with-apr-memcache-prefix=PATH \ 
+        --with-apr-memcache-libs=PATH --with-apr-memcache-includes=PATH
+      * make
+      * make install
+      * Configure & restart apache
 
-
-
-V.    BASIC CONFIGURATION
+VII.  BASIC CONFIGURATION
 
       LoadModule gnutls_module modules/mod_gnutls.so
       
@@ -151,7 +160,7 @@ V.    BASIC CONFIGURATION
 
 
 
-VI.   CREATE OPENPGP CREDENTIALS FOR THE SERVER
+IX.   CREATE OPENPGP CREDENTIALS FOR THE SERVER
 
       mod_gnutls currently cannot read encrypted OpenPGP credentials.  That is,
       when you generate a key with gpg and gpg prompts you for a passphrase,
