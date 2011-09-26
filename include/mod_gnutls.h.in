@@ -143,6 +143,9 @@ typedef struct
 
 /** Functions in gnutls_io.c **/
 
+/* apr_signal_block() for blocking SIGPIPE */
+apr_status_t apr_signal_block(int signum);
+
 /**
  * mgs_filter_input will filter the input data
  * by decrypting it using GnuTLS and passes it cleartext.
