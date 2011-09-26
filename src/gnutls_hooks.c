@@ -516,7 +516,9 @@ typedef struct {
 static int vhost_cb(void *baton, conn_rec * conn, server_rec * s) {
     mgs_srvconf_rec *tsc;
     vhost_cb_rec *x = baton;
-
+    apr_array_header_t *names;
+    int i;
+    
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
     tsc = (mgs_srvconf_rec *) ap_get_module_config(s->module_config,
             &gnutls_module);
@@ -524,34 +526,28 @@ static int vhost_cb(void *baton, conn_rec * conn, server_rec * s) {
     if (tsc->enabled != GNUTLS_ENABLED_TRUE || tsc->cert_cn == NULL) {
         return 0;
     }
-
-    /* The CN can contain a * -- this will match those too. */
-    if (ap_strcasecmp_match(x->sni_name, tsc->cert_cn) == 0) {
-        /* found a match */
-#if MOD_GNUTLS_DEBUG
-        ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
-                x->ctxt->c->base_server,
-                "GnuTLS: Virtual Host CB: "
-                "'%s' == '%s'", tsc->cert_cn, x->sni_name);
-#endif
-        /* Because we actually change the server used here, we need to reset
-         * things like ClientVerify.
-         */
-        x->sc = tsc;
-        /* Shit. Crap. Dammit. We *really* should rehandshake here, as our
-         * certificate structure *should* change when the server changes. 
-         * acccckkkkkk. 
-         */
-        return 1;
-    } else {
-#if MOD_GNUTLS_DEBUG
-        ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
-                x->ctxt->c->base_server,
-                "GnuTLS: Virtual Host CB: "
-                "'%s' != '%s'", tsc->cert_cn, x->sni_name);
-#endif
-
+    
+    /* Check ServerName First! */
+    if(!apr_strnatcasecmp(x->sni_name, s->server_hostname)) {
+            x->sc = tsc;return 1;
+    } else if(s->names) {
+    /* ServerAlias Directives */
+            char **name = (char **)names->elts;            
+            for (i = 0; i < names->nelts; ++i) {
+                    if (!name[i]) { continue; } 
+                    if (!apr_strnatcasecmp(x->sni_name, name[i])) { 
+                        x->sc = tsc;return 1; }
+            }        
+    } else if(s->wild_names) {
+    /* Wild ServerAlias Directives */
+            char **name = (char **)wild_names->elts;
+            for (i = 0; i < wild_names->nelts; ++i) {
+                    if (!name[i]) { continue; } 
+                    if (!ap_strcasecmp_match(x->sni_name, name[i])) { 
+                        x->sc = tsc;return 1; }
+            }            
     }
+    
     return 0;
 }
 #endif
