@@ -568,6 +568,15 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
     apr_status_t status = APR_SUCCESS;
     apr_read_type_e rblock = APR_NONBLOCK_READ;
 
+    /* Block SIGPIPE Signals */
+    status = apr_signal_block(SIGPIPE); 
+    if(status != APR_SUCCESS) {
+        /* error sending output */
+        ap_log_error(APLOG_MARK,APLOG_INFO,ctxt->output_rc,ctxt->c->base_server,
+                "GnuTLS: Error Blocking SIGPIPE Signal!");        
+        return status;
+    }
+    
     if (f->c->aborted) {
         apr_brigade_cleanup(bb);
         return APR_ECONNABORTED;
@@ -586,27 +595,27 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
 
         if (APR_BUCKET_IS_EOS(bucket)) {
             return ap_pass_brigade(f->next, bb);
-        } else if (APR_BUCKET_IS_FLUSH(bucket)) {
+        } else if (APR_BUCKET_IS_FLUSH(bucket)) {       
             /* Try Flush */
             if (write_flush(ctxt) < 0) {
                 /* Flush Error */
                 return ctxt->output_rc;
             }
             /* cleanup! */
-            apr_bucket_delete(bucket);
+            apr_bucket_delete(bucket);                
         } else if (AP_BUCKET_IS_EOC(bucket)) {
             /* End Of Connection */
             if (ctxt->session != NULL) {
                 /* Try A Clean Shutdown */
                 do {
-                    ret = gnutls_bye(ctxt->session,
-                            GNUTLS_SHUT_WR);
-                } while (ret == GNUTLS_E_INTERRUPTED ||
-                        ret == GNUTLS_E_AGAIN);
+                    ret = gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
+                } while (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
                 /* De-Initialize Session */
                 gnutls_deinit(ctxt->session);
                 ctxt->session = NULL;
             }
+            /* cleanup! */
+            apr_bucket_delete(bucket);            
             /* Pass next brigade! */
             return ap_pass_brigade(f->next, bb);
         } else {
@@ -614,8 +623,7 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
             const char *data;
             apr_size_t len;
 
-            status =
-                    apr_bucket_read(bucket, &data, &len, rblock);
+            status = apr_bucket_read(bucket, &data, &len, rblock);
 
             if (APR_STATUS_IS_EAGAIN(status)) {
                 /* No data available so Flush! */
