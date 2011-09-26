@@ -532,6 +532,7 @@ static int vhost_cb(void *baton, conn_rec * conn, server_rec * s) {
             x->sc = tsc;return 1;
     } else if(s->names) {
     /* ServerAlias Directives */
+            names = s->names;
             char **name = (char **)names->elts;            
             for (i = 0; i < names->nelts; ++i) {
                     if (!name[i]) { continue; } 
@@ -540,8 +541,9 @@ static int vhost_cb(void *baton, conn_rec * conn, server_rec * s) {
             }        
     } else if(s->wild_names) {
     /* Wild ServerAlias Directives */
-            char **name = (char **)wild_names->elts;
-            for (i = 0; i < wild_names->nelts; ++i) {
+            names = s->wild_names;
+            char **name = (char **)names->elts;
+            for (i = 0; i < names->nelts; ++i) {
                     if (!name[i]) { continue; } 
                     if (!ap_strcasecmp_match(x->sni_name, name[i])) { 
                         x->sc = tsc;return 1; }
