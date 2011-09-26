@@ -604,12 +604,10 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session) {
 #else
     for (s = ap_server_conf; s; s = s->next) {
 
-        tsc =
-                (mgs_srvconf_rec *)
-                ap_get_module_config(s->module_config, &gnutls_module);
-        if (tsc->enabled != GNUTLS_ENABLED_TRUE) {
-            continue;
-        }
+        tsc = (mgs_srvconf_rec *) ap_get_module_config(s->module_config, 
+                &gnutls_module);
+        
+        if (tsc->enabled != GNUTLS_ENABLED_TRUE) { continue; }
 #if MOD_GNUTLS_DEBUG
         ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
                 ctxt->c->base_server,
@@ -620,18 +618,29 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session) {
                 (ctxt->sc->privkey_x509)), (unsigned int) s,
                 (unsigned int) s->next, (unsigned int) tsc);
 #endif
-        /* The CN can contain a * -- this will match those too. */
-        if (ap_strcasecmp_match(sni_name, tsc->cert_cn) == 0) {
-#if MOD_GNUTLS_DEBUG
-            ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
-                    ctxt->c->base_server,
-                    "GnuTLS: Virtual Host: "
-                    "'%s' == '%s'", tsc->cert_cn,
-                    sni_name);
-#endif
-            return tsc;
-        }
-    }
+        /* Check ServerName First! */
+        if(!apr_strnatcasecmp(sni_name, s->server_hostname)) {
+                return tsc;
+        } else if(s->names) {
+        /* ServerAlias Directives */
+                names = s->names;
+                char **name = (char **)names->elts;            
+                for (i = 0; i < names->nelts; ++i) {
+                        if (!name[i]) { continue; } 
+                        if (!apr_strnatcasecmp(sni_name, name[i])) { 
+                            return tsc; }
+                }        
+        } else if(s->wild_names) {
+        /* Wild ServerAlias Directives */
+                names = s->wild_names;
+                char **name = (char **)names->elts;
+                for (i = 0; i < names->nelts; ++i) {
+                        if (!name[i]) { continue; } 
+                        if (!ap_strcasecmp_match(sni_name, name[i])) { 
+                            return tsc; }
+                }            
+        } /* End Wild Names*/        
+    } /* End For Loop */
 #endif
     return NULL;
 }
