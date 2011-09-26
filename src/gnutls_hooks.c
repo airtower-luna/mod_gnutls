@@ -386,8 +386,7 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
                     load);
         }
 
-        gnutls_certificate_server_set_retrieve_function(sc->certs,
-                cert_retrieve_fn);
+        gnutls_certificate_set_retrieve_function(sc->certs, cert_retrieve_fn);
 
 #ifdef ENABLE_SRP
         if (sc->srp_tpasswd_conf_file != NULL
