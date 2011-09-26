@@ -27,9 +27,7 @@ CHECK_APACHE(,$AP_VERSION,
     AC_MSG_ERROR([*** Apache version $AP_VERSION not found!])
 )
 
-PKG_CHECK_MODULES(LIBGNUTLS, [gnutls >= 2.12.6],
-    AC_DEFINE([LIBGNUTLS_2], [1], [Using GnuTLS 2.12.x])
-)
+PKG_CHECK_MODULES(LIBGNUTLS, [gnutls >= 2.12.6])
 
 LIBGNUTLS_VERSION=`pkg-config --modversion gnutls`
 
