@@ -21,12 +21,6 @@
 #include "http_vhost.h"
 #include "ap_mpm.h"
 
-#if APR_HAS_THREADS
-#if GNUTLS_VERSION_MAJOR <= 2 && GNUTLS_VERSION_MINOR < 11
-#include <gcrypt.h>
-GCRY_THREAD_OPTION_PTHREAD_IMPL;
-#endif
-#endif
 
 #if !USING_2_1_RECENT
 extern server_rec *ap_server_conf;
@@ -36,7 +30,6 @@ extern server_rec *ap_server_conf;
 static apr_file_t *debug_log_fp;
 #endif
 
-static int mpm_is_threaded;
 static gnutls_datum session_ticket_key = {NULL, 0};
 
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt);
@@ -86,19 +79,6 @@ mgs_hook_pre_config(apr_pool_t * pconf,
             gnutls_check_version(NULL));
 #endif
 
-#if APR_HAS_THREADS
-    ap_mpm_query(AP_MPMQ_IS_THREADED, &mpm_is_threaded);
-#if (GNUTLS_VERSION_MAJOR == 2 && GNUTLS_VERSION_MINOR < 11) || GNUTLS_VERSION_MAJOR < 2
-    if (mpm_is_threaded) {
-        gcry_control(GCRYCTL_SET_THREAD_CBS,
-                &gcry_threads_pthread);
-    }
-#endif
-#else
-    mpm_is_threaded = 0;
-#endif
-
-
     if (gnutls_check_version(LIBGNUTLS_VERSION) == NULL) {
         _gnutls_log(debug_log_fp,
                 "gnutls_check_version() failed. Required: gnutls-%s Found: gnutls-%s\n",
@@ -130,8 +110,7 @@ mgs_hook_pre_config(apr_pool_t * pconf,
 static int mgs_select_virtual_server_cb(gnutls_session_t session) {
     mgs_handle_t *ctxt;
     mgs_srvconf_rec *tsc;
-    int ret;
-    int cprio[2];
+    int ret = 0;
 
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
 
@@ -170,24 +149,7 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session) {
      */
     ret = gnutls_priority_set(session, ctxt->sc->priorities);
     /* actually it shouldn't fail since we have checked at startup */
-    if (ret < 0)
-        return ret;
-
-    /* If both certificate types are not present disallow them from
-     * being negotiated.
-     */
-    if (ctxt->sc->certs_x509[0] != NULL && ctxt->sc->cert_pgp == NULL) {
-        cprio[0] = GNUTLS_CRT_X509;
-        cprio[1] = 0;
-        gnutls_certificate_type_set_priority(session, cprio);
-    } else if (ctxt->sc->cert_pgp != NULL
-            && ctxt->sc->certs_x509[0] == NULL) {
-        cprio[0] = GNUTLS_CRT_OPENPGP;
-        cprio[1] = 0;
-        gnutls_certificate_type_set_priority(session, cprio);
-    }
-
-    return 0;
+    return ret;
 }
 
 static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st * ret) {
@@ -200,7 +162,8 @@ static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st * ret) {
         return GNUTLS_E_INTERNAL_ERROR;
 
     if (gnutls_certificate_type_get(session) == GNUTLS_CRT_X509) {
-        ret->type = GNUTLS_CRT_X509;
+	ret->cert_type = GNUTLS_CRT_X509;
+	ret->key_type = GNUTLS_PRIVKEY_X509;
         ret->ncerts = ctxt->sc->certs_x509_num;
         ret->deinit_all = 0;
 
@@ -208,9 +171,9 @@ static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st * ret) {
         ret->key.x509 = ctxt->sc->privkey_x509;
 
         return 0;
-    } else if (gnutls_certificate_type_get(session) ==
-            GNUTLS_CRT_OPENPGP) {
-        ret->type = GNUTLS_CRT_OPENPGP;
+    } else if (gnutls_certificate_type_get(session) == GNUTLS_CRT_OPENPGP) {
+	ret->cert_type = GNUTLS_CRT_OPENPGP;
+	ret->key_type = GNUTLS_PRIVKEY_OPENPGP;        
         ret->ncerts = 1;
         ret->deinit_all = 0;
 
@@ -708,7 +671,7 @@ static mgs_handle_t *create_gnutls_handle(apr_pool_t * pool, conn_rec * c) {
      * the user hello callback) we need to at least set this in order for
      * gnutls to be able to read packets.
      */
-    gnutls_protocol_set_priority(ctxt->session, protocol_priority);
+    gnutls_set_default_priority(ctxt->session);
 
     gnutls_handshake_set_post_client_hello_function(ctxt->session,
             mgs_select_virtual_server_cb);
