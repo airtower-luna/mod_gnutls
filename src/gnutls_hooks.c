@@ -608,16 +608,7 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session) {
                 &gnutls_module);
         
         if (tsc->enabled != GNUTLS_ENABLED_TRUE) { continue; }
-#if MOD_GNUTLS_DEBUG
-        ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
-                ctxt->c->base_server,
-                "GnuTLS: sni-x509 cn: %s/%d pk: %s s: 0x%08X s->n: 0x%08X  sc: 0x%08X",
-                tsc->cert_cn, rv,
-                gnutls_pk_algorithm_get_name
-                (gnutls_x509_privkey_get_pk_algorithm
-                (ctxt->sc->privkey_x509)), (unsigned int) s,
-                (unsigned int) s->next, (unsigned int) tsc);
-#endif
+
         /* Check ServerName First! */
         if(!apr_strnatcasecmp(sni_name, s->server_hostname)) {
                 return tsc;
