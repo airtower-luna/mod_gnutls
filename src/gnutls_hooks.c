@@ -152,7 +152,11 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session) {
     return ret;
 }
 
-static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st * ret) {
+static int cert_retrieve_fn(gnutls_session_t session,
+        const gnutls_datum_t * req_ca_rdn, int nreqs, 
+        const gnutls_pk_algorithm_t * pk_algos, int pk_algos_length, 
+        gnutls_retr2_st *ret) {
+    
     mgs_handle_t *ctxt;
 
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
