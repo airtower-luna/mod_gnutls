@@ -636,11 +636,6 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session) {
     return NULL;
 }
 
-
-static const int protocol_priority[] = {
-    GNUTLS_TLS1_1, GNUTLS_TLS1_0, GNUTLS_SSL3, 0
-};
-
 static mgs_handle_t *create_gnutls_handle(apr_pool_t * pool, conn_rec * c) {
     mgs_handle_t *ctxt;
     /* Get mod_gnutls Configuration Record */
