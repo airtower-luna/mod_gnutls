@@ -316,14 +316,23 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
     gnutls_dh_params_init(&dh_params);
 
     if (sc_base->dh_params == NULL) {
-        rv = gnutls_dh_params_generate2 (dh_params, 
-                gnutls_sec_param_to_pk_bits(GNUTLS_PK_DH,GNUTLS_SEC_PARAM_HIGH));
+        int dh_bits = gnutls_sec_param_to_pk_bits(GNUTLS_PK_DH,
+                GNUTLS_SEC_PARAM_NORMAL);
+        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+            "GnuTLS: Generating DH Params of %i bits\n"
+            "To avoid this use GnuTLSDHFile to specify DH Params for this host",
+            dh_bits);                
+        rv = gnutls_dh_params_generate2 (dh_params,dh_bits);
         if (rv < 0) {
             ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
                     "GnuTLS: Unable to generate DH Params: (%d) %s",
                     rv, gnutls_strerror(rv));
             exit(rv);
         }
+#if MOD_GNUTLS_DEBUG
+            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+                    "GnuTLS: Generated DH Params of %i bits",dh_bits);
+#endif        
     } else {
         dh_params = sc_base->dh_params;
     }
