@@ -316,7 +316,7 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
     gnutls_dh_params_init(&dh_params);
 
     if (sc_base->dh_params == NULL) {
-        gnutls_dh_params_generate2 (dh_params, 
+        rv = gnutls_dh_params_generate2 (dh_params, 
                 gnutls_sec_param_to_pk_bits(GNUTLS_PK_DH,GNUTLS_SEC_PARAM_HIGH));
         if (rv < 0) {
             ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
@@ -357,7 +357,6 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
         } 
         /* else not an error but RSA-EXPORT ciphersuites are not available */
 
-        void *load = NULL;
         if (sc->dh_params != NULL) {
             gnutls_certificate_set_dh_params(sc->certs, sc->dh_params);
             gnutls_anon_set_server_dh_params(sc->anon_creds, sc->dh_params);        
