@@ -191,7 +191,7 @@ static int cert_retrieve_fn(gnutls_session_t session,
     return GNUTLS_E_INTERNAL_ERROR;
 }
 
-/* 2048-bit group parameters from SRP specification */
+/* 2048-bit group parameters from SRP specification 
 const char static_dh_params[] = "-----BEGIN DH PARAMETERS-----\n"
         "MIIBBwKCAQCsa9tBMkqam/Fm3l4TiVgvr3K2ZRmH7gf8MZKUPbVgUKNzKcu0oJnt\n"
         "gZPgdXdnoT3VIxKrSwMxDc1/SKnaBP1Q6Ag5ae23Z7DPYJUXmhY6s2YaBfvV+qro\n"
@@ -200,6 +200,7 @@ const char static_dh_params[] = "-----BEGIN DH PARAMETERS-----\n"
         "YWAnkATleuavh05zA85TKZzMBBx7wwjYKlaY86jQw4JxrjX46dv7tpS1yAPYn3rk\n"
         "Nd4jbVJfVHWbZeNy/NaO8g+nER+eSv9zAgEC\n"
         "-----END DH PARAMETERS-----\n";
+*/
 
 /* Read the common name or the alternative name of the certificate.
  * We only support a single name per certificate.
@@ -290,7 +291,6 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
     int rv;
     server_rec *s;
     gnutls_dh_params_t dh_params = NULL;
-    gnutls_rsa_params_t rsa_params = NULL;
     mgs_srvconf_rec *sc;
     mgs_srvconf_rec *sc_base;
     void *data = NULL;
@@ -316,28 +316,17 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
     gnutls_dh_params_init(&dh_params);
 
     if (sc_base->dh_params == NULL) {
-        gnutls_datum pdata = {
-            (void *) static_dh_params,
-            sizeof (static_dh_params)
-        };
-        /* loading defaults */
-        rv = gnutls_dh_params_import_pkcs3(dh_params, &pdata,
-                GNUTLS_X509_FMT_PEM);
-
+        gnutls_dh_params_generate2 (dh_params, 
+                gnutls_sec_param_to_pk_bits(GNUTLS_PK_DH,GNUTLS_SEC_PARAM_HIGH));
         if (rv < 0) {
             ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                    "GnuTLS: Unable to load DH Params: (%d) %s",
+                    "GnuTLS: Unable to generate DH Params: (%d) %s",
                     rv, gnutls_strerror(rv));
             exit(rv);
         }
-    } else
+    } else {
         dh_params = sc_base->dh_params;
-
-    if (sc_base->rsa_params != NULL)
-        rsa_params = sc_base->rsa_params;
-
-    /* else not an error but RSA-EXPORT ciphersuites are not available 
-     */
+    }
 
     rv = mgs_cache_post_config(p, s, sc_base);
     if (rv != 0) {
@@ -348,7 +337,6 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
     }
 
     for (s = base_server; s; s = s->next) {
-        void *load = NULL;
         sc = (mgs_srvconf_rec *)
                 ap_get_module_config(s->module_config, &gnutls_module);
         sc->cache_type = sc_base->cache_type;
@@ -364,26 +352,18 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
         }
 
         /* Check if DH or RSA params have been set per host */
-        if (sc->rsa_params != NULL)
-            load = sc->rsa_params;
-        else if (rsa_params)
-            load = rsa_params;
+        if (sc->rsa_params != NULL) {
+            gnutls_certificate_set_rsa_export_params(sc->certs, sc->rsa_params);        
+        } 
+        /* else not an error but RSA-EXPORT ciphersuites are not available */
 
-        if (load != NULL)
-            gnutls_certificate_set_rsa_export_params(sc->certs,
-                load);
-
-
-        load = NULL;
-        if (sc->dh_params != NULL)
-            load = sc->dh_params;
-        else if (dh_params)
-            load = dh_params;
-
-        if (load != NULL) { /* not needed but anyway */
-            gnutls_certificate_set_dh_params(sc->certs, load);
-            gnutls_anon_set_server_dh_params(sc->anon_creds,
-                    load);
+        void *load = NULL;
+        if (sc->dh_params != NULL) {
+            gnutls_certificate_set_dh_params(sc->certs, sc->dh_params);
+            gnutls_anon_set_server_dh_params(sc->anon_creds, sc->dh_params);        
+        } else if (dh_params) {
+            gnutls_certificate_set_dh_params(sc->certs, dh_params);
+            gnutls_anon_set_server_dh_params(sc->anon_creds, dh_params);                    
         }
 
         gnutls_certificate_set_retrieve_function(sc->certs, cert_retrieve_fn);

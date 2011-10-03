@@ -291,9 +291,9 @@ static int mc_cache_delete(void *baton, gnutls_datum_t key) {
     return 0;
 }
 
-#endif				/* have_apr_memcache */
+#endif	/* have_apr_memcache */
 
-const char *db_type(mgs_srvconf_rec * sc) {
+static const char *db_type(mgs_srvconf_rec * sc) {
     if (sc->cache_type == mgs_cache_gdbm)
         return "gdbm";
     else
