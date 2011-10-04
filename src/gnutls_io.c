@@ -48,6 +48,7 @@ static apr_status_t gnutls_io_filter_error(ap_filter_t * f,
                     "trying to send HTML error page");
 
             ctxt->status = -1;
+            ctxt->non_ssl_request = 1;
 
             /* fake the request line */
             bucket = HTTP_ON_HTTPS_PORT_BUCKET(f->c->bucket_alloc);
@@ -567,15 +568,6 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
     mgs_handle_t *ctxt = (mgs_handle_t *) f->ctx;
     apr_status_t status = APR_SUCCESS;
     apr_read_type_e rblock = APR_NONBLOCK_READ;
-
-    /* Block SIGPIPE Signals */
-    status = apr_signal_block(SIGPIPE); 
-    if(status != APR_SUCCESS) {
-        /* error sending output */
-        ap_log_error(APLOG_MARK,APLOG_INFO,ctxt->output_rc,ctxt->c->base_server,
-                "GnuTLS: Error Blocking SIGPIPE Signal!");        
-        return status;
-    }
     
     if (f->c->aborted) {
         apr_brigade_cleanup(bb);

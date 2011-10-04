@@ -109,6 +109,8 @@ typedef struct
     int client_verify_mode;
     apr_time_t last_cache_check;
     int tickets; /* whether session tickets are allowed */
+    int proxy_enabled;
+    int non_ssl_request;
 } mgs_srvconf_rec;
 
 typedef struct {
@@ -121,7 +123,6 @@ typedef struct
     mgs_srvconf_rec *sc;
     conn_rec* c;
     gnutls_session_t session;
-
     apr_status_t input_rc;
     ap_filter_t *input_filter;
     apr_bucket_brigade *input_bb;
@@ -129,22 +130,23 @@ typedef struct
     ap_input_mode_t input_mode;
     mgs_char_buffer_t input_cbuf;
     char input_buffer[AP_IOBUFSIZE];
-
     apr_status_t output_rc;
     ap_filter_t *output_filter;
     apr_bucket_brigade *output_bb;
     char output_buffer[AP_IOBUFSIZE];
     apr_size_t output_blen;
     apr_size_t output_length;
-
     int status;
-    int non_https;
 } mgs_handle_t;
 
 /** Functions in gnutls_io.c **/
 
 /* apr_signal_block() for blocking SIGPIPE */
 apr_status_t apr_signal_block(int signum);
+
+ /* Proxy Support */
+int ssl_proxy_enable(conn_rec *c);
+int ssl_engine_disable(conn_rec *c);
 
 /**
  * mgs_filter_input will filter the input data

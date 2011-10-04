@@ -51,46 +51,45 @@ static apr_status_t mgs_cleanup_pre_config(void *data) {
 }
 
 #if MOD_GNUTLS_DEBUG
-
 static void gnutls_debug_log_all(int level, const char *str) {
     apr_file_printf(debug_log_fp, "<%d> %s\n", level, str);
 }
-
 #define _gnutls_log apr_file_printf
 #else
 #define _gnutls_log(...)
 #endif
 
-int
-mgs_hook_pre_config(apr_pool_t * pconf,
-        apr_pool_t * plog, apr_pool_t * ptemp) {
-    int ret;
-
+int mgs_hook_open_logs(apr_pool_t * pconf,apr_pool_t * plog, 
+        apr_pool_t * ptemp) {
 #if MOD_GNUTLS_DEBUG
     apr_file_open(&debug_log_fp, "/tmp/gnutls_debug",
             APR_APPEND | APR_WRITE | APR_CREATE, APR_OS_DEFAULT,
             pconf);
 
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
-
     gnutls_global_set_log_level(9);
     gnutls_global_set_log_function(gnutls_debug_log_all);
     _gnutls_log(debug_log_fp, "gnutls: %s\n",
             gnutls_check_version(NULL));
-#endif
+#endif    
+}
+
+int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog,
+         apr_pool_t * ptemp) {
+    int ret;
 
     if (gnutls_check_version(LIBGNUTLS_VERSION) == NULL) {
         _gnutls_log(debug_log_fp,
                 "gnutls_check_version() failed. Required: gnutls-%s Found: gnutls-%s\n",
                 LIBGNUTLS_VERSION, gnutls_check_version(NULL));
-        return -3;
+        return DECLINED;
     }
 
     ret = gnutls_global_init();
     if (ret < 0) {
         _gnutls_log(debug_log_fp, "gnutls_global_init: %s\n",
                 gnutls_strerror(ret));
-        return -3;
+        return DECLINED;
     }
 
     ret = gnutls_session_ticket_key_generate(&session_ticket_key);
@@ -352,8 +351,7 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
         sc->cache_config = sc_base->cache_config;
 
         /* Check if the priorities have been set */
-        if (sc->priorities == NULL
-                && sc->enabled == GNUTLS_ENABLED_TRUE) {
+        if (sc->priorities == NULL && sc->enabled == GNUTLS_ENABLED_TRUE) {
             ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
                     "GnuTLS: Host '%s:%d' is missing the GnuTLSPriorities directive!",
                     s->server_hostname, s->port);
@@ -453,6 +451,14 @@ void mgs_hook_child_init(apr_pool_t * p, server_rec * s) {
                     "[GnuTLS] - Failed to run Cache Init");
         }
     }
+    /* Block SIGPIPE Signals */
+    status = apr_signal_block(SIGPIPE); 
+    if(status != APR_SUCCESS) {
+        /* error sending output */
+        ap_log_error(APLOG_MARK,APLOG_INFO,ctxt->output_rc,ctxt->c->base_server,
+                "GnuTLS: Error Blocking SIGPIPE Signal!");        
+        return status;
+    }    
 }
 
 const char *mgs_hook_http_scheme(const request_rec * r) {
@@ -624,14 +630,14 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session) {
     return NULL;
 }
 
-static mgs_handle_t *create_gnutls_handle(apr_pool_t * pool, conn_rec * c) {
+static void create_gnutls_handle(conn_rec * c) {
     mgs_handle_t *ctxt;
     /* Get mod_gnutls Configuration Record */
     mgs_srvconf_rec *sc =(mgs_srvconf_rec *) 
             ap_get_module_config(c->base_server->module_config,&gnutls_module);
 
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
-    ctxt = apr_pcalloc(pool, sizeof (*ctxt));
+    ctxt = apr_pcalloc(c->pool, sizeof (*ctxt));
     ctxt->c = c;
     ctxt->sc = sc;
     ctxt->status = 0;
@@ -656,8 +662,20 @@ static mgs_handle_t *create_gnutls_handle(apr_pool_t * pool, conn_rec * c) {
             mgs_select_virtual_server_cb);
     /* Initialize Session Cache */
     mgs_cache_session_init(ctxt);
-    /* Return GnuTLS Handle */
-    return ctxt;
+    
+    /* Set this config for this connection */
+    ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
+    /* Set pull, push & ptr functions */
+    gnutls_transport_set_pull_function(ctxt->session,
+            mgs_transport_read);
+    gnutls_transport_set_push_function(ctxt->session,
+            mgs_transport_write);
+    gnutls_transport_set_ptr2(ctxt->session, ctxt);
+    /* Add IO filters */
+    ctxt->input_filter = ap_add_input_filter(GNUTLS_INPUT_FILTER_NAME, 
+            ctxt, NULL, c);
+    ctxt->output_filter = ap_add_output_filter(GNUTLS_OUTPUT_FILTER_NAME, 
+            ctxt, NULL, c);    
 }
 
 int mgs_hook_pre_connection(conn_rec * c, void *csd) {
@@ -666,37 +684,19 @@ int mgs_hook_pre_connection(conn_rec * c, void *csd) {
 
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
 
-    if (c == NULL) {
-        return DECLINED;
-    }
-
-    sc = (mgs_srvconf_rec *) ap_get_module_config(c->base_server->
-            module_config,
+    sc = (mgs_srvconf_rec *) ap_get_module_config(c->base_server->module_config,
             &gnutls_module);
 
-    if (!(sc && (sc->enabled == GNUTLS_ENABLED_TRUE))) {
+    if (sc && !sc->enabled) {
         return DECLINED;
     }
 
-    if (c->remote_addr->hostname || apr_strnatcmp(c->remote_ip, c->local_ip) == 0) {
+    if (c->remote_addr->hostname) {
         /* Connection initiated by Apache (mod_proxy) => ignore */
         return OK;
     }
 
-    ctxt = create_gnutls_handle(c->pool, c);
-
-    ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
-
-    gnutls_transport_set_pull_function(ctxt->session,
-            mgs_transport_read);
-    gnutls_transport_set_push_function(ctxt->session,
-            mgs_transport_write);
-    gnutls_transport_set_ptr(ctxt->session, ctxt);
-
-    ctxt->input_filter =
-            ap_add_input_filter(GNUTLS_INPUT_FILTER_NAME, ctxt, NULL, c);
-    ctxt->output_filter =
-            ap_add_output_filter(GNUTLS_OUTPUT_FILTER_NAME, ctxt, NULL, c);
+    create_gnutls_handle(c);
 
     return OK;
 }
@@ -779,8 +779,7 @@ int mgs_hook_fixups(request_rec * r) {
     else if (gnutls_certificate_type_get(ctxt->session) ==
             GNUTLS_CRT_OPENPGP)
         mgs_add_common_pgpcert_vars(r, ctxt->sc->cert_pgp, 0,
-            ctxt->
-            sc->export_certificates_enabled);
+            ctxt->sc->export_certificates_enabled);
 
     return rv;
 }

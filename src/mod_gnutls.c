@@ -20,27 +20,31 @@
 #include "mod_gnutls.h"
 
 static void gnutls_hooks(apr_pool_t * p) {
-    ap_hook_pre_connection(mgs_hook_pre_connection, NULL, NULL,
-            APR_HOOK_MIDDLE);
-    ap_hook_post_config(mgs_hook_post_config, NULL, NULL,
-            APR_HOOK_MIDDLE);
+
+    ap_hook_open_logs(mgs_hook_open_logs, NULL, NULL,APR_HOOK_MIDDLE);
+    /* Try Run Post-Config Hook After mod_proxy */
+    static const char * const aszPre[] = { "mod_proxy.c", NULL };
+    ap_hook_post_config(mgs_hook_post_config, aszPre, NULL,APR_HOOK_REALLY_LAST); 
+    /* HTTP Scheme Hook */
+#if USING_2_1_RECENT
+    ap_hook_http_scheme(mgs_hook_http_scheme, NULL, NULL, APR_HOOK_MIDDLE);
+#else
+    ap_hook_http_method(mgs_hook_http_scheme, NULL, NULL, APR_HOOK_MIDDLE);
+#endif
+    /* Default Port Hook */
+    ap_hook_default_port(nss_hook_default_port,  NULL,NULL, APR_HOOK_MIDDLE);
+    /* Pre-Connect Hook */
+    ap_hook_pre_connection(mgs_hook_default_port, NULL, NULL, APR_HOOK_MIDDLE);
+    /* Pre-Config Hook */
+    ap_hook_pre_config(mgs_hook_pre_config, NULL, NULL,
+            APR_HOOK_MIDDLE);    
+    /* Child-Init Hook */
     ap_hook_child_init(mgs_hook_child_init, NULL, NULL,
             APR_HOOK_MIDDLE);
-#if USING_2_1_RECENT
-    ap_hook_http_scheme(mgs_hook_http_scheme, NULL, NULL,
-            APR_HOOK_MIDDLE);
-#else
-    ap_hook_http_method(mgs_hook_http_scheme, NULL, NULL,
-            APR_HOOK_MIDDLE);
-#endif
-    ap_hook_default_port(mgs_hook_default_port, NULL, NULL,
-            APR_HOOK_MIDDLE);
-    ap_hook_pre_config(mgs_hook_pre_config, NULL, NULL,
-            APR_HOOK_MIDDLE);
-
+    /* Authentication Hook */
     ap_hook_access_checker(mgs_hook_authz, NULL, NULL,
             APR_HOOK_REALLY_FIRST);
-
+    /* Fixups Hook */
     ap_hook_fixups(mgs_hook_fixups, NULL, NULL, APR_HOOK_REALLY_FIRST);
 
     /* TODO: HTTP Upgrade Filter */
@@ -48,15 +52,53 @@ static void gnutls_hooks(apr_pool_t * p) {
      *          ssl_io_filter_Upgrade, NULL, AP_FTYPE_PROTOCOL + 5);
      */
 
+    /* Input Filter */
     ap_register_input_filter(GNUTLS_INPUT_FILTER_NAME,
-            mgs_filter_input, NULL,
-            AP_FTYPE_CONNECTION + 5);
+            mgs_filter_input, NULL,AP_FTYPE_CONNECTION + 5);
+    /* Output Filter */
     ap_register_output_filter(GNUTLS_OUTPUT_FILTER_NAME,
-            mgs_filter_output, NULL,
-            AP_FTYPE_CONNECTION + 5);
+            mgs_filter_output, NULL,AP_FTYPE_CONNECTION + 5);
+    
+    /* mod_proxy calls these functions */
+    APR_REGISTER_OPTIONAL_FN(ssl_proxy_enable);
+    APR_REGISTER_OPTIONAL_FN(ssl_engine_disable);
+}
+
+int ssl_is_https(conn_rec *c) {
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *) 
+            ap_get_module_config(c->base_server->module_config, &gnutls_module);
+    if(sc->enabled == GNUTLS_ENABLED_FALSE || sc->non_ssl_request) {
+        /* SSL/TLS Disabled or Plain HTTP Connection Detected */
+        return 0;
+    }
+    /* Connection is Using SSL/TLS */
+    return 1;
+}
+
+int ssl_engine_disable(conn_rec *c) {
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *) 
+            ap_get_module_config(c->base_server->module_config, &gnutls_module);
+    if(sc->enabled == GNUTLS_ENABLED_FALSE) {
+        return 1;
+    } 
+    ap_remove_input_filter(c->input_filters);
+    ap_remove_input_filter(c->output_filters);
+    mgs_cleanup_pre_config(c->pool);
+    sc->enabled = 0;
+    return 1;
+}
+
+int ssl_proxy_enable(conn_rec *c) {
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *) 
+            ap_get_module_config(c->base_server->module_config, &gnutls_module);
+    return sc->proxy_enabled;
 }
 
 static const command_rec mgs_config_cmds[] = {
+    AP_INIT_TAKE1("SSLProxyEngine", mgs_set_proxy_engine,
+    NULL,
+    RSRC_CONF | OR_AUTHCFG,
+    "Set Verification Requirements of the Client Certificate"),
     AP_INIT_TAKE1("GnuTLSClientVerify", mgs_set_client_verify,
     NULL,
     RSRC_CONF | OR_AUTHCFG,

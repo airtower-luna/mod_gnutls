@@ -544,6 +544,23 @@ const char *mgs_set_keyring_file(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
+const char *mgs_set_proxy_engine(cmd_parms * parms, void *dummy,
+        const char *arg) {
+    
+    mgs_srvconf_rec *sc =(mgs_srvconf_rec *) 
+            ap_get_module_config(parms->server->module_config, &gnutls_module);
+    
+    if (!strcasecmp(arg, "On")) {
+        sc->proxy_enabled = GNUTLS_ENABLED_TRUE;
+    } else if (!strcasecmp(arg, "Off")) {
+        sc->proxy_enabled = GNUTLS_ENABLED_FALSE;
+    } else {
+        return "SSLProxyEngine must be set to 'On' or 'Off'";
+    }
+
+    return NULL;
+}
+
 const char *mgs_set_enabled(cmd_parms * parms, void *dummy,
         const char *arg) {
     mgs_srvconf_rec *sc =
