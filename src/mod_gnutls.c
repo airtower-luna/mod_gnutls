@@ -20,8 +20,7 @@
 #include "mod_gnutls.h"
 
 static void gnutls_hooks(apr_pool_t * p) {
-
-    ap_hook_open_logs(mgs_hook_open_logs, NULL, NULL,APR_HOOK_MIDDLE);
+    
     /* Try Run Post-Config Hook After mod_proxy */
     static const char * const aszPre[] = { "mod_proxy.c", NULL };
     ap_hook_post_config(mgs_hook_post_config, aszPre, NULL,APR_HOOK_REALLY_LAST); 
@@ -32,9 +31,9 @@ static void gnutls_hooks(apr_pool_t * p) {
     ap_hook_http_method(mgs_hook_http_scheme, NULL, NULL, APR_HOOK_MIDDLE);
 #endif
     /* Default Port Hook */
-    ap_hook_default_port(nss_hook_default_port,  NULL,NULL, APR_HOOK_MIDDLE);
+    ap_hook_default_port(mgs_hook_default_port,  NULL,NULL, APR_HOOK_MIDDLE);
     /* Pre-Connect Hook */
-    ap_hook_pre_connection(mgs_hook_default_port, NULL, NULL, APR_HOOK_MIDDLE);
+    ap_hook_pre_connection(mgs_hook_pre_connection, NULL, NULL, APR_HOOK_MIDDLE);
     /* Pre-Config Hook */
     ap_hook_pre_config(mgs_hook_pre_config, NULL, NULL,
             APR_HOOK_MIDDLE);    
@@ -67,7 +66,7 @@ static void gnutls_hooks(apr_pool_t * p) {
 int ssl_is_https(conn_rec *c) {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *) 
             ap_get_module_config(c->base_server->module_config, &gnutls_module);
-    if(sc->enabled == GNUTLS_ENABLED_FALSE || sc->non_ssl_request) {
+    if(sc->enabled == 0 || sc->non_ssl_request == 1) {
         /* SSL/TLS Disabled or Plain HTTP Connection Detected */
         return 0;
     }
@@ -91,14 +90,16 @@ int ssl_engine_disable(conn_rec *c) {
 int ssl_proxy_enable(conn_rec *c) {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *) 
             ap_get_module_config(c->base_server->module_config, &gnutls_module);
-    return sc->proxy_enabled;
+    sc->proxy_enabled = 1;
+    sc->enabled = 0;
+    return 1;
 }
 
 static const command_rec mgs_config_cmds[] = {
     AP_INIT_TAKE1("SSLProxyEngine", mgs_set_proxy_engine,
     NULL,
     RSRC_CONF | OR_AUTHCFG,
-    "Set Verification Requirements of the Client Certificate"),
+    "Enable SSL Proxy Engine"),
     AP_INIT_TAKE1("GnuTLSClientVerify", mgs_set_client_verify,
     NULL,
     RSRC_CONF | OR_AUTHCFG,

@@ -42,7 +42,7 @@ static void mgs_add_common_pgpcert_vars(request_rec * r,
         int side,
         int export_certificates_enabled);
 
-static apr_status_t mgs_cleanup_pre_config(void *data) {
+apr_status_t mgs_cleanup_pre_config(void *data) {
     gnutls_free(session_ticket_key.data);
     session_ticket_key.data = NULL;
     session_ticket_key.size = 0;
@@ -59,8 +59,8 @@ static void gnutls_debug_log_all(int level, const char *str) {
 #define _gnutls_log(...)
 #endif
 
-int mgs_hook_open_logs(apr_pool_t * pconf,apr_pool_t * plog, 
-        apr_pool_t * ptemp) {
+int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog,
+         apr_pool_t * ptemp) {
 #if MOD_GNUTLS_DEBUG
     apr_file_open(&debug_log_fp, "/tmp/gnutls_debug",
             APR_APPEND | APR_WRITE | APR_CREATE, APR_OS_DEFAULT,
@@ -69,13 +69,8 @@ int mgs_hook_open_logs(apr_pool_t * pconf,apr_pool_t * plog,
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
     gnutls_global_set_log_level(9);
     gnutls_global_set_log_function(gnutls_debug_log_all);
-    _gnutls_log(debug_log_fp, "gnutls: %s\n",
-            gnutls_check_version(NULL));
+    _gnutls_log(debug_log_fp, "gnutls: %s\n", gnutls_check_version(NULL));
 #endif    
-}
-
-int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog,
-         apr_pool_t * ptemp) {
     int ret;
 
     if (gnutls_check_version(LIBGNUTLS_VERSION) == NULL) {
@@ -190,7 +185,7 @@ static int cert_retrieve_fn(gnutls_session_t session,
     return GNUTLS_E_INTERNAL_ERROR;
 }
 
-/* 2048-bit group parameters from SRP specification 
+/* 2048-bit group parameters from SRP specification */
 const char static_dh_params[] = "-----BEGIN DH PARAMETERS-----\n"
         "MIIBBwKCAQCsa9tBMkqam/Fm3l4TiVgvr3K2ZRmH7gf8MZKUPbVgUKNzKcu0oJnt\n"
         "gZPgdXdnoT3VIxKrSwMxDc1/SKnaBP1Q6Ag5ae23Z7DPYJUXmhY6s2YaBfvV+qro\n"
@@ -199,7 +194,6 @@ const char static_dh_params[] = "-----BEGIN DH PARAMETERS-----\n"
         "YWAnkATleuavh05zA85TKZzMBBx7wwjYKlaY86jQw4JxrjX46dv7tpS1yAPYn3rk\n"
         "Nd4jbVJfVHWbZeNy/NaO8g+nER+eSv9zAgEC\n"
         "-----END DH PARAMETERS-----\n";
-*/
 
 /* Read the common name or the alternative name of the certificate.
  * We only support a single name per certificate.
@@ -315,23 +309,31 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
     gnutls_dh_params_init(&dh_params);
 
     if (sc_base->dh_params == NULL) {
+        gnutls_datum pdata = {
+            (void *) static_dh_params,
+            sizeof(static_dh_params)
+        };
+        rv = gnutls_dh_params_import_pkcs3(dh_params, &pdata,
+                GNUTLS_X509_FMT_PEM);       
+        /* Generate DH Params 
         int dh_bits = gnutls_sec_param_to_pk_bits(GNUTLS_PK_DH,
                 GNUTLS_SEC_PARAM_NORMAL);
         ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
             "GnuTLS: Generating DH Params of %i bits.  "
             "To avoid this use GnuTLSDHFile to specify DH Params for this host",
             dh_bits);                
-        rv = gnutls_dh_params_generate2 (dh_params,dh_bits);
-        if (rv < 0) {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                    "GnuTLS: Unable to generate DH Params: (%d) %s",
-                    rv, gnutls_strerror(rv));
-            exit(rv);
-        }
 #if MOD_GNUTLS_DEBUG
             ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
                     "GnuTLS: Generated DH Params of %i bits",dh_bits);
-#endif        
+#endif  
+        rv = gnutls_dh_params_generate2 (dh_params,dh_bits);
+        */
+        if (rv < 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                    "GnuTLS: Unable to generate or load DH Params: (%d) %s",
+                    rv, gnutls_strerror(rv));
+            exit(rv);
+        }               
     } else {
         dh_params = sc_base->dh_params;
     }
@@ -452,12 +454,11 @@ void mgs_hook_child_init(apr_pool_t * p, server_rec * s) {
         }
     }
     /* Block SIGPIPE Signals */
-    status = apr_signal_block(SIGPIPE); 
-    if(status != APR_SUCCESS) {
+    rv = apr_signal_block(SIGPIPE); 
+    if(rv != APR_SUCCESS) {
         /* error sending output */
-        ap_log_error(APLOG_MARK,APLOG_INFO,ctxt->output_rc,ctxt->c->base_server,
+        ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
                 "GnuTLS: Error Blocking SIGPIPE Signal!");        
-        return status;
     }    
 }
 
@@ -679,7 +680,6 @@ static void create_gnutls_handle(conn_rec * c) {
 }
 
 int mgs_hook_pre_connection(conn_rec * c, void *csd) {
-    mgs_handle_t *ctxt;
     mgs_srvconf_rec *sc;
 
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
@@ -687,17 +687,11 @@ int mgs_hook_pre_connection(conn_rec * c, void *csd) {
     sc = (mgs_srvconf_rec *) ap_get_module_config(c->base_server->module_config,
             &gnutls_module);
 
-    if (sc && !sc->enabled) {
+    if (sc && (!sc->enabled || sc->proxy_enabled == GNUTLS_ENABLED_TRUE)) {
         return DECLINED;
     }
 
-    if (c->remote_addr->hostname) {
-        /* Connection initiated by Apache (mod_proxy) => ignore */
-        return OK;
-    }
-
     create_gnutls_handle(c);
-
     return OK;
 }
 
