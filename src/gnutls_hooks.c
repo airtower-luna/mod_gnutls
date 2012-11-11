@@ -671,7 +671,7 @@ static void create_gnutls_handle(conn_rec * c) {
             mgs_transport_read);
     gnutls_transport_set_push_function(ctxt->session,
             mgs_transport_write);
-    gnutls_transport_set_ptr2(ctxt->session, ctxt);
+    gnutls_transport_set_ptr(ctxt->session, ctxt);
     /* Add IO filters */
     ctxt->input_filter = ap_add_input_filter(GNUTLS_INPUT_FILTER_NAME, 
             ctxt, NULL, c);
