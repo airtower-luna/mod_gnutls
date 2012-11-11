@@ -508,11 +508,57 @@ typedef struct {
     const char *sni_name;
 } vhost_cb_rec;
 
+/**
+ * Matches the current vhost's ServerAlias directives
+ *
+ * @param x vhost callback record
+ * @param s server record
+ * @return true if a match, false otherwise
+ *
+ */
+int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc) {
+	apr_array_header_t *names;
+	int i,rv = 0;
+
+	/* Check ServerName First! */
+	if(apr_strnatcasecmp(x->sni_name, s->server_hostname) == 0) {
+		// We have a match, save this server configuration
+		x->sc = tsc;
+		rv = 1;
+	/* Check any ServerAlias directives */
+	} else if(s->names) {
+		names = s->names;
+		char **name = (char **)names->elts;
+		for (i = 0; i < names->nelts; ++i) {
+    	if (!name[i]) { continue; } 
+			if (apr_strnatcasecmp(x->sni_name, name[i]) == 0) { 
+				// We have a match, save this server configuration
+				x->sc = tsc;
+				rv = 1;
+	    } 			
+		}
+	/* Wild any ServerAlias Directives */
+	} else if(s->wild_names) {
+		names = s->wild_names;
+    char **name = (char **)names->elts;
+		for (i = 0; i < names->nelts; ++i) {
+			if (!name[i]) { continue; }
+			if(apr_fnmatch(name[i], x->sni_name , 
+										APR_FNM_CASE_BLIND|
+										APR_FNM_PERIOD|
+										APR_FNM_PATHNAME|
+										APR_FNM_NOESCAPE) == APR_SUCCESS) { 
+				x->sc = tsc;
+				rv = 1; 
+			}
+		}
+	}
+	return rv;
+}
+
 static int vhost_cb(void *baton, conn_rec * conn, server_rec * s) {
     mgs_srvconf_rec *tsc;
     vhost_cb_rec *x = baton;
-    apr_array_header_t *names;
-    int i;
     
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
     tsc = (mgs_srvconf_rec *) ap_get_module_config(s->module_config,
@@ -522,30 +568,7 @@ static int vhost_cb(void *baton, conn_rec * conn, server_rec * s) {
         return 0;
     }
     
-    /* Check ServerName First! */
-    if(!apr_strnatcasecmp(x->sni_name, s->server_hostname)) {
-            x->sc = tsc;return 1;
-    } else if(s->names) {
-    /* ServerAlias Directives */
-            names = s->names;
-            char **name = (char **)names->elts;            
-            for (i = 0; i < names->nelts; ++i) {
-                    if (!name[i]) { continue; } 
-                    if (!apr_strnatcasecmp(x->sni_name, name[i])) { 
-                        x->sc = tsc;return 1; }
-            }        
-    } else if(s->wild_names) {
-    /* Wild ServerAlias Directives */
-            names = s->wild_names;
-            char **name = (char **)names->elts;
-            for (i = 0; i < names->nelts; ++i) {
-                    if (!name[i]) { continue; } 
-                    if (!ap_strcasecmp_match(x->sni_name, name[i])) { 
-                        x->sc = tsc;return 1; }
-            }            
-    }
-    
-    return 0;
+    return check_server_aliases(x, s, tsc);
 }
 #endif
 
@@ -603,30 +626,10 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session) {
                 &gnutls_module);
         
         if (tsc->enabled != GNUTLS_ENABLED_TRUE) { continue; }
-
-        /* Check ServerName First! */
-        if(!apr_strnatcasecmp(sni_name, s->server_hostname)) {
-                return tsc;
-        } else if(s->names) {
-        /* ServerAlias Directives */
-                names = s->names;
-                char **name = (char **)names->elts;            
-                for (i = 0; i < names->nelts; ++i) {
-                        if (!name[i]) { continue; } 
-                        if (!apr_strnatcasecmp(sni_name, name[i])) { 
-                            return tsc; }
-                }        
-        } else if(s->wild_names) {
-        /* Wild ServerAlias Directives */
-                names = s->wild_names;
-                char **name = (char **)names->elts;
-                for (i = 0; i < names->nelts; ++i) {
-                        if (!name[i]) { continue; } 
-                        if (!ap_strcasecmp_match(sni_name, name[i])) { 
-                            return tsc; }
-                }            
-        } /* End Wild Names*/        
-    } /* End For Loop */
+				
+				if(check_server_aliases(x, s, tsc)) {
+					return tsc;
+				}
 #endif
     return NULL;
 }
