@@ -526,28 +526,28 @@ int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc) 
 		x->sc = tsc;
 		rv = 1;
 	/* Check any ServerAlias directives */
-	} else if(s->names) {
+	} else if(s->names->nelts) {
 		names = s->names;
 		char **name = (char **)names->elts;
 		for (i = 0; i < names->nelts; ++i) {
-    	if (!name[i]) { continue; } 
-			if (apr_strnatcasecmp(x->sni_name, name[i]) == 0) { 
-				// We have a match, save this server configuration
-				x->sc = tsc;
-				rv = 1;
-	    } 			
+			if (!name[i]) { continue; } 
+				if (apr_strnatcasecmp(x->sni_name, name[i]) == 0) { 
+					// We have a match, save this server configuration
+					x->sc = tsc;
+					rv = 1;
+			} 			
 		}
 	/* Wild any ServerAlias Directives */
-	} else if(s->wild_names) {
+	} else if(s->wild_names->nelts) {
 		names = s->wild_names;
     char **name = (char **)names->elts;
 		for (i = 0; i < names->nelts; ++i) {
 			if (!name[i]) { continue; }
-			if(apr_fnmatch(name[i], x->sni_name , 
-										APR_FNM_CASE_BLIND|
-										APR_FNM_PERIOD|
-										APR_FNM_PATHNAME|
-										APR_FNM_NOESCAPE) == APR_SUCCESS) { 
+				if(apr_fnmatch(name[i], x->sni_name , 
+								APR_FNM_CASE_BLIND|
+								APR_FNM_PERIOD|
+								APR_FNM_PATHNAME|
+								APR_FNM_NOESCAPE) == APR_SUCCESS) { 
 				x->sc = tsc;
 				rv = 1; 
 			}
