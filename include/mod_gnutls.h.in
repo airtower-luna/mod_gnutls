@@ -26,6 +26,7 @@
 #include "apr_strings.h"
 #include "apr_tables.h"
 #include "ap_release.h"
+#include "apr_fnmatch.h"
 
 #include <gnutls/gnutls.h>
 #include <gnutls/extra.h>
