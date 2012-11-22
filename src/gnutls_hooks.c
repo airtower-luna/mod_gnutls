@@ -519,6 +519,7 @@ typedef struct {
 int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc) {
 	apr_array_header_t *names;
 	int i,rv = 0;
+	char ** name;
 
 	/* Check ServerName First! */
 	if(apr_strnatcasecmp(x->sni_name, s->server_hostname) == 0) {
@@ -528,7 +529,7 @@ int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc) 
 	/* Check any ServerAlias directives */
 	} else if(s->names->nelts) {
 		names = s->names;
-		char **name = (char **)names->elts;
+		name = (char **)names->elts;
 		for (i = 0; i < names->nelts; ++i) {
 			if (!name[i]) { continue; } 
 				if (apr_strnatcasecmp(x->sni_name, name[i]) == 0) { 
@@ -540,7 +541,7 @@ int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc) 
 	/* Wild any ServerAlias Directives */
 	} else if(s->wild_names->nelts) {
 		names = s->wild_names;
-    char **name = (char **)names->elts;
+    	name = (char **)names->elts;
 		for (i = 0; i < names->nelts; ++i) {
 			if (!name[i]) { continue; }
 				if(apr_fnmatch(name[i], x->sni_name , 
