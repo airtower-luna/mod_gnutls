@@ -95,129 +95,73 @@ const char *mgs_set_dh_file(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
-const char *mgs_set_rsa_export_file(cmd_parms * parms, void *dummy,
-        const char *arg) {
+const char *mgs_set_cert_file(cmd_parms * parms, void *dummy, const char *arg) {
+
     int ret;
     gnutls_datum_t data;
     const char *file;
     apr_pool_t *spool;
-    mgs_srvconf_rec *sc =
-            (mgs_srvconf_rec *) ap_get_module_config(parms->server->
-            module_config,
-            &gnutls_module);
 
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *) ap_get_module_config(parms->server->module_config, &gnutls_module);
     apr_pool_create(&spool, parms->pool);
 
     file = ap_server_root_relative(spool, arg);
 
     if (load_datum_from_file(spool, file, &data) != 0) {
-        return apr_psprintf(parms->pool, "GnuTLS: Error Reading "
-                "RSA params '%s'", file);
+		apr_pool_destroy(spool);
+        return apr_psprintf(parms->pool, "GnuTLS: Error Reading Certificate '%s'", file);
     }
 
-    ret = gnutls_rsa_params_init(&sc->rsa_params);
+    sc->certs_x509_chain_num = MAX_CHAIN_SIZE;
+    ret = gnutls_x509_crt_list_import(sc->certs_x509_chain, &sc->certs_x509_chain_num, &data, GNUTLS_X509_FMT_PEM, 0);
     if (ret < 0) {
-        return apr_psprintf(parms->pool,
-                "GnuTLS: Failed to initialize"
-                ": (%d) %s", ret,
-                gnutls_strerror(ret));
+		apr_pool_destroy(spool);
+        return apr_psprintf(parms->pool, "GnuTLS: Failed to Import Certificate '%s': (%d) %s", file, ret, gnutls_strerror(ret));
     }
-
-    ret =
-            gnutls_rsa_params_import_pkcs1(sc->rsa_params, &data,
-            GNUTLS_X509_FMT_PEM);
-    if (ret != 0) {
-        return apr_psprintf(parms->pool,
-                "GnuTLS: Failed to Import "
-                "RSA params '%s': (%d) %s", file, ret,
-                gnutls_strerror(ret));
-    }
-
-    apr_pool_destroy(spool);
+    
+	apr_pool_destroy(spool);
     return NULL;
+
 }
 
-const char *mgs_set_cert_file(cmd_parms * parms, void *dummy,
-        const char *arg) {
+const char *mgs_set_key_file(cmd_parms * parms, void *dummy, const char *arg) {
+
     int ret;
     gnutls_datum_t data;
     const char *file;
     apr_pool_t *spool;
-    mgs_srvconf_rec *sc =
-            (mgs_srvconf_rec *) ap_get_module_config(parms->server->
-            module_config,
-            &gnutls_module);
-    apr_pool_create(&spool, parms->pool);
+
+	mgs_srvconf_rec *sc = (mgs_srvconf_rec *) ap_get_module_config(parms->server->module_config, &gnutls_module);
+    
+	apr_pool_create(&spool, parms->pool);
 
     file = ap_server_root_relative(spool, arg);
 
     if (load_datum_from_file(spool, file, &data) != 0) {
-        return apr_psprintf(parms->pool, "GnuTLS: Error Reading "
-                "Certificate '%s'", file);
-    }
-
-    sc->certs_x509_num = MAX_CHAIN_SIZE;
-    ret =
-            gnutls_x509_crt_list_import(sc->certs_x509,
-            &sc->certs_x509_num, &data,
-            GNUTLS_X509_FMT_PEM, 0);
-    if (ret < 0) {
-        return apr_psprintf(parms->pool,
-                "GnuTLS: Failed to Import "
-                "Certificate '%s': (%d) %s", file, ret,
-                gnutls_strerror(ret));
-    }
-
-    apr_pool_destroy(spool);
-    return NULL;
-}
-
-const char *mgs_set_key_file(cmd_parms * parms, void *dummy,
-        const char *arg) {
-    int ret;
-    gnutls_datum_t data;
-    const char *file;
-    apr_pool_t *spool;
-    mgs_srvconf_rec *sc =
-            (mgs_srvconf_rec *) ap_get_module_config(parms->server->
-            module_config,
-            &gnutls_module);
-    apr_pool_create(&spool, parms->pool);
-
-    file = ap_server_root_relative(spool, arg);
-
-    if (load_datum_from_file(spool, file, &data) != 0) {
-        return apr_psprintf(parms->pool, "GnuTLS: Error Reading "
-                "Private Key '%s'", file);
+		apr_pool_destroy(spool);
+        return apr_psprintf(parms->pool, "GnuTLS: Error Reading Private Key '%s'", file);
     }
 
     ret = gnutls_x509_privkey_init(&sc->privkey_x509);
-    if (ret < 0) {
-        return apr_psprintf(parms->pool,
-                "GnuTLS: Failed to initialize"
-                ": (%d) %s", ret,
-                gnutls_strerror(ret));
-    }
-
-    ret =
-            gnutls_x509_privkey_import(sc->privkey_x509, &data,
-            GNUTLS_X509_FMT_PEM);
-
-    if (ret < 0)
-        ret =
-            gnutls_x509_privkey_import_pkcs8(sc->privkey_x509,
-            &data,
-            GNUTLS_X509_FMT_PEM,
-            NULL,
-            GNUTLS_PKCS_PLAIN);
 
     if (ret < 0) {
-        return apr_psprintf(parms->pool,
-                "GnuTLS: Failed to Import "
-                "Private Key '%s': (%d) %s", file, ret,
-                gnutls_strerror(ret));
+		apr_pool_destroy(spool);
+        return apr_psprintf(parms->pool, "GnuTLS: Failed to initialize: (%d) %s", ret, gnutls_strerror(ret));
     }
+
+    ret = gnutls_x509_privkey_import(sc->privkey_x509, &data, GNUTLS_X509_FMT_PEM);
+
+    if (ret < 0) {
+        ret = gnutls_x509_privkey_import_pkcs8(sc->privkey_x509, &data, GNUTLS_X509_FMT_PEM, NULL, GNUTLS_PKCS_PLAIN);
+	}
+
+    if (ret < 0) {
+		apr_pool_destroy(spool);
+        return apr_psprintf(parms->pool, "GnuTLS: Failed to Import Private Key '%s': (%d) %s", file, ret, gnutls_strerror(ret));
+    }
+
     apr_pool_destroy(spool);
+
     return NULL;
 }
 
@@ -578,41 +522,21 @@ const char *mgs_set_enabled(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
-const char *mgs_set_export_certificates_enabled(cmd_parms * parms,
-        void *dummy,
-        const char *arg) {
-    mgs_srvconf_rec *sc =
-            (mgs_srvconf_rec *) ap_get_module_config(parms->server->
-            module_config,
-            &gnutls_module);
-    if (!strcasecmp(arg, "On")) {
-        sc->export_certificates_enabled = GNUTLS_ENABLED_TRUE;
-    } else if (!strcasecmp(arg, "Off")) {
-        sc->export_certificates_enabled = GNUTLS_ENABLED_FALSE;
-    } else {
-        return
-        "GnuTLSExportCertificates must be set to 'On' or 'Off'";
-    }
+const char *mgs_set_priorities(cmd_parms * parms, void *dummy, const char *arg) {
 
-    return NULL;
-}
-
-const char *mgs_set_priorities(cmd_parms * parms, void *dummy,
-        const char *arg) {
-    int ret;
+	int ret;
     const char *err;
-    mgs_srvconf_rec *sc =
-            (mgs_srvconf_rec *) ap_get_module_config(parms->server->
-            module_config,
-            &gnutls_module);
 
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *) 
+						  ap_get_module_config(parms->server->module_config, &gnutls_module);
 
     ret = gnutls_priority_init(&sc->priorities, arg, &err);
+
     if (ret < 0) {
-        if (ret == GNUTLS_E_INVALID_REQUEST)
-            return apr_psprintf(parms->pool,
-                "GnuTLS: Syntax error parsing priorities string at: %s",
-                err);
+        if (ret == GNUTLS_E_INVALID_REQUEST) {
+            return apr_psprintf(parms->pool, 
+								"GnuTLS: Syntax error parsing priorities string at: %s", err);
+		}
         return "Error setting priorities";
     }
 
@@ -651,12 +575,14 @@ void *mgs_config_server_create(apr_pool_t * p, server_rec * s) {
 #endif
 
     sc->privkey_x509 = NULL;
-    memset(sc->certs_x509, 0, sizeof (sc->certs_x509));
-    sc->certs_x509_num = 0;
+	/* Initialize all Certificate Chains */
+	sc->certs_x509_chain = malloc(MAX_CHAIN_SIZE * sizeof (*sc->certs_x509_chain));
+    sc->certs_x509_chain_num = 0;
     sc->cache_timeout = apr_time_from_sec(300);
     sc->cache_type = mgs_cache_none;
     sc->cache_config = ap_server_root_relative(p, "conf/gnutls_cache");
-    sc->tickets = 1; /* by default enable session tickets */
+	/* By default enable session tickets */
+    sc->tickets = GNUTLS_ENABLED_TRUE; 
 
     sc->client_verify_mode = GNUTLS_CERT_IGNORE;
 
