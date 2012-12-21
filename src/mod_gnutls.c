@@ -120,10 +120,6 @@ static const command_rec mgs_config_cmds[] = {
     NULL,
     RSRC_CONF,
     "Set the file to read Diffie Hellman parameters from"),
-    AP_INIT_TAKE1("GnuTLSRSAFile", mgs_set_rsa_export_file,
-    NULL,
-    RSRC_CONF,
-    "Set the file to read RSA-EXPORT parameters from"),
     AP_INIT_TAKE1("GnuTLSCertificateFile", mgs_set_cert_file,
     NULL,
     RSRC_CONF,
@@ -179,11 +175,6 @@ static const command_rec mgs_config_cmds[] = {
     NULL,
     RSRC_CONF,
     "Whether this server has GnuTLS Enabled. Default: Off"),
-    AP_INIT_TAKE1("GnuTLSExportCertificates",
-    mgs_set_export_certificates_enabled,
-    NULL,
-    RSRC_CONF,
-    "Whether to export PEM encoded certificates to CGIs. Default: Off"),
     { NULL }
 };
 
