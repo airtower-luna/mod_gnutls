@@ -19,19 +19,20 @@ lift code and ideas directly from mod_ssl. Kudos to the original authors of mod_
 
 ----------------------------
 
-Author: Paul Querna <chip force-elite.com
+Author: Paul Querna <chip force-elite.com>
+
+Heavily modified by Nikos Mavrogiannopoulos <nmav gnutls.org>
 
 License: Apache Software License v2.0. (see the LICENSE file for details)
 
 Current Status:
 - SSL and TLS connections with all popular browsers work!
-- Sets some enviromental vars for scripts
+- Sets enviromental vars for scripts (compatible with mod_ssl vars)
 - Supports Memcached as a distributed SSL Session Cache
 - Supports DBM as a local SSL Session Cache
-
-Future Development:
-- Support for Server Name Indication (partial support is in, but disabled)
+- Support for Server Name Indication
 - Support for Client Certificates
+- Support for TLS-SRP
 
 Basic Configuration:
 
@@ -57,4 +58,36 @@ GnuTLSCache dbm conf/gnutls_cache
 
     # This is the Server Certificate.  
     GnuTLSCertificateFile conf/server.cert
+</VirtualHost>
+
+
+# a more advance configuration
+GnuTLSCache dbm "/var/cache/www-tls-cache/cache"
+GnuTLSCacheTimeout 500
+GnuTLSProtocols TLS1.1 TLS1.0 SSL3.0
+NameVirtualHost 1.2.3.4:443
+
+<VirtualHost 1.2.3.4:443>
+	Servername server.com:443
+        GnuTLSEnable on
+	GnuTLSCiphers AES-128-CBC 3DES-CBC ARCFOUR-128
+	GnuTLSKeyExchangeAlgorithms RSA DHE-RSA DHE-DSS SRP SRP-RSA SRP-DSS
+	GnuTLSMACAlgorithms SHA1 MD5
+	GnuTLSCompressionMethods NULL
+# To export exactly the same environment variables as mod_ssl to CGI scripts.
+	GNUTLSExportCertificates on
+
+	GnuTLSCertificateFile /etc/apache2/server-cert.pem
+	GnuTLSKeyFile /etc/apache2/server-key.pem
+
+# To enable SRP you must have these files installed. Check the gnutls srptool.
+	GnuTLSSRPPasswdFile /etc/apache2/tpasswd
+	GnuTLSSRPPasswdConfFile /etc/apache2/tpasswd.conf
+
+# In order to verify client certificates. Other options to
+# GnuTLSClientVerify could be ignore or require. The GnuTLSClientCAFile
+# contains the CAs to verify client certificates.
+	GnuTLSClientVerify request
+	GnuTLSClientCAFile ca.pem
+	...
 </VirtualHost>

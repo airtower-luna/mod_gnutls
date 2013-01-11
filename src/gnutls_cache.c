@@ -38,6 +38,7 @@
     (sizeof(MC_TAG))
 #define STR_SESSION_LEN (GNUTLS_SESSION_ID_STRING_LEN + MC_TAG_LEN)
 
+#if 0
 static char *gnutls_session_id2sz(unsigned char *id, int idlen,
                                char *str, int strsize)
 {
@@ -50,6 +51,22 @@ static char *gnutls_session_id2sz(unsigned char *id, int idlen,
         cp += 2;
     }
     *cp = '\0';
+    return str;
+}
+#endif
+
+#define CTIME "%b %d %k:%M:%S %Y %Z"
+char *mgs_time2sz(time_t in_time, char *str, int strsize)
+{
+    apr_time_exp_t vtm;
+    apr_size_t ret_size;
+    apr_time_t t;
+    
+ 
+    apr_time_ansi_put (&t, in_time);
+    apr_time_exp_gmt (&vtm, t);
+    apr_strftime(str, &ret_size, strsize-1, CTIME, &vtm);
+
     return str;
 }
 
@@ -349,10 +366,8 @@ static gnutls_datum_t dbm_cache_fetch(void* baton, gnutls_datum_t key)
     mgs_handle_t *ctxt = baton;
     apr_status_t rv;
 
-    dbmkey.dptr  = key.data;
+    dbmkey.dptr  = (void*)key.data;
     dbmkey.dsize = key.size;
-
-    dbm_cache_expire(ctxt);
 
     rv = apr_dbm_open(&dbm, ctxt->sc->cache_config,
 	              APR_DBM_RWCREATE, SSL_DBM_FILE_MODE, ctxt->c->pool);
@@ -412,6 +427,8 @@ static int dbm_cache_store(void* baton, gnutls_datum_t key,
     memcpy((char *)dbmval.dptr+sizeof(apr_time_t),
            data.data, data.size);
 
+    /* we expire dbm only on every store
+     */
     dbm_cache_expire(ctxt);
 
     rv = apr_dbm_open(&dbm, ctxt->sc->cache_config,
@@ -454,8 +471,6 @@ static int dbm_cache_delete(void* baton, gnutls_datum_t key)
     dbmkey.dptr  = (char *)key.data;
     dbmkey.dsize = key.size;
 
-    dbm_cache_expire(ctxt);
-    
     rv = apr_dbm_open(&dbm, ctxt->sc->cache_config,
 	              APR_DBM_RWCREATE, SSL_DBM_FILE_MODE, ctxt->c->pool);
     if (rv != APR_SUCCESS) {
