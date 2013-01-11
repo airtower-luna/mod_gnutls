@@ -37,7 +37,8 @@ static int mpm_is_threaded;
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt);
 /* use side==0 for server and side==1 for client */
 static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt cert,
-				     int side, int export_certificates_enabled);
+				     int side,
+				     int export_certificates_enabled);
 
 static apr_status_t mgs_cleanup_pre_config(void *data)
 {
@@ -83,51 +84,10 @@ mgs_hook_pre_config(apr_pool_t * pconf,
     return OK;
 }
 
-
-static gnutls_datum
-load_params(const char *file, server_rec * s, apr_pool_t * pool)
-{
-    gnutls_datum ret = { NULL, 0 };
-    apr_file_t *fp;
-    apr_finfo_t finfo;
-    apr_status_t rv;
-    apr_size_t br = 0;
-
-    rv = apr_file_open(&fp, file, APR_READ | APR_BINARY, APR_OS_DEFAULT,
-		       pool);
-    if (rv != APR_SUCCESS) {
-	ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, s,
-		     "GnuTLS failed to load params file at: %s. Will use internal params.", file);
-	return ret;
-    }
-
-    rv = apr_file_info_get(&finfo, APR_FINFO_SIZE, fp);
-
-    if (rv != APR_SUCCESS) {
-	ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, s,
-		     "GnuTLS failed to stat params file at: %s", file);
-	return ret;
-    }
-
-    ret.data = apr_palloc(pool, finfo.size + 1);
-    rv = apr_file_read_full(fp, ret.data, finfo.size, &br);
-
-    if (rv != APR_SUCCESS) {
-	ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, s,
-		     "GnuTLS failed to read params file at: %s", file);
-	return ret;
-    }
-    apr_file_close(fp);
-    ret.data[br] = '\0';
-    ret.size = br;
-
-    return ret;
-}
-
 /* We don't support openpgp certificates, yet */
 const static int cert_type_prio[2] = { GNUTLS_CRT_X509, 0 };
 
-static int mgs_select_virtual_server_cb( gnutls_session_t session)
+static int mgs_select_virtual_server_cb(gnutls_session_t session)
 {
     mgs_handle_t *ctxt;
     mgs_srvconf_rec *tsc;
@@ -142,32 +102,33 @@ static int mgs_select_virtual_server_cb( gnutls_session_t session)
 	ctxt->sc = tsc;
 
     gnutls_certificate_server_set_request(session,
-       ctxt->sc->client_verify_mode);
+					  ctxt->sc->client_verify_mode);
 
     /* set the new server credentials 
      */
 
     gnutls_credentials_set(session, GNUTLS_CRD_CERTIFICATE,
-      ctxt->sc->certs);
+			   ctxt->sc->certs);
 
-    gnutls_credentials_set(session, GNUTLS_CRD_ANON,
-      ctxt->sc->anon_creds);
+    gnutls_credentials_set(session, GNUTLS_CRD_ANON, ctxt->sc->anon_creds);
 
-    if ( ctxt->sc->srp_tpasswd_conf_file != NULL && ctxt->sc->srp_tpasswd_file != NULL) {
-       gnutls_credentials_set(session, GNUTLS_CRD_SRP,
-         ctxt->sc->srp_creds);
+    if (ctxt->sc->srp_tpasswd_conf_file != NULL
+	&& ctxt->sc->srp_tpasswd_file != NULL) {
+	gnutls_credentials_set(session, GNUTLS_CRD_SRP,
+			       ctxt->sc->srp_creds);
     }
 
     /* update the priorities - to avoid negotiating a ciphersuite that is not
      * enabled on this virtual server. Note that here we ignore the version
      * negotiation.
      */
-    ret = gnutls_priority_set( session, ctxt->sc->priorities);
-    gnutls_certificate_type_set_priority( session, cert_type_prio);
-    
-    
+    ret = gnutls_priority_set(session, ctxt->sc->priorities);
+    gnutls_certificate_type_set_priority(session, cert_type_prio);
+
+
     /* actually it shouldn't fail since we have checked at startup */
-    if (ret < 0) return ret;
+    if (ret < 0)
+	return ret;
 
     /* allow separate caches per virtual host. Actually allowing the same is a
      * bad idea, since they might have different security requirements.
@@ -193,23 +154,78 @@ static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st * ret)
 }
 
 const char static_dh_params[] = "-----BEGIN DH PARAMETERS-----\n"
-"MIIBBwKCAQCsa9tBMkqam/Fm3l4TiVgvr3K2ZRmH7gf8MZKUPbVgUKNzKcu0oJnt\n"
-"gZPgdXdnoT3VIxKrSwMxDc1/SKnaBP1Q6Ag5ae23Z7DPYJUXmhY6s2YaBfvV+qro\n"
-"KRipli8Lk7hV+XmT7Jde6qgNdArb9P90c1nQQdXDPqcdKB5EaxR3O8qXtDoj+4AW\n"
-"dr0gekNsZIHx0rkHhxdGGludMuaI+HdIVEUjtSSw1X1ep3onddLs+gMs+9v1L7N4\n"
-"YWAnkATleuavh05zA85TKZzMBBx7wwjYKlaY86jQw4JxrjX46dv7tpS1yAPYn3rk\n"
-"Nd4jbVJfVHWbZeNy/NaO8g+nER+eSv9zAgEC\n"
-"-----END DH PARAMETERS-----\n";
+    "MIIBBwKCAQCsa9tBMkqam/Fm3l4TiVgvr3K2ZRmH7gf8MZKUPbVgUKNzKcu0oJnt\n"
+    "gZPgdXdnoT3VIxKrSwMxDc1/SKnaBP1Q6Ag5ae23Z7DPYJUXmhY6s2YaBfvV+qro\n"
+    "KRipli8Lk7hV+XmT7Jde6qgNdArb9P90c1nQQdXDPqcdKB5EaxR3O8qXtDoj+4AW\n"
+    "dr0gekNsZIHx0rkHhxdGGludMuaI+HdIVEUjtSSw1X1ep3onddLs+gMs+9v1L7N4\n"
+    "YWAnkATleuavh05zA85TKZzMBBx7wwjYKlaY86jQw4JxrjX46dv7tpS1yAPYn3rk\n"
+    "Nd4jbVJfVHWbZeNy/NaO8g+nER+eSv9zAgEC\n"
+    "-----END DH PARAMETERS-----\n";
+
+/* Read the common name or the alternative name of the certificate.
+ * We only support a single name per certificate.
+ *
+ * Returns negative on error.
+ */
+static int read_crt_cn(server_rec * s, apr_pool_t * p,
+		       gnutls_x509_crt cert, char **cert_cn)
+{
+    int rv = 0, i;
+    size_t data_len;
+
+
+    *cert_cn = NULL;
+
+    rv = gnutls_x509_crt_get_dn_by_oid(cert,
+				       GNUTLS_OID_X520_COMMON_NAME,
+				       0, 0, NULL, &data_len);
+
+    if (rv == GNUTLS_E_SHORT_MEMORY_BUFFER && data_len > 1) {
+	*cert_cn = apr_palloc(p, data_len);
+	rv = gnutls_x509_crt_get_dn_by_oid(cert,
+					   GNUTLS_OID_X520_COMMON_NAME, 0,
+					   0, *cert_cn, &data_len);
+    } else {			/* No CN return subject alternative name */
+	ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
+		     "No common name found in certificate for '%s:%d'. Looking for subject alternative name.",
+		     s->server_hostname, s->port);
+	rv = 0;
+	/* read subject alternative name */
+	for (i = 0; !(rv < 0); i++) {
+	    data_len = 0;
+	    rv = gnutls_x509_crt_get_subject_alt_name(cert, i,
+						      NULL, &data_len,
+						      NULL);
+
+	    if (rv == GNUTLS_E_SHORT_MEMORY_BUFFER && data_len > 1) {
+		/* FIXME: not very efficient. What if we have several alt names
+		 * before DNSName?
+		 */
+		*cert_cn = apr_palloc(p, data_len + 1);
+
+		rv = gnutls_x509_crt_get_subject_alt_name(cert, i,
+							  *cert_cn,
+							  &data_len, NULL);
+		(*cert_cn)[data_len] = 0;
+
+		if (rv == GNUTLS_SAN_DNSNAME)
+		    break;
+	    }
+	}
+    }
+
+    return rv;
+
+}
 
 int
 mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 		     apr_pool_t * ptemp, server_rec * base_server)
 {
     int rv;
-    size_t data_len;
     server_rec *s;
-    gnutls_dh_params_t dh_params;
-    gnutls_rsa_params_t rsa_params;
+    gnutls_dh_params_t dh_params = NULL;
+    gnutls_rsa_params_t rsa_params = NULL;
     mgs_srvconf_rec *sc;
     mgs_srvconf_rec *sc_base;
     void *data = NULL;
@@ -226,64 +242,33 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 
 
     {
-	gnutls_datum pdata;
-	apr_pool_t *tpool;
 	s = base_server;
 	sc_base =
 	    (mgs_srvconf_rec *) ap_get_module_config(s->module_config,
 						     &gnutls_module);
 
-	apr_pool_create(&tpool, p);
-
 	gnutls_dh_params_init(&dh_params);
 
-	pdata = load_params(sc_base->dh_params_file, s, tpool);
-
-	if (pdata.size != 0) {
-	    rv = gnutls_dh_params_import_pkcs3(dh_params, &pdata,
-					       GNUTLS_X509_FMT_PEM);
-	    if (rv != 0) {
-		ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			     "GnuTLS: Unable to load DH Params: (%d) %s",
-			     rv, gnutls_strerror(rv));
-		exit(rv);
-	    }
-	} else {
-	    /* If the file does not exist use internal parameters
-	     */
-            pdata.data = (void*)static_dh_params;
-            pdata.size = sizeof( static_dh_params);
-	    rv = gnutls_dh_params_import_pkcs3(dh_params, &pdata,
+	if (sc_base->dh_params == NULL) {
+	    gnutls_datum pdata = { (void *) static_dh_params, sizeof(static_dh_params) };
+            /* loading defaults */
+            rv = gnutls_dh_params_import_pkcs3(dh_params, &pdata,
 					       GNUTLS_X509_FMT_PEM);
 
             if (rv < 0) {
-    	      ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			 "GnuTLS: Unable to load internal DH Params."
-			 " Shutting down.");
-              exit(-1);
+  	        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+		     "GnuTLS: Unable to load DH Params: (%d) %s",
+		     rv, gnutls_strerror(rv));
+                exit(rv);
             }
-	}
-	apr_pool_clear(tpool);
+        } else dh_params = sc_base->dh_params;
 
-        rsa_params = NULL;
-        
-	pdata = load_params(sc_base->rsa_params_file, s, tpool);
+        if (sc_base->rsa_params != NULL) 
+            rsa_params = sc_base->rsa_params;
 
-	if (pdata.size != 0) {
-            gnutls_rsa_params_init(&rsa_params);
-	    rv = gnutls_rsa_params_import_pkcs1(rsa_params, &pdata,
-						GNUTLS_X509_FMT_PEM);
-	    if (rv != 0) {
-		ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			     "GnuTLS: Unable to load RSA Params: (%d) %s",
-			     rv, gnutls_strerror(rv));
-		exit(rv);
-	    }
-	} 
-        /* not an error but RSA-EXPORT ciphersuites are not available 
-         */
+	/* else not an error but RSA-EXPORT ciphersuites are not available 
+	 */
 
-	apr_pool_destroy(tpool);
 	rv = mgs_cache_post_config(p, s, sc_base);
 	if (rv != 0) {
 	    ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, s,
@@ -293,26 +278,59 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 	}
 
 	for (s = base_server; s; s = s->next) {
+	    void *load = NULL;
 	    sc = (mgs_srvconf_rec *) ap_get_module_config(s->module_config,
 							  &gnutls_module);
 	    sc->cache_type = sc_base->cache_type;
 	    sc->cache_config = sc_base->cache_config;
 
-	    if (rsa_params != NULL)
-    	      gnutls_certificate_set_rsa_export_params(sc->certs,
-						     rsa_params);
-	    gnutls_certificate_set_dh_params(sc->certs, dh_params);
-
-            gnutls_anon_set_server_dh_params( sc->anon_creds, dh_params);
-	    
-            gnutls_certificate_server_set_retrieve_function(sc->certs,
-						    cert_retrieve_fn);
-
-            if ( sc->srp_tpasswd_conf_file != NULL && sc->srp_tpasswd_file != NULL) {
-                gnutls_srp_set_server_credentials_file( sc->srp_creds, 
-                    sc->srp_tpasswd_file, sc->srp_tpasswd_conf_file);
+            /* Check if the priorities have been set */
+            if (sc->priorities == NULL && sc->enabled == GNUTLS_ENABLED_TRUE) {
+                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+		     "GnuTLS: Host '%s:%d' is missing the GnuTLSPriorities directive!",
+			     s->server_hostname, s->port);
+		exit(-1);
             }
             
+            /* Check if DH or RSA params have been set per host */
+            if (sc->rsa_params != NULL)
+                load = sc->rsa_params;
+            else if (rsa_params) load = rsa_params;
+            
+            if (load != NULL)
+		gnutls_certificate_set_rsa_export_params(sc->certs, load);
+
+
+            load = NULL;
+            if (sc->dh_params != NULL)
+                load = sc->dh_params;
+            else if (dh_params) load = dh_params;
+            
+            if (load != NULL) { /* not needed but anyway */
+	        gnutls_certificate_set_dh_params(sc->certs, load);
+	        gnutls_anon_set_server_dh_params(sc->anon_creds, load);
+            }
+
+	    gnutls_certificate_server_set_retrieve_function(sc->certs,
+							    cert_retrieve_fn);
+
+	    if (sc->srp_tpasswd_conf_file != NULL
+		&& sc->srp_tpasswd_file != NULL) {
+		rv = gnutls_srp_set_server_credentials_file(sc->srp_creds,
+							    sc->
+							    srp_tpasswd_file,
+							    sc->
+							    srp_tpasswd_conf_file);
+
+		if (rv < 0 && sc->enabled == GNUTLS_ENABLED_TRUE) {
+		    ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
+				 "[GnuTLS] - Host '%s:%d' is missing a "
+				 "SRP password or conf File!",
+				 s->server_hostname, s->port);
+		    exit(-1);
+		}
+	    }
+
 	    if (sc->cert_x509 == NULL
 		&& sc->enabled == GNUTLS_ENABLED_TRUE) {
 		ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
@@ -332,22 +350,15 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 	    }
 
 	    if (sc->enabled == GNUTLS_ENABLED_TRUE) {
-	    rv = gnutls_x509_crt_get_dn_by_oid(sc->cert_x509,
-					       GNUTLS_OID_X520_COMMON_NAME,
-					       0, 0, NULL, &data_len);
-
-	    if (data_len < 1) {
-		sc->enabled = GNUTLS_ENABLED_FALSE;
-		sc->cert_cn = NULL;
-		continue;
+		rv = read_crt_cn(s, p, sc->cert_x509, &sc->cert_cn);
+		if (rv < 0) {
+		    ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
+				 "[GnuTLS] - Cannot find a certificate for host '%s:%d'!",
+				 s->server_hostname, s->port);
+		    sc->cert_cn = NULL;
+		    continue;
+		}
 	    }
-
-	    sc->cert_cn = apr_palloc(p, data_len);
-	    rv = gnutls_x509_crt_get_dn_by_oid(sc->cert_x509,
-					       GNUTLS_OID_X520_COMMON_NAME,
-					       0, 0, sc->cert_cn,
-					       &data_len);
-            }
 	}
     }
 
@@ -439,6 +450,14 @@ static int vhost_cb(void *baton, conn_rec * conn, server_rec * s)
 	 * acccckkkkkk. 
 	 */
 	return 1;
+    } else {
+#if MOD_GNUTLS_DEBUG
+	ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
+		     x->ctxt->c->base_server,
+		     "GnuTLS: Virtual Host CB: "
+		     "'%s' != '%s'", tsc->cert_cn, x->sni_name);
+#endif
+
     }
     return 0;
 }
@@ -532,8 +551,9 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
 
 
 static const int protocol_priority[] = {
-  GNUTLS_TLS1_1, GNUTLS_TLS1_0, GNUTLS_SSL3, 0 };
-          
+    GNUTLS_TLS1_1, GNUTLS_TLS1_0, GNUTLS_SSL3, 0
+};
+
 
 static mgs_handle_t *create_gnutls_handle(apr_pool_t * pool, conn_rec * c)
 {
@@ -558,19 +578,15 @@ static mgs_handle_t *create_gnutls_handle(apr_pool_t * pool, conn_rec * c)
     ctxt->output_length = 0;
 
     gnutls_init(&ctxt->session, GNUTLS_SERVER);
-    
-    /* This is not very good as it trades security for compatibility,
-     * but it is the only way to be ultra-portable.
-     */
-    gnutls_session_enable_compatibility_mode( ctxt->session);
-    
+
     /* because we don't set any default priorities here (we set later at
      * the user hello callback) we need to at least set this in order for
      * gnutls to be able to read packets.
      */
-    gnutls_protocol_set_priority( ctxt->session, protocol_priority);
+    gnutls_protocol_set_priority(ctxt->session, protocol_priority);
 
-    gnutls_handshake_set_post_client_hello_function( ctxt->session, mgs_select_virtual_server_cb);
+    gnutls_handshake_set_post_client_hello_function(ctxt->session,
+						    mgs_select_virtual_server_cb);
 
     return ctxt;
 }
@@ -623,25 +639,30 @@ int mgs_hook_fixups(request_rec * r)
 
     apr_table_setn(env, "HTTPS", "on");
 
-    apr_table_setn(env, "SSL_VERSION_LIBRARY", "GnuTLS/"LIBGNUTLS_VERSION);
-    apr_table_setn(env, "SSL_VERSION_INTERFACE", "mod_gnutls/"MOD_GNUTLS_VERSION);
+    apr_table_setn(env, "SSL_VERSION_LIBRARY",
+		   "GnuTLS/" LIBGNUTLS_VERSION);
+    apr_table_setn(env, "SSL_VERSION_INTERFACE",
+		   "mod_gnutls/" MOD_GNUTLS_VERSION);
 
     apr_table_setn(env, "SSL_PROTOCOL",
 		   gnutls_protocol_get_name(gnutls_protocol_get_version
 					    (ctxt->session)));
 
-    /* should have been called SSL_CIPHERSUITE instead */                                          
+    /* should have been called SSL_CIPHERSUITE instead */
     apr_table_setn(env, "SSL_CIPHER",
-          gnutls_cipher_suite_get_name(
-            gnutls_kx_get(ctxt->session), gnutls_cipher_get(ctxt->session),
-                    gnutls_mac_get(ctxt->session)));
+		   gnutls_cipher_suite_get_name(gnutls_kx_get
+						(ctxt->session),
+						gnutls_cipher_get(ctxt->
+								  session),
+						gnutls_mac_get(ctxt->
+							       session)));
 
     apr_table_setn(env, "SSL_COMPRESS_METHOD",
 		   gnutls_compression_get_name(gnutls_compression_get
-					  (ctxt->session)));
+					       (ctxt->session)));
 
     apr_table_setn(env, "SSL_SRP_USER",
-                   gnutls_srp_server_get_username( ctxt->session));
+		   gnutls_srp_server_get_username(ctxt->session));
 
     if (apr_table_get(env, "SSL_CLIENT_VERIFY") == NULL)
 	apr_table_setn(env, "SSL_CLIENT_VERIFY", "NONE");
@@ -662,7 +683,8 @@ int mgs_hook_fixups(request_rec * r)
     tmp = mgs_session_id2sz(sbuf, len, buf, sizeof(buf));
     apr_table_setn(env, "SSL_SESSION_ID", apr_pstrdup(r->pool, tmp));
 
-    mgs_add_common_cert_vars(r, ctxt->sc->cert_x509, 0, ctxt->sc->export_certificates_enabled);
+    mgs_add_common_cert_vars(r, ctxt->sc->cert_x509, 0,
+			     ctxt->sc->export_certificates_enabled);
 
     return rv;
 }
@@ -723,24 +745,28 @@ int mgs_hook_authz(request_rec * r)
  */
 #define MGS_SIDE ((side==0)?"SSL_SERVER":"SSL_CLIENT")
 static void
-mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt cert, int side, int export_certificates_enabled)
+mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt cert, int side,
+			 int export_certificates_enabled)
 {
     unsigned char sbuf[64];	/* buffer to hold serials */
     char buf[AP_IOBUFSIZE];
     const char *tmp;
+    char *tmp2;
     size_t len;
-    int alg;
+    int ret, i;
 
     apr_table_t *env = r->subprocess_env;
 
     if (export_certificates_enabled != 0) {
-      char cert_buf[10*1024];
-      len = sizeof(cert_buf);
+	char cert_buf[10 * 1024];
+	len = sizeof(cert_buf);
 
-      if (gnutls_x509_crt_export(cert, GNUTLS_X509_FMT_PEM, cert_buf, &len) >= 0)
-        apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_CERT", NULL),
-		   apr_pstrmemdup(r->pool, cert_buf, len));
-      
+	if (gnutls_x509_crt_export
+	    (cert, GNUTLS_X509_FMT_PEM, cert_buf, &len) >= 0)
+	    apr_table_setn(env,
+			   apr_pstrcat(r->pool, MGS_SIDE, "_CERT", NULL),
+			   apr_pstrmemdup(r->pool, cert_buf, len));
+
     }
 
     len = sizeof(buf);
@@ -759,6 +785,15 @@ mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt cert, int side, int ex
     apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_M_SERIAL", NULL),
 		   apr_pstrdup(r->pool, tmp));
 
+    ret = gnutls_x509_crt_get_version(cert);
+    if (ret > 0)
+	apr_table_setn(env,
+		       apr_pstrcat(r->pool, MGS_SIDE, "_M_VERSION", NULL),
+		       apr_psprintf(r->pool, "%u", ret));
+
+    apr_table_setn(env,
+       apr_pstrcat(r->pool, MGS_SIDE, "_S_TYPE", NULL), "X.509");
+
     tmp =
 	mgs_time2sz(gnutls_x509_crt_get_expiration_time
 		    (cert), buf, sizeof(buf));
@@ -771,16 +806,50 @@ mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt cert, int side, int ex
     apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_V_START", NULL),
 		   apr_pstrdup(r->pool, tmp));
 
-    alg = gnutls_x509_crt_get_signature_algorithm( cert);
-    if (alg >= 0) {
-      apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_A_SIG", NULL),
-          gnutls_sign_algorithm_get_name( alg));
+    ret = gnutls_x509_crt_get_signature_algorithm(cert);
+    if (ret >= 0) {
+	apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_A_SIG", NULL),
+		       gnutls_sign_algorithm_get_name(ret));
     }
 
-    alg = gnutls_x509_crt_get_pk_algorithm( cert, NULL);
-    if (alg >= 0) {
-      apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_A_KEY", NULL),
-          gnutls_pk_algorithm_get_name( alg));
+    ret = gnutls_x509_crt_get_pk_algorithm(cert, NULL);
+    if (ret >= 0) {
+	apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_A_KEY", NULL),
+		       gnutls_pk_algorithm_get_name(ret));
+    }
+
+    /* export all the alternative names (DNS, RFC822 and URI) */
+    for (i = 0; !(ret < 0); i++) {
+	len = 0;
+	ret = gnutls_x509_crt_get_subject_alt_name(cert, i,
+						   NULL, &len, NULL);
+
+	if (ret == GNUTLS_E_SHORT_MEMORY_BUFFER && len > 1) {
+	    tmp2 = apr_palloc(r->pool, len + 1);
+
+	    ret =
+		gnutls_x509_crt_get_subject_alt_name(cert, i, tmp2, &len,
+						     NULL);
+	    tmp2[len] = 0;
+
+	    if (ret == GNUTLS_SAN_DNSNAME) {
+		apr_table_setn(env,
+		       apr_psprintf(r->pool, "%s_S_SAN%u", MGS_SIDE, i), 
+		       apr_psprintf(r->pool, "DNSNAME:%s", tmp2));
+	    } else if (ret == GNUTLS_SAN_RFC822NAME) {
+		apr_table_setn(env,
+		       apr_psprintf(r->pool, "%s_S_SAN%u", MGS_SIDE, i), 
+		       apr_psprintf(r->pool, "RFC822NAME:%s", tmp2));
+	    } else if (ret == GNUTLS_SAN_URI) {
+		apr_table_setn(env,
+		       apr_psprintf(r->pool, "%s_S_SAN%u", MGS_SIDE, i), 
+		       apr_psprintf(r->pool, "URI:%s", tmp2));
+            } else {
+		apr_table_setn(env,
+		       apr_psprintf(r->pool, "%s_S_SAN%u", MGS_SIDE, i), 
+		       "UNSUPPORTED");
+            }
+	}
     }
 
 
@@ -887,13 +956,16 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
 //    mgs_hook_fixups(r);
 //    rv = mgs_authz_lua(r);
 
-    mgs_add_common_cert_vars(r, cert, 1, ctxt->sc->export_certificates_enabled);
+    mgs_add_common_cert_vars(r, cert, 1,
+			     ctxt->sc->export_certificates_enabled);
 
     {
-      /* days remaining */
-      unsigned long remain = (apr_time_sec(expiration_time) - apr_time_sec(cur_time))/86400;
-      apr_table_setn(r->subprocess_env, "SSL_CLIENT_V_REMAIN", 
-          apr_psprintf(r->pool, "%lu", remain));
+	/* days remaining */
+	unsigned long remain =
+	    (apr_time_sec(expiration_time) -
+	     apr_time_sec(cur_time)) / 86400;
+	apr_table_setn(r->subprocess_env, "SSL_CLIENT_V_REMAIN",
+		       apr_psprintf(r->pool, "%lu", remain));
     }
 
     if (status == 0 && expired == 0) {
