@@ -1,5 +1,8 @@
 /* config.in.  Generated from configure.ac by autoheader.  */
 
+/* Define to 1 if mod_status.h and the mod_Status hook are available */
+#undef HAVE_MOD_STATUS_H
+
 /* Name of package */
 #undef PACKAGE
 

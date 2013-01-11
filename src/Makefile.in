@@ -62,7 +62,9 @@ libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES)
 libmod_gnutls_la_LIBADD =
 am_libmod_gnutls_la_OBJECTS = libmod_gnutls_la-mod_gnutls.lo \
-	libmod_gnutls_la-gnutls_io.lo libmod_gnutls_la-gnutls_cache.lo
+	libmod_gnutls_la-gnutls_io.lo libmod_gnutls_la-gnutls_cache.lo \
+	libmod_gnutls_la-gnutls_config.lo \
+	libmod_gnutls_la-gnutls_hooks.lo
 libmod_gnutls_la_OBJECTS = $(am_libmod_gnutls_la_OBJECTS)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)/include
 depcomp = $(SHELL) $(top_srcdir)/config/depcomp
@@ -196,7 +198,7 @@ target_cpu = @target_cpu@
 target_os = @target_os@
 target_vendor = @target_vendor@
 CLEANFILES = .libs/libmod_gnutls *~
-libmod_gnutls_la_SOURCES = mod_gnutls.c gnutls_io.c gnutls_cache.c
+libmod_gnutls_la_SOURCES = mod_gnutls.c gnutls_io.c gnutls_cache.c gnutls_config.c gnutls_hooks.c
 libmod_gnutls_la_CFLAGS = -Wall ${MODULE_CFLAGS}
 libmod_gnutls_la_LDFLAGS = -rpath ${AP_LIBEXECDIR} -module -avoid-version ${MODULE_LIBS}
 lib_LTLIBRARIES = libmod_gnutls.la
@@ -270,6 +272,8 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmod_gnutls_la-gnutls_cache.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmod_gnutls_la-gnutls_config.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmod_gnutls_la-gnutls_hooks.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmod_gnutls_la-gnutls_io.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmod_gnutls_la-mod_gnutls.Plo@am__quote@
 
@@ -314,6 +318,20 @@ libmod_gnutls_la-gnutls_cache.lo: gnutls_cache.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='gnutls_cache.c' object='libmod_gnutls_la-gnutls_cache.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libmod_gnutls_la_CFLAGS) $(CFLAGS) -c -o libmod_gnutls_la-gnutls_cache.lo `test -f 'gnutls_cache.c' || echo '$(srcdir)/'`gnutls_cache.c
+
+libmod_gnutls_la-gnutls_config.lo: gnutls_config.c
+@am__fastdepCC_TRUE@	if $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libmod_gnutls_la_CFLAGS) $(CFLAGS) -MT libmod_gnutls_la-gnutls_config.lo -MD -MP -MF "$(DEPDIR)/libmod_gnutls_la-gnutls_config.Tpo" -c -o libmod_gnutls_la-gnutls_config.lo `test -f 'gnutls_config.c' || echo '$(srcdir)/'`gnutls_config.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/libmod_gnutls_la-gnutls_config.Tpo" "$(DEPDIR)/libmod_gnutls_la-gnutls_config.Plo"; else rm -f "$(DEPDIR)/libmod_gnutls_la-gnutls_config.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='gnutls_config.c' object='libmod_gnutls_la-gnutls_config.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libmod_gnutls_la_CFLAGS) $(CFLAGS) -c -o libmod_gnutls_la-gnutls_config.lo `test -f 'gnutls_config.c' || echo '$(srcdir)/'`gnutls_config.c
+
+libmod_gnutls_la-gnutls_hooks.lo: gnutls_hooks.c
+@am__fastdepCC_TRUE@	if $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libmod_gnutls_la_CFLAGS) $(CFLAGS) -MT libmod_gnutls_la-gnutls_hooks.lo -MD -MP -MF "$(DEPDIR)/libmod_gnutls_la-gnutls_hooks.Tpo" -c -o libmod_gnutls_la-gnutls_hooks.lo `test -f 'gnutls_hooks.c' || echo '$(srcdir)/'`gnutls_hooks.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/libmod_gnutls_la-gnutls_hooks.Tpo" "$(DEPDIR)/libmod_gnutls_la-gnutls_hooks.Plo"; else rm -f "$(DEPDIR)/libmod_gnutls_la-gnutls_hooks.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='gnutls_hooks.c' object='libmod_gnutls_la-gnutls_hooks.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libmod_gnutls_la_CFLAGS) $(CFLAGS) -c -o libmod_gnutls_la-gnutls_hooks.lo `test -f 'gnutls_hooks.c' || echo '$(srcdir)/'`gnutls_hooks.c
 
 mostlyclean-libtool:
 	-rm -f *.lo
