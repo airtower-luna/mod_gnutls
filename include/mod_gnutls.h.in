@@ -29,6 +29,8 @@
 
 #include <gcrypt.h>
 #include <gnutls/gnutls.h>
+#include <gnutls/extra.h>
+#include <gnutls/openpgp.h>
 #include <gnutls/x509.h>
 
 #ifndef __mod_gnutls_h_inc
@@ -94,6 +96,8 @@ typedef struct
     gnutls_x509_crt_t certs_x509[MAX_CHAIN_SIZE]; /* A certificate chain */
     unsigned int certs_x509_num;
     gnutls_x509_privkey_t privkey_x509;
+    gnutls_openpgp_crt_t cert_pgp; /* A certificate chain */
+    gnutls_openpgp_privkey_t privkey_pgp;
     int enabled;
     /* whether to send the PEM encoded certificates
      * to CGIs
@@ -108,6 +112,7 @@ typedef struct
     const char* srp_tpasswd_file;
     const char* srp_tpasswd_conf_file;
     gnutls_x509_crt_t ca_list[MAX_CA_CRTS];
+    gnutls_openpgp_keyring_t pgp_list;
     unsigned int ca_list_size;
     int client_verify_mode;
 } mgs_srvconf_rec;
@@ -254,6 +259,12 @@ const char *mgs_set_cert_file(cmd_parms * parms, void *dummy,
 const char *mgs_set_key_file(cmd_parms * parms, void *dummy,
                              const char *arg);
 
+const char *mgs_set_pgpcert_file(cmd_parms * parms, void *dummy,
+                                        const char *arg);
+
+const char *mgs_set_pgpkey_file(cmd_parms * parms, void *dummy,
+                             const char *arg);
+
 const char *mgs_set_cache(cmd_parms * parms, void *dummy,
                           const char *type, const char* arg);
 
@@ -264,6 +275,9 @@ const char *mgs_set_client_verify(cmd_parms * parms, void *dummy,
                                   const char *arg);
 
 const char *mgs_set_client_ca_file(cmd_parms * parms, void *dummy,
+                                   const char *arg);
+
+const char *mgs_set_keyring_file(cmd_parms * parms, void *dummy,
                                    const char *arg);
 
 const char *mgs_set_enabled(cmd_parms * parms, void *dummy,

@@ -1,5 +1,6 @@
 /**
  *  Copyright 2004-2005 Paul Querna
+ *  Copyright 2007 Nikos Mavrogiannopoulos
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -202,6 +203,84 @@ const char *mgs_set_key_file(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
+const char *mgs_set_pgpcert_file(cmd_parms * parms, void *dummy,
+			      const char *arg)
+{
+    int ret;
+    gnutls_datum_t data;
+    const char *file;
+    apr_pool_t *spool;
+    mgs_srvconf_rec *sc =
+	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
+						 module_config,
+						 &gnutls_module);
+    apr_pool_create(&spool, parms->pool);
+
+    file = ap_server_root_relative(spool, arg);
+
+    if (load_datum_from_file(spool, file, &data) != 0) {
+	return apr_psprintf(parms->pool, "GnuTLS: Error Reading "
+			    "Certificate '%s'", file);
+    }
+
+    ret = gnutls_openpgp_crt_init( &sc->cert_pgp);
+    if (ret < 0) {
+	return apr_psprintf(parms->pool, "GnuTLS: Failed to Init "
+			    "PGP Certificate: (%d) %s", ret,
+			    gnutls_strerror(ret));
+    }
+      
+    ret =
+	gnutls_openpgp_crt_import(sc->cert_pgp, &data, GNUTLS_OPENPGP_FMT_BASE64);
+    if (ret < 0) {
+	return apr_psprintf(parms->pool, "GnuTLS: Failed to Import "
+			    "PGP Certificate '%s': (%d) %s", file, ret,
+			    gnutls_strerror(ret));
+    }
+
+    apr_pool_destroy(spool);
+    return NULL;
+}
+
+const char *mgs_set_pgpkey_file(cmd_parms * parms, void *dummy,
+			     const char *arg)
+{
+    int ret;
+    gnutls_datum_t data;
+    const char *file;
+    apr_pool_t *spool;
+    mgs_srvconf_rec *sc =
+	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
+						 module_config,
+						 &gnutls_module);
+    apr_pool_create(&spool, parms->pool);
+
+    file = ap_server_root_relative(spool, arg);
+
+    if (load_datum_from_file(spool, file, &data) != 0) {
+	return apr_psprintf(parms->pool, "GnuTLS: Error Reading "
+			    "Private Key '%s'", file);
+    }
+
+    ret = gnutls_openpgp_privkey_init(&sc->privkey_pgp);
+    if (ret < 0) {
+	return apr_psprintf(parms->pool, "GnuTLS: Failed to initialize"
+			    ": (%d) %s", ret, gnutls_strerror(ret));
+    }
+
+    ret =
+	gnutls_openpgp_privkey_import(sc->privkey_pgp, &data,
+				   GNUTLS_OPENPGP_FMT_BASE64, NULL, 0);
+    if (ret != 0) {
+	return apr_psprintf(parms->pool, "GnuTLS: Failed to Import "
+			    "PGP Private Key '%s': (%d) %s", file, ret,
+			    gnutls_strerror(ret));
+    }
+    apr_pool_destroy(spool);
+    return NULL;
+}
+
+
 #ifdef ENABLE_SRP
 
 const char *mgs_set_srp_tpasswd_file(cmd_parms * parms, void *dummy,
@@ -347,6 +426,44 @@ const char *mgs_set_client_ca_file(cmd_parms * parms, void *dummy,
     if (rv < 0) {
 	return apr_psprintf(parms->pool, "GnuTLS: Failed to load "
 			    "Client CA File '%s': (%d) %s", file, rv,
+			    gnutls_strerror(rv));
+    }
+
+    apr_pool_destroy(spool);
+    return NULL;
+}
+
+const char *mgs_set_keyring_file(cmd_parms * parms, void *dummy,
+				   const char *arg)
+{
+    int rv;
+    const char *file;
+    apr_pool_t *spool;
+    gnutls_datum_t data;
+
+    mgs_srvconf_rec *sc =
+	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
+						 module_config,
+						 &gnutls_module);
+    apr_pool_create(&spool, parms->pool);
+
+    file = ap_server_root_relative(spool, arg);
+
+    if (load_datum_from_file(spool, file, &data) != 0) {
+	return apr_psprintf(parms->pool, "GnuTLS: Error Reading "
+			    "Keyring File '%s'", file);
+    }
+
+    rv = gnutls_openpgp_keyring_init(&sc->pgp_list);
+    if (rv < 0) {
+	return apr_psprintf(parms->pool, "GnuTLS: Failed to initialize"
+			    "keyring: (%d) %s", rv, gnutls_strerror(rv));
+    }
+
+    rv = gnutls_openpgp_keyring_import(sc->pgp_list, &data, GNUTLS_OPENPGP_FMT_BASE64);
+    if (rv < 0) {
+	return apr_psprintf(parms->pool, "GnuTLS: Failed to load "
+			    "Keyring File '%s': (%d) %s", file, rv,
 			    gnutls_strerror(rv));
     }
 
