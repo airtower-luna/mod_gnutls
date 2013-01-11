@@ -486,7 +486,12 @@ void mgs_hook_child_init(apr_pool_t * p, server_rec * s)
 
 const char *mgs_hook_http_scheme(const request_rec * r)
 {
-    mgs_srvconf_rec *sc =
+    mgs_srvconf_rec *sc;
+    
+    if (r == NULL)
+        return NULL;
+    
+    sc =
 	(mgs_srvconf_rec *) ap_get_module_config(r->server->module_config,
 						 &gnutls_module);
 
@@ -500,7 +505,12 @@ const char *mgs_hook_http_scheme(const request_rec * r)
 
 apr_port_t mgs_hook_default_port(const request_rec * r)
 {
-    mgs_srvconf_rec *sc =
+    mgs_srvconf_rec *sc;
+    
+    if (r == NULL)
+        return 0;
+    
+    sc =
 	(mgs_srvconf_rec *) ap_get_module_config(r->server->module_config,
 						 &gnutls_module);
 
@@ -578,6 +588,9 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
     server_rec *s;
     mgs_srvconf_rec *tsc;
 #endif
+
+    if (session == NULL)
+        return NULL;
 
     _gnutls_log(debug_log_fp,   "%s: %d\n", __func__, __LINE__);
     ctxt = gnutls_transport_get_ptr(session);
@@ -693,12 +706,18 @@ static mgs_handle_t *create_gnutls_handle(apr_pool_t * pool, conn_rec * c)
 int mgs_hook_pre_connection(conn_rec * c, void *csd)
 {
     mgs_handle_t *ctxt;
-    mgs_srvconf_rec *sc =
+    mgs_srvconf_rec *sc;
+
+    _gnutls_log(debug_log_fp,   "%s: %d\n", __func__, __LINE__);
+    
+    if (c == NULL)
+        return DECLINED;
+    
+    sc =
 	(mgs_srvconf_rec *) ap_get_module_config(c->base_server->
 						 module_config,
 						 &gnutls_module);
 
-    _gnutls_log(debug_log_fp,   "%s: %d\n", __func__, __LINE__);
     if (!(sc && (sc->enabled == GNUTLS_ENABLED_TRUE))) {
 	return DECLINED;
     }
@@ -732,13 +751,16 @@ int mgs_hook_fixups(request_rec * r)
     mgs_handle_t *ctxt;
     int rv = OK;
 
+    if (r == NULL)
+        return DECLINED;
+
     _gnutls_log(debug_log_fp,   "%s: %d\n", __func__, __LINE__);
     apr_table_t *env = r->subprocess_env;
 
     ctxt =
 	ap_get_module_config(r->connection->conn_config, &gnutls_module);
 
-    if (!ctxt) {
+    if (!ctxt || ctxt->session == NULL) {
 	return DECLINED;
     }
 
@@ -804,14 +826,19 @@ int mgs_hook_authz(request_rec * r)
 {
     int rv;
     mgs_handle_t *ctxt;
-    mgs_dirconf_rec *dc = ap_get_module_config(r->per_dir_config,
+    mgs_dirconf_rec *dc;
+    
+    if (r == NULL)
+        return DECLINED;
+    
+    dc = ap_get_module_config(r->per_dir_config,
 					       &gnutls_module);
 
     _gnutls_log(debug_log_fp,   "%s: %d\n", __func__, __LINE__);
     ctxt =
 	ap_get_module_config(r->connection->conn_config, &gnutls_module);
 
-    if (!ctxt) {
+    if (!ctxt || ctxt->session == NULL) {
 	return DECLINED;
     }
 
@@ -874,6 +901,9 @@ mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, int side,
     char *tmp2;
     size_t len;
     int ret, i;
+
+    if (r == NULL)
+        return;
 
     apr_table_t *env = r->subprocess_env;
 
@@ -983,6 +1013,9 @@ mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t cert, int side
     const char *tmp;
     size_t len;
     int ret;
+    
+    if (r == NULL)
+        return;
 
     _gnutls_log(debug_log_fp,   "%s: %d\n", __func__, __LINE__);
     apr_table_t *env = r->subprocess_env;
@@ -1043,14 +1076,17 @@ mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t cert, int side
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
 {
     const gnutls_datum_t *cert_list;
-    unsigned int cert_list_size, status, expired;
+    unsigned int cert_list_size, status;
     int rv = GNUTLS_E_NO_CERTIFICATE_FOUND, ret;
     unsigned int ch_size = 0;
     union {
       gnutls_x509_crt_t x509[MAX_CHAIN_SIZE];
       gnutls_openpgp_crt_t pgp;
     } cert;
-    apr_time_t activation_time, expiration_time, cur_time;
+    apr_time_t expiration_time, cur_time;
+
+    if (r == NULL || ctxt == NULL || ctxt->session == NULL)
+        return HTTP_FORBIDDEN;
 
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
     cert_list =
@@ -1116,8 +1152,6 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
     if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_X509) {
         apr_time_ansi_put(&expiration_time,
 		      gnutls_x509_crt_get_expiration_time(cert.x509[0]));
-        apr_time_ansi_put(&activation_time,
-		      gnutls_x509_crt_get_activation_time(cert.x509[0]));
 
         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
             "GnuTLS: Verifying list of  %d certificate(s)", ch_size);
@@ -1127,8 +1161,6 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
     } else {
         apr_time_ansi_put(&expiration_time,
 		      gnutls_openpgp_crt_get_expiration_time(cert.pgp));
-        apr_time_ansi_put(&activation_time,
-		      gnutls_openpgp_crt_get_creation_time(cert.pgp));
 
         rv = gnutls_openpgp_crt_verify_ring(cert.pgp, ctxt->sc->pgp_list,
                       0, &status);
@@ -1150,23 +1182,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
      */
     /* ret = gnutls_x509_crt_check_revocation(crt, crl_list, crl_list_size); */
 
-    expired = 0;
     cur_time = apr_time_now();
-    if (activation_time > cur_time) {
-	ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-		      "GnuTLS: Failed to Verify Peer: "
-		      "Peer Certificate is not yet activated.");
-	expired = 1;
-    }
-
-    if (gnutls_certificate_type_get( ctxt->session) != GNUTLS_CRT_OPENPGP || expiration_time != 0) {
-        if (expiration_time < cur_time) {
-	    ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-		      "GnuTLS: Failed to Verify Peer: "
-		      "Peer Certificate is expired.");
-            expired = 1;
-        }
-    }
 
     if (status & GNUTLS_CERT_SIGNER_NOT_FOUND) {
 	ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
@@ -1176,6 +1192,16 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
     if (status & GNUTLS_CERT_SIGNER_NOT_CA) {
 	ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
 		      "GnuTLS: Peer's Certificate signer is not a CA");
+    }
+
+    if (status & GNUTLS_CERT_INSECURE_ALGORITHM) {
+	ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+		      "GnuTLS: Peer's Certificate is using insecure algorithms");
+    }
+
+    if (status & GNUTLS_CERT_EXPIRED || status & GNUTLS_CERT_NOT_ACTIVATED) {
+	ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+		      "GnuTLS: Peer's Certificate signer is expired or not yet activated");
     }
 
     if (status & GNUTLS_CERT_INVALID) {
@@ -1202,7 +1228,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
 		       apr_psprintf(r->pool, "%lu", remain));
     }
 
-    if (status == 0 && expired == 0) {
+    if (status == 0) {
 	apr_table_setn(r->subprocess_env, "SSL_CLIENT_VERIFY", "SUCCESS");
 	ret = OK;
     } else {

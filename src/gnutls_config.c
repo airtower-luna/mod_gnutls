@@ -606,6 +606,7 @@ void *mgs_config_server_create(apr_pool_t * p, server_rec * s)
     sc->cache_timeout = apr_time_from_sec(300);
     sc->cache_type = mgs_cache_none;
     sc->cache_config = ap_server_root_relative(p, "conf/gnutls_cache");
+    sc->tickets = 1; /* by default enable session tickets */
 
     sc->client_verify_mode = GNUTLS_CERT_IGNORE;
 
