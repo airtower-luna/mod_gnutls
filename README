@@ -54,12 +54,11 @@ GnuTLSCache dbm conf/gnutls_cache
     GnuTLSEnable On
 
     # This is the Private key for your server.
-    GnuTLSKeyFile conf/server.key
+    GnuTLSX509KeyFile conf/server.key
 
     # This is the Server Certificate.  
-    GnuTLSCertificateFile conf/server.cert
+    GnuTLSX509CertificateFile conf/server.cert
 </VirtualHost>
-
 
 # a more advanced configuration
 GnuTLSCache dbm "/var/cache/www-tls-cache/cache"
@@ -73,8 +72,8 @@ NameVirtualHost 1.2.3.4:443
 # To export exactly the same environment variables as mod_ssl to CGI scripts.
 	GNUTLSExportCertificates on
 
-	GnuTLSCertificateFile /etc/apache2/server-cert.pem
-	GnuTLSKeyFile /etc/apache2/server-key.pem
+	GnuTLSX509CertificateFile /etc/apache2/server-cert.pem
+	GnuTLSX509KeyFile /etc/apache2/server-key.pem
 
 # To enable SRP you must have these files installed. Check the gnutls srptool.
 	GnuTLSSRPPasswdFile /etc/apache2/tpasswd
@@ -84,6 +83,29 @@ NameVirtualHost 1.2.3.4:443
 # GnuTLSClientVerify could be ignore or require. The GnuTLSClientCAFile
 # contains the CAs to verify client certificates.
 	GnuTLSClientVerify request
-	GnuTLSClientCAFile ca.pem
+	GnuTLSX509CAFile ca.pem
 	...
+</VirtualHost>
+
+# A setup for OpenPGP and X.509 authentication
+<VirtualHost 1.2.3.4:443>
+	Servername crystal.lan:443
+        GnuTLSEnable on
+	GnuTLSPriorities NORMAL:+COMP-NULL
+
+# setup the openpgp keys
+	GnuTLSPGPCertificateFile /etc/apache2/test.pub.asc
+	GnuTLSPGPKeyFile /etc/apache2/test.sec.asc
+
+# and the X.509 keys
+	GnuTLSCertificateFile /etc/apache2/server-cert.pem
+	GnuTLSKeyFile /etc/apache2/server-key.pem
+	GnuTLSClientVerify ignore
+
+# To avoid using the default DH params
+	GnuTLSDHFile /etc/apache2/dh.pem
+
+# these are only needed if GnuTLSClientVerify != ignore
+	GnuTLSClientCAFile ca.pem
+	GnuTLSPGPKeyringFile /etc/apache2/ring.asc
 </VirtualHost>
