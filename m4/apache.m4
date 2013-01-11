@@ -60,12 +60,20 @@ AC_ARG_ENABLE(
                     APR_CONFIG="`$APXS_BIN -q APR_BINDIR 2>/dev/null`/apr-config"
                 fi
                 APR_INCLUDES=`$APR_CONFIG --includes 2>/dev/null`
+                APR_LDFLAGS=`$APR_CONFIG --link-ld 2>/dev/null`
+                APR_LIBS=`$APR_CONFIG --libs 2>/dev/null`
+                APR_LIBTOOL=`$APR_CONFIG --link-libtool 2>/dev/null`
+                APR_CPPFLAGS=`$APR_CONFIG --cppflags 2>/dev/null`
+                APR_CFLAGS=`$APR_CONFIG --cflags 2>/dev/null`
                 APR_VERSION=`$APR_CONFIG --version 2>/dev/null`
                 APU_CONFIG="`$APXS_BIN -q APU_BINDIR 2>/dev/null`/apu-1-config"
                 if test ! -x $APU_CONFIG; then
                     APU_CONFIG="`$APXS_BIN -q APU_BINDIR 2>/dev/null`/apu-config"
                 fi
                 APU_INCLUDES=`$APU_CONFIG --includes 2>/dev/null`
+                APU_LDFLAGS=`$APU_CONFIG --link-ld 2>/dev/null`
+                APU_LIBS=`$APU_CONFIG --libs 2>/dev/null`
+                APU_LIBTOOL=`$APU_CONFIG --link-libtool 2>/dev/null`
                 APU_VERSION=`$APU_CONFIG --version 2>/dev/null`
 
                 AC_MSG_CHECKING(for Apache 2.0 version >= $min_apache20_version)
@@ -90,8 +98,16 @@ AC_ARG_ENABLE(
             if test "$min_apache13_version" != "no" -a "x$AP_VERSION" = "x"; then
                 APR_INCLUDES=""
                 APR_VERSION=""
+                APR_LDFLAGS=""
+                APR_LIBS=""
+                APR_LIBTOOL=""
+                APR_CFLAGS=""
+                APR_CPPFLAGS=""
                 APU_INCLUDES=""
                 APU_VERSION=""
+                APU_LDFLAGS=""
+                APU_LIBS=""
+                APU_LIBTOOL=""
                 AC_MSG_CHECKING(for Apache 1.3 version >= $min_apache13_version)
                 TEST_APACHE_VERSION(13,$min_apache13_version,
                     AC_MSG_RESULT(yes)
@@ -106,6 +122,7 @@ AC_ARG_ENABLE(
                 )
             fi
         fi
+        AC_CHECK_DECL([DEFAULT_EXP_LIBEXECDIR],,[AC_DEFINE_UNQUOTED([DEFAULT_EXP_LIBEXECDIR],["$AP_LIBEXECDIR"],[Default Module LibExec directory])])
         AC_SUBST(AP_DEFS)
         AC_SUBST(AP_PREFIX)
         AC_SUBST(AP_CFLAGS)
@@ -118,7 +135,15 @@ AC_ARG_ENABLE(
         AC_SUBST(AP_BINDIR)
         AC_SUBST(AP_SBINDIR)
         AC_SUBST(APR_INCLUDES)
+        AC_SUBST(APR_LDFLAGS)
+        AC_SUBST(APR_LIBS)
+        AC_SUBST(APR_LIBTOOL)
+        AC_SUBST(APR_CPPFLAGS)
+        AC_SUBST(APR_CFLAGS)
         AC_SUBST(APU_INCLUDES)
+        AC_SUBST(APU_LDFLAGS)
+        AC_SUBST(APU_LIBS)
+        AC_SUBST(APU_LIBTOOL)
         AC_SUBST(APXS_EXTENSION)
         AC_SUBST(APXS_BIN)
         AC_SUBST(APXS_CFLAGS)

@@ -17,7 +17,6 @@
 
 #include "mod_gnutls.h"
 
-
 static void gnutls_hooks(apr_pool_t * p)
 {
     ap_hook_pre_connection(mgs_hook_pre_connection, NULL, NULL,
@@ -80,6 +79,7 @@ static const command_rec mgs_config_cmds[] = {
                   NULL,
                   RSRC_CONF,
                   "SSL Server SRP Password file"),
+#ifdef ENABLE_SRP
     AP_INIT_TAKE1("GnuTLSSRPPasswdFile", mgs_set_srp_tpasswd_file,
                   NULL,
                   RSRC_CONF,
@@ -88,6 +88,7 @@ static const command_rec mgs_config_cmds[] = {
                   NULL,
                   RSRC_CONF,
                   "SSL Server SRP Parameters file"),
+#endif
     AP_INIT_TAKE1("GnuTLSCacheTimeout", mgs_set_cache_timeout,
                   NULL,
                   RSRC_CONF,
