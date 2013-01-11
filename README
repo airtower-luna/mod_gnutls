@@ -61,7 +61,7 @@ GnuTLSCache dbm conf/gnutls_cache
 </VirtualHost>
 
 
-# a more advance configuration
+# a more advanced configuration
 GnuTLSCache dbm "/var/cache/www-tls-cache/cache"
 GnuTLSCacheTimeout 500
 GnuTLSProtocols TLS1.1 TLS1.0 SSL3.0

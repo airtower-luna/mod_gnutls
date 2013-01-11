@@ -329,90 +329,28 @@ const char *mgs_set_export_certificates_enabled(cmd_parms * parms, void *dummy,
 }
 
 
-const char *mgs_set_mac(cmd_parms * parms, void *dummy, const char *arg)
+const char *mgs_set_priorities(cmd_parms * parms, void *dummy, const char *arg)
 {
+    int ret;
+    const char *err;
     mgs_srvconf_rec *sc =
 	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
 						 module_config,
 						 &gnutls_module);
 
-    int ret = gnutls_mac_convert_priority( sc->macs, MAX_CIPHERS, arg, ' ');
 
-    if (ret < 0)
-	return "GnuTLSMACAlgorithms must be a comma separated list of SHA-1 or MD5";
-
-    return NULL;
-}
-
-const char *mgs_set_kx(cmd_parms * parms, void *dummy, const char *arg)
-{
-    mgs_srvconf_rec *sc =
-	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
-						 module_config,
-						 &gnutls_module);
-
-    int ret = gnutls_kx_convert_priority( sc->key_exchange, MAX_CIPHERS, arg, ' ');
-
-    if (ret < 0) 
-        return "GnuTLSKeyExchangeAlgorithms must be a comma separated list of RSA, RSA-EXPORT, DHE-RSA, DHE-DSS, SRP, SRP-RSA, SRP-DSS, ANON";
+    ret = gnutls_priority_init( &sc->priorities, arg, &err);
+    if (ret < 0) {
+      if (ret == GNUTLS_E_INVALID_REQUEST)
+	return apr_psprintf(parms->pool, "GnuTLS: Syntax error parsing priorities string at: %s", err);
+      return "Error setting priorities";
+    }
 
     return NULL;
 }
-
-
-const char *mgs_set_ciphers(cmd_parms * parms, void *dummy,
-			    const char *arg)
-{
-    mgs_srvconf_rec *sc =
-	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
-						 module_config,
-						 &gnutls_module);
-
-    int ret = gnutls_cipher_convert_priority( sc->ciphers, MAX_CIPHERS, arg, ' ');
-
-    if (ret < 0) 
-        return "GnuTLSCiphers must be a comma separated list of AES-128-CBC, CAMELIA-128-CBC, ARCFOUR-128, 3DES-CBC or ARCFOUR-40";
-
-    return NULL;
-}
-
-
-const char *mgs_set_compression(cmd_parms * parms, void *dummy,
-				const char *arg)
-{
-    mgs_srvconf_rec *sc =
-	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
-						 module_config,
-						 &gnutls_module);
-
-    int ret = gnutls_compression_convert_priority( sc->compression, MAX_CIPHERS, arg, ' ');
-
-    if (ret < 0) 
-	return "GnuTLSCompressionMethods must be a comma separated list of NULL or DEFLATE";
-
-    return NULL;
-}
-
-const char *mgs_set_protocols(cmd_parms * parms, void *dummy,
-				const char *arg)
-{
-    mgs_srvconf_rec *sc =
-	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
-						 module_config,
-						 &gnutls_module);
-
-    int ret = gnutls_protocol_convert_priority( sc->protocol, MAX_CIPHERS, arg, ' ');
-
-    if (ret < 0) 
-        return "GnuTLSProtocols must be a comma separated list of TLS1.1, TLS1.0 or SSL3.0";
-
-    return NULL;
-}
-
 
 void *mgs_config_server_create(apr_pool_t * p, server_rec * s)
 {
-    int i;
     mgs_srvconf_rec *sc = apr_pcalloc(p, sizeof(*sc));
 
     sc->enabled = GNUTLS_ENABLED_FALSE;
@@ -433,26 +371,6 @@ void *mgs_config_server_create(apr_pool_t * p, server_rec * s)
     sc->rsa_params_file = ap_server_root_relative(p, "conf/rsafile");
 
     sc->client_verify_mode = GNUTLS_CERT_IGNORE;
-
-    if (sc->protocol[0]==0) {
-      i = 0;
-      sc->protocol[i++] = GNUTLS_TLS1_1;
-      sc->protocol[i++] = GNUTLS_TLS1;
-      sc->protocol[i++] = GNUTLS_SSL3;
-      sc->protocol[i] = 0;
-    }
-
-    if (sc->compression[0]==0) {
-      i = 0;
-      sc->compression[i++] = GNUTLS_COMP_NULL;
-      sc->compression[i] = 0;
-    }
-
-    if (sc->cert_types[0]==0) {
-      i = 0;
-      sc->cert_types[i++] = GNUTLS_CRT_X509;
-      sc->cert_types[i] = 0;
-    }
 
     return sc;
 }

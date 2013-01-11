@@ -124,10 +124,14 @@ load_params(const char *file, server_rec * s, apr_pool_t * pool)
     return ret;
 }
 
+/* We don't support openpgp certificates, yet */
+const static int cert_type_prio[2] = { GNUTLS_CRT_X509, 0 };
+
 static int mgs_select_virtual_server_cb( gnutls_session_t session)
 {
     mgs_handle_t *ctxt;
     mgs_srvconf_rec *tsc;
+    int ret;
 
     ctxt = gnutls_transport_get_ptr(session);
 
@@ -154,26 +158,19 @@ static int mgs_select_virtual_server_cb( gnutls_session_t session)
          ctxt->sc->srp_creds);
     }
 
-    /* enable the default priorities and override them later on
-     */
-    gnutls_set_default_priority( session);
-
     /* update the priorities - to avoid negotiating a ciphersuite that is not
-     * enabled on this virtual server
+     * enabled on this virtual server. Note that here we ignore the version
+     * negotiation.
      */
-    if (ctxt->sc->ciphers[0] != 0)
-      gnutls_cipher_set_priority(session, ctxt->sc->ciphers);
-    if (ctxt->sc->compression[0] != 0)
-      gnutls_compression_set_priority(session, ctxt->sc->compression);
-    if (ctxt->sc->key_exchange[0] != 0)
-      gnutls_kx_set_priority(session, ctxt->sc->key_exchange);
-    if (ctxt->sc->macs[0] != 0)
-      gnutls_mac_set_priority(session, ctxt->sc->macs);
-    if (ctxt->sc->cert_types[0] != 0)
-      gnutls_certificate_type_set_priority(session, ctxt->sc->cert_types);
+    ret = gnutls_priority_set( session, ctxt->sc->priorities);
+    gnutls_certificate_type_set_priority( session, cert_type_prio);
+    
+    
+    /* actually it shouldn't fail since we have checked at startup */
+    if (ret < 0) return ret;
 
-    /* allow separate caches per virtual host. Actually allowing the same is not
-     * a good idea, especially if they have different security requirements.
+    /* allow separate caches per virtual host. Actually allowing the same is a
+     * bad idea, since they might have different security requirements.
      */
     mgs_cache_session_init(ctxt);
 
@@ -534,7 +531,9 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
 }
 
 
-
+static const int protocol_priority[] = {
+  GNUTLS_TLS1_1, GNUTLS_TLS1_0, GNUTLS_SSL3, 0 };
+          
 
 static mgs_handle_t *create_gnutls_handle(apr_pool_t * pool, conn_rec * c)
 {
@@ -564,8 +563,12 @@ static mgs_handle_t *create_gnutls_handle(apr_pool_t * pool, conn_rec * c)
      * but it is the only way to be ultra-portable.
      */
     gnutls_session_enable_compatibility_mode( ctxt->session);
-
-    gnutls_protocol_set_priority(ctxt->session, sc->protocol);
+    
+    /* because we don't set any default priorities here (we set later at
+     * the user hello callback) we need to at least set this in order for
+     * gnutls to be able to read packets.
+     */
+    gnutls_protocol_set_priority( ctxt->session, protocol_priority);
 
     gnutls_handshake_set_post_client_hello_function( ctxt->session, mgs_select_virtual_server_cb);
 
