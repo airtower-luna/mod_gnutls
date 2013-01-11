@@ -44,8 +44,9 @@ static void gnutls_hooks(apr_pool_t * p)
     
     /* TODO: HTTP Upgrade Filter */
     /* ap_register_output_filter ("UPGRADE_FILTER", 
-        *          ssl_io_filter_Upgrade, NULL, AP_FTYPE_PROTOCOL + 5);
-*/
+     *          ssl_io_filter_Upgrade, NULL, AP_FTYPE_PROTOCOL + 5);
+     */
+
     ap_register_input_filter(GNUTLS_INPUT_FILTER_NAME,
                              mgs_filter_input, NULL,
                              AP_FTYPE_CONNECTION + 5);
@@ -53,7 +54,6 @@ static void gnutls_hooks(apr_pool_t * p)
                               mgs_filter_output, NULL,
                               AP_FTYPE_CONNECTION + 5);
 }
-
 
 static const command_rec mgs_config_cmds[] = {
     AP_INIT_TAKE1("GnuTLSClientVerify", mgs_set_client_verify,
@@ -63,7 +63,15 @@ static const command_rec mgs_config_cmds[] = {
     AP_INIT_TAKE1("GnuTLSClientCAFile", mgs_set_client_ca_file,
                   NULL,
                   RSRC_CONF,
-                  "Set the CA File for Client Certificates"),
+                  "Set the CA File to verify Client Certificates"),
+    AP_INIT_TAKE1("GnuTLSDHFile", mgs_set_dh_file,
+                  NULL,
+                  RSRC_CONF,
+                  "Set the file to read Diffie Hellman parameters from"),
+    AP_INIT_TAKE1("GnuTLSRSAFile", mgs_set_rsa_export_file,
+                  NULL,
+                  RSRC_CONF,
+                  "Set the file to read RSA-EXPORT parameters from"),
     AP_INIT_TAKE1("GnuTLSCertificateFile", mgs_set_cert_file,
                   NULL,
                   RSRC_CONF,
@@ -71,7 +79,15 @@ static const command_rec mgs_config_cmds[] = {
     AP_INIT_TAKE1("GnuTLSKeyFile", mgs_set_key_file,
                   NULL,
                   RSRC_CONF,
-                  "SSL Server Certificate file"),
+                  "SSL Server SRP Password file"),
+    AP_INIT_TAKE1("GnuTLSSRPPasswdFile", mgs_set_srp_tpasswd_file,
+                  NULL,
+                  RSRC_CONF,
+                  "SSL Server SRP Password Conf file"),
+    AP_INIT_TAKE1("GnuTLSSRPPasswdConfFile", mgs_set_srp_tpasswd_conf_file,
+                  NULL,
+                  RSRC_CONF,
+                  "SSL Server SRP Parameters file"),
     AP_INIT_TAKE1("GnuTLSCacheTimeout", mgs_set_cache_timeout,
                   NULL,
                   RSRC_CONF,
@@ -80,17 +96,51 @@ static const command_rec mgs_config_cmds[] = {
                   NULL,
                   RSRC_CONF,
                   "Cache Configuration"),
+    AP_INIT_RAW_ARGS("GnuTLSCiphers", mgs_set_ciphers,
+                  NULL,
+                  RSRC_CONF,
+                  "The ciphers to enable (AES-128, 3DES, ARCFOUR-128, ARCFOUR-40)"),
+    AP_INIT_RAW_ARGS("GnuTLSKeyExchangeAlgorithms", mgs_set_kx,
+                  NULL,
+                  RSRC_CONF,
+                  "The key exchange algorithms to enable (RSA, DHE-RSA, DHE-DSS, RSA-EXPORT, SRP, SRP-RSA, SRP-DSS)"),
+    AP_INIT_RAW_ARGS("GnuTLSMACAlgorithms", mgs_set_mac,
+                  NULL,
+                  RSRC_CONF,
+                  "The MAC algorithms to utilize (SHA-1, MD5)"),
+    AP_INIT_RAW_ARGS("GnuTLSCompressionMethods", mgs_set_compression,
+                  NULL,
+                  RSRC_CONF,
+                  "The compression methods to utilize (NULL, ZLIB)"),
+    AP_INIT_RAW_ARGS("GnuTLSProtocols", mgs_set_protocols,
+                  NULL,
+                  RSRC_CONF,
+                  "The TLS protocol version to use (TLS1.1, TLS1.0, SSL3.0)"),
     AP_INIT_TAKE1("GnuTLSEnable", mgs_set_enabled,
-                  NULL, RSRC_CONF,
+                  NULL,
+                  RSRC_CONF,
                   "Whether this server has GnuTLS Enabled. Default: Off"),
-    
+    AP_INIT_TAKE1("GnuTLSExportCertificates", mgs_set_export_certificates_enabled,
+                  NULL,
+                  RSRC_CONF,
+                  "Whether to export PEM encoded certificates to CGIs. Default: Off"),
+#if 0
+    AP_INIT_RAW_ARGS("<GnuTLSRequire", mgs_set_require_section,
+                  NULL,
+                  EXEC_ON_READ|OR_ALL,
+                  "Whether this server has GnuTLS Enabled. Default: Off"),
+    AP_INIT_RAW_ARGS("GnuTLSRequireByteCode", mgs_set_require_bytecode,
+                     NULL,
+                     OR_ALL,
+                     "Internal Command for reading Lua Bytecode."),
+#endif
     {NULL}
 };
 
 module AP_MODULE_DECLARE_DATA gnutls_module = {
     STANDARD20_MODULE_STUFF,
     mgs_config_dir_create,
-    NULL,
+    mgs_config_dir_merge,
     mgs_config_server_create,
     NULL,
     mgs_config_cmds,

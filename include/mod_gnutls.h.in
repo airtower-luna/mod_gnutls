@@ -72,26 +72,43 @@ typedef enum
 typedef struct
 {
     int client_verify_mode;
+    const char* lua_bytecode;
+    apr_size_t lua_bytecode_len;
 } mgs_dirconf_rec;
+
+
+/* The maximum number of client CA certificates allowed.
+ */
+#define MAX_CA_CRTS 128
+#define MAX_CIPHERS 16
 
 typedef struct
 {
     gnutls_certificate_credentials_t certs;
+    gnutls_srp_server_credentials_t srp_creds;
+    gnutls_anon_server_credentials_t anon_creds;
     char* cert_cn;
     gnutls_x509_crt_t cert_x509;
     gnutls_x509_privkey_t privkey_x509;
     int enabled;
-    int ciphers[16];
-    int key_exchange[16];
-    int macs[16];
-    int protocol[16];
-    int compression[16];
-    int cert_types[16];
-    apr_time_t cache_timeout;
+    /* whether to send the PEM encoded certificates
+     * to CGIs
+     */
+    int export_certificates_enabled;
+    int ciphers[MAX_CIPHERS];
+    int key_exchange[MAX_CIPHERS];
+    int macs[MAX_CIPHERS];
+    int protocol[MAX_CIPHERS];
+    int compression[MAX_CIPHERS];
+    int cert_types[MAX_CIPHERS];    apr_time_t cache_timeout;
     mgs_cache_e cache_type;
     const char* cache_config;
     const char* rsa_params_file;
     const char* dh_params_file;
+    const char* srp_tpasswd_file;
+    const char* srp_tpasswd_conf_file;
+    gnutls_x509_crt_t ca_list[MAX_CA_CRTS];
+    unsigned int ca_list_size;
     int client_verify_mode;
 } mgs_srvconf_rec;
 
@@ -212,9 +229,25 @@ int mgs_cache_session_init(mgs_handle_t *ctxt);
 char *mgs_session_id2sz(unsigned char *id, int idlen,
                                 char *str, int strsize);
 
+/**
+ * Convert a time_t into a Null Terminated String
+ * @param t time_t time
+ * @param str Location to store the Hex Encoded String
+ * @param strsize The Maximum Length that can be stored in str
+ */
+char *mgs_time2sz(time_t t, char *str, int strsize);
+
 
 /* Configuration Functions */
 
+const char *mgs_set_srp_tpasswd_conf_file(cmd_parms * parms, void *dummy,
+                                        const char *arg);
+const char *mgs_set_srp_tpasswd_file(cmd_parms * parms, void *dummy,
+                                        const char *arg);
+const char *mgs_set_dh_file(cmd_parms * parms, void *dummy,
+                                        const char *arg);
+const char *mgs_set_rsa_export_file(cmd_parms * parms, void *dummy,
+                                        const char *arg);
 const char *mgs_set_cert_file(cmd_parms * parms, void *dummy,
                                         const char *arg);
 
@@ -235,10 +268,29 @@ const char *mgs_set_client_ca_file(cmd_parms * parms, void *dummy,
 
 const char *mgs_set_enabled(cmd_parms * parms, void *dummy,
                             const char *arg);
-
+const char *mgs_set_export_certificates_enabled(cmd_parms * parms, void *dummy,
+                            const char *arg);
+const char *mgs_set_ciphers(cmd_parms * parms, void *dummy,
+                            const char *arg);
+const char *mgs_set_kx(cmd_parms * parms, void *dummy,
+                            const char *arg);
+const char *mgs_set_mac(cmd_parms * parms, void *dummy,
+                            const char *arg);
+const char *mgs_set_compression(cmd_parms * parms, void *dummy,
+                            const char *arg);
+const char *mgs_set_protocols(cmd_parms * parms, void *dummy,
+                            const char *arg);
+                            
+const char *mgs_set_require_section(cmd_parms *cmd, 
+                                    void *mconfig, const char *arg);
 void *mgs_config_server_create(apr_pool_t * p, server_rec * s);
 
+void *mgs_config_dir_merge(apr_pool_t *p, void *basev, void *addv);
+
 void *mgs_config_dir_create(apr_pool_t *p, char *dir);
+
+const char *mgs_set_require_bytecode(cmd_parms *cmd, 
+                                    void *mconfig, const char *arg);
 
 mgs_srvconf_rec* mgs_find_sni_server(gnutls_session_t session);
 
@@ -262,5 +314,7 @@ int mgs_hook_pre_connection(conn_rec * c, void *csd);
 int mgs_hook_fixups(request_rec *r);
 
 int mgs_hook_authz(request_rec *r);
+
+int mgs_authz_lua(request_rec* r);
 
 #endif /*  __mod_gnutls_h_inc */

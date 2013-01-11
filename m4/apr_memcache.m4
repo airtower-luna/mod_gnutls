@@ -11,6 +11,8 @@ AC_ARG_WITH(
     mc_path="$withval",
     :)
 
+AC_LIBTOOL_SYS_DYNAMIC_LINKER
+
 dnl # Determine memcache lib directory
 if test -z $mc_path; then
     test_paths="/usr/local /usr /usr/local/apache2"
@@ -23,8 +25,9 @@ if test -n ${AP_PREFIX}; then
 fi
 
 for x in $test_paths ; do
+    amc_shlib="${x}/libapr_memcache${shrext_cmds}"
     AC_MSG_CHECKING([for apr_memcache library in ${x}/lib])
-    if test -f ${x}/lib/libapr_memcache.so; then
+    if test -f ${amc_shlib}; then
         AC_MSG_RESULT([yes])
         save_CFLAGS=$CFLAGS
         save_LDFLAGS=$LDFLAGS
@@ -32,7 +35,7 @@ for x in $test_paths ; do
         LDFLAGS="-L$x/lib $LDFLAGS"
         AC_CHECK_LIB(apr_memcache, apr_memcache_create,
             [
-            APR_MEMCACHE_LIBS="-L$x/lib -lapr_memcache"
+            APR_MEMCACHE_LIBS="-R$x/lib -L$x/lib -lapr_memcache"
             APR_MEMCACHE_CFLAGS="-I$x/include/apr_memcache-0"
             ])
         CFLAGS=$save_CFLAGS
