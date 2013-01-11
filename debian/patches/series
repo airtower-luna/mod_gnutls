@@ -1,1 +1,2 @@
 build_errors.patch
+enable-gnutls-3-build.diff
