@@ -221,6 +221,10 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
             ctxt->input_block = APR_NONBLOCK_READ;
         }
     }
+    
+    if (ctxt->session == NULL) {
+        return APR_EGENERAL;
+    }
 
     while (1) {
 
@@ -360,7 +364,7 @@ static int gnutls_do_handshake(mgs_handle_t * ctxt)
     int errcode;
     int maxtries = HANDSHAKE_MAX_TRIES;
 
-    if (ctxt->status != 0) {
+    if (ctxt->status != 0 || ctxt->session == NULL) {
         return -1;
     }
 
@@ -441,6 +445,9 @@ tryagain:
 int mgs_rehandshake(mgs_handle_t * ctxt)
 {
     int rv;
+    
+    if (ctxt->session == NULL)
+        return -1;
 
     rv = gnutls_rehandshake(ctxt->session);
     
@@ -565,7 +572,7 @@ apr_status_t mgs_filter_output(ap_filter_t * f,
 
             apr_bucket_copy(bucket, &e);
             APR_BRIGADE_INSERT_TAIL(ctxt->output_bb, e);
-            
+ 
             if ((status = ap_pass_brigade(f->next, tmpb)) != APR_SUCCESS) {
                 apr_brigade_cleanup(ctxt->output_bb);
                 return status;
@@ -609,10 +616,14 @@ apr_status_t mgs_filter_output(ap_filter_t * f,
             
             if (len > 0) {
 
-                do {
-                    ret = gnutls_record_send(ctxt->session, data, len);
+                if (ctxt->session == NULL) {
+                    ret = GNUTLS_E_INVALID_REQUEST;
+                } else {
+                    do {
+                        ret = gnutls_record_send(ctxt->session, data, len);
+                    }
+                    while(ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
                 }
-                while(ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
 
                 if (ret < 0) {
                     /* error sending output */
@@ -674,7 +685,8 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
             if (APR_STATUS_IS_EOF(ctxt->input_rc)) {
                 return 0;
             } else {
-                gnutls_transport_set_errno(ctxt->session, EINTR);
+                if (ctxt->session)
+                    gnutls_transport_set_errno(ctxt->session, EINTR);
                 return -1;
             }
         }
@@ -697,7 +709,8 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
     if (APR_STATUS_IS_EAGAIN(ctxt->input_rc)
         || APR_STATUS_IS_EINTR(ctxt->input_rc)) {
         if (len == 0) {
-            gnutls_transport_set_errno(ctxt->session, EINTR);
+            if (ctxt->session)
+                gnutls_transport_set_errno(ctxt->session, EINTR);
             return -1;
         }
 

@@ -1,3 +1,9 @@
+** Version 0.5.8 (2010-08-18)
+- Session tickets are enabled by default.
+
+- Fixes some segmentation faults noticed in some
+  configurations.
+
 ** Version 0.5.7 (2010-07-01)
 - Force usage of SDBM. For some reason the default in
   my system had issues after reaching a limit of entries.
