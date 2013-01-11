@@ -9,19 +9,16 @@ AC_ARG_WITH(
     apr-memcache-prefix,
     [AC_HELP_STRING([--with-apr-memcache-prefix=PATH],[Install prefix for apr_memcache])],
     apr_memcache_prefix="$withval",
-    apr_memcache_prefix="/usr",
     :)
 AC_ARG_WITH(
     apr-memcache-libs,
     [AC_HELP_STRING([--with-apr-memcache-libs=PATH],[Path to apr_memcache libs])],
     apr_memcache_libs="$withval",
-    apr_memcache_libs="$apr_memcache_prefix/lib"
     :)
 AC_ARG_WITH(
     apr-memcache-includes,
     [AC_HELP_STRING([--with-apr-memcache-includes=PATH],[Path to apr_memcache includes])],
     apr_memcache_includes="$withval",
-    apr_memcache_includes="$apr_memcache_prefix/include/apr_memcache-0"
     :)
 
 
@@ -30,14 +27,34 @@ AC_LIBTOOL_SYS_DYNAMIC_LINKER
 dnl # Determine memcache lib directory
 save_CFLAGS=$CFLAGS
 save_LDFLAGS=$LDFLAGS
-CFLAGS="-I$apr_memcache_includes $APR_INCLUDES $CFLAGS"
-LDFLAGS="-L$apr_memcache_libs $LDFLAGS"
+
+if test -n "$apr_memcache_libs"; then
+    apr_memcache_libdir=$apr_memcache_libs
+elif test -n "$apr_memcache_prefix"; then
+    apr_memcache_libdir=$apr_memcache_prefix/lib
+fi
+if test -n "$apr_memcache_libdir"; then
+    LDFLAGS="-L$apr_memcache_libdir $LDFLAGS"
+fi
+
+if test -n "$apr_memcache_includes"; then
+    apr_memcache_includedir=$apr_memcache_includes
+elif test -n "$apr_memcache_prefix"; then
+    apr_memcache_includedir=$apr_memcache_prefix/include/apr_memcache-0
+else
+    apr_memcache_includedir=$includedir/apr_memcache-0
+fi
+CFLAGS="-I$apr_memcache_includedir $CFLAGS"
+
 AC_CHECK_LIB(
     apr_memcache,
     apr_memcache_create,
     [
-	APR_MEMCACHE_LIBS="-R$apr_memcache_libs -L$apr_memcache_libs -lapr_memcache"
-	APR_MEMCACHE_CFLAGS="-I$apr_memcache_includes"
+	APR_MEMCACHE_LIBS="-lapr_memcache"
+	if test -n "$apr_memcache_libdir"; then
+	    APR_MEMCACHE_LIBS="-R$apr_memcache_libdir -L$apr_memcache_libdir $APR_MEMCACHE_LIBS"
+	fi
+	APR_MEMCACHE_CFLAGS="-I$apr_memcache_includedir"
     ]
 )
 CFLAGS=$save_CFLAGS
