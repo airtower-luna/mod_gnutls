@@ -555,15 +555,7 @@ apr_status_t mgs_filter_output(ap_filter_t * f,
     while (!APR_BRIGADE_EMPTY(bb)) {
         apr_bucket *bucket = APR_BRIGADE_FIRST(bb);
         
-        if (AP_BUCKET_IS_EOC(bucket) || APR_BUCKET_IS_EOS(bucket)) {
-            apr_bucket_brigade * tmpb;
-            
-            if (APR_BUCKET_IS_EOS(bucket)) {
-                tmpb = bb;
-            } else {
-                tmpb = ctxt->output_bb;
-            }
-            
+        if (AP_BUCKET_IS_EOC(bucket)) {
             if (ctxt->session != NULL) {
                 do {
                     ret = gnutls_bye( ctxt->session, GNUTLS_SHUT_WR);
@@ -573,7 +565,7 @@ apr_status_t mgs_filter_output(ap_filter_t * f,
             apr_bucket_copy(bucket, &e);
             APR_BRIGADE_INSERT_TAIL(ctxt->output_bb, e);
  
-            if ((status = ap_pass_brigade(f->next, tmpb)) != APR_SUCCESS) {
+            if ((status = ap_pass_brigade(f->next, ctxt->output_bb)) != APR_SUCCESS) {
                 apr_brigade_cleanup(ctxt->output_bb);
                 return status;
             }
@@ -584,7 +576,7 @@ apr_status_t mgs_filter_output(ap_filter_t * f,
                 ctxt->session = NULL;
             }
             continue;
-        } else if (APR_BUCKET_IS_FLUSH(bucket)) {
+        } else if (APR_BUCKET_IS_FLUSH(bucket) || APR_BUCKET_IS_EOS(bucket)) {
 
             apr_bucket_copy(bucket, &e);
             APR_BRIGADE_INSERT_TAIL(ctxt->output_bb, e);

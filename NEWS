@@ -1,3 +1,12 @@
+** Version 0.5.9 (2010-09-24)
+- Corrected behavior in Keep-Alive connections (do not
+  terminate the connection prematurely)
+
+- The GnuTLSCache variable now can be given the specific
+  option "gdbm" instead of "dbm". "dbm" will use the berkeley
+  db type of libapr while gdbm will force gdbm to be used.
+  sdbm is no longer being used due to serious limitations.
+
 ** Version 0.5.8 (2010-08-18)
 - Session tickets are enabled by default.
 

@@ -343,9 +343,13 @@ const char *mgs_set_cache(cmd_parms * parms, void *dummy,
 	return err;
     }
 
-    sc->cache_type = mgs_cache_none;
-    if (strcasecmp("dbm", type) == 0) {
+    if (strcasecmp("none", type) == 0) {
+	sc->cache_type = mgs_cache_none;
+    } else if (strcasecmp("dbm", type) == 0) {
 	sc->cache_type = mgs_cache_dbm;
+    }
+    else if (strcasecmp("gdbm", type) == 0) {
+	sc->cache_type = mgs_cache_gdbm;
     }
 #if HAVE_APR_MEMCACHE
     else if (strcasecmp("memcache", type) == 0) {
@@ -356,7 +360,7 @@ const char *mgs_set_cache(cmd_parms * parms, void *dummy,
 	return "Invalid Type for GnuTLSCache!";
     }
 
-    if (sc->cache_type == mgs_cache_dbm) {
+    if (sc->cache_type == mgs_cache_dbm || sc->cache_type == mgs_cache_gdbm) {
 	sc->cache_config = ap_server_root_relative(parms->pool, arg);
     } else {
 	sc->cache_config = apr_pstrdup(parms->pool, arg);
