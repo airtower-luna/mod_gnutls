@@ -1,5 +1,5 @@
 dnl 
-AC_INIT(mod_gnutls, 0.4.1)
+AC_INIT(mod_gnutls, 0.4.2)
 OOO_CONFIG_NICE(config.nice)
 MOD_GNUTLS_VERSION=AC_PACKAGE_VERSION
 AC_PREREQ(2.53)
@@ -43,7 +43,7 @@ MODULE_LIBS="${APR_MEMCACHE_LIBS} ${LIBGNUTLS_LIBS}"
 AC_SUBST(MODULE_CFLAGS)
 AC_SUBST(MODULE_LIBS)
 
-AC_CONFIG_FILES([Makefile src/Makefile include/mod_gnutls.h data/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile include/mod_gnutls.h])
 AC_OUTPUT
 
 echo "---"

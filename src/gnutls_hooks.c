@@ -57,6 +57,7 @@ int
 mgs_hook_pre_config(apr_pool_t * pconf,
 		    apr_pool_t * plog, apr_pool_t * ptemp)
 {
+int ret;
 
 #if APR_HAS_THREADS
     ap_mpm_query(AP_MPMQ_IS_THREADED, &mpm_is_threaded);
@@ -67,8 +68,10 @@ mgs_hook_pre_config(apr_pool_t * pconf,
     mpm_is_threaded = 0;
 #endif
 
-    gnutls_global_init();
-
+    ret = gnutls_global_init();
+    if (ret < 0) /* FIXME: can we print here? */
+        exit(ret);
+                                            
     apr_pool_cleanup_register(pconf, NULL, mgs_cleanup_pre_config,
 			      apr_pool_cleanup_null);
 
@@ -130,10 +133,6 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session)
     if (ret < 0)
 	return ret;
 
-    /* allow separate caches per virtual host. Actually allowing the same is a
-     * bad idea, since they might have different security requirements.
-     */
-    mgs_cache_session_init(ctxt);
 
     return 0;
 }
@@ -145,10 +144,10 @@ static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st * ret)
     ctxt = gnutls_transport_get_ptr(session);
 
     ret->type = GNUTLS_CRT_X509;
-    ret->ncerts = 1;
+    ret->ncerts = ctxt->sc->certs_x509_num;
     ret->deinit_all = 0;
 
-    ret->cert.x509 = &ctxt->sc->cert_x509;
+    ret->cert.x509 = ctxt->sc->certs_x509;
     ret->key.x509 = ctxt->sc->privkey_x509;
     return 0;
 }
@@ -331,7 +330,7 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 		}
 	    }
 
-	    if (sc->cert_x509 == NULL
+	    if (sc->certs_x509[0] == NULL
 		&& sc->enabled == GNUTLS_ENABLED_TRUE) {
 		ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
 			     "[GnuTLS] - Host '%s:%d' is missing a "
@@ -350,7 +349,7 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 	    }
 
 	    if (sc->enabled == GNUTLS_ENABLED_TRUE) {
-		rv = read_crt_cn(s, p, sc->cert_x509, &sc->cert_cn);
+		rv = read_crt_cn(s, p, sc->certs_x509[0], &sc->cert_cn);
 		if (rv < 0) {
 		    ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
 				 "[GnuTLS] - Cannot find a certificate for host '%s:%d'!",
@@ -588,6 +587,8 @@ static mgs_handle_t *create_gnutls_handle(apr_pool_t * pool, conn_rec * c)
     gnutls_handshake_set_post_client_hello_function(ctxt->session,
 						    mgs_select_virtual_server_cb);
 
+    mgs_cache_session_init(ctxt);
+
     return ctxt;
 }
 
@@ -683,7 +684,7 @@ int mgs_hook_fixups(request_rec * r)
     tmp = mgs_session_id2sz(sbuf, len, buf, sizeof(buf));
     apr_table_setn(env, "SSL_SESSION_ID", apr_pstrdup(r->pool, tmp));
 
-    mgs_add_common_cert_vars(r, ctxt->sc->cert_x509, 0,
+    mgs_add_common_cert_vars(r, ctxt->sc->certs_x509[0], 0,
 			     ctxt->sc->export_certificates_enabled);
 
     return rv;

@@ -11,7 +11,7 @@ to debug.  I wanted to understand how it worked, and I had recently heard about
 GnuTLS, so long story short, I decided to implement a mod_gnutls.
 
 Lines of Code in mod_ssl: 15,324
-Lines of Code in mod_gnutls: 1,886
+Lines of Code in mod_gnutls: 3,594
 
 Because of writing mod_gnutls, I now understand how input and output filters work, 
 better than I ever thought possible.  It was a little painful at times, and some parts
@@ -63,17 +63,13 @@ GnuTLSCache dbm conf/gnutls_cache
 
 # a more advanced configuration
 GnuTLSCache dbm "/var/cache/www-tls-cache/cache"
-GnuTLSCacheTimeout 500
-GnuTLSProtocols TLS1.1 TLS1.0 SSL3.0
+GnuTLSCacheTimeout 600
 NameVirtualHost 1.2.3.4:443
 
 <VirtualHost 1.2.3.4:443>
 	Servername server.com:443
         GnuTLSEnable on
-	GnuTLSCiphers AES-128-CBC 3DES-CBC ARCFOUR-128
-	GnuTLSKeyExchangeAlgorithms RSA DHE-RSA DHE-DSS SRP SRP-RSA SRP-DSS
-	GnuTLSMACAlgorithms SHA1 MD5
-	GnuTLSCompressionMethods NULL
+	GnuTLSPriority NORMAL
 # To export exactly the same environment variables as mod_ssl to CGI scripts.
 	GNUTLSExportCertificates on
 
