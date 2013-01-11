@@ -33,6 +33,9 @@
 #include "unixd.h"
 #endif
 
+/* it seems the default has some strange errors. Use SDBM 
+ */
+#define ODB "SDBM"
 
 #define MC_TAG "mod_gnutls:"
 #define MC_TAG_LEN sizeof(MC_TAG)
@@ -295,86 +298,68 @@ static int mc_cache_delete(void* baton, gnutls_datum_t key)
 
 #define SSL_DBM_FILE_MODE ( APR_UREAD | APR_UWRITE | APR_GREAD | APR_WREAD )
 
-static int dbm_cache_expire(mgs_handle_t *ctxt)
+static void dbm_cache_expire(mgs_handle_t *ctxt)
 {
     apr_status_t rv;
     apr_dbm_t *dbm;
-    apr_datum_t *keylist;
     apr_datum_t dbmkey;
     apr_datum_t dbmval;
-    apr_time_t ex;
+    apr_time_t now;
     apr_time_t dtime;
     apr_pool_t* spool;
-    int i = 0;
-    int keyidx = 0;
-    int should_delete = 0;
+    int total, deleted;
+
+    now = apr_time_now();
+    
+    if (now - ctxt->sc->last_cache_check < (ctxt->sc->cache_timeout)/2)
+        return;
+
+    ctxt->sc->last_cache_check = now;
 
     apr_pool_create(&spool, ctxt->c->pool);
-    ex = apr_time_now();
-    
-    rv = apr_dbm_open(&dbm, ctxt->sc->cache_config, APR_DBM_READONLY,
+
+    total = 0;
+    deleted = 0;
+
+    rv = apr_dbm_open_ex(&dbm, ODB, ctxt->sc->cache_config, APR_DBM_RWCREATE,
                       SSL_DBM_FILE_MODE, spool);
     if (rv != APR_SUCCESS) {
         ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
                      ctxt->c->base_server,
                      "[gnutls_cache] error opening cache searcher '%s'",
                      ctxt->sc->cache_config);
-        return -1;
+        apr_pool_destroy(spool);
+        return;
     }
-
-#define KEYMAX 128
-
-    keylist = apr_palloc(spool, sizeof(dbmkey)*KEYMAX);
 
     apr_dbm_firstkey(dbm, &dbmkey);
     while (dbmkey.dptr != NULL) {
         apr_dbm_fetch(dbm, dbmkey, &dbmval);
-        if (dbmval.dptr != NULL) {
-            if (dbmval.dsize >= sizeof(apr_time_t)) {
+        if (dbmval.dptr != NULL && dbmval.dsize >= sizeof(apr_time_t)) {
                 memcpy(&dtime, dbmval.dptr, sizeof(apr_time_t));
-                if (dtime < ex) {
-                    should_delete = 1;
+
+                if (now >= dtime) {
+                    apr_dbm_delete(dbm, dbmkey);
+                    deleted++;
                 }
-            }
-            else {
-                should_delete = 1;
-            }
-            
-            if (should_delete == 1) {
-                should_delete = 0;
-                keylist[keyidx].dptr = apr_palloc(spool, dbmkey.dsize) ;
-                memcpy(keylist[keyidx].dptr, dbmkey.dptr, dbmkey.dsize);
-                keylist[keyidx].dsize = dbmkey.dsize;
-                keyidx++;
-                if (keyidx == KEYMAX) {
-                    break;
-                }
-            }
-            apr_dbm_freedatum( dbm, dbmval);
-            
+                apr_dbm_freedatum( dbm, dbmval);
+        } else {
+            apr_dbm_delete(dbm, dbmkey);
+            deleted++;
         }
+        total++;
         apr_dbm_nextkey(dbm, &dbmkey);
     }
     apr_dbm_close(dbm);
 
-    rv = apr_dbm_open(&dbm, ctxt->sc->cache_config,
-                  APR_DBM_RWCREATE, SSL_DBM_FILE_MODE, spool);
-    if (rv != APR_SUCCESS) {
-        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
-                 ctxt->c->base_server,
-                 "[gnutls_cache] error opening cache writer '%s'",
-                 ctxt->sc->cache_config);
-        return -1;
-    }
+    ap_log_error(APLOG_MARK, APLOG_DEBUG, rv,
+                     ctxt->c->base_server,
+                     "[gnutls_cache] Cleaned up cache '%s'. Deleted %d and left %d",
+                     ctxt->sc->cache_config, deleted, total-deleted);
 
-    for (i = 0; i < keyidx; i++) {
-        apr_dbm_delete(dbm, keylist[i]);
-    }
-
-    apr_dbm_close(dbm);
     apr_pool_destroy(spool);
     
-    return 0;
+    return;
 }
 
 static gnutls_datum_t dbm_cache_fetch(void* baton, gnutls_datum_t key)
@@ -389,8 +374,8 @@ static gnutls_datum_t dbm_cache_fetch(void* baton, gnutls_datum_t key)
     if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
         return data;
 
-    rv = apr_dbm_open(&dbm, ctxt->sc->cache_config,
-	              APR_DBM_RWCREATE, SSL_DBM_FILE_MODE, ctxt->c->pool);
+    rv = apr_dbm_open_ex(&dbm, ODB, ctxt->sc->cache_config,
+	              APR_DBM_READONLY, SSL_DBM_FILE_MODE, ctxt->c->pool);
     if (rv != APR_SUCCESS) {
         ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
                      ctxt->c->base_server,
@@ -438,13 +423,20 @@ static int dbm_cache_store(void* baton, gnutls_datum_t key,
     mgs_handle_t *ctxt = baton;
     apr_status_t rv;
     apr_time_t expiry;
+    apr_pool_t* spool;
 
     if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
         return -1;
 
+    /* we expire dbm only on every store
+     */
+    dbm_cache_expire(ctxt);
+
+    apr_pool_create(&spool, ctxt->c->pool);
+
     /* create DBM value */
     dbmval.dsize = data.size + sizeof(apr_time_t);
-    dbmval.dptr  = (char *)malloc(dbmval.dsize);
+    dbmval.dptr  = (char *)apr_palloc(spool, dbmval.dsize);
 
     expiry = apr_time_now() + ctxt->sc->cache_timeout;
 
@@ -452,18 +444,14 @@ static int dbm_cache_store(void* baton, gnutls_datum_t key,
     memcpy((char *)dbmval.dptr+sizeof(apr_time_t),
            data.data, data.size);
 
-    /* we expire dbm only on every store
-     */
-    dbm_cache_expire(ctxt);
-
-    rv = apr_dbm_open(&dbm, ctxt->sc->cache_config,
+    rv = apr_dbm_open_ex(&dbm, ODB, ctxt->sc->cache_config,
 	              APR_DBM_RWCREATE, SSL_DBM_FILE_MODE, ctxt->c->pool);
     if (rv != APR_SUCCESS) {
         ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
                      ctxt->c->base_server,
                      "[gnutls_cache] error opening cache '%s'",
                      ctxt->sc->cache_config);
-        free(dbmval.dptr);        
+        apr_pool_destroy(spool);
         return -1;
     }
 
@@ -475,13 +463,13 @@ static int dbm_cache_store(void* baton, gnutls_datum_t key,
                      "[gnutls_cache] error storing in cache '%s'",
                      ctxt->sc->cache_config);
         apr_dbm_close(dbm);
-        free(dbmval.dptr);
+        apr_pool_destroy(spool);
         return -1;
     }
 
     apr_dbm_close(dbm);
 
-    free(dbmval.dptr);
+    apr_pool_destroy(spool);
     
     return 0;
 }
@@ -496,7 +484,7 @@ static int dbm_cache_delete(void* baton, gnutls_datum_t key)
     if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
         return -1;
 
-    rv = apr_dbm_open(&dbm, ctxt->sc->cache_config,
+    rv = apr_dbm_open_ex(&dbm, ODB, ctxt->sc->cache_config,
 	              APR_DBM_RWCREATE, SSL_DBM_FILE_MODE, ctxt->c->pool);
     if (rv != APR_SUCCESS) {
         ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
@@ -530,7 +518,7 @@ static int dbm_cache_post_config(apr_pool_t *p, server_rec *s,
     const char* path1;
     const char* path2;
 
-    rv = apr_dbm_open(&dbm, sc->cache_config, APR_DBM_RWCREATE, 
+    rv = apr_dbm_open_ex(&dbm, ODB, sc->cache_config, APR_DBM_RWCREATE, 
                       SSL_DBM_FILE_MODE, p);
 
     if (rv != APR_SUCCESS) {
@@ -542,12 +530,12 @@ static int dbm_cache_post_config(apr_pool_t *p, server_rec *s,
 
     apr_dbm_close(dbm);
 
-    apr_dbm_get_usednames(p, sc->cache_config, &path1, &path2);
+    apr_dbm_get_usednames_ex(p, ODB, sc->cache_config, &path1, &path2);
 
     /* The Following Code takes logic directly from mod_ssl's DBM Cache */ 
 #if !defined(OS2) && !defined(WIN32) && !defined(BEOS) && !defined(NETWARE)
     /* Running as Root */
-    if (geteuid() == 0)  {
+    if (path1 && geteuid() == 0)  {
         chown(path1, ap_unixd_config.user_id, -1);
         if (path2 != NULL) { 
             chown(path2, ap_unixd_config.user_id, -1);

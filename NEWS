@@ -1,3 +1,19 @@
+** Version 0.5.7 (2010-07-01)
+- Force usage of SDBM. For some reason the default in
+  my system had issues after reaching a limit of entries.
+  SDBM seems stable so force it.
+
+- Optimizations in session caching.
+
+- Added support for session tickets. This allows a
+  server to avoid using a session cache and still support
+  session resumption. This is at the cost of transporting
+  session data during handshake. New option
+  GnuTLSSessionTickets [on|off]
+
+- Depend on gnutls 2.10.0 to force support for safe
+  renegotiation.
+
 ** Version 0.5.6 (2010-03-24)
 - Corrected issue with firefox and long POST data (by
   handling EINTR and EAGAIN errors in read).
