@@ -1,0 +1,16 @@
+Source: mod-gnutls
+Section: httpd
+Priority: extra
+Maintainer: Jack Bates <ms419@freezone.co.uk>
+Build-Depends: debhelper (>= 8.0.0), autotools-dev, apache2-dev, libgnutls-dev (>= 2.4.0), pkg-config
+Standards-Version: 3.9.2
+Homepage: http://www.outoforder.cc/projects/apache/mod_gnutls/
+Vcs-Browser: https://github.com/jablko/debian/tree/master/mod-gnutls
+Vcs-Git: https://github.com/jablko/debian.git
+
+Package: libapache2-mod-gnutls
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Apache module for SSL and TLS encryption with GnuTLS
+ mod_gnutls provides SSL 3.0, TLS 1.0, and TLS 1.1 encryption with the GnuTLS
+ library. It's similar in purpose to mod_ssl, but doesn't use OpenSSL.

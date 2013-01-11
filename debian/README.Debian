@@ -1,0 +1,21 @@
+mod-gnutls for Debian
+---------------------
+
+To each virtual host configuration with which you want to use mod_gnutls, you
+must add at least these three directives, using your own certificate and key,
+
+  <IfModule mod_gnutls.c>
+
+    GnuTLSEnable On
+    GnuTLSCertificateFile /etc/ssl/certs/ssl-cert-snakeoil.pem
+    GnuTLSKeyFile /etc/ssl/private/ssl-cert-snakeoil.key
+
+  </IfModule>
+
+More examples are provided in online documentation,
+http://www.outoforder.cc/projects/apache/mod_gnutls/docs/
+
+mod_gnutls doesn't yet support RFC 2817, upgrading to TLS,
+http://ietf.org/rfc/rfc2817.txt
+
+ -- Jack Bates <ms419@freezone.co.uk>  Thu, 26 Jul 2007 13:54:30 -0700

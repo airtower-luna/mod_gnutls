@@ -1,0 +1,54 @@
+mod-gnutls (0.5.10-1) unstable; urgency=low
+
+  * New upstream release (Closes: #602957)
+
+ -- Jack Bates <ms419@freezone.co.uk>  Tue, 19 Jul 2011 09:38:29 -0700
+
+mod-gnutls (0.5.9-1) unstable; urgency=low
+
+  * New upstream release
+  * Fix typo in package description (Closes: #602036)
+
+ -- Jack Bates <ms419@freezone.co.uk>  Thu, 17 Feb 2011 18:19:33 -0800
+
+mod-gnutls (0.5.7-1) unstable; urgency=low
+
+  * New upstream release (Closes: #588909)
+
+ -- Jack Bates <ms419@freezone.co.uk>  Mon, 19 Jul 2010 16:04:43 -0700
+
+mod-gnutls (0.5.6-1) unstable; urgency=low
+
+  * New upstream release (Closes: #513249, #575282)
+
+ -- Jack Bates <ms419@freezone.co.uk>  Thu, 25 Mar 2010 19:54:34 -0700
+
+mod-gnutls (0.5.5-1) unstable; urgency=low
+
+  * New upstream release (Closes: #511573, #529837)
+
+ -- Jack Bates <ms419@freezone.co.uk>  Sun, 14 Jun 2009 16:11:54 -0700
+
+mod-gnutls (0.5.2-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Jack Bates <ms419@freezone.co.uk>  Fri, 25 Jul 2008 18:04:29 +0800
+
+mod-gnutls (0.5.1-1) unstable; urgency=low
+
+  * New upstream release (Closes: #470286)
+
+ -- Jack Bates <ms419@freezone.co.uk>  Tue, 11 Mar 2008 19:08:46 -0700
+
+mod-gnutls (0.5.0-alpha-1) unstable; urgency=low
+
+  * New upstream release (Closes: #462167)
+
+ -- Jack Bates <ms419@freezone.co.uk>  Sat, 09 Feb 2008 05:23:09 -0800
+
+mod-gnutls (0.2.0-1) unstable; urgency=low
+
+  * Initial release (Closes: #387971)
+
+ -- Jack Bates <ms419@freezone.co.uk>  Thu, 26 Jul 2007 13:54:30 -0700

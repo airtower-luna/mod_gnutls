@@ -1,0 +1,20 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode
+#export DH_VERBOSE=1
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- --with-apxs=/usr/bin/apxs2
+
+override_dh_auto_install:
+	dh_installdirs $(shell apxs2 -q LIBEXECDIR)
+	cp src/.libs/libmod_gnutls.so debian/libapache2-mod-gnutls$(shell apxs2 -q LIBEXECDIR)/mod_gnutls.so
+
+override_dh_install:
+	dh_install debian/gnutls.conf debian/gnutls.load etc/apache2/mods-available
+
+override_dh_installdocs:
+	dh_installdocs README README.ENV
