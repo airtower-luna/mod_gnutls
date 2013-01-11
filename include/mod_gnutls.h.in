@@ -95,12 +95,8 @@ typedef struct
      * to CGIs
      */
     int export_certificates_enabled;
-    int ciphers[MAX_CIPHERS];
-    int key_exchange[MAX_CIPHERS];
-    int macs[MAX_CIPHERS];
-    int protocol[MAX_CIPHERS];
-    int compression[MAX_CIPHERS];
-    int cert_types[MAX_CIPHERS];    apr_time_t cache_timeout;
+    gnutls_priority_t priorities;
+    int cache_timeout;
     mgs_cache_e cache_type;
     const char* cache_config;
     const char* rsa_params_file;
@@ -270,15 +266,7 @@ const char *mgs_set_enabled(cmd_parms * parms, void *dummy,
                             const char *arg);
 const char *mgs_set_export_certificates_enabled(cmd_parms * parms, void *dummy,
                             const char *arg);
-const char *mgs_set_ciphers(cmd_parms * parms, void *dummy,
-                            const char *arg);
-const char *mgs_set_kx(cmd_parms * parms, void *dummy,
-                            const char *arg);
-const char *mgs_set_mac(cmd_parms * parms, void *dummy,
-                            const char *arg);
-const char *mgs_set_compression(cmd_parms * parms, void *dummy,
-                            const char *arg);
-const char *mgs_set_protocols(cmd_parms * parms, void *dummy,
+const char *mgs_set_priorities(cmd_parms * parms, void *dummy,
                             const char *arg);
                             
 const char *mgs_set_require_section(cmd_parms *cmd, 
