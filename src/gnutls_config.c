@@ -202,6 +202,8 @@ const char *mgs_set_key_file(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
+#ifdef ENABLE_SRP
+
 const char *mgs_set_srp_tpasswd_file(cmd_parms * parms, void *dummy,
 				     const char *arg)
 {
@@ -227,6 +229,8 @@ const char *mgs_set_srp_tpasswd_conf_file(cmd_parms * parms, void *dummy,
 
     return NULL;
 }
+
+#endif
 
 const char *mgs_set_cache(cmd_parms * parms, void *dummy,
 			  const char *type, const char *arg)
@@ -426,6 +430,7 @@ void *mgs_config_server_create(apr_pool_t * p, server_rec * s)
 			    ": (%d) %s", ret, gnutls_strerror(ret));
     }
 
+#ifdef ENABLE_SRP
     ret = gnutls_srp_allocate_server_credentials(&sc->srp_creds);
     if (ret < 0) {
 	return apr_psprintf(p, "GnuTLS: Failed to initialize"
@@ -434,6 +439,8 @@ void *mgs_config_server_create(apr_pool_t * p, server_rec * s)
 
     sc->srp_tpasswd_conf_file = NULL;
     sc->srp_tpasswd_file = NULL;
+#endif
+
     sc->privkey_x509 = NULL;
     memset( sc->certs_x509, 0, sizeof(sc->certs_x509));
     sc->certs_x509_num = 0;

@@ -1,5 +1,6 @@
 /**
  *  Copyright 2004-2005 Paul Querna
+ *  Portions Copyright 2008 Nikos Mavrogiannopoulos
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -345,6 +346,7 @@ static int dbm_cache_expire(mgs_handle_t *ctxt)
                     break;
                 }
             }
+            apr_dbm_freedatum( dbm, dbmval);
             
         }
         apr_dbm_nextkey(dbm, &dbmkey);
@@ -401,19 +403,24 @@ static gnutls_datum_t dbm_cache_fetch(void* baton, gnutls_datum_t key)
     }
 
     if (dbmval.dptr == NULL || dbmval.dsize <= sizeof(apr_time_t)) {
+        apr_dbm_freedatum( dbm, dbmval);
         apr_dbm_close(dbm);
         return data;
     }
-    apr_dbm_close(dbm);
 
     data.size = dbmval.dsize - sizeof(apr_time_t);
 
     data.data = gnutls_malloc(data.size);
     if (data.data == NULL) {
+        apr_dbm_freedatum( dbm, dbmval);
+        apr_dbm_close(dbm);
         return data;
     }
     
     memcpy(data.data, dbmval.dptr+sizeof(apr_time_t), data.size);
+
+    apr_dbm_freedatum( dbm, dbmval);
+    apr_dbm_close(dbm);
 
     return data;
 }
@@ -459,7 +466,7 @@ static int dbm_cache_store(void* baton, gnutls_datum_t key,
     rv = apr_dbm_store(dbm, dbmkey, dbmval);
     
     if (rv != APR_SUCCESS) {
-        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
+        ap_log_error(APLOG_MARK, APLOG_DEBUG, rv,
                      ctxt->c->base_server,
                      "[gnutls_cache] error storing in cache '%s'",
                      ctxt->sc->cache_config);
