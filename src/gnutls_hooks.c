@@ -400,7 +400,7 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 							    srp_tpasswd_conf_file);
 
 		if (rv < 0 && sc->enabled == GNUTLS_ENABLED_TRUE) {
-		    ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
+		    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
 				 "[GnuTLS] - Host '%s:%d' is missing a "
 				 "SRP password or conf File!",
 				 s->server_hostname, s->port);
@@ -412,7 +412,7 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 	    if (sc->certs_x509[0] == NULL &&
 	        sc->cert_pgp == NULL &&
 		sc->enabled == GNUTLS_ENABLED_TRUE) {
-		ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
+		ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
 			     "[GnuTLS] - Host '%s:%d' is missing a "
 			     "Certificate File!", s->server_hostname,
 			     s->port);
@@ -422,7 +422,7 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 	    if (sc->enabled == GNUTLS_ENABLED_TRUE && 
 	      ((sc->certs_x509[0] != NULL && sc->privkey_x509 == NULL) ||
 	      (sc->cert_pgp != NULL && sc->privkey_pgp == NULL))) {
-		ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
+		ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
 			     "[GnuTLS] - Host '%s:%d' is missing a "
 			     "Private Key File!",
 			     s->server_hostname, s->port);
@@ -435,7 +435,7 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
     		    rv = read_pgpcrt_cn(s, p, sc->cert_pgp, &sc->cert_cn);
 
 		if (rv < 0) {
-		    ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
+		    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
 				 "[GnuTLS] - Cannot find a certificate for host '%s:%d'!",
 				 s->server_hostname, s->port);
 		    sc->cert_cn = NULL;
@@ -685,6 +685,10 @@ int mgs_hook_pre_connection(conn_rec * c, void *csd)
     if (!(sc && (sc->enabled == GNUTLS_ENABLED_TRUE))) {
 	return DECLINED;
     }
+
+    if(c->remote_addr->hostname)
+      /* Connection initiated by Apache (mod_proxy) => ignore */
+      return OK;
 
     ctxt = create_gnutls_handle(c->pool, c);
 
