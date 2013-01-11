@@ -1,111 +1,171 @@
-mod_gnutls 
 
-This module started back in September of 2004 because I was tired of trying to
-fix bugs in mod_ssl.  mod_ssl is a giant beast of a module -- no offense to it's 
-authors is intended -- but I believe it has fallen prey to massive feature bloat.
+                mod_gnutls, Apache GnuTLS module.
+                =================================
 
-When I started hacking on httpd, mod_ssl remained a great mystery to me, and 
-when I actually looked at it, I ran away.  The shear ammount code is huge, and it 
-does not conform to the style guidelines.  It was painful to read, and even harder
-to debug.  I wanted to understand how it worked, and I had recently heard about 
-GnuTLS, so long story short, I decided to implement a mod_gnutls.
+$LastChangedDate: $
 
-Lines of Code in mod_ssl: 15,324
-Lines of Code in mod_gnutls: 3,594
+Contents:
 
-Because of writing mod_gnutls, I now understand how input and output filters work, 
-better than I ever thought possible.  It was a little painful at times, and some parts
-lift code and ideas directly from mod_ssl. Kudos to the original authors of mod_ssl.
+     I. ABOUT
+    II. AUTHORS
+   III. LICENSE
+    IV. STATUS
+     V. BASIC CONFIGURATION
+    VI. CREATE OPENPGP CREDENTIALS FOR THE SERVER
 
-----------------------------
 
-Author: Paul Querna <chip force-elite.com>
 
-Heavily modified by Nikos Mavrogiannopoulos <nmav gnutls.org>
+I.    ABOUT
 
-License: Apache Software License v2.0. (see the LICENSE file for details)
+      This module started back in September of 2004 because I was tired of
+      trying to fix bugs in mod_ssl.  mod_ssl is a giant beast of a module --
+      no offense to it's authors is intended -- but I believe it has fallen
+      prey to massive feature bloat.
 
-Current Status:
-- SSL and TLS connections with all popular browsers work!
-- Sets enviromental vars for scripts (compatible with mod_ssl vars)
-- Supports Memcached as a distributed SSL Session Cache
-- Supports DBM as a local SSL Session Cache
-- Support for Server Name Indication
-- Support for Client Certificates
-- Support for TLS-SRP
+      When I started hacking on httpd, mod_ssl remained a great mystery to me,
+      and when I actually looked at it, I ran away.  The shear amount code is
+      huge, and it does not conform to the style guidelines.  It was painful to
+      read, and even harder to debug.  I wanted to understand how it worked,
+      and I had recently heard about GnuTLS, so long story short, I decided to
+      implement a mod_gnutls.
 
-Basic Configuration:
+         Lines of Code in mod_ssl: 15,324
+         Lines of Code in mod_gnutls: 3,594
 
-LoadModule gnutls_module  modules/mod_gnutls.so
+      Because of writing mod_gnutls, I now understand how input and output
+      filters work, better than I ever thought possible.  It was a little
+      painful at times, and some parts lift code and ideas directly from
+      mod_ssl.  Kudos to the original authors of mod_ssl.
 
-# mod_gnutls can optionaly use a memcached server to store it's SSL Sessions.
-# This is useful in a cluster enviroment, where you want all of your servers 
-# to share a single SSL Session Cache.
-#GnuTLSCache memcache "127.0.0.1 server2.example.com server3.example.com"
 
-# The Default method is to use a DBM backed Cache.  It isn't super fast, but 
-# it is portable and does not require another server to be running like memcached.
-GnuTLSCache dbm conf/gnutls_cache
 
-<VirtualHost 1.2.3.4:443>
-    # insert other directives ... here ...
+II.   AUTHORS
 
-    # This enables the mod_gnutls Handlers for this Virtual Host
-    GnuTLSEnable On
+      Paul Querna <chip force-elite.com>
+      Nikos Mavrogiannopoulos <nmav gnutls.org>
 
-    # This is the Private key for your server.
-    GnuTLSX509KeyFile conf/server.key
 
-    # This is the Server Certificate.  
-    GnuTLSX509CertificateFile conf/server.cert
-</VirtualHost>
 
-# a more advanced configuration
-GnuTLSCache dbm "/var/cache/www-tls-cache/cache"
-GnuTLSCacheTimeout 600
-NameVirtualHost 1.2.3.4:443
+III.  LICENSE
 
-<VirtualHost 1.2.3.4:443>
-	Servername server.com:443
+      Apache License, Version 2.0 (see the LICENSE file for details)
+
+
+
+IV.   STATUS
+
+      * SSL and TLS connections with all popular browsers work!
+      * Sets environmental vars for scripts (compatible with mod_ssl vars)
+      * Supports memcached as a distributed SSL session cache
+      * Supports DBM as a local SSL session cache
+      * Support for server name indication (SNI), RFC3546
+      * Support for client certificates
+      * Support for secure remote password (SRP), RFC5054
+
+
+
+V.    BASIC CONFIGURATION
+
+      LoadModule gnutls_module modules/mod_gnutls.so
+      
+      # mod_gnutls can optionally use a memcached server to store it's SSL
+      # Sessions.  This is useful in a cluster environment, where you want all
+      # of your servers to share a single SSL session cache.
+      #GnuTLSCache memcache "127.0.0.1 server2.example.com server3.example.com"
+      
+      # The Default method is to use a DBM backed Cache.  It isn't super fast,
+      # but it is portable and does not require another server to be running
+      # like memcached.
+      GnuTLSCache dbm conf/gnutls_cache
+      
+      <VirtualHost 1.2.3.4:443>
+
+        # Enable mod_gnutls handlers for this virtual host
+        GnuTLSEnable On
+      
+        # This is the private key for your server
+        GnuTLSX509KeyFile conf/server.key
+      
+        # This is the server certificate
+        GnuTLSX509CertificateFile conf/server.cert
+
+      </VirtualHost>
+      
+      # A more advanced configuration
+      GnuTLSCache dbm "/var/cache/www-tls-cache/cache"
+      GnuTLSCacheTimeout 600
+      NameVirtualHost 1.2.3.4:443
+      
+      <VirtualHost 1.2.3.4:443>
+
+      	Servername server.com:443
         GnuTLSEnable on
-	GnuTLSPriority NORMAL
-# To export exactly the same environment variables as mod_ssl to CGI scripts.
-	GNUTLSExportCertificates on
+      	GnuTLSPriority NORMAL
 
-	GnuTLSX509CertificateFile /etc/apache2/server-cert.pem
-	GnuTLSX509KeyFile /etc/apache2/server-key.pem
+	# Export exactly the same environment variables as mod_ssl to CGI
+	# scripts.
+      	GNUTLSExportCertificates on
+      
+      	GnuTLSX509CertificateFile /etc/apache2/server-cert.pem
+      	GnuTLSX509KeyFile /etc/apache2/server-key.pem
+      
+	# To enable SRP you must have these files installed.  Check the gnutls
+	# srptool.
+      	GnuTLSSRPPasswdFile /etc/apache2/tpasswd
+      	GnuTLSSRPPasswdConfFile /etc/apache2/tpasswd.conf
+      
+	# In order to verify client certificates.  Other options to
+	# GnuTLSClientVerify could be ignore or require.  The
+	# GnuTLSClientCAFile contains the CAs to verify client certificates.
+      	GnuTLSClientVerify request
+      	GnuTLSX509CAFile ca.pem
 
-# To enable SRP you must have these files installed. Check the gnutls srptool.
-	GnuTLSSRPPasswdFile /etc/apache2/tpasswd
-	GnuTLSSRPPasswdConfFile /etc/apache2/tpasswd.conf
+      </VirtualHost>
+      
+      # A setup for OpenPGP and X.509 authentication
+      <VirtualHost 1.2.3.4:443>
 
-# In order to verify client certificates. Other options to
-# GnuTLSClientVerify could be ignore or require. The GnuTLSClientCAFile
-# contains the CAs to verify client certificates.
-	GnuTLSClientVerify request
-	GnuTLSX509CAFile ca.pem
-	...
-</VirtualHost>
-
-# A setup for OpenPGP and X.509 authentication
-<VirtualHost 1.2.3.4:443>
-	Servername crystal.lan:443
+      	Servername crystal.lan:443
         GnuTLSEnable on
-	GnuTLSPriorities NORMAL:+COMP-NULL
+      	GnuTLSPriorities NORMAL:+COMP-NULL
+      
+        # Setup the openpgp keys
+      	GnuTLSPGPCertificateFile /etc/apache2/test.pub.asc
+      	GnuTLSPGPKeyFile /etc/apache2/test.sec.asc
+      
+        # - and the X.509 keys
+      	GnuTLSCertificateFile /etc/apache2/server-cert.pem
+      	GnuTLSKeyFile /etc/apache2/server-key.pem
 
-# setup the openpgp keys
-	GnuTLSPGPCertificateFile /etc/apache2/test.pub.asc
-	GnuTLSPGPKeyFile /etc/apache2/test.sec.asc
+      	GnuTLSClientVerify ignore
+      
+        # To avoid using the default DH params
+      	GnuTLSDHFile /etc/apache2/dh.pem
+      
+        # These are only needed if GnuTLSClientVerify != ignore
+      	GnuTLSClientCAFile ca.pem
+      	GnuTLSPGPKeyringFile /etc/apache2/ring.asc
 
-# and the X.509 keys
-	GnuTLSCertificateFile /etc/apache2/server-cert.pem
-	GnuTLSKeyFile /etc/apache2/server-key.pem
-	GnuTLSClientVerify ignore
+      </VirtualHost>
 
-# To avoid using the default DH params
-	GnuTLSDHFile /etc/apache2/dh.pem
 
-# these are only needed if GnuTLSClientVerify != ignore
-	GnuTLSClientCAFile ca.pem
-	GnuTLSPGPKeyringFile /etc/apache2/ring.asc
-</VirtualHost>
+
+VI.   CREATE OPENPGP CREDENTIALS FOR THE SERVER
+
+      mod_gnutls currently cannot read encrypted OpenPGP credentials.  That is,
+      when you generate a key with gpg and gpg prompts you for a passphrase,
+      just press enter.  Then press enter again, to confirm an empty
+      passphrase.  http://news.gmane.org/gmane.comp.apache.outoforder.modules
+
+      These instructions are from the GnuTLS manual:
+      http://www.gnu.org/software/gnutls/manual/html_node/Invoking-gnutls_002dserv.html#Invoking-gnutls_002dserv
+
+        $ gpg --gen-key
+        ...enter whatever details you want, use 'test.gnutls.org' as name...
+
+      Make a note of the OpenPGP key identifier of the newly generated key,
+      here it was 5D1D14D8.  You will need to export the key for GnuTLS to be
+      able to use it.
+
+         $ gpg -a --export 5D1D14D8 > openpgp-server.txt
+         $ gpg -a --export-secret-keys 5D1D14D8 > openpgp-server-key.txt

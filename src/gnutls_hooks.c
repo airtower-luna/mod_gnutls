@@ -54,6 +54,9 @@ static void gnutls_debug_log_all(int level, const char *str)
 {
     apr_file_printf(debug_log_fp, "<%d> %s\n", level, str);
 }
+#define _gnutls_log apr_file_printf
+#else
+# define _gnutls_log(...) 
 #endif
 
 int
@@ -61,6 +64,18 @@ mgs_hook_pre_config(apr_pool_t * pconf,
 		    apr_pool_t * plog, apr_pool_t * ptemp)
 {
 int ret;
+
+#if MOD_GNUTLS_DEBUG
+    apr_file_open(&debug_log_fp, "/tmp/gnutls_debug",
+		  APR_APPEND | APR_WRITE | APR_CREATE, APR_OS_DEFAULT,
+		  pconf);
+
+    _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
+
+    gnutls_global_set_log_level(9);
+    gnutls_global_set_log_function(gnutls_debug_log_all);
+    _gnutls_log(debug_log_fp, "gnutls: %s\n", gnutls_check_version(NULL));
+#endif
 
 #if APR_HAS_THREADS
     ap_mpm_query(AP_MPMQ_IS_THREADED, &mpm_is_threaded);
@@ -72,29 +87,20 @@ int ret;
 #endif
 
     if (gnutls_check_version(LIBGNUTLS_VERSION)==NULL) {
-        fprintf(stderr, "gnutls_check_version() failed. Required: gnutls-%s Found: gnutls-%s\n", 
+        _gnutls_log(debug_log_fp, "gnutls_check_version() failed. Required: gnutls-%s Found: gnutls-%s\n", 
           LIBGNUTLS_VERSION, gnutls_check_version(NULL));
         return -3;
     }
 
     ret = gnutls_global_init();
     if (ret < 0) {
-        fprintf(stderr, "gnutls_global_init: %s\n", gnutls_strerror(ret));
+        _gnutls_log(debug_log_fp, "gnutls_global_init: %s\n", gnutls_strerror(ret));
         return -3;
     }
 
     apr_pool_cleanup_register(pconf, NULL, mgs_cleanup_pre_config,
 			      apr_pool_cleanup_null);
 
-#if MOD_GNUTLS_DEBUG
-    apr_file_open(&debug_log_fp, "/tmp/gnutls_debug",
-		  APR_APPEND | APR_WRITE | APR_CREATE, APR_OS_DEFAULT,
-		  pconf);
-
-    gnutls_global_set_log_level(9);
-    gnutls_global_set_log_function(gnutls_debug_log_all);
-    apr_file_printf(debug_log_fp, "gnutls: %s\n", gnutls_check_version(NULL));
-#endif
 
     return OK;
 }
@@ -105,6 +111,8 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session)
     mgs_srvconf_rec *tsc;
     int ret;
     int cprio[2];
+
+    _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
 
     ctxt = gnutls_transport_get_ptr(session);
 
@@ -162,7 +170,11 @@ static int cert_retrieve_fn(gnutls_session_t session, gnutls_retr_st * ret)
 {
     mgs_handle_t *ctxt;
 
+    _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
     ctxt = gnutls_transport_get_ptr(session);
+
+    if (ctxt == NULL)
+        return GNUTLS_E_INTERNAL_ERROR;
 
     if (gnutls_certificate_type_get( session) == GNUTLS_CRT_X509) {
         ret->type = GNUTLS_CRT_X509;
@@ -210,6 +222,7 @@ static int read_crt_cn(server_rec * s, apr_pool_t * p,
     size_t data_len;
 
 
+    _gnutls_log(debug_log_fp,   "%s: %d\n", __func__, __LINE__);
     *cert_cn = NULL;
 
     data_len = 0;
@@ -261,6 +274,7 @@ static int read_pgpcrt_cn(server_rec * s, apr_pool_t * p,
     size_t data_len;
 
 
+    _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
     *cert_cn = NULL;
 
     data_len = 0;
@@ -293,6 +307,7 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
     int first_run = 0;
     const char *userdata_key = "mgs_init";
 
+    _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
     apr_pool_userdata_get(&data, userdata_key, base_server->process->pool);
     if (data == NULL) {
 	first_run = 1;
@@ -394,8 +409,9 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 	    }
 #endif
 
-	    if (sc->certs_x509[0] == NULL
-		&& sc->enabled == GNUTLS_ENABLED_TRUE) {
+	    if (sc->certs_x509[0] == NULL &&
+	        sc->cert_pgp == NULL &&
+		sc->enabled == GNUTLS_ENABLED_TRUE) {
 		ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
 			     "[GnuTLS] - Host '%s:%d' is missing a "
 			     "Certificate File!", s->server_hostname,
@@ -403,8 +419,9 @@ mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
 		exit(-1);
 	    }
 
-	    if (sc->privkey_x509 == NULL
-		&& sc->enabled == GNUTLS_ENABLED_TRUE) {
+	    if (sc->enabled == GNUTLS_ENABLED_TRUE && 
+	      ((sc->certs_x509[0] != NULL && sc->privkey_x509 == NULL) ||
+	      (sc->cert_pgp != NULL && sc->privkey_pgp == NULL))) {
 		ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
 			     "[GnuTLS] - Host '%s:%d' is missing a "
 			     "Private Key File!",
@@ -439,6 +456,7 @@ void mgs_hook_child_init(apr_pool_t * p, server_rec * s)
     mgs_srvconf_rec *sc = ap_get_module_config(s->module_config,
 					       &gnutls_module);
 
+    _gnutls_log(debug_log_fp,   "%s: %d\n", __func__, __LINE__);
     if (sc->cache_type != mgs_cache_none) {
 	rv = mgs_cache_child_init(p, s, sc);
 	if (rv != APR_SUCCESS) {
@@ -457,6 +475,7 @@ const char *mgs_hook_http_scheme(const request_rec * r)
 	(mgs_srvconf_rec *) ap_get_module_config(r->server->module_config,
 						 &gnutls_module);
 
+    _gnutls_log(debug_log_fp,   "%s: %d\n", __func__, __LINE__);
     if (sc->enabled == GNUTLS_ENABLED_FALSE) {
 	return NULL;
     }
@@ -470,6 +489,7 @@ apr_port_t mgs_hook_default_port(const request_rec * r)
 	(mgs_srvconf_rec *) ap_get_module_config(r->server->module_config,
 						 &gnutls_module);
 
+    _gnutls_log(debug_log_fp,   "%s: %d\n", __func__, __LINE__);
     if (sc->enabled == GNUTLS_ENABLED_FALSE) {
 	return 0;
     }
@@ -491,6 +511,7 @@ static int vhost_cb(void *baton, conn_rec * conn, server_rec * s)
     mgs_srvconf_rec *tsc;
     vhost_cb_rec *x = baton;
 
+    _gnutls_log(debug_log_fp,   "%s: %d\n", __func__, __LINE__);
     tsc = (mgs_srvconf_rec *) ap_get_module_config(s->module_config,
 						   &gnutls_module);
 
@@ -543,6 +564,7 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
     mgs_srvconf_rec *tsc;
 #endif
 
+    _gnutls_log(debug_log_fp,   "%s: %d\n", __func__, __LINE__);
     ctxt = gnutls_transport_get_ptr(session);
 
     rv = gnutls_server_name_get(ctxt->session, sni_name,
@@ -620,6 +642,7 @@ static mgs_handle_t *create_gnutls_handle(apr_pool_t * pool, conn_rec * c)
 						 module_config,
 						 &gnutls_module);
 
+    _gnutls_log(debug_log_fp,   "%s: %d\n", __func__, __LINE__);
     ctxt = apr_pcalloc(pool, sizeof(*ctxt));
     ctxt->c = c;
     ctxt->sc = sc;
@@ -658,6 +681,7 @@ int mgs_hook_pre_connection(conn_rec * c, void *csd)
 						 module_config,
 						 &gnutls_module);
 
+    _gnutls_log(debug_log_fp,   "%s: %d\n", __func__, __LINE__);
     if (!(sc && (sc->enabled == GNUTLS_ENABLED_TRUE))) {
 	return DECLINED;
     }
@@ -687,6 +711,7 @@ int mgs_hook_fixups(request_rec * r)
     mgs_handle_t *ctxt;
     int rv = OK;
 
+    _gnutls_log(debug_log_fp,   "%s: %d\n", __func__, __LINE__);
     apr_table_t *env = r->subprocess_env;
 
     ctxt =
@@ -761,6 +786,7 @@ int mgs_hook_authz(request_rec * r)
     mgs_dirconf_rec *dc = ap_get_module_config(r->per_dir_config,
 					       &gnutls_module);
 
+    _gnutls_log(debug_log_fp,   "%s: %d\n", __func__, __LINE__);
     ctxt =
 	ap_get_module_config(r->connection->conn_config, &gnutls_module);
 
@@ -822,6 +848,7 @@ mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, int side,
 
     apr_table_t *env = r->subprocess_env;
 
+    _gnutls_log(debug_log_fp,   "%s: %d\n", __func__, __LINE__);
     if (export_certificates_enabled != 0) {
 	char cert_buf[10 * 1024];
 	len = sizeof(cert_buf);
@@ -928,6 +955,7 @@ mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t cert, int side
     size_t len;
     int ret;
 
+    _gnutls_log(debug_log_fp,   "%s: %d\n", __func__, __LINE__);
     apr_table_t *env = r->subprocess_env;
 
     if (export_certificates_enabled != 0) {
@@ -994,6 +1022,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
     } cert;
     apr_time_t activation_time, expiration_time, cur_time;
 
+    _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
     cert_list =
 	gnutls_certificate_get_peers(ctxt->session, &cert_list_size);
 
