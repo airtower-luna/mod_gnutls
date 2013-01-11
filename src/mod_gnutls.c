@@ -21,7 +21,9 @@
 GCRY_THREAD_OPTION_PTHREAD_IMPL;
 #endif
 
+#if MOD_GNUTLS_DEBUG
 static apr_file_t* debug_log_fp;
+#endif
 
 static apr_status_t mod_gnutls_cleanup_pre_config(void *data)
 {
@@ -29,10 +31,12 @@ static apr_status_t mod_gnutls_cleanup_pre_config(void *data)
     return APR_SUCCESS;
 }
 
+#if MOD_GNUTLS_DEBUG
 static void gnutls_debug_log_all( int level, const char* str)
 {
     apr_file_printf(debug_log_fp, "<%d> %s\n", level, str);
 }
+#endif
 
 static int mod_gnutls_hook_pre_config(apr_pool_t * pconf,
                                       apr_pool_t * plog, apr_pool_t * ptemp)
@@ -48,11 +52,13 @@ static int mod_gnutls_hook_pre_config(apr_pool_t * pconf,
     apr_pool_cleanup_register(pconf, NULL, mod_gnutls_cleanup_pre_config,
                               apr_pool_cleanup_null);
 
+#if MOD_GNUTLS_DEBUG
     apr_file_open(&debug_log_fp, "/tmp/gnutls_debug",
                   APR_APPEND|APR_WRITE|APR_CREATE, APR_OS_DEFAULT, pconf);
 
     gnutls_global_set_log_level(9);
     gnutls_global_set_log_function(gnutls_debug_log_all);
+#endif
 
     return OK;
 }
@@ -520,8 +526,13 @@ static void gnutls_hooks(apr_pool_t * p)
                         APR_HOOK_MIDDLE);
     ap_hook_child_init(mod_gnutls_hook_child_init, NULL, NULL,
                         APR_HOOK_MIDDLE);
+#if USING_2_1_RECENT
     ap_hook_http_scheme(mod_gnutls_hook_http_scheme, NULL, NULL,
                         APR_HOOK_MIDDLE);
+#else
+    ap_hook_http_method(mod_gnutls_hook_http_scheme, NULL, NULL,
+                        APR_HOOK_MIDDLE);
+#endif
     ap_hook_default_port(mod_gnutls_hook_default_port, NULL, NULL,
                          APR_HOOK_MIDDLE);
     ap_hook_pre_config(mod_gnutls_hook_pre_config, NULL, NULL,
