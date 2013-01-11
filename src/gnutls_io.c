@@ -587,26 +587,29 @@ apr_status_t mgs_filter_output(ap_filter_t * f,
             if (!APR_STATUS_IS_EOF(status) && (status != APR_SUCCESS)) {
                 break;
             }
+            
+            if (len > 0) {
 
-            do {
-                ret = gnutls_record_send(ctxt->session, data, len);
-            }
-            while(ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
+                do {
+                    ret = gnutls_record_send(ctxt->session, data, len);
+                }
+                while(ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
 
-            if (ret < 0) {
-                /* error sending output */
-                ap_log_error(APLOG_MARK, APLOG_INFO, ctxt->output_rc,
+                if (ret < 0) {
+                    /* error sending output */
+                    ap_log_error(APLOG_MARK, APLOG_INFO, ctxt->output_rc,
                              ctxt->c->base_server,
                              "GnuTLS: Error writing data."
                              " (%d) '%s'", (int)ret, gnutls_strerror(ret));
-                if (ctxt->output_rc == APR_SUCCESS) {
-                    ctxt->output_rc = APR_EGENERAL;
+                    if (ctxt->output_rc == APR_SUCCESS) {
+                        ctxt->output_rc = APR_EGENERAL;
+                    }
                 }
-            }
-            else if (ret != len) {
-                /* Not able to send the entire bucket, 
-                   split it and send it again. */
-                apr_bucket_split(bucket, ret);
+                else if (ret != len) {
+                    /* Not able to send the entire bucket, 
+                       split it and send it again. */
+                    apr_bucket_split(bucket, ret);
+                }
             }
 
             apr_bucket_delete(bucket);
