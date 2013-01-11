@@ -1,4 +1,12 @@
-** Verison 0.5.4 (2009-01-04)
+** Version 0.5.5 (2009-06-13)
+
+- Removed limits on CA certificate loading. Reported by
+  Sander Marechal and Jack Bates.
+
+- Do not allow sending empty TLS packets even when instructed to.
+  This had the side effect of clients closing connection.
+
+** Version 0.5.4 (2009-01-04)
 
 - mod_gnutls.h: modified definition to extern to avoid compilation
   errors in darwin.

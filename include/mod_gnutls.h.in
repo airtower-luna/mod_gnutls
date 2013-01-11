@@ -79,10 +79,6 @@ typedef struct
 } mgs_dirconf_rec;
 
 
-/* The maximum number of client CA certificates allowed.
- */
-#define MAX_CA_CRTS 128
-
 /* The maximum number of certificates to send in a chain
  */
 #define MAX_CHAIN_SIZE 8
@@ -111,7 +107,7 @@ typedef struct
     const char* cache_config;
     const char* srp_tpasswd_file;
     const char* srp_tpasswd_conf_file;
-    gnutls_x509_crt_t ca_list[MAX_CA_CRTS];
+    gnutls_x509_crt_t *ca_list;
     gnutls_openpgp_keyring_t pgp_list;
     unsigned int ca_list_size;
     int client_verify_mode;
