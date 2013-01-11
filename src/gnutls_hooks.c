@@ -20,12 +20,15 @@
 #include "http_vhost.h"
 #include "ap_mpm.h"
 
-#if !USING_2_1_RECENT
-extern server_rec *ap_server_conf;
+#if APR_HAS_THREADS
+# if GNUTLS_VERSION_MAJOR <= 2 && GNUTLS_VERSION_MINOR < 11
+#include <gcrypt.h>
+GCRY_THREAD_OPTION_PTHREAD_IMPL;
+# endif
 #endif
 
-#if APR_HAS_THREADS
-GCRY_THREAD_OPTION_PTHREAD_IMPL;
+#if !USING_2_1_RECENT
+extern server_rec *ap_server_conf;
 #endif
 
 #if MOD_GNUTLS_DEBUG
@@ -33,6 +36,7 @@ static apr_file_t *debug_log_fp;
 #endif
 
 static int mpm_is_threaded;
+static gnutls_datum session_ticket_key = { NULL, 0 };
 
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt);
 /* use side==0 for server and side==1 for client */
@@ -45,6 +49,9 @@ static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t ce
 
 static apr_status_t mgs_cleanup_pre_config(void *data)
 {
+    gnutls_free(session_ticket_key.data);
+    session_ticket_key.data = NULL;
+    session_ticket_key.size = 0;
     gnutls_global_deinit();
     return APR_SUCCESS;
 }
@@ -79,12 +86,15 @@ int ret;
 
 #if APR_HAS_THREADS
     ap_mpm_query(AP_MPMQ_IS_THREADED, &mpm_is_threaded);
+#if (GNUTLS_VERSION_MAJOR == 2 && GNUTLS_VERSION_MINOR < 11) || GNUTLS_VERSION_MAJOR < 2
     if (mpm_is_threaded) {
 	gcry_control(GCRYCTL_SET_THREAD_CBS, &gcry_threads_pthread);
     }
+#endif
 #else
     mpm_is_threaded = 0;
 #endif
+
 
     if (gnutls_check_version(LIBGNUTLS_VERSION)==NULL) {
         _gnutls_log(debug_log_fp, "gnutls_check_version() failed. Required: gnutls-%s Found: gnutls-%s\n", 
@@ -96,6 +106,11 @@ int ret;
     if (ret < 0) {
         _gnutls_log(debug_log_fp, "gnutls_global_init: %s\n", gnutls_strerror(ret));
         return -3;
+    }
+    
+    ret = gnutls_session_ticket_key_generate( &session_ticket_key);
+    if (ret < 0) {
+        _gnutls_log(debug_log_fp, "gnutls_session_ticket_key_generate: %s\n", gnutls_strerror(ret));
     }
 
     apr_pool_cleanup_register(pconf, NULL, mgs_cleanup_pre_config,
@@ -144,7 +159,7 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session)
     /* update the priorities - to avoid negotiating a ciphersuite that is not
      * enabled on this virtual server. Note that here we ignore the version
      * negotiation.
-     */
+     */   
     ret = gnutls_priority_set(session, ctxt->sc->priorities);
     /* actually it shouldn't fail since we have checked at startup */
     if (ret < 0)
@@ -658,6 +673,8 @@ static mgs_handle_t *create_gnutls_handle(apr_pool_t * pool, conn_rec * c)
     ctxt->output_length = 0;
 
     gnutls_init(&ctxt->session, GNUTLS_SERVER);
+    if (session_ticket_key.data != NULL && ctxt->sc->tickets != 0)
+        gnutls_session_ticket_enable_server(ctxt->session, &session_ticket_key);
 
     /* because we don't set any default priorities here (we set later at
      * the user hello callback) we need to at least set this in order for
@@ -1027,7 +1044,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
 {
     const gnutls_datum_t *cert_list;
     unsigned int cert_list_size, status, expired;
-    int rv, ret;
+    int rv = GNUTLS_E_NO_CERTIFICATE_FOUND, ret;
     unsigned int ch_size = 0;
     union {
       gnutls_x509_crt_t x509[MAX_CHAIN_SIZE];
@@ -1056,7 +1073,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
             "GnuTLS: A Chain of %d certificate(s) was provided for validation", cert_list_size);
 
-        for (ch_size =0; ch_size<cert_list_size; ch_size++) {
+        for (ch_size = 0; ch_size<cert_list_size; ch_size++) {
             gnutls_x509_crt_init(&cert.x509[ch_size]);
             rv = gnutls_x509_crt_import(cert.x509[ch_size], &cert_list[ch_size], GNUTLS_X509_FMT_DER);
             // When failure to import, leave the loop

@@ -285,6 +285,22 @@ const char *mgs_set_pgpkey_file(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
+const char *mgs_set_tickets(cmd_parms * parms, void *dummy,
+				     const char *arg)
+{
+    mgs_srvconf_rec *sc =
+	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
+						 module_config,
+						 &gnutls_module);
+
+    sc->tickets = 0;
+    if (strcasecmp("on", arg) == 0) {
+	sc->tickets = 1;
+    }
+
+    return NULL;
+}
+
 
 #ifdef ENABLE_SRP
 
@@ -327,9 +343,8 @@ const char *mgs_set_cache(cmd_parms * parms, void *dummy,
 	return err;
     }
 
-    if (strcasecmp("none", type) == 0) {
-	sc->cache_type = mgs_cache_none;
-    } else if (strcasecmp("dbm", type) == 0) {
+    sc->cache_type = mgs_cache_none;
+    if (strcasecmp("dbm", type) == 0) {
 	sc->cache_type = mgs_cache_dbm;
     }
 #if HAVE_APR_MEMCACHE
@@ -589,7 +604,7 @@ void *mgs_config_server_create(apr_pool_t * p, server_rec * s)
     memset( sc->certs_x509, 0, sizeof(sc->certs_x509));
     sc->certs_x509_num = 0;
     sc->cache_timeout = apr_time_from_sec(300);
-    sc->cache_type = mgs_cache_dbm;
+    sc->cache_type = mgs_cache_none;
     sc->cache_config = ap_server_root_relative(p, "conf/gnutls_cache");
 
     sc->client_verify_mode = GNUTLS_CERT_IGNORE;
