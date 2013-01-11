@@ -38,6 +38,10 @@
 #define MC_TAG_LEN sizeof(MC_TAG)
 #define STR_SESSION_LEN (GNUTLS_SESSION_ID_STRING_LEN + MC_TAG_LEN)
 
+#if MODULE_MAGIC_NUMBER_MAJOR < 20081201
+#define ap_unixd_config unixd_config
+#endif
+
 char *mgs_session_id2sz(unsigned char *id, int idlen,
                                char *str, int strsize)
 {
@@ -544,9 +548,9 @@ static int dbm_cache_post_config(apr_pool_t *p, server_rec *s,
 #if !defined(OS2) && !defined(WIN32) && !defined(BEOS) && !defined(NETWARE)
     /* Running as Root */
     if (geteuid() == 0)  {
-        chown(path1, unixd_config.user_id, -1);
+        chown(path1, ap_unixd_config.user_id, -1);
         if (path2 != NULL) { 
-            chown(path2, unixd_config.user_id, -1);
+            chown(path2, ap_unixd_config.user_id, -1);
         }
     }
 #endif

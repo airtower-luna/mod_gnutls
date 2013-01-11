@@ -1,3 +1,12 @@
+** Version 0.5.6 (2010-03-24)
+- Corrected issue with firefox and long POST data (by
+  handling EINTR and EAGAIN errors in read).
+
+- Added support for chained client certificates
+
+- Corrected more issues related to double frees
+http://issues.outoforder.cc/view.php?id=102
+
 ** Version 0.5.5 (2009-06-13)
 
 - Removed limits on CA certificate loading. Reported by
