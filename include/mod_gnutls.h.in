@@ -1,0 +1,188 @@
+/**
+ *  Copyright 2004-2005 Paul Querna
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ */
+
+#include "httpd.h"
+#include "http_config.h"
+#include "http_protocol.h"
+#include "http_connection.h"
+#include "http_request.h"
+#include "http_core.h"
+#include "http_log.h"
+#include "apr_buckets.h"
+#include "apr_strings.h"
+#include "apr_tables.h"
+
+#ifndef __mod_gnutls_h_inc
+#define __mod_gnutls_h_inc
+
+#define HAVE_APR_MEMCACHE    @have_apr_memcache@
+
+#include <gcrypt.h>
+#include <gnutls/gnutls.h>
+
+module AP_MODULE_DECLARE_DATA gnutls_module;
+
+#define GNUTLS_OUTPUT_FILTER_NAME "gnutls_output_filter"
+#define GNUTLS_INPUT_FILTER_NAME "gnutls_input_filter"
+
+#define GNUTLS_ENABLED_FALSE 0
+#define GNUTLS_ENABLED_TRUE  1
+
+#define MOD_GNUTLS_VERSION "@MOD_GNUTLS_VERSION@"
+
+typedef enum 
+{
+    mod_gnutls_cache_none,
+    mod_gnutls_cache_dbm,
+#if HAVE_APR_MEMCACHE
+    mod_gnutls_cache_memcache
+#endif
+} mod_gnutls_cache_e;
+
+typedef struct
+{
+    gnutls_certificate_credentials_t certs;
+    char *key_file;
+    char *cert_file;
+    int enabled;
+    int ciphers[16];
+    int key_exchange[16];
+    int macs[16];
+    int protocol[16];
+    int compression[16];
+    int cert_types[16];
+    apr_time_t cache_timeout;
+    mod_gnutls_cache_e cache_type;
+    const char* cache_config;
+    const char* rsa_params_file;
+    const char* dh_params_file;
+} mod_gnutls_srvconf_rec;
+
+typedef struct {
+    int length;
+    char *value;
+} mod_gnutls_char_buffer_t;
+
+typedef struct
+{
+    mod_gnutls_srvconf_rec *sc;
+    conn_rec* c;
+    gnutls_session_t session;
+
+    apr_status_t input_rc;
+    ap_filter_t *input_filter;
+    apr_bucket_brigade *input_bb;
+    apr_read_type_e input_block;
+    ap_input_mode_t input_mode;
+    mod_gnutls_char_buffer_t input_cbuf;
+    char input_buffer[AP_IOBUFSIZE];
+
+    apr_status_t output_rc;
+    ap_filter_t *output_filter;
+    apr_bucket_brigade *output_bb;
+    char output_buffer[AP_IOBUFSIZE];
+    apr_size_t output_blen;
+    apr_size_t output_length;
+
+    int status;
+    int non_https;
+} mod_gnutls_handle_t;
+
+/** Functions in gnutls_io.c **/
+
+/**
+ * mod_gnutls_filter_input will filter the input data
+ * by decrypting it using GnuTLS and passes it cleartext.
+ *
+ * @param f     the filter info record
+ * @param bb    the bucket brigade, where to store the result to
+ * @param mode  what shall we read?
+ * @param block a block index we shall read from?
+ * @return result status
+ */
+apr_status_t mod_gnutls_filter_input(ap_filter_t * f,
+                                     apr_bucket_brigade * bb,
+                                     ap_input_mode_t mode,
+                                     apr_read_type_e block,
+                                     apr_off_t readbytes);
+
+/**
+ * mod_gnutls_filter_output will filter the encrypt
+ * the incoming bucket using GnuTLS and passes it onto the next filter.
+ *
+ * @param f     the filter info record
+ * @param bb    the bucket brigade, where to store the result to
+ * @return result status
+ */
+apr_status_t mod_gnutls_filter_output(ap_filter_t * f,
+                                      apr_bucket_brigade * bb);
+
+
+/**
+ * mod_gnutls_transport_read is called from GnuTLS to provide encrypted 
+ * data from the client.
+ *
+ * @param ptr     pointer to the filter context
+ * @param buffer  place to put data
+ * @param len     maximum size
+ * @return size   length of the data stored in buffer
+ */
+ssize_t mod_gnutls_transport_read(gnutls_transport_ptr_t ptr,
+                                  void *buffer, size_t len);
+
+/**
+ * mod_gnutls_transport_write is called from GnuTLS to 
+ * write data to the client.
+ *
+ * @param ptr     pointer to the filter context
+ * @param buffer  buffer to write to the client
+ * @param len     size of the buffer
+ * @return size   length of the data written
+ */
+ssize_t mod_gnutls_transport_write(gnutls_transport_ptr_t ptr,
+                                   const void *buffer, size_t len);
+
+
+/**
+ * Init the Cache after Configuration is done
+ */
+int mod_gnutls_cache_post_config(apr_pool_t *p, server_rec *s, 
+                                 mod_gnutls_srvconf_rec *sc);
+/**
+ * Init the Cache inside each Process
+ */
+int mod_gnutls_cache_child_init(apr_pool_t *p, server_rec *s, 
+                                mod_gnutls_srvconf_rec *sc);
+/**
+ * Setup the Session Caching
+ */
+int mod_gnutls_cache_session_init(mod_gnutls_handle_t *ctxt);
+
+#define GNUTLS_SESSION_ID_STRING_LEN \
+    ((GNUTLS_MAX_SESSION_ID + 1) * 2)
+    
+/**
+ * Convert a SSL Session ID into a Null Terminated Hex Encoded String
+ * @param id raw SSL Session ID
+ * @param idlen Length of the raw Session ID
+ * @param str Location to store the Hex Encoded String
+ * @param strsize The Maximum Length that can be stored in str
+ */
+char *mod_gnutls_session_id2sz(unsigned char *id, int idlen,
+                                char *str, int strsize);
+
+#endif /*  __mod_gnutls_h_inc */

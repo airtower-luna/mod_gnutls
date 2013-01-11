@@ -1,0 +1,60 @@
+mod_gnutls 
+
+This module started back in September of 2004 because I was tired of trying to
+fix bugs in mod_ssl.  mod_ssl is a giant beast of a module -- no offense to it's 
+authors is intended -- but I believe it has fallen prey to massive feature bloat.
+
+When I started hacking on httpd, mod_ssl remained a great mystery to me, and 
+when I actually looked at it, I ran away.  The shear ammount code is huge, and it 
+does not conform to the style guidelines.  It was painful to read, and even harder
+to debug.  I wanted to understand how it worked, and I had recently heard about 
+GnuTLS, so long story short, I decided to implement a mod_gnutls.
+
+Lines of Code in mod_ssl: 15,324
+Lines of Code in mod_gnutls: 1,886
+
+Because of writing mod_gnutls, I now understand how input and output filters work, 
+better than I ever thought possible.  It was a little painful at times, and some parts
+lift code and ideas directly from mod_ssl. Kudos to the original authors of mod_ssl.
+
+----------------------------
+
+Author: Paul Querna <chip force-elite.com
+
+License: Apache Software License v2.0. (see the LICENSE file for details)
+
+Current Status:
+- SSL and TLS connections with all popular browsers work!
+- Sets some enviromental vars for scripts
+- Supports Memcached as a distributed SSL Session Cache
+- Supports DBM as a local SSL Session Cache
+
+Future Development:
+- Support for Server Name Indication (partial support is in, but disabled)
+- Support for Client Certificates
+
+Basic Configuration:
+
+LoadModule gnutls_module  modules/mod_gnutls.so
+
+# mod_gnutls can optionaly use a memcached server to store it's SSL Sessions.
+# This is useful in a cluster enviroment, where you want all of your servers 
+# to share a single SSL Session Cache.
+#GnuTLSCache memcache "127.0.0.1 server2.example.com server3.example.com"
+
+# The Default method is to use a DBM backed Cache.  It isn't super fast, but 
+# it is portable and does not require another server to be running like memcached.
+GnuTLSCache dbm conf/gnutls_cache
+
+<VirtualHost 1.2.3.4:443>
+    # insert other directives ... here ...
+
+    # This enables the mod_gnutls Handlers for this Virtual Host
+    GnuTLSEnable On
+
+    # This is the Private key for your server.
+    GnuTLSKeyFile conf/server.key
+
+    # This is the Server Certificate.  
+    GnuTLSCertificateFile conf/server.cert
+</VirtualHost>
