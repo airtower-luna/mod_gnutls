@@ -1,3 +1,13 @@
+** Verison 0.5.4 (2009-01-04)
+
+- mod_gnutls.h: modified definition to extern to avoid compilation
+  errors in darwin.
+
+- Added patch to fix issue with mod_proxy. Investigation and patch by Alain
+  Knaff.
+
+- libgnutls detection uses pkg-config.
+
 ** Version 0.5.3 (2008-10-16)
 
 - Corrected bug to allow having an OpenPGP-only web site.
