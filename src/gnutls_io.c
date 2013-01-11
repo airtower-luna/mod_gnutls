@@ -368,7 +368,7 @@ tryagain:
     do {
         ret = gnutls_handshake(ctxt->session);
         maxtries--;
-    } while (ret == GNUTLS_E_AGAIN && maxtries > 0);
+    } while ((ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN) && maxtries > 0);
 
     if (maxtries < 1) {
         ctxt->status = -1;
@@ -379,9 +379,12 @@ tryagain:
         ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
                      "GnuTLS: Handshake Failed. Hit Maximum Attempts");
 #endif
-        gnutls_alert_send(ctxt->session, GNUTLS_AL_FATAL, 
-                          gnutls_error_to_alert(ret, NULL));
-        gnutls_deinit(ctxt->session);
+        if (ctxt->session) {
+            gnutls_alert_send(ctxt->session, GNUTLS_AL_FATAL, 
+                          gnutls_error_to_alert(GNUTLS_E_INTERNAL_ERROR, NULL));
+            gnutls_deinit(ctxt->session);
+        }
+        ctxt->session = NULL;
         return -1;
     }
 
@@ -410,9 +413,12 @@ tryagain:
                      gnutls_strerror(ret));
 #endif
         ctxt->status = -1;
-        gnutls_alert_send(ctxt->session, GNUTLS_AL_FATAL, 
+        if (ctxt->session) {
+            gnutls_alert_send(ctxt->session, GNUTLS_AL_FATAL, 
                           gnutls_error_to_alert(ret, NULL));
-        gnutls_deinit(ctxt->session);
+            gnutls_deinit(ctxt->session);
+        }
+        ctxt->session = NULL;
         return ret;
     }
     else {
@@ -541,24 +547,37 @@ apr_status_t mgs_filter_output(ap_filter_t * f,
 
     while (!APR_BRIGADE_EMPTY(bb)) {
         apr_bucket *bucket = APR_BRIGADE_FIRST(bb);
-        if (AP_BUCKET_IS_EOC(bucket)) {
-            do {
-                ret = gnutls_bye( ctxt->session, GNUTLS_SHUT_WR);
-            } while(ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
+        
+        if (AP_BUCKET_IS_EOC(bucket) || APR_BUCKET_IS_EOS(bucket)) {
+            apr_bucket_brigade * tmpb;
+            
+            if (APR_BUCKET_IS_EOS(bucket)) {
+                tmpb = bb;
+            } else {
+                tmpb = ctxt->output_bb;
+            }
+            
+            if (ctxt->session != NULL) {
+                do {
+                    ret = gnutls_bye( ctxt->session, GNUTLS_SHUT_WR);
+                } while(ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
+            }
 
             apr_bucket_copy(bucket, &e);
             APR_BRIGADE_INSERT_TAIL(ctxt->output_bb, e);
             
-            if ((status = ap_pass_brigade(f->next, ctxt->output_bb)) != APR_SUCCESS) {
+            if ((status = ap_pass_brigade(f->next, tmpb)) != APR_SUCCESS) {
                 apr_brigade_cleanup(ctxt->output_bb);
                 return status;
             }
 
             apr_brigade_cleanup(ctxt->output_bb);
-            gnutls_deinit(ctxt->session);
+            if (ctxt->session) {
+                gnutls_deinit(ctxt->session);
+                ctxt->session = NULL;
+            }
             continue;
-
-        } else if (APR_BUCKET_IS_FLUSH(bucket) || APR_BUCKET_IS_EOS(bucket)) {
+        } else if (APR_BUCKET_IS_FLUSH(bucket)) {
 
             apr_bucket_copy(bucket, &e);
             APR_BRIGADE_INSERT_TAIL(ctxt->output_bb, e);
@@ -651,8 +670,15 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
          */
         if (APR_STATUS_IS_EAGAIN(rc) || APR_STATUS_IS_EINTR(rc)
             || (rc == APR_SUCCESS && APR_BRIGADE_EMPTY(ctxt->input_bb))) {
-            return 0;
+            
+            if (APR_STATUS_IS_EOF(ctxt->input_rc)) {
+                return 0;
+            } else {
+                gnutls_transport_set_errno(ctxt->session, EINTR);
+                return -1;
+            }
         }
+        
 
         if (rc != APR_SUCCESS) {
             /* Unexpected errors discard the brigade */
@@ -670,6 +696,11 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
 
     if (APR_STATUS_IS_EAGAIN(ctxt->input_rc)
         || APR_STATUS_IS_EINTR(ctxt->input_rc)) {
+        if (len == 0) {
+            gnutls_transport_set_errno(ctxt->session, EINTR);
+            return -1;
+        }
+
         return (ssize_t) len;
     }
 

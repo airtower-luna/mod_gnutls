@@ -123,7 +123,7 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session)
 	ctxt->sc = tsc;
 
     gnutls_certificate_server_set_request(session,
-					  ctxt->sc->client_verify_mode);
+					      ctxt->sc->client_verify_mode);
 
     /* set the new server credentials 
      */
@@ -750,8 +750,8 @@ int mgs_hook_fixups(request_rec * r)
 					       (ctxt->session)));
 
 #ifdef ENABLE_SRP
-    apr_table_setn(env, "SSL_SRP_USER",
-		   gnutls_srp_server_get_username(ctxt->session));
+    tmp = gnutls_srp_server_get_username(ctxt->session);
+    apr_table_setn(env, "SSL_SRP_USER", (tmp!=NULL)?tmp:"");
 #endif
 
     if (apr_table_get(env, "SSL_CLIENT_VERIFY") == NULL)
@@ -808,6 +808,12 @@ int mgs_hook_authz(request_rec * r)
 			  ctxt->sc->client_verify_mode,
 			  dc->client_verify_mode);
 
+            /* If we already have a client certificate, there's no point in
+             * re-handshaking... */
+            rv = mgs_cert_verify(r, ctxt);
+            if (rv != DECLINED && rv != HTTP_FORBIDDEN)
+                return rv;
+
 	    gnutls_certificate_server_set_request(ctxt->session,
 						  dc->client_verify_mode);
 
@@ -819,11 +825,13 @@ int mgs_hook_authz(request_rec * r)
 	    ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
 			  "GnuTLS: Peer is set to IGNORE");
 #endif
-	} else {
-	    rv = mgs_cert_verify(r, ctxt);
-	    if (rv != DECLINED) {
-		return rv;
-	    }
+	    return DECLINED;
+	}
+	rv = mgs_cert_verify(r, ctxt);
+	if (rv != DECLINED &&
+	    (rv != HTTP_FORBIDDEN ||
+	     dc->client_verify_mode == GNUTLS_CERT_REQUIRE)) {
+	    return rv;
 	}
     }
 
@@ -1020,8 +1028,9 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
     const gnutls_datum_t *cert_list;
     unsigned int cert_list_size, status, expired;
     int rv, ret;
+    unsigned int ch_size = 0;
     union {
-      gnutls_x509_crt_t x509;
+      gnutls_x509_crt_t x509[MAX_CHAIN_SIZE];
       gnutls_openpgp_crt_t pgp;
     } cert;
     apr_time_t activation_time, expiration_time, cur_time;
@@ -1043,19 +1052,40 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
 	return HTTP_FORBIDDEN;
     }
 
-    if (cert_list_size > 1) {
-	ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+    if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_X509) {
+        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+            "GnuTLS: A Chain of %d certificate(s) was provided for validation", cert_list_size);
+
+        for (ch_size =0; ch_size<cert_list_size; ch_size++) {
+            gnutls_x509_crt_init(&cert.x509[ch_size]);
+            rv = gnutls_x509_crt_import(cert.x509[ch_size], &cert_list[ch_size], GNUTLS_X509_FMT_DER);
+            // When failure to import, leave the loop
+            if ( rv != GNUTLS_E_SUCCESS ) {
+                if (ch_size < 1) {
+                    ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+                            "GnuTLS: Failed to Verify Peer: "
+                            "Failed to import peer certificates.");
+                    ret = HTTP_FORBIDDEN;
+                    goto exit;
+                }
+                ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+                        "GnuTLS: Failed to import some peer certificates. Using %d certificates", 
+                        ch_size);
+                rv = GNUTLS_E_SUCCESS;
+                break;
+            }
+        }
+    } else if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_OPENPGP) {
+        if (cert_list_size > 1) {
+	    ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
 		      "GnuTLS: Failed to Verify Peer: "
 		      "Chained Client Certificates are not supported.");
-	return HTTP_FORBIDDEN;
-    }
+            return HTTP_FORBIDDEN;
+        }
 
-    if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_X509) {
-        gnutls_x509_crt_init(&cert.x509);
-        rv = gnutls_x509_crt_import(cert.x509, &cert_list[0], GNUTLS_X509_FMT_DER);
-    } else if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_OPENPGP) {
         gnutls_openpgp_crt_init(&cert.pgp);
         rv = gnutls_openpgp_crt_import(cert.pgp, &cert_list[0], GNUTLS_OPENPGP_FMT_RAW);
+
     } else return HTTP_FORBIDDEN;
  
     if (rv < 0) {
@@ -1068,12 +1098,15 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
 
     if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_X509) {
         apr_time_ansi_put(&expiration_time,
-		      gnutls_x509_crt_get_expiration_time(cert.x509));
+		      gnutls_x509_crt_get_expiration_time(cert.x509[0]));
         apr_time_ansi_put(&activation_time,
-		      gnutls_x509_crt_get_activation_time(cert.x509));
+		      gnutls_x509_crt_get_activation_time(cert.x509[0]));
 
-        rv = gnutls_x509_crt_verify(cert.x509, ctxt->sc->ca_list,
-				ctxt->sc->ca_list_size, 0, &status);
+        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+            "GnuTLS: Verifying list of  %d certificate(s)", ch_size);
+        rv = gnutls_x509_crt_list_verify(cert.x509, ch_size, 
+                ctxt->sc->ca_list, ctxt->sc->ca_list_size,
+                NULL, 0, 0, &status);
     } else {
         apr_time_ansi_put(&expiration_time,
 		      gnutls_openpgp_crt_get_expiration_time(cert.pgp));
@@ -1109,11 +1142,13 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
 	expired = 1;
     }
 
-    if (expiration_time < cur_time) {
-	ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+    if (gnutls_certificate_type_get( ctxt->session) != GNUTLS_CRT_OPENPGP || expiration_time != 0) {
+        if (expiration_time < cur_time) {
+	    ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
 		      "GnuTLS: Failed to Verify Peer: "
 		      "Peer Certificate is expired.");
-	expired = 1;
+            expired = 1;
+        }
     }
 
     if (status & GNUTLS_CERT_SIGNER_NOT_FOUND) {
@@ -1135,7 +1170,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
     }
 
     if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_X509)
-        mgs_add_common_cert_vars(r, cert.x509, 1,
+        mgs_add_common_cert_vars(r, cert.x509[0], 1,
 			     ctxt->sc->export_certificates_enabled);
     else if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_OPENPGP)
         mgs_add_common_pgpcert_vars(r, cert.pgp, 1,
@@ -1162,9 +1197,12 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt)
     }
 
   exit:
-    if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_X509)
-        gnutls_x509_crt_deinit(cert.x509);
-    else if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_OPENPGP)
+    if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_X509) {
+        int i;
+        for (i=0; i<ch_size; i++) {
+            gnutls_x509_crt_deinit(cert.x509[i]);
+        }
+    } else if (gnutls_certificate_type_get( ctxt->session) == GNUTLS_CRT_OPENPGP)
         gnutls_openpgp_crt_deinit(cert.pgp);
     return ret;
 
