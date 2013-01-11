@@ -3,7 +3,7 @@ dnl CHECK_APACHE([MINIMUM13-VERSION [, MINIMUM20-VERSION [,
 dnl            ACTION-IF-FOUND13 [, ACTION-IF-FOUND20 [, ACTION-IF-NOT-FOUND]]])
 dnl Test for Apache apxs, APR, and APU
 
-AC_DEFUN(CHECK_APACHE,
+AC_DEFUN([CHECK_APACHE],
 [dnl
 AC_ARG_WITH(
     apxs,
@@ -74,6 +74,9 @@ AC_ARG_ENABLE(
                     AC_DEFINE(WITH_APACHE20,1,[Define to 1 if we are compiling with Apache 2.0.x])
                     AP_VERSION="2.0"
                     APXS_EXTENSION=.la
+		    if test -f `$APXS_BIN -q INCLUDEDIR`/mod_status.h; then
+			AC_DEFINE(HAVE_MOD_STATUS_H,1,[Define to 1 if mod_status.h and the mod_Status hook are available])
+		    fi
                     AP_CFLAGS="$AP_CFLAGS $APU_INCLUDES $APR_INCLUDES"
                     AP_CPPFLAGS="$AP_CPPFLAGS $APU_INCLUDES $APR_INCLUDES"
                     AP_DEFS="-DWITH_APACHE20"

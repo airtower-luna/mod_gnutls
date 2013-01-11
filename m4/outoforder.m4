@@ -4,7 +4,7 @@ dnl this writes a "config.nice" file which reinvokes ./configure with all
 dnl of the arguments. this is different from config.status which simply
 dnl regenerates the output files. config.nice is useful after you rebuild
 dnl ./configure (via autoconf or autogen.sh)
-AC_DEFUN(OOO_CONFIG_NICE,[
+AC_DEFUN([OOO_CONFIG_NICE],[
   echo configure: creating $1
   rm -f $1
   cat >$1<<EOF
@@ -25,7 +25,7 @@ EOF
 
 dnl this macro adds a maintainer mode option to enable programmer specific
 dnl  code in makefiles
-AC_DEFUN(OOO_MAINTAIN_MODE,[
+AC_DEFUN([OOO_MAINTAIN_MODE],[
   AC_ARG_ENABLE(
         maintainer,
         [AC_HELP_STRING([--enable-maintainer],[Enable maintainer mode for this project])],

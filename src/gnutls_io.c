@@ -35,7 +35,7 @@ static apr_status_t gnutls_io_filter_error(ap_filter_t * f,
                                            apr_bucket_brigade * bb,
                                            apr_status_t status)
 {
-    mod_gnutls_handle_t *ctxt = (mod_gnutls_handle_t *) f->ctx;
+    mgs_handle_t *ctxt = (mgs_handle_t *) f->ctx;
     apr_bucket *bucket;
 
     switch (status) {
@@ -63,7 +63,7 @@ static apr_status_t gnutls_io_filter_error(ap_filter_t * f,
     return APR_SUCCESS;
 }
 
-static int char_buffer_read(mod_gnutls_char_buffer_t * buffer, char *in,
+static int char_buffer_read(mgs_char_buffer_t * buffer, char *in,
                             int inl)
 {
     if (!buffer->length) {
@@ -87,7 +87,7 @@ static int char_buffer_read(mod_gnutls_char_buffer_t * buffer, char *in,
     return inl;
 }
 
-static int char_buffer_write(mod_gnutls_char_buffer_t * buffer, char *in,
+static int char_buffer_write(mgs_char_buffer_t * buffer, char *in,
                              int inl)
 {
     buffer->value = in;
@@ -181,7 +181,7 @@ static apr_status_t brigade_consume(apr_bucket_brigade * bb,
 }
 
 
-static apr_status_t gnutls_io_input_read(mod_gnutls_handle_t * ctxt,
+static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
                                          char *buf, apr_size_t * len)
 {
     apr_size_t wanted = *len;
@@ -310,7 +310,7 @@ static apr_status_t gnutls_io_input_read(mod_gnutls_handle_t * ctxt,
     return ctxt->input_rc;
 }
 
-static apr_status_t gnutls_io_input_getline(mod_gnutls_handle_t * ctxt,
+static apr_status_t gnutls_io_input_getline(mgs_handle_t * ctxt,
                                             char *buf, apr_size_t * len)
 {
     const char *pos = NULL;
@@ -353,18 +353,19 @@ static apr_status_t gnutls_io_input_getline(mod_gnutls_handle_t * ctxt,
     return APR_SUCCESS;
 }
 
-
-static void gnutls_do_handshake(mod_gnutls_handle_t * ctxt)
+static int gnutls_do_handshake(mgs_handle_t * ctxt)
 {
     int ret;
     int errcode;
     if (ctxt->status != 0) {
-        return;
+        return -1;
     }
 
 tryagain:
-
-    ret = gnutls_handshake(ctxt->session);
+    do {
+        ret = gnutls_handshake(ctxt->session);
+    } while (ret == GNUTLS_E_AGAIN);
+    
     if (ret < 0) {
         if (ret == GNUTLS_E_WARNING_ALERT_RECEIVED
             || ret == GNUTLS_E_FATAL_ALERT_RECEIVED) {
@@ -380,31 +381,67 @@ tryagain:
                       gnutls_strerror(ret));
             goto tryagain;
         }
-
-        ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
+#if USING_2_1_RECENT
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, ctxt->c,
                      "GnuTLS: Handshake Failed (%d) '%s'", ret,
                       gnutls_strerror(ret));
+#else
+        ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
+                     "GnuTLS: Handshake Failed (%d) '%s'", ret,
+                     gnutls_strerror(ret));
+#endif
         ctxt->status = -1;
         gnutls_alert_send(ctxt->session, GNUTLS_AL_FATAL, 
                           gnutls_error_to_alert(ret, NULL));
         gnutls_deinit(ctxt->session);
-        return;
+        return ret;
     }
     else {
+        /* all done with the handshake */
         ctxt->status = 1;
-        return;             /* all done with the handshake */
+        /* If the session was resumed, we did not set the correct 
+         * server_rec in ctxt->sc.  Go Find it. (ick!)
+         */
+        if (gnutls_session_is_resumed(ctxt->session)) {
+            mgs_srvconf_rec* sc;
+            sc = mgs_find_sni_server(ctxt->session);
+            if (sc) {
+                ctxt->sc = sc;
+            }
+        }
+        return 0;
     }
 }
 
+int mgs_rehandshake(mgs_handle_t * ctxt)
+{
+    int rv;
 
-apr_status_t mod_gnutls_filter_input(ap_filter_t* f,
+    rv = gnutls_rehandshake(ctxt->session);
+    
+    if (rv != 0) {
+        /* the client did not want to rehandshake. goodbye */
+        ap_log_error(APLOG_MARK, APLOG_ERR, 0, ctxt->c->base_server,
+                     "GnuTLS: Client Refused Rehandshake request.");
+        return -1;
+    }
+    
+    ctxt->status = 0;
+
+    rv = gnutls_do_handshake(ctxt);
+
+    return rv;
+}
+
+
+apr_status_t mgs_filter_input(ap_filter_t* f,
                                      apr_bucket_brigade * bb,
                                      ap_input_mode_t mode,
                                      apr_read_type_e block,
                                      apr_off_t readbytes)
 {
     apr_status_t status = APR_SUCCESS;
-    mod_gnutls_handle_t *ctxt = (mod_gnutls_handle_t *) f->ctx;
+    mgs_handle_t *ctxt = (mgs_handle_t *) f->ctx;
     apr_size_t len = sizeof(ctxt->input_buffer);
 
     if (f->c->aborted) {
@@ -414,26 +451,7 @@ apr_status_t mod_gnutls_filter_input(ap_filter_t* f,
     }
 
     if (ctxt->status == 0) {
-        char* server_name;
-        int server_type;
-        int data_len = 256;
-        
         gnutls_do_handshake(ctxt);
-        
-        /**
-         * Due to issues inside the GnuTLS API, we cannot currently do TLS 1.1
-         * Server Name Indication.
-         */
-        server_name = apr_palloc(ctxt->c->pool, data_len);
-        if (gnutls_server_name_get(ctxt->session, server_name, &data_len, &server_type, 0) == 0) {
-            if (server_type == GNUTLS_NAME_DNS) {
-                ap_log_error(APLOG_MARK, APLOG_DEBUG, 0,
-                             ctxt->c->base_server,
-                             "GnuTLS: TLS 1.1 Server Name: "
-                             "%s", server_name);
-                
-            }
-        }
     }
 
     if (ctxt->status < 0) {
@@ -480,12 +498,12 @@ apr_status_t mod_gnutls_filter_input(ap_filter_t* f,
     return status;
 }
 
-apr_status_t mod_gnutls_filter_output(ap_filter_t * f,
+apr_status_t mgs_filter_output(ap_filter_t * f,
                                       apr_bucket_brigade * bb)
 {
     apr_size_t ret;
     apr_bucket* e;
-    mod_gnutls_handle_t *ctxt = (mod_gnutls_handle_t *) f->ctx;
+    mgs_handle_t *ctxt = (mgs_handle_t *) f->ctx;
     apr_status_t status = APR_SUCCESS;
     apr_read_type_e rblock = APR_NONBLOCK_READ;
 
@@ -584,10 +602,10 @@ apr_status_t mod_gnutls_filter_output(ap_filter_t * f,
     return status;
 }
 
-ssize_t mod_gnutls_transport_read(gnutls_transport_ptr_t ptr,
+ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
                                   void *buffer, size_t len)
 {
-    mod_gnutls_handle_t *ctxt = ptr;
+    mgs_handle_t *ctxt = ptr;
     apr_status_t rc;
     apr_size_t in = len;
     apr_read_type_e block = ctxt->input_block;
@@ -651,7 +669,7 @@ ssize_t mod_gnutls_transport_read(gnutls_transport_ptr_t ptr,
 }
 
 
-static ssize_t write_flush(mod_gnutls_handle_t * ctxt)
+static ssize_t write_flush(mgs_handle_t * ctxt)
 {
     apr_bucket *e;
 
@@ -683,10 +701,10 @@ static ssize_t write_flush(mod_gnutls_handle_t * ctxt)
     return (ctxt->output_rc == APR_SUCCESS) ? 1 : -1;
 }
 
-ssize_t mod_gnutls_transport_write(gnutls_transport_ptr_t ptr,
+ssize_t mgs_transport_write(gnutls_transport_ptr_t ptr,
                                    const void *buffer, size_t len)
 {
-    mod_gnutls_handle_t *ctxt = ptr;
+    mgs_handle_t *ctxt = ptr;
 
     /* pass along the encrypted data
      * need to flush since we're using SSL's malloc-ed buffer
