@@ -146,6 +146,11 @@ typedef struct
 /** Functions in gnutls_io.c **/
 
 /**
+ * write_flush will flush data
+ */
+static ssize_t write_flush(mgs_handle_t * ctxt);
+
+/**
  * mgs_filter_input will filter the input data
  * by decrypting it using GnuTLS and passes it cleartext.
  *
