@@ -99,7 +99,7 @@ static const command_rec mgs_config_cmds[] = {
     AP_INIT_RAW_ARGS("GnuTLSPriorities", mgs_set_priorities,
                   NULL,
                   RSRC_CONF,
-                  "The priorities to enable (ciphers, Key exchange, macs, compression)"),
+                  "The priorities to enable (ciphers, Key exchange, macs, compression)."),
     AP_INIT_TAKE1("GnuTLSEnable", mgs_set_enabled,
                   NULL,
                   RSRC_CONF,

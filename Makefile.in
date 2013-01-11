@@ -36,7 +36,7 @@ subdir = .
 DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config.in \
 	$(top_srcdir)/configure $(top_srcdir)/include/mod_gnutls.h.in \
-	config/config.guess config/config.sub config/depcomp \
+	NEWS config/config.guess config/config.sub config/depcomp \
 	config/install-sh config/ltmain.sh config/missing
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/apache.m4 \
@@ -220,7 +220,7 @@ EXTRA_DIST = m4/outoforder.m4 m4/apache.m4 \
 		m4/libgnutls.m4 m4/apr_memcache.m4 \
 		m4/apache_test.m4 m4/lua.m4 \
 		include/mod_gnutls.h.in \
-		README README.ENV \
+		README README.ENV NEWS \
 		NOTICE LICENSE autogen.sh
 
 SUBDIRS = src data
