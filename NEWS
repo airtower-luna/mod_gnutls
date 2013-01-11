@@ -1,3 +1,11 @@
+** Version 0.4.2 (2007-12-10)
+
+- Added support for sending a certificate chain.
+
+- Corrected bug which did not allow the TLS session cache to be used.
+
+- Do not allow resuming sessions on different servers.
+
 ** Version 0.4.1 (2007-12-03)
 
 - Added support for subject alternative names in certificates.
