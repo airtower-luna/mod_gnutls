@@ -30,7 +30,9 @@
 #include "apr_fnmatch.h"
 /* GnuTLS Library Headers */
 #include <gnutls/gnutls.h>
+#if GNUTLS_VERSION_MAJOR == 2
 #include <gnutls/extra.h>
+#endif
 #include <gnutls/openpgp.h>
 #include <gnutls/x509.h>
 
