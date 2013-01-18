@@ -287,14 +287,12 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog, apr_pool_t * ptemp, 
     mgs_srvconf_rec *sc;
     mgs_srvconf_rec *sc_base;
     void *data = NULL;
-    int first_run = 0;
     const char *userdata_key = "mgs_init";
 
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
 
     apr_pool_userdata_get(&data, userdata_key, base_server->process->pool);
     if (data == NULL) {
-        first_run = 1;
         apr_pool_userdata_set((const void *) 1, userdata_key, apr_pool_cleanup_null, base_server->process->pool);
     }
 
