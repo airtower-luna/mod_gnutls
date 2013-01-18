@@ -542,9 +542,15 @@ static int dbm_cache_post_config(apr_pool_t * p, server_rec * s,
 #if !defined(OS2) && !defined(WIN32) && !defined(BEOS) && !defined(NETWARE)
     /* Running as Root */
     if (path1 && geteuid() == 0) {
-        chown(path1, ap_unixd_config.user_id, -1);
+        if (0 != chown(path1, ap_unixd_config.user_id, -1))
+            ap_log_error(APLOG_MARK, APLOG_NOTICE, -1, s,
+                         "GnuTLS: could not chown cache path1 `%s' to uid %d (errno: %d)",
+                         path1, ap_unixd_config.user_id, errno);
         if (path2 != NULL) {
-            chown(path2, ap_unixd_config.user_id, -1);
+            if (0 != chown(path2, ap_unixd_config.user_id, -1))
+                ap_log_error(APLOG_MARK, APLOG_NOTICE, -1, s,
+                             "GnuTLS: could not chown cache path2 `%s' to uid %d (errno: %d)",
+                             path2, ap_unixd_config.user_id, errno);
         }
     }
 #endif
