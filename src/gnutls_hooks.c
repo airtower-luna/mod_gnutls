@@ -547,7 +547,10 @@ static int vhost_cb(void *baton, conn_rec * conn, server_rec * s) {
     }
    
 	int ret = gnutls_x509_crt_check_hostname(tsc->certs_x509_chain[tsc->certs_x509_chain_num-1], s->server_hostname);
-    
+    if (0 == ret)
+        ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
+                     "GnuTLS: Error checking certificate for hostname "
+                     "'%s'", s->server_hostname);
 	return check_server_aliases(x, s, tsc);
 }
 #endif
