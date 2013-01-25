@@ -266,23 +266,6 @@
             Those are used when the DHE key exchange method is enabled.<br />
             You can generate this file using "certtool --generate-dh-params --bits 2048".<br />
             If not set mod_gnutls will use the included parameters.</p>
-            <h4>GnuTLSRSAFile</h4>
-            <div class="directive">
-                <h5>Description:</h5>Set to the PKCS #1 encoded RSA parameters for 'EXPORT' ciphersuites<br />
-                <h5>Syntax:</h5>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                GnuTLSRSAFile <i>file-path</i> <br />
-                <h5>Default:</h5>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                <i>none</i><br />
-                <h5>Context:</h5>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                server config, virtual host<br />
-            </div>  
-            <p>Takes an absolute or relative path to a PKCS #1 encoded RSA parameters.<br />
-            Those are used when the RSA-EXPORT key exchange method is enabled.<br />
-            You can generate this file using "certtool --generate-privkey --bits 512".<br />
-            These parameters should not contain a key longer than 512 bits (due to the export restrictions).<br />
-            If not set mod_gnutls will not negotiate the 'EXPORT' ciphersuites.<br />
-            It is recommended not to enable those ciphersuites.<br />
-            If you do make sure you regenerate this file at every few hours.</p>
             <h4>GnuTLSSRPPasswdFile</h4>
             <div class="directive">
                 <h5>Description:</h5>Set to the SRP password file for SRP ciphersuites<br />

@@ -315,8 +315,6 @@ const char *mgs_set_srp_tpasswd_file(cmd_parms * parms, void *dummy,
                                         const char *arg);
 const char *mgs_set_dh_file(cmd_parms * parms, void *dummy,
                                         const char *arg);
-const char *mgs_set_rsa_export_file(cmd_parms * parms, void *dummy,
-                                        const char *arg);
 const char *mgs_set_cert_file(cmd_parms * parms, void *dummy,
                                         const char *arg);
 
