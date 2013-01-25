@@ -119,12 +119,12 @@
                 <h5>Syntax:</h5>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                 GnuTLSCacheTimeout <i>seconds</i><br />
                 <h5>Default:</h5>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                GnuTLSCache gdbm "conf/gnutls_cache"<br />
+                GnuTLSCacheTimeout 300<br />
                 <h5>Context:</h5>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                 global config<br />
             </div>    
             <p>Sets the timeout for SSL Session Cache entries expiration.<br />
-            This directive is valid even if Session Tickets are used, and indicates the expiration time of the ticket.</p>
+            This directive is valid even if Session Tickets are used, and indicates the expiration time of the ticket in seconds.</p>
             <h4>GnuTLSSessionTickets</h4>
             <div class="directive">
                 <h5>Description:</h5>Enable Session Tickets for the server<br />
@@ -410,7 +410,7 @@
             <h4>Server Name Indication Example:</h4>
             <p>
             mod_gnutls can also use 'Server Name Indication', as specified in RFC 3546.<br />
-            This allows hosting many SSL Websites, with a Single IP Address.M<br />
+            This allows hosting many SSL Websites, with a Single IP Address.<br />
             Currently all the recent browsers support this standard.<br />
             Here is an example, using SNI:<br />
             <code>
