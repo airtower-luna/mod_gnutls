@@ -381,14 +381,17 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog, apr_pool_t * ptemp, 
         }
 #endif
 
-        if (sc->certs_x509_chain == NULL && sc->cert_pgp == NULL && sc->enabled == GNUTLS_ENABLED_TRUE) {
+        if ((sc->certs_x509_chain == NULL || sc->certs_x509_chain_num < 1) &&
+            sc->cert_pgp == NULL && sc->enabled == GNUTLS_ENABLED_TRUE) {
 			ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s, 
 						"[GnuTLS] - Host '%s:%d' is missing a Certificate File!", 
 						s->server_hostname, s->port);
             exit(-1);
         }
 
-        if (sc->enabled == GNUTLS_ENABLED_TRUE && ((sc->certs_x509_chain != NULL && sc->privkey_x509 == NULL) || (sc->cert_pgp != NULL && sc->privkey_pgp == NULL))) {
+        if (sc->enabled == GNUTLS_ENABLED_TRUE &&
+            ((sc->certs_x509_chain != NULL && sc->certs_x509_chain_num > 0 && sc->privkey_x509 == NULL) ||
+             (sc->cert_pgp != NULL && sc->privkey_pgp == NULL))) {
 			ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s, 
 						"[GnuTLS] - Host '%s:%d' is missing a Private Key File!", 
 						s->server_hostname, s->port);
@@ -396,7 +399,10 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog, apr_pool_t * ptemp, 
         }
 
         if (sc->enabled == GNUTLS_ENABLED_TRUE) {
-            rv = read_crt_cn(s, p, sc->certs_x509_chain[sc->certs_x509_chain_num-1], &sc->cert_cn);
+            rv = -1;
+            if (sc->certs_x509_chain_num > 0) {
+                rv = read_crt_cn(s, p, sc->certs_x509_chain[0], &sc->cert_cn);
+            }
             if (rv < 0 && sc->cert_pgp != NULL) { 
                 rv = read_pgpcrt_cn(s, p, sc->cert_pgp, &sc->cert_cn);
 			}
@@ -546,7 +552,7 @@ static int vhost_cb(void *baton, conn_rec * conn, server_rec * s) {
         return 0;
     }
    
-	int ret = gnutls_x509_crt_check_hostname(tsc->certs_x509_chain[tsc->certs_x509_chain_num-1], s->server_hostname);
+	int ret = gnutls_x509_crt_check_hostname(tsc->certs_x509_chain[0], s->server_hostname);
     if (0 == ret)
         ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
                      "GnuTLS: Error checking certificate for hostname "
@@ -753,7 +759,7 @@ int mgs_hook_fixups(request_rec * r) {
     apr_table_setn(env, "SSL_SESSION_ID", apr_pstrdup(r->pool, tmp));
 
     if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_X509) {
-		mgs_add_common_cert_vars(r, ctxt->sc->certs_x509_chain[ctxt->sc->certs_x509_chain_num], 0);
+		mgs_add_common_cert_vars(r, ctxt->sc->certs_x509_chain[0], 0);
 	} else if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_OPENPGP) {
         mgs_add_common_pgpcert_vars(r, ctxt->sc->cert_pgp, 0);
 	}

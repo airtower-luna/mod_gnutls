@@ -148,7 +148,14 @@
                 <h5>Context:</h5>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                 server config, virtual host<br />
             </div>        
-            <p>Takes an absolute or relative path to a PEM Encoded Certificate to use as this Server's Certificate.</p>
+            <p>Takes an absolute or relative path to a PEM-encoded
+            X.509 certificate to use as this Server's End Entity (EE)
+            certificate. If you need to supply certificates for
+            intermediate Certificate Authorities (iCAs), they should
+            be listed in sequence in the file, from EE to the iCA
+            closest to the root CA.  Optionally, you can also include
+            the root CA's certificate as the last certificate in the
+            list.</p>
             <h4>GnuTLSKeyFile</h4>
             <div class="directive">
                 <h5>Description:</h5>Set to the PEM Encoded Server Certificate<br />
