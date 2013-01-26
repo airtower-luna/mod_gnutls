@@ -580,7 +580,7 @@ void *mgs_config_server_create(apr_pool_t * p, server_rec * s) {
     sc->certs_x509_chain_num = 0;
     sc->cache_timeout = apr_time_from_sec(300);
     sc->cache_type = mgs_cache_none;
-    sc->cache_config = ap_server_root_relative(p, "conf/gnutls_cache");
+    sc->cache_config = NULL;
 	/* By default enable session tickets */
     sc->tickets = GNUTLS_ENABLED_TRUE; 
 

@@ -90,7 +90,7 @@
                 <h5>Syntax:</h5>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                 GnuTLSCache [<i>dbm</i>|<i>gdbm</i>|<i>memcache</i>|<i>none</i>] [path|server list|-]<br />
                 <h5>Default:</h5>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                GnuTLSCache gdbm "conf/gnutls_cache"<br />
+                GnuTLSCache none<br />
                 <h5>Context:</h5>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                 global config<br />
             </div>
@@ -104,14 +104,18 @@
                <b>gdbm</b><br />
                Uses the GDBM backend of APR DBM to cache SSL Sessions results.<br />
                The argument is a relative or absolute path to be used as the DBM Cache file.<br />
-               This is the default and recommended option.<br />
+               This is the recommended option.<br />
                <b>memcache</b><br />
                Uses a memcached server to cache the SSL Session.<br />
                The argument is a space separated list of servers. If no port number is supplied, the default of 11211 is used.<br />
                This can be used to share a session cache between all servers in a cluster.<br />
                <b>none</b><br />
                Turns off all caching of SSL Sessions.<br />
-               This can significantly reduce the performance of mod_gnutls since even followup connections by a client must renegotiate parameters instead of reusing old ones.<br />
+               This can significantly reduce the performance of
+               mod_gnutls since even followup connections by a client
+               must renegotiate parameters instead of reusing old
+               ones.<br />
+               This is the default, since it requires no configuration.<br />
             </p>
             <h4>GnuTLSCacheTimeout</h4>
             <div class="directive">
