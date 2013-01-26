@@ -734,8 +734,12 @@ int mgs_hook_fixups(request_rec * r) {
             (ctxt->session)));
 
 #ifdef ENABLE_SRP
-    tmp = gnutls_srp_server_get_username(ctxt->session);
-    apr_table_setn(env, "SSL_SRP_USER", (tmp != NULL) ? tmp : "");
+    if (ctxt->sc->srp_tpasswd_conf_file != NULL && ctxt->sc->srp_tpasswd_file != NULL) {
+        tmp = gnutls_srp_server_get_username(ctxt->session);
+        apr_table_setn(env, "SSL_SRP_USER", (tmp != NULL) ? tmp : "");
+    } else {
+        apr_table_unset(env, "SSL_SRP_USER");
+    }
 #endif
 
     if (apr_table_get(env, "SSL_CLIENT_VERIFY") == NULL)
