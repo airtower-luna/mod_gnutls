@@ -30,7 +30,7 @@ extern server_rec *ap_server_conf;
 static apr_file_t *debug_log_fp;
 #endif
 
-static gnutls_datum session_ticket_key = {NULL, 0};
+static gnutls_datum_t session_ticket_key = {NULL, 0};
 
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt);
 /* use side==0 for server and side==1 for client */
@@ -303,7 +303,7 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog, apr_pool_t * ptemp, 
     gnutls_dh_params_init(&dh_params);
 
     if (sc_base->dh_params == NULL) {
-        gnutls_datum pdata = {
+        gnutls_datum_t pdata = {
             (void *) static_dh_params,
             sizeof(static_dh_params)
         };
