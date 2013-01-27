@@ -1,0 +1,12 @@
+setup.done
+cache
+*~
+logs
+outputs
+server
+client
+authority
+imposter
+rogueca
+server.uid
+server.template

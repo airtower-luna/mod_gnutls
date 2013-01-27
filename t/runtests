@@ -1,0 +1,78 @@
+#!/bin/bash
+
+# Author: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
+
+set -e
+
+tests="${1##t-}"
+
+BADVARS=0
+for v in TEST_HOST TEST_IP TEST_PORT TEST_QUERY_DELAY TEST_GAP; do
+    if [ ! -v "$v" ]; then
+        printf "You need to set the %s environment variable\n" "$v" >&2
+        BADVARS=1
+    fi
+done
+
+if [ 0 != "$BADVARS" ]; then
+    exit 1
+fi
+
+if [ . != "$(dirname "$0")" ]; then
+    printf "You should only run this mod-gnutls test suite from the t/ directory of the mod_gnutls source.\n" >&2
+    exit 1
+fi
+
+function apache_down_err() {
+    printf "FAILURE: %s\n" "$TEST_NAME"
+    /usr/sbin/apache2 -f "$(pwd)/apache.conf" -k stop || true
+    if [ -e output ]; then
+        printf "\ngnutls-cli outputs:\n"
+        diff -u output <( tail -n "$(wc -l < output)" "$output" ) || true
+    fi
+    printf "\nApache error logs:\n"
+    tail "../../logs/${TEST_NAME}.error.log"
+}
+
+if [ -z "$tests" ] ; then
+    tests=./tests/*
+else
+    tests=./tests/"$(printf "%02d" "$tests")"_*
+fi
+
+for t in $tests; do 
+    export TEST_NAME="$(basename "$t")"
+    output="../../outputs/${TEST_NAME}.output"
+    rm -f "$output"
+    cd "$t"
+    if [ -e fail.* ]; then
+        EXPECTED_FAILURE="$(printf " (expected: %s)" fail.*)"
+    else
+        unset EXPECTED_FAILURE
+    fi
+    printf "TESTING: %s%s\n" "$TEST_NAME" "$EXPECTED_FAILURE"
+    trap apache_down_err EXIT
+    /usr/sbin/apache2 -f "$(pwd)/apache.conf" -k start || [ -e fail.server ]
+
+    if (sed "s/__HOSTNAME__/${TEST_HOST}/" < ./input && sleep "$TEST_QUERY_DELAY") | \
+        gnutls-cli -p "${TEST_PORT}" $(cat ./gnutls-cli.args) "${TEST_HOST}" > \
+        "$output" ; then
+        if [ -e fail* ]; then
+            printf "%s should have failed but succeeded\n" "$(basename "$t")" >&2
+            exit 1
+        fi
+    else
+        if [ ! -e fail* ]; then
+            printf "%s should have succeeded but failed\n" "$(basename "$t")" >&2
+            exit 1
+        fi
+    fi
+    if [ -e output ] ; then
+        diff -q -u output <( tail -n "$(wc -l < output)" "$output" )
+    fi
+    /usr/sbin/apache2 -f "$(pwd)/apache.conf" -k stop || [ -e fail.server ]
+    trap - EXIT
+    printf "SUCCESS: %s\n" "$TEST_NAME"
+    cd ../..
+    sleep "$TEST_GAP"
+done
