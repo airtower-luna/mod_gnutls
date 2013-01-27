@@ -560,6 +560,14 @@ static int dbm_cache_post_config(apr_pool_t * p, server_rec * s,
 
 int mgs_cache_post_config(apr_pool_t * p, server_rec * s,
         mgs_srvconf_rec * sc) {
+
+    /* if GnuTLSCache was never explicitly set: */
+    if (sc->cache_type == mgs_cache_unset)
+        sc->cache_type = mgs_cache_none;
+    /* if GnuTLSCacheTimeout was never explicitly set: */
+    if (sc->cache_timeout == -1) 
+        sc->cache_timeout = apr_time_from_sec(300);
+
     if (sc->cache_type == mgs_cache_dbm
             || sc->cache_type == mgs_cache_gdbm) {
         return dbm_cache_post_config(p, s, sc);

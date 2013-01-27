@@ -49,6 +49,7 @@ extern module AP_MODULE_DECLARE_DATA gnutls_module;
 /* GnuTLS Constants */
 #define GNUTLS_ENABLED_FALSE 0
 #define GNUTLS_ENABLED_TRUE  1
+#define GNUTLS_ENABLED_UNSET  2
 /* Current module version */
 #define MOD_GNUTLS_VERSION "0.5.10"
 /* Module Debug Mode */
@@ -74,8 +75,9 @@ typedef enum {
     mgs_cache_gdbm,
 #if HAVE_APR_MEMCACHE
 	/* Use Memcache */
-    mgs_cache_memcache
+    mgs_cache_memcache,
 #endif
+    mgs_cache_unset
 } mgs_cache_e;
 
 /* Directory Configuration Record */
@@ -354,6 +356,7 @@ const char *mgs_set_tickets(cmd_parms * parms, void *dummy,
 const char *mgs_set_require_section(cmd_parms *cmd, 
                                     void *mconfig, const char *arg);
 void *mgs_config_server_create(apr_pool_t * p, server_rec * s);
+void *mgs_config_server_merge(apr_pool_t *p, void *BASE, void *ADD);
 
 void *mgs_config_dir_merge(apr_pool_t *p, void *basev, void *addv);
 

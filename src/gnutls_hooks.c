@@ -343,6 +343,16 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog, apr_pool_t * ptemp, 
         sc = (mgs_srvconf_rec *) ap_get_module_config(s->module_config, &gnutls_module);
         sc->cache_type = sc_base->cache_type;
         sc->cache_config = sc_base->cache_config;
+        sc->cache_timeout = sc_base->cache_timeout;
+
+        /* defaults for unset values: */
+        if (sc->enabled == GNUTLS_ENABLED_UNSET)
+            sc->enabled = GNUTLS_ENABLED_FALSE;
+        if (sc->tickets ==  GNUTLS_ENABLED_UNSET)
+            sc->tickets = GNUTLS_ENABLED_TRUE;
+        if (sc->client_verify_mode ==  -1)
+            sc->client_verify_mode = GNUTLS_CERT_IGNORE;
+
 
         /* Check if the priorities have been set */
         if (sc->priorities == NULL && sc->enabled == GNUTLS_ENABLED_TRUE) {

@@ -183,6 +183,7 @@ module AP_MODULE_DECLARE_DATA gnutls_module = {
     .create_dir_config = mgs_config_dir_create,
     .merge_dir_config = mgs_config_dir_merge,
     .create_server_config = mgs_config_server_create,
+    .merge_server_config = mgs_config_server_merge,
     .cmds = mgs_config_cmds,
     .register_hooks = gnutls_hooks
 };

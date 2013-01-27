@@ -543,31 +543,34 @@ const char *mgs_set_priorities(cmd_parms * parms, void *dummy, const char *arg) 
     return NULL;
 }
 
-void *mgs_config_server_create(apr_pool_t * p, server_rec * s) {
+static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p, char** err) {
     mgs_srvconf_rec *sc = apr_pcalloc(p, sizeof (*sc));
     int ret;
 
-    sc->enabled = GNUTLS_ENABLED_FALSE;
+    sc->enabled = GNUTLS_ENABLED_UNSET;
 
     ret = gnutls_certificate_allocate_credentials(&sc->certs);
     if (ret < 0) {
-        return apr_psprintf(p, "GnuTLS: Failed to initialize"
-                ": (%d) %s", ret,
-                gnutls_strerror(ret));
+        *err = apr_psprintf(p, "GnuTLS: Failed to initialize"
+                            ": (%d) %s", ret,
+                            gnutls_strerror(ret));
+        return NULL;
     }
 
     ret = gnutls_anon_allocate_server_credentials(&sc->anon_creds);
     if (ret < 0) {
-        return apr_psprintf(p, "GnuTLS: Failed to initialize"
-                ": (%d) %s", ret,
-                gnutls_strerror(ret));
+        *err = apr_psprintf(p, "GnuTLS: Failed to initialize"
+                            ": (%d) %s", ret,
+                            gnutls_strerror(ret));
+        return NULL;
     }
 #ifdef ENABLE_SRP
     ret = gnutls_srp_allocate_server_credentials(&sc->srp_creds);
     if (ret < 0) {
-        return apr_psprintf(p, "GnuTLS: Failed to initialize"
-                ": (%d) %s", ret,
-                gnutls_strerror(ret));
+        *err =  apr_psprintf(p, "GnuTLS: Failed to initialize"
+                             ": (%d) %s", ret,
+                             gnutls_strerror(ret));
+        return NULL;
     }
 
     sc->srp_tpasswd_conf_file = NULL;
@@ -576,18 +579,82 @@ void *mgs_config_server_create(apr_pool_t * p, server_rec * s) {
 
     sc->privkey_x509 = NULL;
 	/* Initialize all Certificate Chains */
+    /* FIXME: how do we indicate that this is unset for a merge? (that
+     * is, how can a subordinate server override the chain by setting
+     * an empty one?  what would that even look like in the
+     * configuration?) */
 	sc->certs_x509_chain = malloc(MAX_CHAIN_SIZE * sizeof (*sc->certs_x509_chain));
     sc->certs_x509_chain_num = 0;
-    sc->cache_timeout = apr_time_from_sec(300);
-    sc->cache_type = mgs_cache_none;
+    sc->cache_timeout = -1; /* -1 means "unset" */
+    sc->cache_type = mgs_cache_unset;
     sc->cache_config = NULL;
-	/* By default enable session tickets */
-    sc->tickets = GNUTLS_ENABLED_TRUE; 
-
-    sc->client_verify_mode = GNUTLS_CERT_IGNORE;
+    sc->tickets = GNUTLS_ENABLED_UNSET;
+    sc->priorities = NULL;
+    sc->dh_params = NULL;
+    sc->proxy_enabled = GNUTLS_ENABLED_UNSET;
+    
+/* this relies on GnuTLS never changing the gnutls_certificate_request_t enum to define -1 */
+    sc->client_verify_mode = -1; 
 
     return sc;
 }
+
+void *mgs_config_server_create(apr_pool_t * p, server_rec * s) {
+    char *err = NULL;
+    mgs_srvconf_rec *sc = _mgs_config_server_create(p, &err);
+    if (sc) return sc; else return err;
+}
+
+#define gnutls_srvconf_merge(t, unset) sc->t = (add->t == unset) ? base->t : add->t
+#define gnutls_srvconf_assign(t) sc->t = add->t
+
+void *mgs_config_server_merge(apr_pool_t *p, void *BASE, void *ADD) {
+    int i;
+    char *err = NULL;
+    mgs_srvconf_rec *base = (mgs_srvconf_rec *)BASE;
+    mgs_srvconf_rec *add = (mgs_srvconf_rec *)ADD;
+    mgs_srvconf_rec *sc = _mgs_config_server_create(p, &err);
+    if (NULL == sc) return err;
+
+    gnutls_srvconf_merge(enabled, GNUTLS_ENABLED_UNSET);
+    gnutls_srvconf_merge(tickets, GNUTLS_ENABLED_UNSET);
+    gnutls_srvconf_merge(proxy_enabled, GNUTLS_ENABLED_UNSET);
+    gnutls_srvconf_merge(client_verify_mode, -1);
+    gnutls_srvconf_merge(srp_tpasswd_file, NULL);
+    gnutls_srvconf_merge(srp_tpasswd_conf_file, NULL);
+    gnutls_srvconf_merge(privkey_x509, NULL);
+    gnutls_srvconf_merge(priorities, NULL);
+    gnutls_srvconf_merge(dh_params, NULL);
+
+    /* FIXME: the following items are pre-allocated, and should be
+     * properly disposed of before assigning in order to avoid leaks;
+     * so at the moment, we can't actually have them in the config.
+     * what happens during de-allocation? 
+
+     * This is probably leaky.
+     */
+    gnutls_srvconf_assign(certs);
+    gnutls_srvconf_assign(anon_creds);
+    gnutls_srvconf_assign(srp_creds);
+    gnutls_srvconf_assign(certs_x509_chain);
+    gnutls_srvconf_assign(certs_x509_chain_num);
+
+    /* how do these get transferred cleanly before the data from ADD
+     * goes away? */
+    gnutls_srvconf_assign(cert_cn);
+    for (i = 0; i < MAX_CERT_SAN; i++)
+        gnutls_srvconf_assign(cert_san[i]);
+    gnutls_srvconf_assign(ca_list);
+    gnutls_srvconf_assign(ca_list_size);
+    gnutls_srvconf_assign(cert_pgp);
+    gnutls_srvconf_assign(pgp_list);
+    gnutls_srvconf_assign(privkey_pgp);
+
+    return sc;
+}
+
+#undef gnutls_srvconf_merge
+#undef gnutls_srvconf_assign
 
 void *mgs_config_dir_merge(apr_pool_t * p, void *basev, void *addv) {
     mgs_dirconf_rec *new;
@@ -604,3 +671,4 @@ void *mgs_config_dir_create(apr_pool_t * p, char *dir) {
     dc->client_verify_mode = -1;
     return dc;
 }
+
