@@ -336,10 +336,15 @@ const char *mgs_set_cache(cmd_parms * parms, void *dummy,
 const char *mgs_set_cache_timeout(cmd_parms * parms, void *dummy,
         const char *arg) {
     int argint;
+    const char *err;
     mgs_srvconf_rec *sc =
             (mgs_srvconf_rec *) ap_get_module_config(parms->server->
             module_config,
             &gnutls_module);
+
+    if ((err = ap_check_cmd_context(parms, GLOBAL_ONLY))) {
+        return err;
+    }
 
     argint = atoi(arg);
 
