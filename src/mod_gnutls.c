@@ -180,10 +180,9 @@ static const command_rec mgs_config_cmds[] = {
 
 module AP_MODULE_DECLARE_DATA gnutls_module = {
     STANDARD20_MODULE_STUFF,
-    mgs_config_dir_create,
-    mgs_config_dir_merge,
-    mgs_config_server_create,
-    NULL,
-    mgs_config_cmds,
-    gnutls_hooks
+    .create_dir_config = mgs_config_dir_create,
+    .merge_dir_config = mgs_config_dir_merge,
+    .create_server_config = mgs_config_server_create,
+    .cmds = mgs_config_cmds,
+    .register_hooks = gnutls_hooks
 };
