@@ -130,6 +130,7 @@ const char *mgs_set_key_file(cmd_parms * parms, void *dummy, const char *arg) {
     gnutls_datum_t data;
     const char *file;
     apr_pool_t *spool;
+    const char *out;
 
 	mgs_srvconf_rec *sc = (mgs_srvconf_rec *) ap_get_module_config(parms->server->module_config, &gnutls_module);
     
@@ -138,8 +139,9 @@ const char *mgs_set_key_file(cmd_parms * parms, void *dummy, const char *arg) {
     file = ap_server_root_relative(spool, arg);
 
     if (load_datum_from_file(spool, file, &data) != 0) {
+        out = apr_psprintf(parms->pool, "GnuTLS: Error Reading Private Key '%s'", file);
 		apr_pool_destroy(spool);
-        return apr_psprintf(parms->pool, "GnuTLS: Error Reading Private Key '%s'", file);
+        return out;
     }
 
     ret = gnutls_x509_privkey_init(&sc->privkey_x509);
@@ -156,8 +158,9 @@ const char *mgs_set_key_file(cmd_parms * parms, void *dummy, const char *arg) {
 	}
 
     if (ret < 0) {
+        out = apr_psprintf(parms->pool, "GnuTLS: Failed to Import Private Key '%s': (%d) %s", file, ret, gnutls_strerror(ret));
 		apr_pool_destroy(spool);
-        return apr_psprintf(parms->pool, "GnuTLS: Failed to Import Private Key '%s': (%d) %s", file, ret, gnutls_strerror(ret));
+        return out;
     }
 
     apr_pool_destroy(spool);
