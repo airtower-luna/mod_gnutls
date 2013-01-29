@@ -112,11 +112,8 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session) {
     /* find the virtual server */
     tsc = mgs_find_sni_server(session);
 
-    if (tsc == NULL) {
-	// No TLS vhost configured!
-		return GNUTLS_E_NO_CERTIFICATE_FOUND;
-	} else {
-	// Found a TLS vhost
+    if (tsc != NULL) {
+        // Found a TLS vhost based on the SNI from the client; use it instead.
         ctxt->sc = tsc;
 	}
 
