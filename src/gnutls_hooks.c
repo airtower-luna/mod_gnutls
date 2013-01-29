@@ -136,8 +136,7 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session) {
      * negotiation.
      */
 
-	ret = gnutls_priority_set_direct(session, "NORMAL", NULL);
-    //ret = gnutls_priority_set(session, ctxt->sc->priorities);
+    ret = gnutls_priority_set(session, ctxt->sc->priorities);
     /* actually it shouldn't fail since we have checked at startup */
     return ret;
 
