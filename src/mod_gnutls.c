@@ -175,7 +175,12 @@ static const command_rec mgs_config_cmds[] = {
     NULL,
     RSRC_CONF,
     "Whether this server has GnuTLS Enabled. Default: Off"),
-    { NULL }
+    AP_INIT_TAKE1("GnuTLSExportCertificates",
+    mgs_set_export_certificates_enabled,
+    NULL,
+    RSRC_CONF,
+    "Whether to export PEM encoded certificates to CGIs. Default: Off"),
+    { NULL },
 };
 
 module AP_MODULE_DECLARE_DATA gnutls_module = {

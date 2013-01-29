@@ -118,6 +118,8 @@ typedef struct {
     unsigned int certs_x509_chain_num;
 	/* Is the module enabled? */
     int enabled;
+    /* Export full certificates to CGI environment: */
+    int export_certificates_enabled;
 	/* GnuTLS Priorities */
     gnutls_priority_t priorities;
 	/* GnuTLS DH Parameters */

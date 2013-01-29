@@ -357,8 +357,12 @@
                 <h5>Context:</h5>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                 server config, virtual host<br />
             </div>
-            <p>This directive enables exporting the full PEM encoded certificates of the server and the client to CGIs.<br />
-            This makes mod_gnutls export exactly the same environment variables as mod_ssl.</p>
+            <p>This directive enables exporting the full certificates
+            of the server and the client to CGI scripts.  The exported
+            certificates will be PEM-encoded (if X.509) or
+            ASCII-armored (if OpenPGP).<br />With
+            GnuTLSExportCertificates enabled, mod_gnutls exports the
+            same environment variables as mod_ssl.</p>
         </div>
         <hr />
         <div id="Examples">
