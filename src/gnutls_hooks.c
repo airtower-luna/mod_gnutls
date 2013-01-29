@@ -51,7 +51,7 @@ apr_status_t mgs_cleanup_pre_config(void *data) {
 /* Logging Function for Maintainers */
 #if MOD_GNUTLS_DEBUG
 static void gnutls_debug_log_all(int level, const char *str) {
-    apr_file_printf(debug_log_fp, "<%d> %s\n", level, str);
+    apr_file_printf(debug_log_fp, "<%d> %s", level, str);
 }
 #define _gnutls_log apr_file_printf
 #else
@@ -75,21 +75,21 @@ int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog, apr_pool_t * ptem
 	/* Check for required GnuTLS Library Version */
     if (gnutls_check_version(LIBGNUTLS_VERSION) == NULL) {
 		ap_log_perror(APLOG_MARK, APLOG_EMERG, 0, plog, "gnutls_check_version() failed. Required: "
-					"gnutls-%s Found: gnutls-%s\n", LIBGNUTLS_VERSION, gnutls_check_version(NULL));
+					"gnutls-%s Found: gnutls-%s", LIBGNUTLS_VERSION, gnutls_check_version(NULL));
         return DONE;
     }
 
 	/* Initialize GnuTLS Library */
     ret = gnutls_global_init();
     if (ret < 0) {
-		ap_log_perror(APLOG_MARK, APLOG_EMERG, 0, plog, "gnutls_global_init: %s\n", gnutls_strerror(ret));
+		ap_log_perror(APLOG_MARK, APLOG_EMERG, 0, plog, "gnutls_global_init: %s", gnutls_strerror(ret));
 		return DONE;
     }
 
 	/* Generate a Session Key */
     ret = gnutls_session_ticket_key_generate(&session_ticket_key);
     if (ret < 0) {
-		ap_log_perror(APLOG_MARK, APLOG_EMERG, 0, plog, "gnutls_session_ticket_key_generate: %s\n", gnutls_strerror(ret));
+		ap_log_perror(APLOG_MARK, APLOG_EMERG, 0, plog, "gnutls_session_ticket_key_generate: %s", gnutls_strerror(ret));
 		return DONE;
     }
 
