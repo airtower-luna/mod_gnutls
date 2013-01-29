@@ -71,10 +71,9 @@ int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog, apr_pool_t * ptem
 #endif    
 
     int ret;
-	const char * req_GnuTLSVer = "2.12.0";
 
 	/* Check for required GnuTLS Library Version */
-    if (gnutls_check_version(req_GnuTLSVer) == NULL) {
+    if (gnutls_check_version(LIBGNUTLS_VERSION) == NULL) {
 		ap_log_perror(APLOG_MARK, APLOG_EMERG, 0, plog, "gnutls_check_version() failed. Required: "
 					"gnutls-%s Found: gnutls-%s\n", LIBGNUTLS_VERSION, gnutls_check_version(NULL));
         return DONE;
