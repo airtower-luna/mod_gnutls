@@ -77,25 +77,25 @@ int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog, apr_pool_t * ptem
     if (gnutls_check_version(req_GnuTLSVer) == NULL) {
 		ap_log_perror(APLOG_MARK, APLOG_DEBUG, 0, plog, "gnutls_check_version() failed. Required: "
 					"gnutls-%s Found: gnutls-%s\n", LIBGNUTLS_VERSION, gnutls_check_version(NULL));
-		exit(-1);
+        return DONE;
     }
 
 	/* Initialize GnuTLS Library */
     ret = gnutls_global_init();
     if (ret < 0) {
 		ap_log_perror(APLOG_MARK, APLOG_DEBUG, 0, plog, "gnutls_global_init: %s\n", gnutls_strerror(ret));
-		exit(-1);
+		return DONE;
     }
 
 	/* Generate a Session Key */
     ret = gnutls_session_ticket_key_generate(&session_ticket_key);
     if (ret < 0) {
 		ap_log_perror(APLOG_MARK, APLOG_DEBUG, 0, plog, "gnutls_session_ticket_key_generate: %s\n", gnutls_strerror(ret));
-		exit(-1);
+		return DONE;
     }
 
 	/* Register a pool clean-up function */
-    apr_pool_cleanup_register(pconf, NULL, mgs_cleanup_pre_config, apr_pool_cleanup_null);\
+    apr_pool_cleanup_register(pconf, NULL, mgs_cleanup_pre_config, apr_pool_cleanup_null);
 
     return OK;
 }
