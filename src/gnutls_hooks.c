@@ -150,14 +150,17 @@ static int cert_retrieve_fn(gnutls_session_t session,
     
 	_gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
 
-	mgs_handle_t *ctxt = gnutls_transport_get_ptr(session);
+	mgs_handle_t *ctxt;
 
     if (session == NULL) {
 		// ERROR INVALID SESSION
 		ret->ncerts = 0;
 		ret->deinit_all = 1;
         return -1;
-	} else if (gnutls_certificate_type_get(session) == GNUTLS_CRT_X509) {
+	}
+    ctxt = gnutls_transport_get_ptr(session);
+
+    if (gnutls_certificate_type_get(session) == GNUTLS_CRT_X509) {
 		// X509 CERTIFICATE
 		ret->cert_type = GNUTLS_CRT_X509;
 		ret->key_type = GNUTLS_PRIVKEY_X509;
