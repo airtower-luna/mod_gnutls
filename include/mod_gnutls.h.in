@@ -51,9 +51,10 @@ extern module AP_MODULE_DECLARE_DATA gnutls_module;
 #define GNUTLS_ENABLED_TRUE  1
 #define GNUTLS_ENABLED_UNSET  2
 /* Current module version */
-#define MOD_GNUTLS_VERSION "0.5.10"
+#define MOD_GNUTLS_VERSION "@MOD_GNUTLS_VERSION@"
+
 /* Module Debug Mode */
-#define MOD_GNUTLS_DEBUG 1
+#define MOD_GNUTLS_DEBUG @OOO_MAINTAIN@
 
 /* 
  * Recent Versions of 2.1 renamed several hooks. 
