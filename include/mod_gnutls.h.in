@@ -120,8 +120,6 @@ typedef struct {
     int enabled;
 	/* GnuTLS Priorities */
     gnutls_priority_t priorities;
-	/* GnuTLS RSA Parameters [Obselete] */
-    gnutls_rsa_params_t rsa_params;
 	/* GnuTLS DH Parameters */
     gnutls_dh_params_t dh_params;
 	/* Cache timeout value */
