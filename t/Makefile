@@ -25,7 +25,7 @@ t-%: setup.done
 
 ### for setting up a little miniature CA + server + client environment:
 identities := server authority client imposter rogueca
-tokens := x509.pem pubring.gpg secret.key
+tokens := x509.pem secring.gpg secret.key cert.pgp secret.pgp
 all_tokens := $(foreach id,$(identities),$(foreach token,$(tokens),$(id)/$(token)))
 
 %.template: %.template.in
@@ -39,11 +39,26 @@ server.uid: server.uid.in
 	chmod 0700 $(dir $@)
 	certtool --generate-privkey > $@
 
-%/pubring.gpg: %.uid %/secret.key
+%/secring.gpg: %.uid %/secret.key
 	rm -f $(dir $@)pubring.gpg $(dir $@)secring.gpg $(dir $@)trustdb.gpg
 	PEM2OPENPGP_EXPIRATION=86400 PEM2OPENPGP_USAGE_FLAGS=authenticate,certify pem2openpgp "$$(cat $<)" < $(dir $@)secret.key | GNUPGHOME=$(dir $@) gpg --import
 	printf "%s:6:\n" "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" | GNUPGHOME=$(dir $@) gpg --import-ownertrust
 
+%/gpg.conf: %/secring.gpg
+	printf "default-key %s\n" "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" > $@
+
+%/secret.pgp: %/secring.gpg
+	GNUPGHOME=$(dir $@) gpg --armor --batch --no-tty --yes --export-secret-key "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" > $@
+
+%/minimal.pgp: %/secring.gpg
+	GNUPGHOME=$(dir $@) gpg --armor --export "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" > $@
+
+%/cert.pgp: %/minimal.pgp authority/gpg.conf
+	GNUPGHOME=authority gpg --import $<
+	GNUPGHOME=authority gpg --batch --sign-key --no-tty --yes "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)"
+	GNUPGHOME=authority gpg --armor --export "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" > $@
+
+# special cases for the authorities' root certs:
 authority/x509.pem: authority.template authority/secret.key
 	certtool --generate-self-signed --load-privkey=authority/secret.key --template=authority.template > $@
 rogueca/x509.pem: rogueca.template rogueca/secret.key
@@ -61,6 +76,6 @@ setup.done: $(all_tokens)
 
 
 clean:
-	rm -rf server client authority logs cache outputs setup.done *.template
+	rm -rf server client authority logs cache outputs setup.done server.template
 
 .PHONY: all clean
