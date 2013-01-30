@@ -1,0 +1,12 @@
+-----END CERTIFICATE-----
+
+
+----Verification Status:----
+SUCCESS
+
+----SubjectAltName:----
+RFC822NAME:test0@modgnutls.test
+
+0
+
+- Peer has closed the GnuTLS connection

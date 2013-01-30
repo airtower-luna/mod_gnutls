@@ -1,0 +1,17 @@
+Connection: close
+Transfer-Encoding: chunked
+Content-Type: text/plain
+
+53
+----Certificate:----
+
+
+----Verification Status:----
+NONE
+
+----SubjectAltName:----
+
+
+0
+
+- Peer has closed the GnuTLS connection
