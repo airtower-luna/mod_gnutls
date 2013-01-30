@@ -362,6 +362,25 @@ const char *mgs_set_cache_timeout(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
+const char *mgs_set_client_verify_method(cmd_parms * parms, void *dummy,
+        const char *arg) {
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)ap_get_module_config(parms->server->module_config, &gnutls_module);
+
+    if (strcasecmp("cartel", arg) == 0) {
+        sc->client_verify_method = mgs_cvm_cartel;
+    } else if (strcasecmp("msva", arg) == 0) {
+#ifdef ENABLE_MSVA
+        sc->client_verify_method = mgs_cvm_msva;
+#else
+        return "GnuTLSClientVerifyMethod: msva is not supported";
+#endif
+    } else {
+        return "GnuTLSClientVerifyMethod: Invalid argument";
+    }
+
+    return NULL;
+}
+
 const char *mgs_set_client_verify(cmd_parms * parms, void *dummy,
         const char *arg) {
     int mode;
@@ -615,6 +634,7 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p, char** err) {
     sc->dh_params = NULL;
     sc->proxy_enabled = GNUTLS_ENABLED_UNSET;
     sc->export_certificates_enabled = GNUTLS_ENABLED_UNSET;
+    sc->client_verify_method = mgs_cvm_unset; 
     
 /* this relies on GnuTLS never changing the gnutls_certificate_request_t enum to define -1 */
     sc->client_verify_mode = -1; 
@@ -643,6 +663,7 @@ void *mgs_config_server_merge(apr_pool_t *p, void *BASE, void *ADD) {
     gnutls_srvconf_merge(tickets, GNUTLS_ENABLED_UNSET);
     gnutls_srvconf_merge(proxy_enabled, GNUTLS_ENABLED_UNSET);
     gnutls_srvconf_merge(export_certificates_enabled, GNUTLS_ENABLED_UNSET);
+    gnutls_srvconf_merge(client_verify_method, mgs_cvm_unset);
     gnutls_srvconf_merge(client_verify_mode, -1);
     gnutls_srvconf_merge(srp_tpasswd_file, NULL);
     gnutls_srvconf_merge(srp_tpasswd_conf_file, NULL);

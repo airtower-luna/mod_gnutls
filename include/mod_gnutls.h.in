@@ -81,6 +81,13 @@ typedef enum {
     mgs_cache_unset
 } mgs_cache_e;
 
+typedef enum {
+    mgs_cvm_unset,
+    mgs_cvm_cartel,
+    mgs_cvm_msva
+} mgs_client_verification_method_e;
+
+
 /* Directory Configuration Record */
 typedef struct {
     int client_verify_mode;
@@ -139,6 +146,8 @@ typedef struct {
     unsigned int ca_list_size;
 	/* Client Certificate Verification Mode */
     int client_verify_mode;
+	/* Client Certificate Verification Method */
+    mgs_client_verification_method_e client_verify_method;
 	/* Last Cache timestamp */
     apr_time_t last_cache_check;
 	/* GnuTLS uses Session Tickets */
@@ -338,6 +347,9 @@ const char *mgs_set_cache_timeout(cmd_parms * parms, void *dummy,
 
 const char *mgs_set_client_verify(cmd_parms * parms, void *dummy,
                                   const char *arg);
+
+const char *mgs_set_client_verify_method(cmd_parms * parms, void *dummy,
+                                         const char *arg);
 
 const char *mgs_set_client_ca_file(cmd_parms * parms, void *dummy,
                                    const char *arg);

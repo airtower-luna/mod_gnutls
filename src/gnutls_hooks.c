@@ -352,6 +352,8 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog, apr_pool_t * ptemp, 
             sc->export_certificates_enabled = GNUTLS_ENABLED_FALSE;
         if (sc->client_verify_mode ==  -1)
             sc->client_verify_mode = GNUTLS_CERT_IGNORE;
+        if (sc->client_verify_method ==  mgs_cvm_unset)
+            sc->client_verify_method = mgs_cvm_cartel;
 
 
         /* Check if the priorities have been set */
