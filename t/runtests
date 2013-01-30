@@ -7,7 +7,7 @@ set -e
 tests="${1##t-}"
 
 BADVARS=0
-for v in TEST_HOST TEST_IP TEST_PORT TEST_QUERY_DELAY TEST_GAP; do
+for v in TEST_HOST TEST_IP TEST_PORT TEST_QUERY_DELAY TEST_GAP MSVA_PORT; do
     if [ ! -v "$v" ]; then
         printf "You need to set the %s environment variable\n" "$v" >&2
         BADVARS=1
@@ -23,6 +23,10 @@ if [ . != "$(dirname "$0")" ]; then
     exit 1
 fi
 
+function stop_msva() {
+    kill %1
+}
+
 function apache_down_err() {
     printf "FAILURE: %s\n" "$TEST_NAME"
     /usr/sbin/apache2 -f "$(pwd)/apache.conf" -k stop || true
@@ -32,6 +36,7 @@ function apache_down_err() {
     fi
     printf "\nApache error logs:\n"
     tail "../../logs/${TEST_NAME}.error.log"
+    stop_msva
 }
 
 if [ -z "$tests" ] ; then
@@ -40,7 +45,18 @@ else
     tests=./tests/"$(printf "%02d" "$tests")"_*
 fi
 
+GNUPGHOME=$(pwd)/msva.gnupghome MSVA_KEYSERVER_POLICY=never monkeysphere-validation-agent &
+
+trap stop_msva EXIT
+
+sleep "$TEST_GAP"
+
+printf "TESTING: initial MSVA verification\n"
+MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT" msva-query-agent https "$(cat client.uid)" x509pem client < client/x509.pem  
+printf "\nSUCCESS: initial MSVA verification\n"
+
 for t in $tests; do 
+    sleep "$TEST_GAP"
     export TEST_NAME="$(basename "$t")"
     output="../../outputs/${TEST_NAME}.output"
     rm -f "$output"
@@ -52,7 +68,7 @@ for t in $tests; do
     fi
     printf "TESTING: %s%s\n" "$TEST_NAME" "$EXPECTED_FAILURE"
     trap apache_down_err EXIT
-    /usr/sbin/apache2 -f "$(pwd)/apache.conf" -k start || [ -e fail.server ]
+    MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT" /usr/sbin/apache2 -f "$(pwd)/apache.conf" -k start || [ -e fail.server ]
 
     if (sed "s/__HOSTNAME__/${TEST_HOST}/" < ./input && sleep "$TEST_QUERY_DELAY") | \
         gnutls-cli -p "${TEST_PORT}" $(cat ./gnutls-cli.args) "${TEST_HOST}" > \
@@ -71,8 +87,9 @@ for t in $tests; do
         diff -q -u output <( tail -n "$(wc -l < output)" "$output" )
     fi
     /usr/sbin/apache2 -f "$(pwd)/apache.conf" -k stop || [ -e fail.server ]
-    trap - EXIT
+    trap stop_msva EXIT
     printf "SUCCESS: %s\n" "$TEST_NAME"
     cd ../..
-    sleep "$TEST_GAP"
 done
+
+stop_msva

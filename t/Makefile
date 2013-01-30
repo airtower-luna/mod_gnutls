@@ -9,6 +9,7 @@ export TEST_HOST ?= localhost
 export TEST_IP ?= ::1
 # chosen at random:
 export TEST_PORT ?= 9932
+export MSVA_PORT ?= 9933
 
 export TEST_GAP ?= 1.5
 export TEST_QUERY_DELAY ?= 2
@@ -70,12 +71,20 @@ rogueca/x509.pem: rogueca.template rogueca/secret.key
 %/x509.pem: %.template %/cert-request authority/secret.key authority/x509.pem 
 	certtool --generate-certificate --load-ca-certificate=authority/x509.pem --load-ca-privkey=authority/secret.key --load-request=$(dir $@)cert-request --template=$< > $@
 
-setup.done: $(all_tokens)
+msva.gnupghome/trustdb.gpg: authority/minimal.pgp client/cert.pgp
+	mkdir -m 0700 $(dir $@)
+	GNUPGHOME=$(dir $@) gpg --import < $<
+	printf "%s:6:\n" "$$(GNUPGHOME=authority gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" | GNUPGHOME=$(dir $@) gpg --import-ownertrust
+	GNUPGHOME=$(dir $@) gpg --import < client/cert.pgp
+	printf "keyserver does-not-exist.example\n" > msva.gnupghome/gpg.conf
+
+
+setup.done: $(all_tokens) msva.gnupghome/trustdb.gpg
 	mkdir -p logs cache outputs
 	touch setup.done
 
 
 clean:
-	rm -rf server client authority logs cache outputs setup.done server.template
+	rm -rf server client authority logs cache outputs setup.done server.template msva.gnupghome
 
 .PHONY: all clean
