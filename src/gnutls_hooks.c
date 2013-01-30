@@ -21,6 +21,9 @@
 #include "http_vhost.h"
 #include "ap_mpm.h"
 
+#ifdef ENABLE_MSVA
+#include <msv/msv.h>
+#endif
 
 #if !USING_2_1_RECENT
 extern server_rec *ap_server_conf;
@@ -57,6 +60,18 @@ static void gnutls_debug_log_all(int level, const char *str) {
 #else
 #define _gnutls_log(...)
 #endif
+
+static const char* mgs_readable_cvm(mgs_client_verification_method_e m) {
+    switch(m) {
+    case mgs_cvm_unset:
+        return "unset";
+    case mgs_cvm_cartel:
+        return "cartel";
+    case mgs_cvm_msva:
+        return "msva";
+    }
+    return "unknown";
+}
 
 /* Pre-Configuration HOOK: Runs First */
 int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog, apr_pool_t * ptemp) {
@@ -1137,8 +1152,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
                 break;
             }
         }
-    } else if (gnutls_certificate_type_get(ctxt->session) ==
-            GNUTLS_CRT_OPENPGP) {
+    } else if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_OPENPGP) {
         if (cert_list_size > 1) {
             ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
                     "GnuTLS: Failed to Verify Peer: "
