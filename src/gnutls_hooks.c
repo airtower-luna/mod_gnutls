@@ -553,6 +553,7 @@ int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc) 
 static int vhost_cb(void *baton, conn_rec * conn, server_rec * s) {
     mgs_srvconf_rec *tsc;
     vhost_cb_rec *x = baton;
+    int ret;
     
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
     tsc = (mgs_srvconf_rec *) ap_get_module_config(s->module_config,
@@ -562,11 +563,18 @@ static int vhost_cb(void *baton, conn_rec * conn, server_rec * s) {
         return 0;
     }
    
-	int ret = gnutls_x509_crt_check_hostname(tsc->certs_x509_chain[0], s->server_hostname);
-    if (0 == ret)
+    if (tsc->certs_x509_chain_num > 0) {
+        /* why are we doing this check? */
+        ret = gnutls_x509_crt_check_hostname(tsc->certs_x509_chain[0], s->server_hostname);
+        if (0 == ret)
+            ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
+                         "GnuTLS: Error checking certificate for hostname "
+                         "'%s'", s->server_hostname);
+    } else {
         ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
-                     "GnuTLS: Error checking certificate for hostname "
-                     "'%s'", s->server_hostname);
+                     "GnuTLS: SNI request for '%s' but no X.509 certs available at all",
+                     s->server_hostname);
+    }
 	return check_server_aliases(x, s, tsc);
 }
 #endif
