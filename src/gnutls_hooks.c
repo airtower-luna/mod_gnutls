@@ -1181,20 +1181,90 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
                 (cert.x509[0]));
 
         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
-                "GnuTLS: Verifying list of  %d certificate(s)",
-                ch_size);
-        rv = gnutls_x509_crt_list_verify(cert.x509, ch_size,
-                ctxt->sc->ca_list,
-                ctxt->sc->ca_list_size,
-                NULL, 0, 0, &status);
+                      "GnuTLS: Verifying list of %d certificate(s) via method '%s'",
+                      ch_size, mgs_readable_cvm(ctxt->sc->client_verify_method));
+        switch(ctxt->sc->client_verify_method) {
+        case mgs_cvm_cartel:
+            rv = gnutls_x509_crt_list_verify(cert.x509, ch_size,
+                                             ctxt->sc->ca_list,
+                                             ctxt->sc->ca_list_size,
+                                             NULL, 0, 0, &status);
+            break;
+#ifdef ENABLE_MSVA
+        case mgs_cvm_msva:
+        {
+            struct msv_response resp;
+            char cert_pem_buf[10 * 1024];
+            size_t len = sizeof (cert_pem_buf);
+
+            rv = 0;
+            if (gnutls_x509_crt_export(cert.x509[0], GNUTLS_X509_FMT_PEM, cert_pem_buf, &len) >= 0) {
+                char cert_pem_buf2[10*1024];
+                char* tokstate;
+                char* ptr = cert_pem_buf;
+                char* outptr = cert_pem_buf2;
+                /* convert PEM to JSON-friendly string by escaping all newlines
+                   (this should really be done within libmsv) */
+                ptr = apr_strtok(ptr, "\n", &tokstate);
+                do {
+                    outptr = apr_cpystrn(outptr, ptr, (cert_pem_buf2 + sizeof(cert_pem_buf2) - outptr));
+                    outptr = apr_cpystrn(outptr, "\\n", (cert_pem_buf2 + sizeof(cert_pem_buf2) - outptr));
+                    ptr = apr_strtok(NULL, "\n", &tokstate);
+                } while (ptr);
+                
+                /* FIXME : put together a name from the cert we received, instead of hard-coding this value: */
+                rv = msv_query_agent(NULL, "https", "client", "Test User <test0@modgnutls.test>", "x509pem", cert_pem_buf2, &resp);
+                if (rv == LIBMSV_ERROR_SUCCESS) {
+                    status = 0;
+                } else if (rv == LIBMSV_ERROR_INVALID) {
+                    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                                  "GnuTLS: Monkeysphere validation failed: (message: %s)", resp.message);
+                    status = GNUTLS_CERT_INVALID;
+                } else {
+                    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                                  "GnuTLS: Error communicating with the Monkeysphere Validation Agent: (%d) %s", rv, msv_strerror(rv));
+                    status = GNUTLS_CERT_INVALID;
+                    rv = -1;
+                } 
+            } else {
+                ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+                              "GnuTLS: Could not convert the client certificate to PEM format");
+                status = GNUTLS_CERT_INVALID;
+                rv = GNUTLS_E_ASN1_ELEMENT_NOT_FOUND;
+            }
+        }
+            break;
+#endif
+        default:
+            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+                          "GnuTLS: Failed to Verify X.509 Peer: method '%s' is not supported",
+                          mgs_readable_cvm(ctxt->sc->client_verify_method));
+        }
+        
     } else {
         apr_time_ansi_put(&expiration_time,
                 gnutls_openpgp_crt_get_expiration_time
                 (cert.pgp));
 
-        rv = gnutls_openpgp_crt_verify_ring(cert.pgp,
-                ctxt->sc->pgp_list, 0,
-                &status);
+        switch(ctxt->sc->client_verify_method) {
+        case mgs_cvm_cartel:
+            rv = gnutls_openpgp_crt_verify_ring(cert.pgp,
+                                                ctxt->sc->pgp_list, 0,
+                                                &status);
+            break;
+#ifdef ENABLE_MSVA
+        case mgs_cvm_msva:
+            /* need to set status and rv */
+            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+                          "GnuTLS:  OpenPGP verification via MSVA is not yet implemented");
+            rv = GNUTLS_E_UNIMPLEMENTED_FEATURE;
+            break;
+#endif
+        default:
+            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+                          "GnuTLS: Failed to Verify OpenPGP Peer: method '%s' is not supported",
+                          mgs_readable_cvm(ctxt->sc->client_verify_method));
+        }
     }
 
     if (rv < 0) {
