@@ -39,6 +39,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt);
 /* use side==0 for server and side==1 for client */
 static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, int side, int export_full_cert);
 static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t cert, int side, int export_full_cert);
+static const char* mgs_x509_construct_uid(request_rec * pool, gnutls_x509_crt_t cert);
 
 /* Pool Cleanup Function */
 apr_status_t mgs_cleanup_pre_config(void *data) {
@@ -1203,6 +1204,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
                 char* tokstate;
                 char* ptr = cert_pem_buf;
                 char* outptr = cert_pem_buf2;
+                const char* candidate = mgs_x509_construct_uid(r, cert.x509[0]);
                 /* convert PEM to JSON-friendly string by escaping all newlines
                    (this should really be done within libmsv) */
                 ptr = apr_strtok(ptr, "\n", &tokstate);
@@ -1213,7 +1215,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
                 } while (ptr);
                 
                 /* FIXME : put together a name from the cert we received, instead of hard-coding this value: */
-                rv = msv_query_agent(NULL, "https", "client", "Test User <test0@modgnutls.test>", "x509pem", cert_pem_buf2, &resp);
+                rv = msv_query_agent(NULL, "https", "client", candidate, "x509pem", cert_pem_buf2, &resp);
                 if (rv == LIBMSV_ERROR_SUCCESS) {
                     status = 0;
                 } else if (rv == LIBMSV_ERROR_INVALID) {
@@ -1353,4 +1355,164 @@ exit:
     return ret;
 
 
+}
+
+static const char* mgs_x509_leaf_oid_from_dn(apr_pool_t *pool, const char* oid, gnutls_x509_crt_t cert) {
+    int rv=GNUTLS_E_SUCCESS, i;
+    size_t sz=0, lastsz=0;
+    char* data=NULL;
+
+    i = -1;
+    while(rv != GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE) {
+        i++;
+        lastsz=sz;
+        sz=0;
+        rv = gnutls_x509_crt_get_dn_by_oid (cert, oid, i, 0, NULL, &sz);
+    }
+    if (i > 0) {
+        data = apr_palloc(pool, lastsz);
+        sz=lastsz;
+        rv = gnutls_x509_crt_get_dn_by_oid (cert, oid, i-1, 0, data, &sz);
+        if (rv == GNUTLS_E_SUCCESS)
+            return data;
+    }
+    return NULL;
+}
+
+static const char* mgs_x509_first_type_from_san(apr_pool_t *pool, gnutls_x509_subject_alt_name_t target, gnutls_x509_crt_t cert) {
+    int rv=GNUTLS_E_SUCCESS;
+    size_t sz;
+    char* data=NULL;
+    unsigned int i;
+    gnutls_x509_subject_alt_name_t thistype;
+
+    i = 0;
+    while(rv != GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE) {
+        sz = 0;
+        rv = gnutls_x509_crt_get_subject_alt_name2(cert, i, NULL, &sz, &thistype, NULL);
+        if (rv == GNUTLS_E_SHORT_MEMORY_BUFFER && thistype == target) {
+            data = apr_palloc(pool, sz);
+            rv = gnutls_x509_crt_get_subject_alt_name2(cert, i, data, &sz, &thistype, NULL);
+            if (rv == target)
+                return data;
+        }
+        i++;
+    }
+    return NULL;
+}
+
+/* Create a string representing a candidate User ID from an X.509
+ * certificate
+
+ * We need this for client certification because a client gives us a
+ * certificate, but doesn't tell us (in any other way) who they are
+ * trying to authenticate as.
+
+ * TODO: we might need another parallel for OpenPGP, but for that it's
+ * much simpler: we can just assume that the first User ID marked as
+ * "primary" (or the first User ID, period) is the identity the user
+ * is trying to present as.
+
+ * one complaint might be "but the user wanted to be another identity,
+ * which is also in the certificate (e.g. in a SubjectAltName)"
+ * However, given that any user can regenerate their own X.509
+ * certificate with their own public key content, they should just do
+ * so, and not expect us to guess at their identity :)
+
+ * This function allocates it's response from the pool given it.  When
+ * that pool is reclaimed, the response will also be deallocated.
+
+ * FIXME: what about extracting a server-style cert
+ *        (e.g. https://imposter.example) from the DN or any sAN?
+
+ * FIXME: what if we want to call this outside the context of a
+ *        request?  That complicates the logging.
+ */
+static const char* mgs_x509_construct_uid(request_rec *r, gnutls_x509_crt_t cert) {
+    /* basic strategy, assuming humans are the users: we are going to
+     * try to reconstruct a "conventional" User ID by pulling in a
+     * name, comment, and e-mail address.
+     */
+    apr_pool_t *pool = r->pool;
+    const char *name=NULL, *comment=NULL, *email=NULL;
+    const char *ret=NULL;
+    /* subpool for temporary allocation: */
+    apr_pool_t *sp=NULL;
+
+    if (APR_SUCCESS != apr_pool_create(&sp, pool))        
+        return NULL; /* i'm assuming that libapr would log this kind
+                      * of error on its own */
+
+     /* Name
+     
+     the name comes from the leaf commonName of the cert's Subject.
+     
+     (MAYBE: should we look at trying to assemble a candidate from
+             givenName, surName, suffix, etc?  the "name" field
+             appears to be case-insensitive, which seems problematic
+             from what we expect; see:
+             http://www.itu.int/rec/T-REC-X.520-200102-s/e )
+
+     (MAYBE: should we try pulling a commonName or otherName or
+             something from subjectAltName? see:
+             https://tools.ietf.org/html/rfc5280#section-4.2.1.6
+             GnuTLS does not support looking for Common Names in the
+             SAN yet)
+     */
+    name = mgs_x509_leaf_oid_from_dn(sp, GNUTLS_OID_X520_COMMON_NAME, cert);
+
+    /* Comment
+
+       I am inclined to punt on this for now, as Comment has been so
+       atrociously misused in OpenPGP.  Perhaps if there is a
+       pseudonym (OID 2.5.4.65, aka GNUTLS_OID_X520_PSEUDONYM) field
+       in the subject or sAN?
+    */
+    comment = mgs_x509_leaf_oid_from_dn(sp, GNUTLS_OID_X520_PSEUDONYM, cert);
+
+    /* E-mail
+
+       This should be the the first rfc822Name from the sAN.
+
+   (MAYBE: leaf rfc822Name in the certificate's subject, but this is
+           deprecated, and i don't see the OID in x509.h; can we
+           support it?)
+
+     */
+    email = mgs_x509_first_type_from_san(sp, GNUTLS_SAN_RFC822NAME, cert);
+
+
+    /* assemble all the parts: */
+
+    /* must have at least a name or an e-mail. */
+    if (name == NULL && email == NULL) {
+        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+                "GnuTLS: Need either a name or an e-mail address to get a User ID from an X.509 certificate.");
+        goto end;
+    }
+    if (name) {
+        if (comment) {
+            if (email) {
+                ret = apr_psprintf(pool, "%s (%s) <%s>", name, comment, email);
+            } else {
+                ret = apr_psprintf(pool, "%s (%s)", name, comment);
+            }
+        } else {
+            if (email) {
+                ret = apr_psprintf(pool, "%s <%s>", name, email);
+            } else {
+                ret = apr_pstrdup(pool, name);
+            }
+        }
+    } else {
+        if (comment) {
+            ret = apr_psprintf(pool, "(%s) <%s>", comment, email);
+        } else {
+            ret = apr_psprintf(pool, "<%s>", email);
+        }
+    }
+
+end:
+    apr_pool_destroy(sp);
+    return ret;
 }
