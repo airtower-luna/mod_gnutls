@@ -1466,13 +1466,12 @@ static const char* mgs_x509_construct_uid(request_rec *r, gnutls_x509_crt_t cert
 
        This should be the the first rfc822Name from the sAN.
 
-   (MAYBE: leaf rfc822Name in the certificate's subject, but this is
-           deprecated, and i don't see the OID in x509.h; can we
-           support it?)
-
+       failing that, we'll take the leaf email in the certificate's
+       subject; this is a deprecated use though.
      */
     email = mgs_x509_first_type_from_san(sp, GNUTLS_SAN_RFC822NAME, cert);
-
+    if (email == NULL)
+        email = mgs_x509_leaf_oid_from_dn(sp, GNUTLS_OID_PKCS9_EMAIL, cert);
 
     /* assemble all the parts: */
 
