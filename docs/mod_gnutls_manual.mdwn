@@ -1,68 +1,36 @@
-mod\_gnutls Manual 0.1\
-July 2011
-=======================
+% `mod_gnutls` Manual
 
 * * * * *
 
-Contents
---------
-
-1.  Compilation & Installation
-2.  Integration
-3.  Configuration Directives\
-    -   GnuTLSCache
-    -   GnuTLSCacheTimeout
-    -   GnuTLSSessionTickets
-    -   GnuTLSCertificateFile
-    -   GnuTLSKeyFile
-    -   GnuTLSPGPCertificateFile
-    -   GnuTLSPGPKeyFile
-    -   GnuTLSClientVerify
-    -   GnuTLSClientCAFile
-    -   GnuTLSPGPKeyringFile
-    -   GnuTLSEnable
-    -   GnuTLSDHFile
-    -   GnuTLSRSAFile
-    -   GnuTLSSRPPasswdFile
-    -   GnuTLSSRPPasswdConfFile
-    -   GnuTLSPriorities
-    -   GnuTLSExportCertificates
-
-4.  Configuration Examples\
-    -   Simple Standard SSL Example
-    -   Server Name Indication Example
-
-5.  Performance Issues
-6.  Environment Variables
-7.  Credits
+`mod_gnutls` is a module for the Apache web server that provides
+HTTPS (HTTP over Transport Layer Security (TLS) or the older Secure
+Sockets Layer (SSL)) using the GnuTLS library.
 
 * * * * *
 
 Compilation & Installation
 --------------------------
 
-mod\_gnutls uses the "configure/make/make install" mechanism common to
-many Open Source programs.\
- Most of the dirty work is handled by either configure or Apache's apxs
-utility.\
- If you have built Apache modules before, there shouldn't be any
-surprises for you.\
- The interesting options you can pass to configure are:\
- \
- --with-apxs=PATH\
- This option is used to specify the location of the apxs utility that
-was installed as part of apache.\
- Specify the location of the binary, not the directory it is located
-in.\
- \
- --with-libgnutls=PATH\
- Full path to the libgnutls-config program.\
- \
- --with-apr-memcache=PREFIX\
- Prefix to where apr\_memcache is installed.\
- \
- --help\
- Provides a list of all available configure options.
+`mod_gnutls` uses the `./configure && make && make install` mechanism
+common to many Open Source programs.  Most of the dirty work is
+handled by either `./configure` or Apache's `apxs` utility. If you have
+built Apache modules before, there shouldn't be any surprises for you.
+
+The interesting options you can pass to configure are:
+
+`--with-apxs=PATH` 
+:   This option is used to specify the location of the apxs utility that
+    was installed as part of apache. Specify the location of the
+    binary, not the directory it is located in.
+
+`--with-libgnutls=PATH`
+:   Full path to the libgnutls-config program.
+
+`--with-apr-memcache=PREFIX`
+:   Prefix to where apr\_memcache is installed.
+
+`--help`
+:   Provides a list of all available configure options.
 
 * * * * *
 
