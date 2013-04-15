@@ -349,7 +349,7 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog, apr_pool_t * ptemp, 
         if (sc->tickets == GNUTLS_ENABLED_UNSET)
             sc->tickets = GNUTLS_ENABLED_TRUE;
         if (sc->export_certificates_enabled == GNUTLS_ENABLED_UNSET)
-            sc->export_certificates_enabled = GNUTLS_ENABLED_TRUE;
+            sc->export_certificates_enabled = GNUTLS_ENABLED_FALSE;
         if (sc->client_verify_mode ==  -1)
             sc->client_verify_mode = GNUTLS_CERT_IGNORE;
 
