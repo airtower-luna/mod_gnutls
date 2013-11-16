@@ -72,7 +72,7 @@ rogueca/x509.pem: rogueca.template rogueca/secret.key
 	certtool --generate-certificate --load-ca-certificate=authority/x509.pem --load-ca-privkey=authority/secret.key --load-request=$(dir $@)cert-request --template=$< > $@
 
 msva.gnupghome/trustdb.gpg: authority/minimal.pgp client/cert.pgp
-	mkdir -m 0700 $(dir $@)
+	mkdir -p -m 0700 $(dir $@)
 	GNUPGHOME=$(dir $@) gpg --import < $<
 	printf "%s:6:\n" "$$(GNUPGHOME=authority gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" | GNUPGHOME=$(dir $@) gpg --import-ownertrust
 	GNUPGHOME=$(dir $@) gpg --import < client/cert.pgp
