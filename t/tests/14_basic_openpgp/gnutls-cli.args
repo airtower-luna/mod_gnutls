@@ -1,2 +1,2 @@
 --pgpkeyring=../../authority/cert.pgp
---priority=NORMAL:+CTYPE-OPENPGP
+--priority=NORMAL:-CTYPE-X509:+CTYPE-OPENPGP:+CTYPE-X509
