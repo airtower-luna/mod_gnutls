@@ -678,3 +678,8 @@ The PEM-encoded server certificate.
 ----------------------
 
 The certificate type can be `X.509` or `OPENPGP`.
+
+`SSL_CLIENT_CERT_TYPE`
+----------------------
+
+The certificate type can be `X.509` or `OPENPGP`.
