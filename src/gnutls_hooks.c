@@ -20,6 +20,7 @@
 #include "mod_gnutls.h"
 #include "http_vhost.h"
 #include "ap_mpm.h"
+#include "mod_status.h"
 
 #ifdef ENABLE_MSVA
 #include <msv/msv.h>
@@ -40,6 +41,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt);
 static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, int side, int export_full_cert);
 static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t cert, int side, int export_full_cert);
 static const char* mgs_x509_construct_uid(request_rec * pool, gnutls_x509_crt_t cert);
+static int mgs_status_hook(request_rec *r, int flags);
 
 /* Pool Cleanup Function */
 apr_status_t mgs_cleanup_pre_config(void *data) {
@@ -108,6 +110,8 @@ int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog, apr_pool_t * ptem
 		ap_log_perror(APLOG_MARK, APLOG_EMERG, 0, plog, "gnutls_session_ticket_key_generate: %s", gnutls_strerror(ret));
 		return DONE;
     }
+
+    AP_OPTIONAL_HOOK(status_hook, mgs_status_hook, NULL, NULL, APR_HOOK_MIDDLE);
 
 	/* Register a pool clean-up function */
     apr_pool_cleanup_register(pconf, NULL, mgs_cleanup_pre_config, apr_pool_cleanup_null);
@@ -1507,3 +1511,38 @@ end:
     apr_pool_destroy(sp);
     return ret;
 }
+
+static int mgs_status_hook(request_rec *r, int flags)
+{
+    mgs_srvconf_rec *sc;
+
+    if (r == NULL)
+        return OK;
+
+    sc = (mgs_srvconf_rec *) ap_get_module_config(r->server->module_config, &gnutls_module);
+
+    _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
+
+    ap_rputs("<hr>\n", r);
+    ap_rputs("<h2>GnuTLS Information:</h2>\n<dl>\n", r);
+
+    ap_rprintf(r, "<dt>GnuTLS version:</dt><dd>%s</dd>\n", gnutls_check_version(NULL));
+    ap_rputs("<dt>Built against:</dt><dd>" GNUTLS_VERSION "</dd>\n", r);
+    ap_rprintf(r, "<dt>using TLS:</dt><dd>%s</dd>\n", (sc->enabled == GNUTLS_ENABLED_FALSE ? "no" : "yes"));
+    if (sc->enabled != GNUTLS_ENABLED_FALSE) {
+        mgs_handle_t* ctxt;
+        char* z = NULL;
+        ctxt = ap_get_module_config(r->connection->conn_config, &gnutls_module);
+        if (ctxt && ctxt->session != NULL) {
+            z = gnutls_session_get_desc(ctxt->session);
+            if (z) {
+                ap_rprintf(r, "<dt>This TLS Session:</dt><dd>%s</dd>\n", z);
+                gnutls_free(z);
+            }
+        }
+    }
+
+    ap_rputs("</dl>\n", r);
+    return OK;
+}
+
