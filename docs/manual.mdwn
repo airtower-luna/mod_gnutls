@@ -661,8 +661,14 @@ GnuTLSSRPPasswdFile and GnuTLSSRPPasswdConfFile are configured).
 The number if bits used in the used cipher algorithm.
 
 This does not fully reflect the security level since the size of
-
 RSA or DHE key exchange parameters affect the security level too.
+
+###### SSL\_DH\_PRIME\_BITS
+
+The number if bits in the modulus for the DH group, if DHE or static
+DH is used.
+
+This will not be set if DH is not used.
 
 ###### SSL\_CIPHER\_EXPORT
 
@@ -726,3 +732,4 @@ The PEM-encoded server certificate.
 ###### SSL\_SERVER\_CERT\_TYPE
 
 The certificate type can be X.509 or OPENPGP.
+

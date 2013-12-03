@@ -10,4 +10,6 @@ $SSL_CLIENT_VERIFY
 
 ----SubjectAltName:----
 $SSL_CLIENT_S_AN0
+
+DH prime bits: $SSL_DH_PRIME_BITS
 EOF

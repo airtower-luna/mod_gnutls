@@ -2,7 +2,7 @@ Connection: close
 Transfer-Encoding: chunked
 Content-Type: text/plain
 
-53
+64
 ----Certificate:----
 
 
@@ -11,6 +11,8 @@ NONE
 
 ----SubjectAltName:----
 
+
+DH prime bits: 
 
 0
 

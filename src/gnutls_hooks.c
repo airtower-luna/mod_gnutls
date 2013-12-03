@@ -797,6 +797,12 @@ int mgs_hook_fixups(request_rec * r) {
     apr_table_setn(env, "SSL_CIPHER_EXPORT",
             (key_size <= 40) ? "true" : "false");
 
+    int dhsize = gnutls_dh_get_prime_bits(ctxt->session);
+    if (dhsize > 0) {
+        tmp = apr_psprintf(r->pool, "%d", dhsize);
+        apr_table_setn(env, "SSL_DH_PRIME_BITS", tmp);
+    }
+
     len = sizeof (sbuf);
     gnutls_session_get_id(ctxt->session, sbuf, &len);
     tmp = mgs_session_id2sz(sbuf, len, buf, sizeof (buf));
