@@ -20,7 +20,7 @@
 #include "mod_gnutls.h"
 
 /**
- * Describe how the GnuTLS Filter system works here 
+ * Describe how the GnuTLS Filter system works here
  *  - Basicly the same as what mod_ssl does with OpenSSL.
  *
  */
@@ -48,7 +48,7 @@ static apr_status_t gnutls_io_filter_error(ap_filter_t * f,
                     "trying to send HTML error page");
 
 				    mgs_srvconf_rec *sc = (mgs_srvconf_rec *) ap_get_module_config(
-																												f->c->base_server->module_config, 
+																												f->c->base_server->module_config,
 																												&gnutls_module
 																											);
             ctxt->status = -1;
@@ -434,7 +434,7 @@ tryagain:
     } else {
         /* all done with the handshake */
         ctxt->status = 1;
-        /* If the session was resumed, we did not set the correct 
+        /* If the session was resumed, we did not set the correct
          * server_rec in ctxt->sc.  Go Find it. (ick!)
          */
         if (gnutls_session_is_resumed(ctxt->session)) {
@@ -572,7 +572,7 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
     mgs_handle_t *ctxt = (mgs_handle_t *) f->ctx;
     apr_status_t status = APR_SUCCESS;
     apr_read_type_e rblock = APR_NONBLOCK_READ;
-    
+
     if (f->c->aborted) {
         apr_brigade_cleanup(bb);
         return APR_ECONNABORTED;
@@ -591,14 +591,14 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
 
         if (APR_BUCKET_IS_EOS(bucket)) {
             return ap_pass_brigade(f->next, bb);
-        } else if (APR_BUCKET_IS_FLUSH(bucket)) {       
+        } else if (APR_BUCKET_IS_FLUSH(bucket)) {
             /* Try Flush */
             if (write_flush(ctxt) < 0) {
                 /* Flush Error */
                 return ctxt->output_rc;
             }
             /* cleanup! */
-            apr_bucket_delete(bucket);                
+            apr_bucket_delete(bucket);
         } else if (AP_BUCKET_IS_EOC(bucket)) {
             /* End Of Connection */
             if (ctxt->session != NULL) {
@@ -611,7 +611,7 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
                 ctxt->session = NULL;
             }
             /* cleanup! */
-            apr_bucket_delete(bucket);            
+            apr_bucket_delete(bucket);
             /* Pass next brigade! */
             return ap_pass_brigade(f->next, bb);
         } else {
@@ -668,7 +668,7 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
                         return ctxt->output_rc;
                     }
                 } else if (ret != len) {
-                    /* Not able to send the entire bucket, 
+                    /* Not able to send the entire bucket,
                        split it and send it again. */
                     apr_bucket_split(bucket, ret);
                 }

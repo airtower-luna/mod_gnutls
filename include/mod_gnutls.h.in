@@ -56,15 +56,15 @@ extern module AP_MODULE_DECLARE_DATA gnutls_module;
 /* Module Debug Mode */
 #define MOD_GNUTLS_DEBUG @OOO_MAINTAIN@
 
-/* 
- * Recent Versions of 2.1 renamed several hooks. 
- * This allows us to compile on 2.0.xx  
+/*
+ * Recent Versions of 2.1 renamed several hooks.
+ * This allows us to compile on 2.0.xx
  */
 #if AP_SERVER_MINORVERSION_NUMBER >= 2 || (AP_SERVER_MINORVERSION_NUMBER == 1 && AP_SERVER_PATCHLEVEL_NUMBER >= 3)
 	#define USING_2_1_RECENT 1
 #else
 	#define USING_2_1_RECENT 0
-#endif 
+#endif
 
 /* mod_gnutls Cache Types */
 typedef enum {
@@ -104,7 +104,7 @@ typedef struct {
 /* Server Configuration Record */
 typedef struct {
 	/* x509 Certificate Structure */
-    gnutls_certificate_credentials_t certs; 
+    gnutls_certificate_credentials_t certs;
 	/* SRP Certificate Structure*/
     gnutls_srp_server_credentials_t srp_creds;
 	/* Annonymous Certificate Structure */
@@ -151,7 +151,7 @@ typedef struct {
 	/* Last Cache timestamp */
     apr_time_t last_cache_check;
 	/* GnuTLS uses Session Tickets */
-    int tickets; 
+    int tickets;
 	/* Is mod_proxy enabled? */
     int proxy_enabled;
 	/* A Plain HTTP request */
@@ -254,7 +254,7 @@ apr_status_t mgs_filter_output(ap_filter_t * f,
 
 
 /**
- * mgs_transport_read is called from GnuTLS to provide encrypted 
+ * mgs_transport_read is called from GnuTLS to provide encrypted
  * data from the client.
  *
  * @param ptr     pointer to the filter context
@@ -266,7 +266,7 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
                                   void *buffer, size_t len);
 
 /**
- * mgs_transport_write is called from GnuTLS to 
+ * mgs_transport_write is called from GnuTLS to
  * write data to the client.
  *
  * @param ptr     pointer to the filter context
@@ -285,12 +285,12 @@ int mgs_rehandshake(mgs_handle_t * ctxt);
 /**
  * Init the Cache after Configuration is done
  */
-int mgs_cache_post_config(apr_pool_t *p, server_rec *s, 
+int mgs_cache_post_config(apr_pool_t *p, server_rec *s,
                                  mgs_srvconf_rec *sc);
 /**
  * Init the Cache inside each Process
  */
-int mgs_cache_child_init(apr_pool_t *p, server_rec *s, 
+int mgs_cache_child_init(apr_pool_t *p, server_rec *s,
                                 mgs_srvconf_rec *sc);
 /**
  * Setup the Session Caching
@@ -299,7 +299,7 @@ int mgs_cache_session_init(mgs_handle_t *ctxt);
 
 #define GNUTLS_SESSION_ID_STRING_LEN \
     ((GNUTLS_MAX_SESSION_ID + 1) * 2)
-    
+
 /**
  * Convert a SSL Session ID into a Null Terminated Hex Encoded String
  * @param id raw SSL Session ID
@@ -365,8 +365,8 @@ const char *mgs_set_priorities(cmd_parms * parms, void *dummy,
                             const char *arg);
 const char *mgs_set_tickets(cmd_parms * parms, void *dummy,
                             const char *arg);
-                            
-const char *mgs_set_require_section(cmd_parms *cmd, 
+
+const char *mgs_set_require_section(cmd_parms *cmd,
                                     void *mconfig, const char *arg);
 void *mgs_config_server_create(apr_pool_t * p, server_rec * s);
 void *mgs_config_server_merge(apr_pool_t *p, void *BASE, void *ADD);
@@ -375,7 +375,7 @@ void *mgs_config_dir_merge(apr_pool_t *p, void *basev, void *addv);
 
 void *mgs_config_dir_create(apr_pool_t *p, char *dir);
 
-const char *mgs_set_require_bytecode(cmd_parms *cmd, 
+const char *mgs_set_require_bytecode(cmd_parms *cmd,
                                     void *mconfig, const char *arg);
 
 mgs_srvconf_rec* mgs_find_sni_server(gnutls_session_t session);

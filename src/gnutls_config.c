@@ -118,7 +118,7 @@ const char *mgs_set_cert_file(cmd_parms * parms, void *dummy, const char *arg) {
 		apr_pool_destroy(spool);
         return apr_psprintf(parms->pool, "GnuTLS: Failed to Import Certificate '%s': (%d) %s", file, ret, gnutls_strerror(ret));
     }
-    
+
 	apr_pool_destroy(spool);
     return NULL;
 
@@ -133,7 +133,7 @@ const char *mgs_set_key_file(cmd_parms * parms, void *dummy, const char *arg) {
     const char *out;
 
 	mgs_srvconf_rec *sc = (mgs_srvconf_rec *) ap_get_module_config(parms->server->module_config, &gnutls_module);
-    
+
 	apr_pool_create(&spool, parms->pool);
 
     file = ap_server_root_relative(spool, arg);
@@ -517,10 +517,10 @@ const char *mgs_set_keyring_file(cmd_parms * parms, void *dummy,
 
 const char *mgs_set_proxy_engine(cmd_parms * parms, void *dummy,
         const char *arg) {
-    
-    mgs_srvconf_rec *sc =(mgs_srvconf_rec *) 
+
+    mgs_srvconf_rec *sc =(mgs_srvconf_rec *)
             ap_get_module_config(parms->server->module_config, &gnutls_module);
-    
+
     if (!strcasecmp(arg, "On")) {
         sc->proxy_enabled = GNUTLS_ENABLED_TRUE;
     } else if (!strcasecmp(arg, "Off")) {
@@ -568,14 +568,14 @@ const char *mgs_set_priorities(cmd_parms * parms, void *dummy, const char *arg) 
 	int ret;
     const char *err;
 
-    mgs_srvconf_rec *sc = (mgs_srvconf_rec *) 
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
 						  ap_get_module_config(parms->server->module_config, &gnutls_module);
 
     ret = gnutls_priority_init(&sc->priorities, arg, &err);
 
     if (ret < 0) {
         if (ret == GNUTLS_E_INVALID_REQUEST) {
-            return apr_psprintf(parms->pool, 
+            return apr_psprintf(parms->pool,
 								"GnuTLS: Syntax error parsing priorities string at: %s", err);
 		}
         return "Error setting priorities";
@@ -634,10 +634,10 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p, char** err) {
     sc->dh_params = NULL;
     sc->proxy_enabled = GNUTLS_ENABLED_UNSET;
     sc->export_certificates_enabled = GNUTLS_ENABLED_UNSET;
-    sc->client_verify_method = mgs_cvm_unset; 
-    
+    sc->client_verify_method = mgs_cvm_unset;
+
 /* this relies on GnuTLS never changing the gnutls_certificate_request_t enum to define -1 */
-    sc->client_verify_mode = -1; 
+    sc->client_verify_mode = -1;
 
     return sc;
 }
@@ -674,7 +674,7 @@ void *mgs_config_server_merge(apr_pool_t *p, void *BASE, void *ADD) {
     /* FIXME: the following items are pre-allocated, and should be
      * properly disposed of before assigning in order to avoid leaks;
      * so at the moment, we can't actually have them in the config.
-     * what happens during de-allocation? 
+     * what happens during de-allocation?
 
      * This is probably leaky.
      */

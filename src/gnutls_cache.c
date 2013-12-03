@@ -34,7 +34,7 @@
 #include "unixd.h"
 #endif
 
-/* it seems the default has some strange errors. Use SDBM 
+/* it seems the default has some strange errors. Use SDBM
  */
 #define MC_TAG "mod_gnutls:"
 #define MC_TAG_LEN sizeof(MC_TAG)
@@ -565,7 +565,7 @@ int mgs_cache_post_config(apr_pool_t * p, server_rec * s,
     if (sc->cache_type == mgs_cache_unset)
         sc->cache_type = mgs_cache_none;
     /* if GnuTLSCacheTimeout was never explicitly set: */
-    if (sc->cache_timeout == -1) 
+    if (sc->cache_timeout == -1)
         sc->cache_timeout = apr_time_from_sec(300);
 
     if (sc->cache_type == mgs_cache_dbm

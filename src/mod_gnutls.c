@@ -20,10 +20,10 @@
 #include "mod_gnutls.h"
 
 static void gnutls_hooks(apr_pool_t * p) {
-    
+
     /* Try Run Post-Config Hook After mod_proxy */
     static const char * const aszPre[] = { "mod_proxy.c", NULL };
-    ap_hook_post_config(mgs_hook_post_config, aszPre, NULL,APR_HOOK_REALLY_LAST); 
+    ap_hook_post_config(mgs_hook_post_config, aszPre, NULL,APR_HOOK_REALLY_LAST);
     /* HTTP Scheme Hook */
 #if USING_2_1_RECENT
     ap_hook_http_scheme(mgs_hook_http_scheme, NULL, NULL, APR_HOOK_MIDDLE);
@@ -36,7 +36,7 @@ static void gnutls_hooks(apr_pool_t * p) {
     ap_hook_pre_connection(mgs_hook_pre_connection, NULL, NULL, APR_HOOK_MIDDLE);
     /* Pre-Config Hook */
     ap_hook_pre_config(mgs_hook_pre_config, NULL, NULL,
-            APR_HOOK_MIDDLE);    
+            APR_HOOK_MIDDLE);
     /* Child-Init Hook */
     ap_hook_child_init(mgs_hook_child_init, NULL, NULL,
             APR_HOOK_MIDDLE);
@@ -47,7 +47,7 @@ static void gnutls_hooks(apr_pool_t * p) {
     ap_hook_fixups(mgs_hook_fixups, NULL, NULL, APR_HOOK_REALLY_FIRST);
 
     /* TODO: HTTP Upgrade Filter */
-    /* ap_register_output_filter ("UPGRADE_FILTER", 
+    /* ap_register_output_filter ("UPGRADE_FILTER",
      *          ssl_io_filter_Upgrade, NULL, AP_FTYPE_PROTOCOL + 5);
      */
 
@@ -57,14 +57,14 @@ static void gnutls_hooks(apr_pool_t * p) {
     /* Output Filter */
     ap_register_output_filter(GNUTLS_OUTPUT_FILTER_NAME,
             mgs_filter_output, NULL,AP_FTYPE_CONNECTION + 5);
-    
+
     /* mod_proxy calls these functions */
     APR_REGISTER_OPTIONAL_FN(ssl_proxy_enable);
     APR_REGISTER_OPTIONAL_FN(ssl_engine_disable);
 }
 
 int ssl_is_https(conn_rec *c) {
-    mgs_srvconf_rec *sc = (mgs_srvconf_rec *) 
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
             ap_get_module_config(c->base_server->module_config, &gnutls_module);
     if(sc->enabled == 0 || sc->non_ssl_request == 1) {
         /* SSL/TLS Disabled or Plain HTTP Connection Detected */
@@ -75,11 +75,11 @@ int ssl_is_https(conn_rec *c) {
 }
 
 int ssl_engine_disable(conn_rec *c) {
-    mgs_srvconf_rec *sc = (mgs_srvconf_rec *) 
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
             ap_get_module_config(c->base_server->module_config, &gnutls_module);
     if(sc->enabled == GNUTLS_ENABLED_FALSE) {
         return 1;
-    } 
+    }
     ap_remove_input_filter(c->input_filters);
     ap_remove_input_filter(c->output_filters);
     mgs_cleanup_pre_config(c->pool);
@@ -88,7 +88,7 @@ int ssl_engine_disable(conn_rec *c) {
 }
 
 int ssl_proxy_enable(conn_rec *c) {
-    mgs_srvconf_rec *sc = (mgs_srvconf_rec *) 
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
             ap_get_module_config(c->base_server->module_config, &gnutls_module);
     sc->proxy_enabled = 1;
     sc->enabled = 0;
