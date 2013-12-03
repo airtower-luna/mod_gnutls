@@ -1,0 +1,2 @@
+--x509cafile=../../authority/x509.pem
+--priority=NONE:+VERS-TLS1.2:+AES-128-GCM:+AEAD:+RSA:+COMP-NULL

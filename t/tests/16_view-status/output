@@ -1,0 +1,5 @@
+<dt>using TLS:</dt><dd>yes</dd>
+<dt>This TLS Session:</dt><dd>(TLS1.2-PKIX)-(RSA)-(AES-128-GCM)-(AEAD)</dd>
+</dl>
+</body></html>
+- Peer has closed the GnuTLS connection
