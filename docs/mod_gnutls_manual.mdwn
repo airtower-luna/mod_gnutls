@@ -308,7 +308,7 @@ file holds the SRP parameters and is associate with the password file
 Set the allowed ciphers, key exchange algorithms, MACs and compression
 methods
 
-    GnuTLSPriorities +CIPHER_0:+CIPHER_1:...:+CIPHER_N
+    GnuTLSPriorities NORMAL:+CIPHER_0:+CIPHER_1:...:+CIPHER_N
 
 Default: *none*\
 Context: server config, virtual host
@@ -318,7 +318,7 @@ Message authentication codes and compression methods to enable.
 The allowed keywords are specified in the `gnutls_priority_init()`
 function of GnuTLS.
 
-Its documentation can be found at [Core GnuTLS functions](http://www.gnu.org/software/gnutls/manual/html_node/Core-functions.html#Core-functions).
+Full details can be found at [the GnuTLS documentation](http://gnutls.org/manual/html_node/Priority-Strings.html#Priority-Strings).
 In brief you can specify a set of ciphersuites from the choices:
 
 `NONE`
