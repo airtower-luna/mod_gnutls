@@ -757,21 +757,16 @@ int mgs_hook_fixups(request_rec * r) {
             "mod_gnutls/" MOD_GNUTLS_VERSION);
 
     apr_table_setn(env, "SSL_PROTOCOL",
-            gnutls_protocol_get_name(gnutls_protocol_get_version
-            (ctxt->session)));
+            gnutls_protocol_get_name(gnutls_protocol_get_version(ctxt->session)));
 
     /* should have been called SSL_CIPHERSUITE instead */
     apr_table_setn(env, "SSL_CIPHER",
-            gnutls_cipher_suite_get_name(gnutls_kx_get
-            (ctxt->session),
-            gnutls_cipher_get
-            (ctxt->session),
-            gnutls_mac_get
-            (ctxt->session)));
+            gnutls_cipher_suite_get_name(gnutls_kx_get(ctxt->session),
+                                         gnutls_cipher_get(ctxt->session),
+                                         gnutls_mac_get(ctxt->session)));
 
     apr_table_setn(env, "SSL_COMPRESS_METHOD",
-            gnutls_compression_get_name(gnutls_compression_get
-            (ctxt->session)));
+            gnutls_compression_get_name(gnutls_compression_get(ctxt->session)));
 
 #ifdef ENABLE_SRP
     if (ctxt->sc->srp_tpasswd_conf_file != NULL && ctxt->sc->srp_tpasswd_file != NULL) {
@@ -785,9 +780,7 @@ int mgs_hook_fixups(request_rec * r) {
     if (apr_table_get(env, "SSL_CLIENT_VERIFY") == NULL)
         apr_table_setn(env, "SSL_CLIENT_VERIFY", "NONE");
 
-    unsigned int key_size =
-            8 *
-            gnutls_cipher_get_key_size(gnutls_cipher_get(ctxt->session));
+    unsigned int key_size = 8 * gnutls_cipher_get_key_size(gnutls_cipher_get(ctxt->session));
     tmp = apr_psprintf(r->pool, "%u", key_size);
 
     apr_table_setn(env, "SSL_CIPHER_USEKEYSIZE", tmp);
