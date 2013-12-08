@@ -1530,14 +1530,21 @@ static int mgs_status_hook(request_rec *r, int flags)
     ap_rprintf(r, "<dt>using TLS:</dt><dd>%s</dd>\n", (sc->enabled == GNUTLS_ENABLED_FALSE ? "no" : "yes"));
     if (sc->enabled != GNUTLS_ENABLED_FALSE) {
         mgs_handle_t* ctxt;
-        char* z = NULL;
         ctxt = ap_get_module_config(r->connection->conn_config, &gnutls_module);
         if (ctxt && ctxt->session != NULL) {
+#if GNUTLS_VERSION_MAJOR < 3
+            ap_rprintf(r, "<dt>This TLS Session:</dt><dd>%s</dd>\n",
+                gnutls_cipher_suite_get_name(gnutls_kx_get(ctxt->session),
+                gnutls_cipher_get(ctxt->session),
+                gnutls_mac_get(ctxt->session)));
+#else
+            char* z = NULL;
             z = gnutls_session_get_desc(ctxt->session);
             if (z) {
                 ap_rprintf(r, "<dt>This TLS Session:</dt><dd>%s</dd>\n", z);
                 gnutls_free(z);
             }
+#endif
         }
     }
 
