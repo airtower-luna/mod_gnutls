@@ -1,16 +1,20 @@
 **TODO:
--Fix support for proxy termination
--Consider Certificate SANs
--Handle Unclean Shutdowns
-** Version 0.6 (2011-00-00)
--Generating DH Params instead of using static ones.
--Now considering ServerAlias Directives.
--Major Legacy Code Cleanup.
--Included Pdf & Html Manuals.
+- Fix support for proxy termination
+- Handle Unclean Shutdowns
+- make session cache use generic apache caches
+
+** Version 0.6 (2014-02-17)
+- Generating DH Params instead of using static ones.
+- Now considering ServerAlias Directives.
+- Major Legacy Code Cleanup.
+- html and pdf and manual documentation generated from markdown sources
+- support monkeysphere validation agent (MSVA) client-certificate verification
+- wider test suite
+- GnuTLSExportCertificates off by default
 
 ** Version 0.5.10 (2011-07-12)
--Patched a bug responsible for excessive memory consumption by mod_gnutls.
--Support for proxying from SSL to plain HTTP was added (ie. proxy termination).
+- Patched a bug responsible for excessive memory consumption by mod_gnutls.
+- Support for proxying from SSL to plain HTTP was added (ie. proxy termination).
 
 ** Version 0.5.9 (2010-09-24)
 - GnuTLSCache none is now an allowed option.
