@@ -2,9 +2,10 @@
 
 * * * * *
 
-`mod_gnutls` is a module for the Apache web server that provides
-HTTPS (HTTP over Transport Layer Security (TLS) or the older Secure
-Sockets Layer (SSL)) using the GnuTLS library.
+`mod_gnutls` is a module for the Apache web server that provides HTTPS
+(HTTP over Transport Layer Security (TLS) or the older Secure Sockets
+Layer (SSL)) using the GnuTLS library.  More information about the
+module can be found at [the project's website](https://mod.gnutls.org/).
 
 * * * * *
 
