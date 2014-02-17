@@ -10,4 +10,6 @@ imposter
 rogueca
 server.uid
 server.template
+client.template
+authority.template
 msva.gnupghome
