@@ -453,12 +453,13 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog, apr_pool_t * ptemp, 
     ap_add_version_component(p, "mod_gnutls/" MOD_GNUTLS_VERSION);
 
     {
-        char* gnutls_version = apr_psprintf(p, "GnuTLS/%s", gnutls_check_version(NULL));
-        if( !gnutls_version ) {
+        const char* libvers = gnutls_check_version(NULL);
+        char* gnutls_version = NULL;
+        if(libvers && (gnutls_version = apr_psprintf(p, "GnuTLS/%s", libvers))) {
+            ap_add_version_component(p, gnutls_version);
+        } else {
             // In case we could not create the above string go for the static version instead
             ap_add_version_component(p, "GnuTLS/" GNUTLS_VERSION "-static");
-        } else {
-            ap_add_version_component(p, gnutls_version);
         }
     }
 
