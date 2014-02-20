@@ -44,6 +44,10 @@
 #define ap_unixd_config unixd_config
 #endif
 
+#ifdef APLOG_USE_MODULE
+APLOG_USE_MODULE(gnutls);
+#endif
+
 char *mgs_session_id2sz(unsigned char *id, int idlen,
         char *str, int strsize) {
     char *cp;

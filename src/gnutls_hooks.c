@@ -26,6 +26,10 @@
 #include <msv/msv.h>
 #endif
 
+#ifdef APLOG_USE_MODULE
+APLOG_USE_MODULE(gnutls);
+#endif
+
 #if !USING_2_1_RECENT
 extern server_rec *ap_server_conf;
 #endif

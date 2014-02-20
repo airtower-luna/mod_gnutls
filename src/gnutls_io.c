@@ -19,6 +19,10 @@
 
 #include "mod_gnutls.h"
 
+#ifdef APLOG_USE_MODULE
+APLOG_USE_MODULE(gnutls);
+#endif
+
 /**
  * Describe how the GnuTLS Filter system works here
  *  - Basicly the same as what mod_ssl does with OpenSSL.

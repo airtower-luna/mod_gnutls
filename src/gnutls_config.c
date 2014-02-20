@@ -19,6 +19,10 @@
 
 #include "mod_gnutls.h"
 
+#ifdef APLOG_USE_MODULE
+APLOG_USE_MODULE(gnutls);
+#endif
+
 static int load_datum_from_file(apr_pool_t * pool,
         const char *file, gnutls_datum_t * data) {
     apr_file_t *fp;
