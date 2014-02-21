@@ -4,18 +4,17 @@
 #export DH_VERBOSE=1
 
 %:
-	dh $@
+	dh $@ --with apache2
 
 override_dh_auto_configure:
 	dh_auto_configure -- --with-apxs=/usr/bin/apxs2
 
 override_dh_auto_install:
-	dh_installdirs $(shell apxs2 -q LIBEXECDIR)
-	cp src/.libs/libmod_gnutls.so debian/libapache2-mod-gnutls$(shell apxs2 -q LIBEXECDIR)/mod_gnutls.so
 
 override_dh_install:
-	dh_install debian/gnutls.conf debian/gnutls.load etc/apache2/mods-available
-	dh_install debian/default-tls etc/apache2/sites-available/
+	mv src/.libs/libmod_gnutls.so src/.libs/mod_gnutls.so
+	dh_install
 
-override_dh_installdocs:
-	dh_installdocs README README.ENV
+override_dh_clean:
+	rm -f config.nice
+	dh_clean

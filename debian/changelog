@@ -1,3 +1,16 @@
+mod-gnutls (0.5.10-2) unstable; urgency=low
+
+  * QA upload.
+  * Set maintainer to Debian QA Group <packages@qa.debian.org>.
+  * Acknowledge NMU. (Closes: #669895).
+  * Build with Apache2.4. (Closes: #666831).
+    + Remove libapache2-threaded-dev b-d.
+    + Add dh-apache2 and apache2-dev b-d.
+  * Bump debhelper build-dep and compat to 9.
+  * Bump Standards Version to 3.9.4.
+
+ -- Barry deFreese <bdefreese@debian.org>  Wed, 17 Jul 2013 21:28:51 -0400
+
 mod-gnutls (0.5.10-1.1) unstable; urgency=low
 
   [ Bastiaan Franciscus van den Dikkenberg ]
