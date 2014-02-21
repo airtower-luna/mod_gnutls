@@ -1,9 +1,10 @@
-mod-gnutls (0.5.10-5) UNRELEASED; urgency=medium
+mod-gnutls (0.5.10-5) unstable; urgency=low
 
   * Adopting package. Closes: #680182
   * wrap and sort debian/control
+  * prefer building against libgnutls28-dev (GnuTLS 3.x)
 
- -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Thu, 20 Feb 2014 20:05:05 -0500
+ -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Fri, 21 Feb 2014 00:01:09 -0500
 
 mod-gnutls (0.5.10-4) unstable; urgency=medium
 
