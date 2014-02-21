@@ -1,0 +1,7 @@
+t/*/*.gpg
+t/*/*.pgp
+t/*/*.pem
+t/*/*.key
+t/authority.template
+t/client.template
+t/server.uid
