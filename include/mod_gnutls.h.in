@@ -15,6 +15,7 @@
  *
  */
 
+/* Apache Runtime Headers */
 #include "httpd.h"
 #include "http_config.h"
 #include "http_protocol.h"
@@ -26,9 +27,12 @@
 #include "apr_strings.h"
 #include "apr_tables.h"
 #include "ap_release.h"
-
+#include "apr_fnmatch.h"
+/* GnuTLS Library Headers */
 #include <gnutls/gnutls.h>
+#if GNUTLS_VERSION_MAJOR == 2
 #include <gnutls/extra.h>
+#endif
 #include <gnutls/openpgp.h>
 #include <gnutls/x509.h>
 
@@ -39,116 +43,187 @@
 
 extern module AP_MODULE_DECLARE_DATA gnutls_module;
 
+/* IO Filter names */
 #define GNUTLS_OUTPUT_FILTER_NAME "gnutls_output_filter"
 #define GNUTLS_INPUT_FILTER_NAME "gnutls_input_filter"
-
+/* GnuTLS Constants */
 #define GNUTLS_ENABLED_FALSE 0
 #define GNUTLS_ENABLED_TRUE  1
-
+#define GNUTLS_ENABLED_UNSET  2
+/* Current module version */
 #define MOD_GNUTLS_VERSION "@MOD_GNUTLS_VERSION@"
 
+/* Module Debug Mode */
 #define MOD_GNUTLS_DEBUG @OOO_MAINTAIN@
 
-/* Recent Versions of 2.1 renamed several hooks. This allows us to 
-   compile on 2.0.xx  */
+/*
+ * Recent Versions of 2.1 renamed several hooks.
+ * This allows us to compile on 2.0.xx
+ */
 #if AP_SERVER_MINORVERSION_NUMBER >= 2 || (AP_SERVER_MINORVERSION_NUMBER == 1 && AP_SERVER_PATCHLEVEL_NUMBER >= 3)
-#define USING_2_1_RECENT 1
-#endif 
-
-#ifndef USING_2_1_RECENT
-#define USING_2_1_RECENT 0
+	#define USING_2_1_RECENT 1
+#else
+	#define USING_2_1_RECENT 0
 #endif
 
-typedef enum 
-{
+/* mod_gnutls Cache Types */
+typedef enum {
+	/* No Cache */
     mgs_cache_none,
+	/* Use Old Berkley DB */
     mgs_cache_dbm,
+	/* Use Gnu's version of Berkley DB */
     mgs_cache_gdbm,
 #if HAVE_APR_MEMCACHE
-    mgs_cache_memcache
+	/* Use Memcache */
+    mgs_cache_memcache,
 #endif
+    mgs_cache_unset
 } mgs_cache_e;
 
-typedef struct
-{
+typedef enum {
+    mgs_cvm_unset,
+    mgs_cvm_cartel,
+    mgs_cvm_msva
+} mgs_client_verification_method_e;
+
+
+/* Directory Configuration Record */
+typedef struct {
     int client_verify_mode;
     const char* lua_bytecode;
     apr_size_t lua_bytecode_len;
 } mgs_dirconf_rec;
 
 
-/* The maximum number of certificates to send in a chain
- */
+/* The maximum number of certificates to send in a chain */
 #define MAX_CHAIN_SIZE 8
+/* The maximum number of SANs to read from a x509 certificate */
+#define MAX_CERT_SAN 5
 
-typedef struct
-{
+/* Server Configuration Record */
+typedef struct {
+	/* x509 Certificate Structure */
     gnutls_certificate_credentials_t certs;
+	/* SRP Certificate Structure*/
     gnutls_srp_server_credentials_t srp_creds;
+	/* Annonymous Certificate Structure */
     gnutls_anon_server_credentials_t anon_creds;
+	/* Current x509 Certificate CN [Common Name] */
     char* cert_cn;
-    gnutls_x509_crt_t certs_x509[MAX_CHAIN_SIZE]; /* A certificate chain */
-    unsigned int certs_x509_num;
+	/* Current x509 Certificate SAN [Subject Alternate Name]s*/
+	char* cert_san[MAX_CERT_SAN];
+	/* A x509 Certificate Chain */
+    gnutls_x509_crt_t *certs_x509_chain;
+	/* Current x509 Certificate Private Key */
     gnutls_x509_privkey_t privkey_x509;
-    gnutls_openpgp_crt_t cert_pgp; /* A certificate chain */
+	/* OpenPGP Certificate */
+    gnutls_openpgp_crt_t cert_pgp;
+	/* OpenPGP Certificate Private Key */
     gnutls_openpgp_privkey_t privkey_pgp;
+	/* Number of Certificates in Chain */
+    unsigned int certs_x509_chain_num;
+	/* Is the module enabled? */
     int enabled;
-    /* whether to send the PEM encoded certificates
-     * to CGIs
-     */
+    /* Export full certificates to CGI environment: */
     int export_certificates_enabled;
+	/* GnuTLS Priorities */
     gnutls_priority_t priorities;
-    gnutls_rsa_params_t rsa_params;
+	/* GnuTLS DH Parameters */
     gnutls_dh_params_t dh_params;
+	/* Cache timeout value */
     int cache_timeout;
+	/* Chose Cache Type */
     mgs_cache_e cache_type;
     const char* cache_config;
     const char* srp_tpasswd_file;
     const char* srp_tpasswd_conf_file;
+	/* A list of CA Certificates */
     gnutls_x509_crt_t *ca_list;
+	/* OpenPGP Key Ring */
     gnutls_openpgp_keyring_t pgp_list;
+	/* CA Certificate list size */
     unsigned int ca_list_size;
+	/* Client Certificate Verification Mode */
     int client_verify_mode;
+	/* Client Certificate Verification Method */
+    mgs_client_verification_method_e client_verify_method;
+	/* Last Cache timestamp */
     apr_time_t last_cache_check;
-    int tickets; /* whether session tickets are allowed */
+	/* GnuTLS uses Session Tickets */
+    int tickets;
+	/* Is mod_proxy enabled? */
+    int proxy_enabled;
+	/* A Plain HTTP request */
+    int non_ssl_request;
 } mgs_srvconf_rec;
 
+/* Character Buffer */
 typedef struct {
     int length;
     char *value;
 } mgs_char_buffer_t;
 
-typedef struct
-{
+/* GnuTLS Handle */
+typedef struct {
+	/* Server configuration record */
     mgs_srvconf_rec *sc;
+	/* Connection record */
     conn_rec* c;
+	/* GnuTLS Session handle */
     gnutls_session_t session;
-
+	/* module input status */
     apr_status_t input_rc;
+	/* Input filter */
     ap_filter_t *input_filter;
+	/* Input Bucket Brigade */
     apr_bucket_brigade *input_bb;
+	/* Input Read Type */
     apr_read_type_e input_block;
+	/* Input Mode */
     ap_input_mode_t input_mode;
+	/* Input Character Buffer */
     mgs_char_buffer_t input_cbuf;
+	/* Input Character Array */
     char input_buffer[AP_IOBUFSIZE];
-
+	/* module Output status */
     apr_status_t output_rc;
+	/* Output filter */
     ap_filter_t *output_filter;
+	/* Output Bucket Brigade */
     apr_bucket_brigade *output_bb;
+	/* Output character array */
     char output_buffer[AP_IOBUFSIZE];
+	/* Output buffer length */
     apr_size_t output_blen;
+	/* Output length */
     apr_size_t output_length;
-
+	/* General Status */
     int status;
-    int non_https;
 } mgs_handle_t;
+
+
 
 /** Functions in gnutls_io.c **/
 
-/**
- * write_flush will flush data
- */
-static ssize_t write_flush(mgs_handle_t * ctxt);
+/* apr_signal_block() for blocking SIGPIPE */
+apr_status_t apr_signal_block(int signum);
+
+ /* Proxy Support */
+/* An optional function which returns non-zero if the given connection
+is using SSL/TLS. */
+APR_DECLARE_OPTIONAL_FN(int, ssl_is_https, (conn_rec *));
+/* The ssl_proxy_enable() and ssl_engine_disable() optional functions
+ * are used by mod_proxy to enable use of SSL for outgoing
+ * connections. */
+APR_DECLARE_OPTIONAL_FN(int, ssl_proxy_enable, (conn_rec *));
+APR_DECLARE_OPTIONAL_FN(int, ssl_engine_disable, (conn_rec *));
+int ssl_is_https(conn_rec *c);
+int ssl_proxy_enable(conn_rec *c);
+int ssl_engine_disable(conn_rec *c);
+const char *mgs_set_proxy_engine(cmd_parms * parms, void *dummy,
+    const char *arg);
+apr_status_t mgs_cleanup_pre_config(void *data);
 
 /**
  * mgs_filter_input will filter the input data
@@ -179,7 +254,7 @@ apr_status_t mgs_filter_output(ap_filter_t * f,
 
 
 /**
- * mgs_transport_read is called from GnuTLS to provide encrypted 
+ * mgs_transport_read is called from GnuTLS to provide encrypted
  * data from the client.
  *
  * @param ptr     pointer to the filter context
@@ -191,7 +266,7 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
                                   void *buffer, size_t len);
 
 /**
- * mgs_transport_write is called from GnuTLS to 
+ * mgs_transport_write is called from GnuTLS to
  * write data to the client.
  *
  * @param ptr     pointer to the filter context
@@ -210,12 +285,12 @@ int mgs_rehandshake(mgs_handle_t * ctxt);
 /**
  * Init the Cache after Configuration is done
  */
-int mgs_cache_post_config(apr_pool_t *p, server_rec *s, 
+int mgs_cache_post_config(apr_pool_t *p, server_rec *s,
                                  mgs_srvconf_rec *sc);
 /**
  * Init the Cache inside each Process
  */
-int mgs_cache_child_init(apr_pool_t *p, server_rec *s, 
+int mgs_cache_child_init(apr_pool_t *p, server_rec *s,
                                 mgs_srvconf_rec *sc);
 /**
  * Setup the Session Caching
@@ -224,7 +299,7 @@ int mgs_cache_session_init(mgs_handle_t *ctxt);
 
 #define GNUTLS_SESSION_ID_STRING_LEN \
     ((GNUTLS_MAX_SESSION_ID + 1) * 2)
-    
+
 /**
  * Convert a SSL Session ID into a Null Terminated Hex Encoded String
  * @param id raw SSL Session ID
@@ -252,8 +327,6 @@ const char *mgs_set_srp_tpasswd_file(cmd_parms * parms, void *dummy,
                                         const char *arg);
 const char *mgs_set_dh_file(cmd_parms * parms, void *dummy,
                                         const char *arg);
-const char *mgs_set_rsa_export_file(cmd_parms * parms, void *dummy,
-                                        const char *arg);
 const char *mgs_set_cert_file(cmd_parms * parms, void *dummy,
                                         const char *arg);
 
@@ -275,6 +348,9 @@ const char *mgs_set_cache_timeout(cmd_parms * parms, void *dummy,
 const char *mgs_set_client_verify(cmd_parms * parms, void *dummy,
                                   const char *arg);
 
+const char *mgs_set_client_verify_method(cmd_parms * parms, void *dummy,
+                                         const char *arg);
+
 const char *mgs_set_client_ca_file(cmd_parms * parms, void *dummy,
                                    const char *arg);
 
@@ -289,16 +365,17 @@ const char *mgs_set_priorities(cmd_parms * parms, void *dummy,
                             const char *arg);
 const char *mgs_set_tickets(cmd_parms * parms, void *dummy,
                             const char *arg);
-                            
-const char *mgs_set_require_section(cmd_parms *cmd, 
+
+const char *mgs_set_require_section(cmd_parms *cmd,
                                     void *mconfig, const char *arg);
 void *mgs_config_server_create(apr_pool_t * p, server_rec * s);
+void *mgs_config_server_merge(apr_pool_t *p, void *BASE, void *ADD);
 
 void *mgs_config_dir_merge(apr_pool_t *p, void *basev, void *addv);
 
 void *mgs_config_dir_create(apr_pool_t *p, char *dir);
 
-const char *mgs_set_require_bytecode(cmd_parms *cmd, 
+const char *mgs_set_require_bytecode(cmd_parms *cmd,
                                     void *mconfig, const char *arg);
 
 mgs_srvconf_rec* mgs_find_sni_server(gnutls_session_t session);
@@ -323,7 +400,5 @@ int mgs_hook_pre_connection(conn_rec * c, void *csd);
 int mgs_hook_fixups(request_rec *r);
 
 int mgs_hook_authz(request_rec *r);
-
-int mgs_authz_lua(request_rec* r);
 
 #endif /*  __mod_gnutls_h_inc */

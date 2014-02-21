@@ -1,0 +1,6 @@
+serial=2
+cn=__HOSTNAME__
+tls_www_server
+signing_key
+encryption_key
+dns_name="__HOSTNAME__"

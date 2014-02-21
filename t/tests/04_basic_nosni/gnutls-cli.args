@@ -1,0 +1,3 @@
+--x509cafile=../../authority/x509.pem
+--priority=NORMAL
+--disable-extensions

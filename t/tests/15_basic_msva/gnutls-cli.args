@@ -1,0 +1,4 @@
+--x509certfile=../../client/x509.pem
+--x509keyfile=../../client/secret.key
+--x509cafile=../../authority/x509.pem
+--priority=NORMAL

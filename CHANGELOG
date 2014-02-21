@@ -1,0 +1,97 @@
+**TODO:
+- Fix support for proxy termination
+- Handle Unclean Shutdowns
+- make session cache use generic apache caches
+
+** Version 0.6 (2014-02-17)
+- Generating DH Params instead of using static ones.
+- Now considering ServerAlias Directives.
+- Major Legacy Code Cleanup.
+- html and pdf and manual documentation generated from markdown sources
+- support monkeysphere validation agent (MSVA) client-certificate verification
+- wider test suite
+- GnuTLSExportCertificates off by default
+
+** Version 0.5.10 (2011-07-12)
+- Patched a bug responsible for excessive memory consumption by mod_gnutls.
+- Support for proxying from SSL to plain HTTP was added (ie. proxy termination).
+
+** Version 0.5.9 (2010-09-24)
+- GnuTLSCache none is now an allowed option.
+- Corrected behavior in Keep-Alive connections (do not
+  terminate the connection prematurely)
+- The GnuTLSCache variable now can be given the specific
+  option "gdbm" instead of "dbm". "dbm" will use the berkeley
+  db type of libapr while gdbm will force gdbm to be used.
+  sdbm is no longer being used due to serious limitations.
+
+** Version 0.5.8 (2010-08-18)
+- Session tickets are enabled by default.
+- Fixes some segmentation faults noticed in some
+  configurations.
+
+** Version 0.5.7 (2010-07-01)
+- Force usage of SDBM. For some reason the default in
+  my system had issues after reaching a limit of entries.
+  SDBM seems stable so force it.
+- Optimizations in session caching.
+- Added support for session tickets. This allows a
+  server to avoid using a session cache and still support
+  session resumption. This is at the cost of transporting
+  session data during handshake. New option
+  GnuTLSSessionTickets [on|off]
+- Depend on gnutls 2.10.0 to force support for safe
+  renegotiation.
+
+** Version 0.5.6 (2010-03-24)
+- Corrected issue with firefox and long POST data (by
+  handling EINTR and EAGAIN errors in read).
+- Added support for chained client certificates
+- Corrected more issues related to double frees
+http://issues.outoforder.cc/view.php?id=102
+
+** Version 0.5.5 (2009-06-13)
+- Removed limits on CA certificate loading. Reported by
+  Sander Marechal and Jack Bates.
+- Do not allow sending empty TLS packets even when instructed to.
+  This had the side effect of clients closing connection.
+
+** Version 0.5.4 (2009-01-04)
+- mod_gnutls.h: modified definition to extern to avoid compilation
+  errors in darwin.
+- Added patch to fix issue with mod_proxy. Investigation and patch by Alain
+  Knaff.
+- libgnutls detection uses pkg-config.
+
+** Version 0.5.3 (2008-10-16)
+- Corrected bug to allow having an OpenPGP-only web site.
+- Increased Max handshake tries due to interrupted system calls.
+
+** Version 0.5.2 (2008-06-29)
+- Depend on gnutls 2.4 which has openpgp support in main library.
+
+** Version 0.5.1 (2008-03-05)
+- Added --disable-srp configure option
+- Better check for memcache (patch by Guillaume Rousse)
+- Corrected possible memory leak in DBM support for resuming sessions.
+
+** Version 0.5.0-alpha (2008-01-24)
+- Added support for OpenPGP keys. The new directives are:
+  GnuTLSPGPKeyringFile, GnuTLSPGPCertificateFile, GnuTLSPGPKeyFile
+
+** Version 0.4.2 (2007-12-10)
+- Added support for sending a certificate chain.
+- Corrected bug which did not allow the TLS session cache to be used.
+- Do not allow resuming sessions on different servers.
+
+** Version 0.4.1 (2007-12-03)
+- Added support for subject alternative names in certificates.
+Only one per certificate is supported.
+- New enviroment variables: SSL_CLIENT_M_VERSION, SSL_CLIENT_S_SAN%, 
+SSL_CLIENT_S_TYPE, SSL_SERVER_M_VERSION, SSL_SERVER_S_SAN%, SSL_SERVER_S_TYPE
+- The compatibility mode can now be enabled explicitely with the
+%COMPAT keyword at the GnuTLSPriorities string. It is no longer the default.
+- Check for GnuTLSPriorities directive. This corrects a segfault. Thanks
+to David Hrbáč.
+- Better handling of GnuTLSDHFile and GnuTLSRSAFile.
+- No longer default paths for RSA and DH parameter files.
