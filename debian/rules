@@ -15,6 +15,7 @@ override_dh_auto_install:
 
 override_dh_install:
 	dh_install debian/gnutls.conf debian/gnutls.load etc/apache2/mods-available
+	dh_install debian/default-tls etc/apache2/sites-available/
 
 override_dh_installdocs:
 	dh_installdocs README README.ENV

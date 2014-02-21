@@ -1,0 +1,34 @@
+<IfModule mod_gnutls.c> 
+<VirtualHost _default_:443>
+	ServerAdmin webmaster@localhost
+	DocumentRoot /var/www/
+	<Directory />
+		Options FollowSymLinks
+		AllowOverride None
+	</Directory>
+	<Directory /var/www/>
+		Options Indexes FollowSymLinks MultiViews
+		AllowOverride None
+		Order allow,deny
+		allow from all
+	</Directory>
+	ScriptAlias /cgi-bin/ /usr/lib/cgi-bin/
+	<Directory "/usr/lib/cgi-bin">
+		AllowOverride None
+		Options +ExecCGI -MultiViews +SymLinksIfOwnerMatch
+		Order allow,deny
+		Allow from all
+	</Directory>
+	ErrorLog ${APACHE_LOG_DIR}/error.log
+	# Possible values include: debug, info, notice, warn, error, crit, alert, emerg.
+	LogLevel warn
+	CustomLog ${APACHE_LOG_DIR}/ssl_access.log combined
+	#   GnuTLS Switch: Enable/Disable SSL/TLS for this virtual host.
+	GnuTLSEnable On
+	#   A self-signed (snakeoil) certificate can be created by installing the ssl-cert package. See /usr/share/doc/apache2.2-common/README.Debian.gz for more info.
+	GnuTLSCertificateFile	/etc/ssl/certs/ssl-cert-snakeoil.pem
+	GnuTLSKeyFile /etc/ssl/private/ssl-cert-snakeoil.key
+	#   See http://www.outoforder.cc/projects/apache/mod_gnutls/docs/#GnuTLSPriorities
+	GnuTLSPriorities NORMAL 
+</VirtualHost> 
+</IfModule>

@@ -1,3 +1,16 @@
+mod-gnutls (0.5.10-1.1) unstable; urgency=low
+
+  [ Bastiaan Franciscus van den Dikkenberg ]
+  * Non-maintainer upload.
+  * Fix "default-tls file for apache" Added default-tls file
+    (Closes: #558232)
+  * Fix "configure: *** memcache library not found."
+    added build-depensie to libapr-memcache-dev (Closes: #497097)
+  * apache2-dev is releplaced by apache2-threaded-dev (Closes: #667626)
+  * DEP-5 url changed in copyright file to new standard
+
+ -- Bastiaan Franciscus van den Dikkenberg <bas@dikkenberg.net>  Sat, 21 Apr 2012 09:10:49 +0200
+
 mod-gnutls (0.5.10-1) unstable; urgency=low
 
   * New upstream release (Closes: #602957)
