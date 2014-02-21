@@ -9,6 +9,7 @@ Build-Depends:
  dh-autoreconf,
  libapr-memcache-dev,
  libgnutls28-dev | libgnutls-dev (>= 2.4.0),
+ libmsv-dev (>= 1.0),
  pkg-config
 Standards-Version: 3.9.5
 Homepage: https://mod.gnutls.org/

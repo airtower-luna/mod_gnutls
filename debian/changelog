@@ -1,3 +1,12 @@
+mod-gnutls (0.6-1) unstable; urgency=low
+
+  * New upstream version
+   - multi-name certificates now work (Closes: #677847)
+  * added debian/watch and debian/upstream/signing-key.pgp
+  * enable MSVA support
+
+ -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Fri, 21 Feb 2014 00:17:59 -0500
+
 mod-gnutls (0.5.10-5) unstable; urgency=low
 
   * Adopting package. (Closes: #680182)
