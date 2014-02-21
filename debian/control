@@ -12,6 +12,7 @@ Build-Depends:
  libapr-memcache-dev,
  libgnutls28-dev | libgnutls-dev (>= 2.4.0),
  libmsv-dev (>= 1.0),
+ libwww-perl,
  monkeysphere (>= 0.36),
  msva-perl,
  pandoc,
