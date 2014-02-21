@@ -8,7 +8,7 @@ Build-Depends:
  dh-apache2,
  dh-autoreconf,
  libapr-memcache-dev,
- libgnutls-dev (>= 2.4.0),
+ libgnutls28-dev | libgnutls-dev (>= 2.4.0),
  pkg-config
 Standards-Version: 3.9.5
 Homepage: https://mod.gnutls.org/
