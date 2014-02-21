@@ -1,3 +1,15 @@
+mod-gnutls (0.5.10-4) unstable; urgency=medium
+
+  * QA upload.
+  * Merge from Ubuntu (Logan Rosen):
+   + Use dh-autoreconf instead of autotools-dev to also fix FTBFS on ppc64el
+     by getting new libtool macros (still updates config.{sub,guess}).
+     Closes: #734574
+  * Mention TLS 1.2 in package description. Closes: #736406
+
+
+ -- Andreas Metzler <ametzler@debian.org>  Sun, 02 Feb 2014 11:10:36 +0100
+
 mod-gnutls (0.5.10-3) unstable; urgency=low
 
   * QA upload.

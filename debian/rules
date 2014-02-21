@@ -4,7 +4,7 @@
 #export DH_VERBOSE=1
 
 %:
-	dh $@ --with apache2,autotools_dev
+	dh $@ --with apache2,autoreconf
 
 override_dh_auto_configure:
 	dh_auto_configure -- --with-apxs=/usr/bin/apxs2
