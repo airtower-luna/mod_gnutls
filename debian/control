@@ -2,11 +2,10 @@ Source: mod-gnutls
 Section: httpd
 Priority: extra
 Maintainer: Debian QA Group <packages@qa.debian.org>
-Build-Depends: debhelper (>= 9), autotools-dev, dh-apache2, apache2-dev, libgnutls-dev (>= 2.4.0), pkg-config, libapr-memcache-dev
+Build-Depends: debhelper (>= 9), autotools-dev, dh-apache2, apache2-dev,
+ libgnutls-dev (>= 2.4.0), pkg-config, libapr-memcache-dev
 Standards-Version: 3.9.4
-Homepage: http://www.outoforder.cc/projects/apache/mod_gnutls/
-Vcs-Browser: https://github.com/jablko/debian/tree/master/mod-gnutls
-Vcs-Git: https://github.com/jablko/debian.git
+Homepage: https://mod.gnutls.org/
 
 Package: libapache2-mod-gnutls
 Architecture: any

@@ -1,3 +1,14 @@
+mod-gnutls (0.5.10-3) unstable; urgency=low
+
+  * QA upload.
+  * Use dh_autotools-dev. Closes: #727461
+  * Drop outdated Vcs-* lines from debian/control. - The repository only had
+    a single commit.
+  * Rebuilding gets rid of reference to symbol unixd_config. Closes: #710986
+  * Update homepage location.
+
+ -- Andreas Metzler <ametzler@debian.org>  Sat, 30 Nov 2013 14:04:12 +0100
+
 mod-gnutls (0.5.10-2) unstable; urgency=low
 
   * QA upload.
