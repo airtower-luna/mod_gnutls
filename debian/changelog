@@ -1,8 +1,10 @@
 mod-gnutls (0.5.10-5) unstable; urgency=low
 
-  * Adopting package. Closes: #680182
+  * Adopting package. (Closes: #680182)
   * wrap and sort debian/control
   * prefer building against libgnutls28-dev (GnuTLS 3.x)
+  * ship /etc/apache2/sites-available/default-tls.conf instead of default-tls
+    (Closes: #724038)
 
  -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Fri, 21 Feb 2014 00:01:09 -0500
 
