@@ -1,5 +1,5 @@
 dnl 
-AC_INIT(mod_gnutls, 0.5.10)
+AC_INIT(mod_gnutls, 0.6)
 OOO_CONFIG_NICE(config.nice)
 MOD_GNUTLS_VERSION=AC_PACKAGE_VERSION
 AC_PREREQ(2.53)
@@ -19,24 +19,17 @@ AC_PROG_LD
 AC_PROG_INSTALL
 AC_PROG_LIBTOOL
 
+AC_CONFIG_MACRO_DIR([m4])
+
 AP_VERSION=2.0.40
 CHECK_APACHE(,$AP_VERSION,
     :,:,
     AC_MSG_ERROR([*** Apache version $AP_VERSION not found!])
 )
 
-dnl LIBTOOL="`${APR_CONFIG} --apr-libtool`"
-dnl AC_SUBST(LIBTOOL)
+PKG_CHECK_MODULES([LIBGNUTLS], [gnutls >= 2.12.6])
 
-dnl Depend on 2.10.0 due to safe renegotiation addition.
-MIN_TLS_VERSION=2.10.0
-AM_PATH_LIBGNUTLS($MIN_TLS_VERSION,,
- 	AC_MSG_ERROR([[
-***  
-*** libgnutls was not found. You may want to get it from
-*** http://www.gnutls.org/
-***
-]]))
+LIBGNUTLS_VERSION=`pkg-config --modversion gnutls`
 
 AC_ARG_ENABLE(srp,
        AS_HELP_STRING([--disable-srp],
@@ -47,16 +40,32 @@ SRP_CFLAGS=""
 if test "$use_srp" != "no"; then
  	SRP_CFLAGS="-DENABLE_SRP=1"
 fi
+
 AC_MSG_CHECKING([whether to enable SRP functionality])
 AC_MSG_RESULT($use_srp)
 
-dnl CHECK_LUA()
+AC_ARG_ENABLE(msva,
+       AS_HELP_STRING([--enable-msva],
+               [enable Monkeysphere client certificate verification]),
+       use_msva=$enableval, use_msva=no)
+
+MSVA_CFLAGS=""
+if test "$use_msva" != "no"; then
+ 	AC_CHECK_HEADERS([msv/msv.h], [], 
+                         [AC_MSG_ERROR([*** No libmsv headers found!])])
+        AC_SEARCH_LIBS([msv_query_agent], [msv], [],
+                         [AC_MSG_ERROR([*** No libmsv found with msv_query_agent!])])
+ 	MSVA_CFLAGS="-DENABLE_MSVA=1"
+fi
+
+AC_MSG_CHECKING([whether to enable MSVA functionality])
+AC_MSG_RESULT($use_msva)
 
 have_apr_memcache=0
 CHECK_APR_MEMCACHE([have_apr_memcache=1], [have_apr_memcache=0])
 AC_SUBST(have_apr_memcache)
 
-MODULE_CFLAGS="${LIBGNUTLS_CFLAGS} ${SRP_CFLAGS} ${APR_MEMCACHE_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES}"
+MODULE_CFLAGS="${LIBGNUTLS_CFLAGS} ${SRP_CFLAGS} ${MSVA_CFLAGS} ${APR_MEMCACHE_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES}"
 MODULE_LIBS="${APR_MEMCACHE_LIBS} ${LIBGNUTLS_LIBS}"
 
 AC_SUBST(MODULE_CFLAGS)
@@ -72,5 +81,6 @@ echo "   * mod_gnutls version:	${MOD_GNUTLS_VERSION}"
 echo "   * Apache Modules directory:	${AP_LIBEXECDIR}"
 echo "   * GnuTLS Library version:	${LIBGNUTLS_VERSION}"
 echo "   * SRP Authentication:          ${use_srp}"
+echo "   * MSVA Client Verification:    ${use_msva}"
 echo ""
 echo "---"
