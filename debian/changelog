@@ -5,6 +5,8 @@ mod-gnutls (0.6-1) unstable; urgency=low
   * added debian/watch and debian/upstream/signing-key.pgp
   * enable MSVA support
   * drop patches -- builds cleanly without them
+  * build and ship newer, cleaner docs
+  * add build-dependencies for new test suite
 
  -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Fri, 21 Feb 2014 00:58:09 -0500
 

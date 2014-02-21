@@ -7,9 +7,13 @@ Build-Depends:
  debhelper (>= 9),
  dh-apache2,
  dh-autoreconf,
+ gnutls-bin,
  libapr-memcache-dev,
  libgnutls28-dev | libgnutls-dev (>= 2.4.0),
  libmsv-dev (>= 1.0),
+ msva-perl,
+ pandoc,
+ monkeysphere (>= 0.36),
  pkg-config
 Standards-Version: 3.9.5
 Homepage: https://mod.gnutls.org/
