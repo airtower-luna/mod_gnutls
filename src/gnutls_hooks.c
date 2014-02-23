@@ -2,6 +2,7 @@
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2008 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
+ *  Copyright 2013-2014 Daniel Kahn Gillmor
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -896,7 +897,7 @@ int mgs_hook_authz(request_rec * r) {
  * @param export_cert_size (int) maximum size for environment variable
  * to use for the PEM-encoded certificate (0 means do not export)
  */
-#define MGS_SIDE ((side==0)?"SSL_SERVER":"SSL_CLIENT")
+#define MGS_SIDE(suffix) ((side==0) ? "SSL_SERVER" suffix : "SSL_CLIENT" suffix)
 
 static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, int side, int export_cert_size) {
     unsigned char sbuf[64]; /* buffer to hold serials */
@@ -917,15 +918,14 @@ static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, in
         ret = gnutls_x509_crt_export(cert, GNUTLS_X509_FMT_PEM, NULL, &len);
         if (ret == GNUTLS_E_SHORT_MEMORY_BUFFER) {
             if (len >= export_cert_size) {
-                apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_CERT", NULL),
-                               "GNUTLS_CERTIFICATE_SIZE_LIMIT_EXCEEDED");
+                apr_table_setn(env, MGS_SIDE("_CERT"), "GNUTLS_CERTIFICATE_SIZE_LIMIT_EXCEEDED");
                 ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
                               "GnuTLS: Failed to export too-large X.509 certificate to environment");
             } else {
                 char* cert_buf = apr_palloc(r->pool, len + 1);
                 if (cert_buf != NULL && gnutls_x509_crt_export(cert, GNUTLS_X509_FMT_PEM, cert_buf, &len) >= 0) {
                     cert_buf[len] = 0;
-                    apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_CERT", NULL), cert_buf);
+                    apr_table_setn(env, MGS_SIDE("_CERT"), cert_buf);
                 } else {
                     ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
                                   "GnuTLS: failed to export X.509 certificate");
@@ -939,63 +939,49 @@ static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, in
 
     len = sizeof (buf);
     gnutls_x509_crt_get_dn(cert, buf, &len);
-    apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_S_DN", NULL),
-            apr_pstrmemdup(r->pool, buf, len));
+    apr_table_setn(env, MGS_SIDE("_S_DN"), apr_pstrmemdup(r->pool, buf, len));
 
     len = sizeof (buf);
     gnutls_x509_crt_get_issuer_dn(cert, buf, &len);
-    apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_I_DN", NULL),
-            apr_pstrmemdup(r->pool, buf, len));
+    apr_table_setn(env, MGS_SIDE("_I_DN"), apr_pstrmemdup(r->pool, buf, len));
 
     len = sizeof (sbuf);
     gnutls_x509_crt_get_serial(cert, sbuf, &len);
     tmp = mgs_session_id2sz(sbuf, len, buf, sizeof (buf));
-    apr_table_setn(env,
-            apr_pstrcat(r->pool, MGS_SIDE, "_M_SERIAL", NULL),
-            apr_pstrdup(r->pool, tmp));
+    apr_table_setn(env, MGS_SIDE("_M_SERIAL"), apr_pstrdup(r->pool, tmp));
 
     ret = gnutls_x509_crt_get_version(cert);
     if (ret > 0)
-        apr_table_setn(env,
-            apr_pstrcat(r->pool, MGS_SIDE, "_M_VERSION",
-            NULL), apr_psprintf(r->pool,
-            "%u", ret));
+        apr_table_setn(env, MGS_SIDE("_M_VERSION"),
+                       apr_psprintf(r->pool, "%u", ret));
 
-    apr_table_setn(env,
-            apr_pstrcat(r->pool, MGS_SIDE, "_CERT_TYPE", NULL),
-            "X.509");
+    apr_table_setn(env, MGS_SIDE("_CERT_TYPE"), "X.509");
 
     tmp =
             mgs_time2sz(gnutls_x509_crt_get_expiration_time
             (cert), buf, sizeof (buf));
-    apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_V_END", NULL),
-            apr_pstrdup(r->pool, tmp));
+    apr_table_setn(env, MGS_SIDE("_V_END"), apr_pstrdup(r->pool, tmp));
 
     tmp =
             mgs_time2sz(gnutls_x509_crt_get_activation_time
             (cert), buf, sizeof (buf));
-    apr_table_setn(env,
-            apr_pstrcat(r->pool, MGS_SIDE, "_V_START", NULL),
-            apr_pstrdup(r->pool, tmp));
+    apr_table_setn(env, MGS_SIDE("_V_START"), apr_pstrdup(r->pool, tmp));
 
     ret = gnutls_x509_crt_get_signature_algorithm(cert);
     if (ret >= 0) {
-        apr_table_setn(env,
-                apr_pstrcat(r->pool, MGS_SIDE, "_A_SIG",
-                NULL),
+        apr_table_setn(env, MGS_SIDE("_A_SIG"),
                 gnutls_sign_algorithm_get_name(ret));
     }
 
     ret = gnutls_x509_crt_get_pk_algorithm(cert, NULL);
     if (ret >= 0) {
-        apr_table_setn(env,
-                apr_pstrcat(r->pool, MGS_SIDE, "_A_KEY",
-                NULL),
+        apr_table_setn(env, MGS_SIDE("_A_KEY"),
                 gnutls_pk_algorithm_get_name(ret));
     }
 
     /* export all the alternative names (DNS, RFC822 and URI) */
     for (i = 0; !(ret < 0); i++) {
+        const char *san, *sanlabel;
         len = 0;
         ret = gnutls_x509_crt_get_subject_alt_name(cert, i,
                 NULL, &len,
@@ -1011,37 +997,17 @@ static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, in
                     NULL);
             tmp2[len] = 0;
 
+            sanlabel = apr_psprintf(r->pool, "%s%u", MGS_SIDE("_S_AN"), i);
             if (ret == GNUTLS_SAN_DNSNAME) {
-                apr_table_setn(env,
-                        apr_psprintf(r->pool,
-                        "%s_S_AN%u",
-                        MGS_SIDE, i),
-                        apr_psprintf(r->pool,
-                        "DNSNAME:%s",
-                        tmp2));
+                san = apr_psprintf(r->pool, "DNSNAME:%s", tmp2);
             } else if (ret == GNUTLS_SAN_RFC822NAME) {
-                apr_table_setn(env,
-                        apr_psprintf(r->pool,
-                        "%s_S_AN%u",
-                        MGS_SIDE, i),
-                        apr_psprintf(r->pool,
-                        "RFC822NAME:%s",
-                        tmp2));
+                san = apr_psprintf(r->pool, "RFC822NAME:%s", tmp2);
             } else if (ret == GNUTLS_SAN_URI) {
-                apr_table_setn(env,
-                        apr_psprintf(r->pool,
-                        "%s_S_AN%u",
-                        MGS_SIDE, i),
-                        apr_psprintf(r->pool,
-                        "URI:%s",
-                        tmp2));
+                san = apr_psprintf(r->pool, "URI:%s", tmp2);
             } else {
-                apr_table_setn(env,
-                        apr_psprintf(r->pool,
-                        "%s_S_AN%u",
-                        MGS_SIDE, i),
-                        "UNSUPPORTED");
+                san = "UNSUPPORTED";
             }
+            apr_table_setn(env, sanlabel, san);
         }
     }
 }
@@ -1071,7 +1037,7 @@ static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t ce
         ret = gnutls_openpgp_crt_export(cert, GNUTLS_OPENPGP_FMT_BASE64, NULL, &len);
         if (ret == GNUTLS_E_SHORT_MEMORY_BUFFER) {
             if (len >= export_cert_size) {
-                apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_CERT", NULL),
+                apr_table_setn(env, MGS_SIDE("_CERT"),
                                "GNUTLS_CERTIFICATE_SIZE_LIMIT_EXCEEDED");
                 ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
                               "GnuTLS: Failed to export too-large OpenPGP certificate to environment");
@@ -1079,7 +1045,7 @@ static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t ce
                 char* cert_buf = apr_palloc(r->pool, len + 1);
                 if (cert_buf != NULL && gnutls_openpgp_crt_export(cert, GNUTLS_OPENPGP_FMT_BASE64, cert_buf, &len) >= 0) {
                     cert_buf[len] = 0;
-                    apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_CERT", NULL), cert_buf);
+                    apr_table_setn(env, MGS_SIDE("_CERT"), cert_buf);
                 } else {
                     ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
                                   "GnuTLS: failed to export OpenPGP certificate");
@@ -1093,46 +1059,33 @@ static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t ce
 
     len = sizeof (buf);
     gnutls_openpgp_crt_get_name(cert, 0, buf, &len);
-    apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_NAME", NULL),
-            apr_pstrmemdup(r->pool, buf, len));
+    apr_table_setn(env, MGS_SIDE("_NAME"), apr_pstrmemdup(r->pool, buf, len));
 
     len = sizeof (sbuf);
     gnutls_openpgp_crt_get_fingerprint(cert, sbuf, &len);
     tmp = mgs_session_id2sz(sbuf, len, buf, sizeof (buf));
-    apr_table_setn(env,
-            apr_pstrcat(r->pool, MGS_SIDE, "_FINGERPRINT",
-            NULL), apr_pstrdup(r->pool, tmp));
+    apr_table_setn(env, MGS_SIDE("_FINGERPRINT"), apr_pstrdup(r->pool, tmp));
 
     ret = gnutls_openpgp_crt_get_version(cert);
     if (ret > 0)
-        apr_table_setn(env,
-            apr_pstrcat(r->pool, MGS_SIDE, "_M_VERSION",
-            NULL), apr_psprintf(r->pool,
-            "%u", ret));
+        apr_table_setn(env, MGS_SIDE("_M_VERSION"),
+                       apr_psprintf(r->pool, "%u", ret));
 
-    apr_table_setn(env,
-            apr_pstrcat(r->pool, MGS_SIDE, "_CERT_TYPE", NULL),
-            "OPENPGP");
+    apr_table_setn(env, MGS_SIDE("_CERT_TYPE"), "OPENPGP");
 
     tmp =
             mgs_time2sz(gnutls_openpgp_crt_get_expiration_time
             (cert), buf, sizeof (buf));
-    apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_V_END", NULL),
-            apr_pstrdup(r->pool, tmp));
+    apr_table_setn(env, MGS_SIDE("_V_END"), apr_pstrdup(r->pool, tmp));
 
     tmp =
             mgs_time2sz(gnutls_openpgp_crt_get_creation_time
             (cert), buf, sizeof (buf));
-    apr_table_setn(env,
-            apr_pstrcat(r->pool, MGS_SIDE, "_V_START", NULL),
-            apr_pstrdup(r->pool, tmp));
+    apr_table_setn(env, MGS_SIDE("_V_START"), apr_pstrdup(r->pool, tmp));
 
     ret = gnutls_openpgp_crt_get_pk_algorithm(cert, NULL);
     if (ret >= 0) {
-        apr_table_setn(env,
-                apr_pstrcat(r->pool, MGS_SIDE, "_A_KEY",
-                NULL),
-                gnutls_pk_algorithm_get_name(ret));
+        apr_table_setn(env, MGS_SIDE("_A_KEY"), gnutls_pk_algorithm_get_name(ret));
     }
 
 }
