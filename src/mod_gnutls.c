@@ -180,10 +180,10 @@ static const command_rec mgs_config_cmds[] = {
     RSRC_CONF,
     "Whether this server has GnuTLS Enabled. Default: Off"),
     AP_INIT_TAKE1("GnuTLSExportCertificates",
-    mgs_set_export_certificates_enabled,
+    mgs_set_export_certificates_size,
     NULL,
     RSRC_CONF,
-    "Whether to export PEM encoded certificates to CGIs. Default: Off"),
+    "Max size to export PEM encoded certificates to CGIs (or off to disable). Default: off"),
     { NULL },
 };
 

@@ -18,6 +18,7 @@
  */
 
 #include "mod_gnutls.h"
+#include "apr_lib.h"
 
 #ifdef APLOG_USE_MODULE
 APLOG_USE_MODULE(gnutls);
@@ -553,15 +554,23 @@ const char *mgs_set_enabled(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
-const char *mgs_set_export_certificates_enabled(cmd_parms * parms, void *dummy, const char *arg) {
+const char *mgs_set_export_certificates_size(cmd_parms * parms, void *dummy, const char *arg) {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *) ap_get_module_config(parms->server->module_config, &gnutls_module);
     if (!strcasecmp(arg, "On")) {
-        sc->export_certificates_enabled = GNUTLS_ENABLED_TRUE;
+        sc->export_certificates_size = 16 * 1024;
     } else if (!strcasecmp(arg, "Off")) {
-        sc->export_certificates_enabled = GNUTLS_ENABLED_FALSE;
+        sc->export_certificates_size = 0;
     } else {
-        return
-        "GnuTLSExportCertificates must be set to 'On' or 'Off'";
+        char* endptr;
+        sc->export_certificates_size = strtol(arg, &endptr, 10);
+        while (apr_isspace(*endptr)) endptr++;
+        if (*endptr == '\0' || *endptr == 'b' || *endptr == 'B') {
+            ;
+        } else if (*endptr == 'k' || *endptr == 'K') {
+            sc->export_certificates_size *= 1024;
+        } else {
+            return "GnuTLSExportCertificates must be set to a size (in bytes) or 'On' or 'Off'";
+        }
     }
 
     return NULL;
@@ -637,7 +646,7 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p, char** err) {
     sc->priorities = NULL;
     sc->dh_params = NULL;
     sc->proxy_enabled = GNUTLS_ENABLED_UNSET;
-    sc->export_certificates_enabled = GNUTLS_ENABLED_UNSET;
+    sc->export_certificates_size = -1;
     sc->client_verify_method = mgs_cvm_unset;
 
 /* this relies on GnuTLS never changing the gnutls_certificate_request_t enum to define -1 */
@@ -666,7 +675,7 @@ void *mgs_config_server_merge(apr_pool_t *p, void *BASE, void *ADD) {
     gnutls_srvconf_merge(enabled, GNUTLS_ENABLED_UNSET);
     gnutls_srvconf_merge(tickets, GNUTLS_ENABLED_UNSET);
     gnutls_srvconf_merge(proxy_enabled, GNUTLS_ENABLED_UNSET);
-    gnutls_srvconf_merge(export_certificates_enabled, GNUTLS_ENABLED_UNSET);
+    gnutls_srvconf_merge(export_certificates_size, -1);
     gnutls_srvconf_merge(client_verify_method, mgs_cvm_unset);
     gnutls_srvconf_merge(client_verify_mode, -1);
     gnutls_srvconf_merge(srp_tpasswd_file, NULL);

@@ -42,8 +42,8 @@ static gnutls_datum_t session_ticket_key = {NULL, 0};
 
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt);
 /* use side==0 for server and side==1 for client */
-static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, int side, int export_full_cert);
-static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t cert, int side, int export_full_cert);
+static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, int side, int export_cert_size);
+static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t cert, int side, int export_cert_size);
 static const char* mgs_x509_construct_uid(request_rec * pool, gnutls_x509_crt_t cert);
 static int mgs_status_hook(request_rec *r, int flags);
 
@@ -372,8 +372,8 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog, apr_pool_t * ptemp, 
             sc->enabled = GNUTLS_ENABLED_FALSE;
         if (sc->tickets == GNUTLS_ENABLED_UNSET)
             sc->tickets = GNUTLS_ENABLED_TRUE;
-        if (sc->export_certificates_enabled == GNUTLS_ENABLED_UNSET)
-            sc->export_certificates_enabled = GNUTLS_ENABLED_FALSE;
+        if (sc->export_certificates_size < 0)
+            sc->export_certificates_size = 0;
         if (sc->client_verify_mode ==  -1)
             sc->client_verify_mode = GNUTLS_CERT_IGNORE;
         if (sc->client_verify_method ==  mgs_cvm_unset)
@@ -817,9 +817,9 @@ int mgs_hook_fixups(request_rec * r) {
     apr_table_setn(env, "SSL_SESSION_ID", apr_pstrdup(r->pool, tmp));
 
     if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_X509) {
-		mgs_add_common_cert_vars(r, ctxt->sc->certs_x509_chain[0], 0, ctxt->sc->export_certificates_enabled);
+		mgs_add_common_cert_vars(r, ctxt->sc->certs_x509_chain[0], 0, ctxt->sc->export_certificates_size);
 	} else if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_OPENPGP) {
-        mgs_add_common_pgpcert_vars(r, ctxt->sc->cert_pgp, 0, ctxt->sc->export_certificates_enabled);
+        mgs_add_common_pgpcert_vars(r, ctxt->sc->cert_pgp, 0, ctxt->sc->export_certificates_size);
 	}
 
     return rv;
@@ -893,12 +893,12 @@ int mgs_hook_authz(request_rec * r) {
 
 /* @param side is either 0 for SERVER or 1 for CLIENT
  *
- * @param export_full_cert (boolean) export the PEM-encoded
- * certificate in full as an environment variable.
+ * @param export_cert_size (int) maximum size for environment variable
+ * to use for the PEM-encoded certificate (0 means do not export)
  */
 #define MGS_SIDE ((side==0)?"SSL_SERVER":"SSL_CLIENT")
 
-static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, int side, int export_full_cert) {
+static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, int side, int export_cert_size) {
     unsigned char sbuf[64]; /* buffer to hold serials */
     char buf[AP_IOBUFSIZE];
     const char *tmp;
@@ -912,16 +912,29 @@ static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, in
     apr_table_t *env = r->subprocess_env;
 
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
-    if (export_full_cert != 0) {
-        char cert_buf[10 * 1024];
-        len = sizeof (cert_buf);
-
-        if (gnutls_x509_crt_export(cert, GNUTLS_X509_FMT_PEM, cert_buf, &len) >= 0)
-            apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_CERT", NULL),
-                           apr_pstrmemdup(r->pool, cert_buf, len));
-        else
-            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                          "GnuTLS: Failed to export X.509 certificate to environment");
+    if (export_cert_size > 0) {
+        len = 0;
+        ret = gnutls_x509_crt_export(cert, GNUTLS_X509_FMT_PEM, NULL, &len);
+        if (ret == GNUTLS_E_SHORT_MEMORY_BUFFER) {
+            if (len >= export_cert_size) {
+                apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_CERT", NULL),
+                               "GNUTLS_CERTIFICATE_SIZE_LIMIT_EXCEEDED");
+                ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+                              "GnuTLS: Failed to export too-large X.509 certificate to environment");
+            } else {
+                char* cert_buf = apr_palloc(r->pool, len + 1);
+                if (cert_buf != NULL && gnutls_x509_crt_export(cert, GNUTLS_X509_FMT_PEM, cert_buf, &len) >= 0) {
+                    cert_buf[len] = 0;
+                    apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_CERT", NULL), cert_buf);
+                } else {
+                    ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                                  "GnuTLS: failed to export X.509 certificate");
+                }
+            }
+        } else {
+            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                          "GnuTLS: dazed and confused about X.509 certificate size");
+        }
     }
 
     len = sizeof (buf);
@@ -1036,10 +1049,10 @@ static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, in
 
 /* @param side 0: server, 1: client
  *
- * @param export_full_cert (boolean) export the PEM-encoded
- * certificate in full as an environment variable.
+ * @param export_cert_size (int) maximum size for environment variable
+ * to use for the PEM-encoded certificate (0 means do not export)
  */
-static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t cert, int side, int export_full_cert) {
+static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t cert, int side, int export_cert_size) {
 
 	unsigned char sbuf[64]; /* buffer to hold serials */
     char buf[AP_IOBUFSIZE];
@@ -1053,16 +1066,29 @@ static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t ce
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
     apr_table_t *env = r->subprocess_env;
 
-    if (export_full_cert != 0) {
-        char cert_buf[10 * 1024];
-        len = sizeof (cert_buf);
-
-        if (gnutls_openpgp_crt_export(cert, GNUTLS_OPENPGP_FMT_BASE64, cert_buf, &len) >= 0)
-            apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_CERT", NULL),
-                           apr_pstrmemdup(r->pool, cert_buf, len));
-        else
-            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                          "GnuTLS: Failed to export OpenPGP certificate to environment");
+    if (export_cert_size > 0) {
+        len = 0;
+        ret = gnutls_openpgp_crt_export(cert, GNUTLS_OPENPGP_FMT_BASE64, NULL, &len);
+        if (ret == GNUTLS_E_SHORT_MEMORY_BUFFER) {
+            if (len >= export_cert_size) {
+                apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_CERT", NULL),
+                               "GNUTLS_CERTIFICATE_SIZE_LIMIT_EXCEEDED");
+                ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
+                              "GnuTLS: Failed to export too-large OpenPGP certificate to environment");
+            } else {
+                char* cert_buf = apr_palloc(r->pool, len + 1);
+                if (cert_buf != NULL && gnutls_openpgp_crt_export(cert, GNUTLS_OPENPGP_FMT_BASE64, cert_buf, &len) >= 0) {
+                    cert_buf[len] = 0;
+                    apr_table_setn(env, apr_pstrcat(r->pool, MGS_SIDE, "_CERT", NULL), cert_buf);
+                } else {
+                    ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                                  "GnuTLS: failed to export OpenPGP certificate");
+                }
+            }
+        } else {
+            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                          "GnuTLS: dazed and confused about OpenPGP certificate size");
+        }
     }
 
     len = sizeof (buf);
@@ -1327,9 +1353,9 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
     }
 
     if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_X509)
-        mgs_add_common_cert_vars(r, cert.x509[0], 1, ctxt->sc->export_certificates_enabled);
+        mgs_add_common_cert_vars(r, cert.x509[0], 1, ctxt->sc->export_certificates_size);
     else if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_OPENPGP)
-        mgs_add_common_pgpcert_vars(r, cert.pgp, 1, ctxt->sc->export_certificates_enabled);
+        mgs_add_common_pgpcert_vars(r, cert.pgp, 1, ctxt->sc->export_certificates_size);
 
     {
         /* days remaining */

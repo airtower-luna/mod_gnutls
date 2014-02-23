@@ -126,7 +126,7 @@ typedef struct {
 	/* Is the module enabled? */
     int enabled;
     /* Export full certificates to CGI environment: */
-    int export_certificates_enabled;
+    int export_certificates_size;
 	/* GnuTLS Priorities */
     gnutls_priority_t priorities;
 	/* GnuTLS DH Parameters */
@@ -359,7 +359,7 @@ const char *mgs_set_keyring_file(cmd_parms * parms, void *dummy,
 
 const char *mgs_set_enabled(cmd_parms * parms, void *dummy,
                             const char *arg);
-const char *mgs_set_export_certificates_enabled(cmd_parms * parms, void *dummy,
+const char *mgs_set_export_certificates_size(cmd_parms * parms, void *dummy,
                             const char *arg);
 const char *mgs_set_priorities(cmd_parms * parms, void *dummy,
                             const char *arg);
