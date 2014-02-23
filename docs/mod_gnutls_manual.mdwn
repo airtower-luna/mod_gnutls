@@ -372,14 +372,26 @@ achieve maximum compatibility (some broken mobile clients need this).
 
 Export the PEM encoded certificates to CGIs
 
-    GnuTLSExportCertificates [on|off]
+    GnuTLSExportCertificates [off|on|SIZE]
 
 Default: `off`\
 Context: server config, virtual host
 
-This directive enables exporting the full certificates of the server and
-the client to CGI scripts. The exported certificates will be PEM-encoded
-(if X.509) or ASCII-armored (if OpenPGP).
+This directive configures exporting the full certificates of the
+server and the client to CGI scripts via the `SSL_SERVER_CERT` and
+`SSL_CLIENT_CERT` environment variables. The exported certificates
+will be PEM-encoded (if X.509) or ASCII-armored (if OpenPGP) up to the
+size given.  The type of the certificate will be exported in
+`SSL_SERVER_CERT_TYPE` and `SSL_CLIENT_CERT_TYPE`.
+
+SIZE should be an integer number of bytes, or may be written with a
+trailing `K` to indicate kibibytes.  `off` means the same thing as
+`0`, in which case the certificates will not be exported to the
+environment.  `on` is an alias for `16K`.  If a non-zero size is
+specified for this directive, but a certificate is too large to fit in
+the buffer, then the corresponding environment variable will contain
+the fixed string `GNUTLS_CERTIFICATE_SIZE_LIMIT_EXCEEDED`.
+
 With GnuTLSExportCertificates enabled, `mod_gnutls` exports the same
 environment variables to the CGI process as `mod_ssl`.
 
@@ -670,15 +682,22 @@ The algorithm used for the signature in server's certificate.
 
 The public key algorithm in server's certificate.
 
-`SSL_SERVER1_CERT`
+`SSL_SERVER_CERT`
 ------------------
 
-The PEM-encoded server certificate.
+The PEM-encoded (X.509) or ASCII-armored (OpenPGP) server certificate
+(see the `GnuTLSExportCertificates` directive).
 
 `SSL_SERVER_CERT_TYPE`
 ----------------------
 
 The certificate type can be `X.509` or `OPENPGP`.
+
+`SSL_CLIENT_CERT`
+------------------
+
+The PEM-encoded (X.509) or ASCII-armored (OpenPGP) client certificate
+(see the `GnuTLSExportCertificates` directive).
 
 `SSL_CLIENT_CERT_TYPE`
 ----------------------
