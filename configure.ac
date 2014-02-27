@@ -41,6 +41,16 @@ if test "$use_srp" != "no"; then
  	SRP_CFLAGS="-DENABLE_SRP=1"
 fi
 
+AC_ARG_ENABLE(strict,
+       AS_HELP_STRING([--disable-strict],
+               [Avoid strict compiler warnings and errors]),
+       use_strict=$enableval, use_strict=yes)
+
+STRICT_CFLAGS=""
+if test "$use_strict" != "no"; then
+        STRICT_CFLAGS="-Wall -Werror -Wextra"
+fi
+
 AC_MSG_CHECKING([whether to enable SRP functionality])
 AC_MSG_RESULT($use_srp)
 
@@ -65,7 +75,7 @@ have_apr_memcache=0
 CHECK_APR_MEMCACHE([have_apr_memcache=1], [have_apr_memcache=0])
 AC_SUBST(have_apr_memcache)
 
-MODULE_CFLAGS="${LIBGNUTLS_CFLAGS} ${SRP_CFLAGS} ${MSVA_CFLAGS} ${APR_MEMCACHE_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES}"
+MODULE_CFLAGS="${LIBGNUTLS_CFLAGS} ${SRP_CFLAGS} ${MSVA_CFLAGS} ${APR_MEMCACHE_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES} ${STRICT_CFLAGS}"
 MODULE_LIBS="${APR_MEMCACHE_LIBS} ${LIBGNUTLS_LIBS}"
 
 AC_SUBST(MODULE_CFLAGS)
