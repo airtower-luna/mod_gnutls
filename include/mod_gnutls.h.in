@@ -33,6 +33,7 @@
 #if GNUTLS_VERSION_MAJOR == 2
 #include <gnutls/extra.h>
 #endif
+#include <gnutls/abstract.h>
 #include <gnutls/openpgp.h>
 #include <gnutls/x509.h>
 
@@ -103,6 +104,46 @@ typedef struct {
 
 /* Server Configuration Record */
 typedef struct {
+    /* --- Configuration values --- */
+	/* Is the module enabled? */
+    int enabled;
+	/* Is mod_proxy enabled? */
+    int proxy_enabled;
+	/* A Plain HTTP request */
+    int non_ssl_request;
+
+    /* PIN used for PKCS #11 operations */
+    char *pin;
+
+    /* the SRK PIN used in TPM operations */
+    char *srk_pin;
+
+    char *x509_cert_file;
+    char *x509_key_file;
+    char *x509_ca_file;
+
+    char *pgp_cert_file;
+    char *pgp_key_file;
+    char *pgp_ring_file;
+
+    char *dh_file;
+    
+    char *priorities_str;
+
+    const char* srp_tpasswd_file;
+    const char* srp_tpasswd_conf_file;
+
+	/* Cache timeout value */
+    int cache_timeout;
+	/* Chose Cache Type */
+    mgs_cache_e cache_type;
+    const char* cache_config;
+
+	/* GnuTLS uses Session Tickets */
+    int tickets;
+
+    /* --- Things initialized at _child_init --- */
+
 	/* x509 Certificate Structure */
     gnutls_certificate_credentials_t certs;
 	/* SRP Certificate Structure*/
@@ -112,32 +153,29 @@ typedef struct {
 	/* Current x509 Certificate CN [Common Name] */
     char* cert_cn;
 	/* Current x509 Certificate SAN [Subject Alternate Name]s*/
-	char* cert_san[MAX_CERT_SAN];
-	/* A x509 Certificate Chain */
-    gnutls_x509_crt_t *certs_x509_chain;
-	/* Current x509 Certificate Private Key */
-    gnutls_x509_privkey_t privkey_x509;
-	/* OpenPGP Certificate */
-    gnutls_openpgp_crt_t cert_pgp;
-	/* OpenPGP Certificate Private Key */
-    gnutls_openpgp_privkey_t privkey_pgp;
+    char* cert_san[MAX_CERT_SAN];
+	/* An x509 Certificate Chain */
+    gnutls_pcert_st *certs_x509_chain;
+    gnutls_x509_crt_t *certs_x509_crt_chain;
 	/* Number of Certificates in Chain */
     unsigned int certs_x509_chain_num;
-	/* Is the module enabled? */
-    int enabled;
+
+	/* Current x509 Certificate Private Key */
+    gnutls_privkey_t privkey_x509;
+
+	/* OpenPGP Certificate */
+    gnutls_pcert_st *cert_pgp;
+    gnutls_openpgp_crt_t *cert_crt_pgp;
+
+	/* OpenPGP Certificate Private Key */
+    gnutls_privkey_t privkey_pgp;
+
     /* Export full certificates to CGI environment: */
     int export_certificates_size;
 	/* GnuTLS Priorities */
     gnutls_priority_t priorities;
 	/* GnuTLS DH Parameters */
     gnutls_dh_params_t dh_params;
-	/* Cache timeout value */
-    int cache_timeout;
-	/* Chose Cache Type */
-    mgs_cache_e cache_type;
-    const char* cache_config;
-    const char* srp_tpasswd_file;
-    const char* srp_tpasswd_conf_file;
 	/* A list of CA Certificates */
     gnutls_x509_crt_t *ca_list;
 	/* OpenPGP Key Ring */
@@ -150,12 +188,6 @@ typedef struct {
     mgs_client_verification_method_e client_verify_method;
 	/* Last Cache timestamp */
     apr_time_t last_cache_check;
-	/* GnuTLS uses Session Tickets */
-    int tickets;
-	/* Is mod_proxy enabled? */
-    int proxy_enabled;
-	/* A Plain HTTP request */
-    int non_ssl_request;
 } mgs_srvconf_rec;
 
 /* Character Buffer */
@@ -301,6 +333,11 @@ int mgs_cache_session_init(mgs_handle_t *ctxt);
     ((GNUTLS_MAX_SESSION_ID + 1) * 2)
 
 /**
+ * Perform any reinitialization required in PKCS #11
+ */
+int mgs_pkcs11_reinit(server_rec * s);
+
+/**
  * Convert a SSL Session ID into a Null Terminated Hex Encoded String
  * @param id raw SSL Session ID
  * @param idlen Length of the raw Session ID
@@ -320,6 +357,9 @@ char *mgs_time2sz(time_t t, char *str, int strsize);
 
 
 /* Configuration Functions */
+
+/* Loads all files set in the configuration */
+int mgs_load_files(apr_pool_t * p, server_rec * s);
 
 const char *mgs_set_srp_tpasswd_conf_file(cmd_parms * parms, void *dummy,
                                         const char *arg);
@@ -352,6 +392,11 @@ const char *mgs_set_client_verify_method(cmd_parms * parms, void *dummy,
                                          const char *arg);
 
 const char *mgs_set_client_ca_file(cmd_parms * parms, void *dummy,
+                                   const char *arg);
+const char *mgs_set_pin(cmd_parms * parms, void *dummy,
+                                   const char *arg);
+
+const char *mgs_set_srk_pin(cmd_parms * parms, void *dummy,
                                    const char *arg);
 
 const char *mgs_set_keyring_file(cmd_parms * parms, void *dummy,

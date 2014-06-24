@@ -367,6 +367,33 @@ The special keyword `%COMPAT` will disable some security features such
 as protection against statistical attacks to ciphertext data in order to
 achieve maximum compatibility (some broken mobile clients need this).
 
+`GnuTLSPIN`
+------------------
+
+Set the PIN to be used to access encrypted key files or PKCS #11 objects.
+
+    GnuTLSPIN XXXXXX
+
+Default: *none*\
+Context: server config, virtual host
+
+Takes a string to be used as a PIN for the protected objects in
+a security module, or as a key to be used to decrypt PKCS #8, PKCS #12,
+or openssl encrypted keys.
+
+`GnuTLSSRKPIN`
+------------------
+
+Set the SRK PIN to be used to unlaccess the TPM.
+
+    GnuTLSSRKPIN XXXXXX
+
+Default: *none*\
+Context: server config, virtual host
+
+Takes a string to be used as a PIN for the protected objects in
+the TPM module.
+
 `GnuTLSExportCertificates`
 --------------------------
 
