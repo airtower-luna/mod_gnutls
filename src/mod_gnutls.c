@@ -83,15 +83,15 @@ int ssl_engine_disable(conn_rec *c) {
     ap_remove_input_filter(c->input_filters);
     ap_remove_input_filter(c->output_filters);
     mgs_cleanup_pre_config(c->pool);
-    sc->enabled = 0;
+    sc->enabled = GNUTLS_ENABLED_FALSE;
     return 1;
 }
 
 int ssl_proxy_enable(conn_rec *c) {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
             ap_get_module_config(c->base_server->module_config, &gnutls_module);
-    sc->proxy_enabled = 1;
-    sc->enabled = 0;
+    sc->proxy_enabled = GNUTLS_ENABLED_TRUE;
+    sc->enabled = GNUTLS_ENABLED_FALSE;
     return 1;
 }
 
