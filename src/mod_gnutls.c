@@ -80,8 +80,10 @@ int ssl_engine_disable(conn_rec *c) {
     if(sc->enabled == GNUTLS_ENABLED_FALSE) {
         return 1;
     }
-    ap_remove_input_filter(c->input_filters);
-    ap_remove_input_filter(c->output_filters);
+    if (c->input_filters)
+        ap_remove_input_filter(c->input_filters);
+    if (c->output_filters)
+        ap_remove_output_filter(c->output_filters);
     mgs_cleanup_pre_config(c->pool);
     sc->enabled = GNUTLS_ENABLED_FALSE;
     return 1;
