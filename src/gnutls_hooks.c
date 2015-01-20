@@ -681,14 +681,23 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session) {
     return NULL;
 }
 
-static void create_gnutls_handle(conn_rec * c) {
-    mgs_handle_t *ctxt;
-    /* Get mod_gnutls Configuration Record */
-    mgs_srvconf_rec *sc =(mgs_srvconf_rec *)
-            ap_get_module_config(c->base_server->module_config,&gnutls_module);
+static void create_gnutls_handle(conn_rec * c)
+{
+    /* Get mod_gnutls server configuration */
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+            ap_get_module_config(c->base_server->module_config, &gnutls_module);
 
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
-    ctxt = apr_pcalloc(c->pool, sizeof (*ctxt));
+
+    /* Get connection specific configuration */
+    mgs_handle_t *ctxt = (mgs_handle_t *) ap_get_module_config(c->conn_config, &gnutls_module);
+    if (ctxt == NULL)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c, "%s: allocating connection memory", __func__);
+        ctxt = apr_pcalloc(c->pool, sizeof (*ctxt));
+        ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
+    }
+    ctxt->enabled = GNUTLS_ENABLED_TRUE;
     ctxt->c = c;
     ctxt->sc = sc;
     ctxt->status = 0;
@@ -699,6 +708,7 @@ static void create_gnutls_handle(conn_rec * c) {
     ctxt->output_bb = apr_brigade_create(c->pool, c->bucket_alloc);
     ctxt->output_blen = 0;
     ctxt->output_length = 0;
+
     /* Initialize GnuTLS Library */
     int err = gnutls_init(&ctxt->session, GNUTLS_SERVER);
     if (err != GNUTLS_E_SUCCESS)
@@ -720,8 +730,6 @@ static void create_gnutls_handle(conn_rec * c) {
     /* Initialize Session Cache */
     mgs_cache_session_init(ctxt);
 
-    /* Set this config for this connection */
-    ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
     /* Set pull, push & ptr functions */
     gnutls_transport_set_pull_function(ctxt->session,
             mgs_transport_read);
@@ -735,15 +743,20 @@ static void create_gnutls_handle(conn_rec * c) {
             ctxt, NULL, c);
 }
 
-int mgs_hook_pre_connection(conn_rec * c, void *csd __attribute__((unused))) {
-    mgs_srvconf_rec *sc;
-
+int mgs_hook_pre_connection(conn_rec * c, void *csd __attribute__((unused)))
+{
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
 
-    sc = (mgs_srvconf_rec *) ap_get_module_config(c->base_server->module_config,
-            &gnutls_module);
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(c->base_server->module_config, &gnutls_module);
+    mgs_handle_t *ctxt = (mgs_handle_t *)
+        ap_get_module_config(c->conn_config, &gnutls_module);
 
-    if (sc && (!sc->enabled || sc->proxy_enabled == GNUTLS_ENABLED_TRUE)) {
+    if ((sc && (!sc->enabled || sc->proxy_enabled == GNUTLS_ENABLED_TRUE))
+        || (ctxt && ctxt->enabled == GNUTLS_ENABLED_FALSE))
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c, "%s declined connection",
+                      __func__);
         return DECLINED;
     }
 
@@ -765,11 +778,12 @@ int mgs_hook_fixups(request_rec * r) {
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
     apr_table_t *env = r->subprocess_env;
 
-    ctxt =
-            ap_get_module_config(r->connection->conn_config,
-            &gnutls_module);
+    ctxt = ap_get_module_config(r->connection->conn_config,
+                                &gnutls_module);
 
-    if (!ctxt || ctxt->session == NULL) {
+    if (!ctxt || ctxt->enabled != GNUTLS_ENABLED_TRUE || ctxt->session == NULL)
+    {
+        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, "request declined in %s", __func__);
         return DECLINED;
     }
 
