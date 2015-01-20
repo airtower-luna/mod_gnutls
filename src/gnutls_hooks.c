@@ -700,14 +700,20 @@ static void create_gnutls_handle(conn_rec * c) {
     ctxt->output_blen = 0;
     ctxt->output_length = 0;
     /* Initialize GnuTLS Library */
-    gnutls_init(&ctxt->session, GNUTLS_SERVER);
+    int err = gnutls_init(&ctxt->session, GNUTLS_SERVER);
+    if (err != GNUTLS_E_SUCCESS)
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c, "gnutls_init failed!");
     /* Initialize Session Tickets */
     if (session_ticket_key.data != NULL && ctxt->sc->tickets != 0) {
-        gnutls_session_ticket_enable_server(ctxt->session,&session_ticket_key);
+        err = gnutls_session_ticket_enable_server(ctxt->session, &session_ticket_key);
+        if (err != GNUTLS_E_SUCCESS)
+            ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c, "gnutls_session_ticket_enable_server failed!");
     }
 
     /* Set Default Priority */
-	gnutls_priority_set_direct (ctxt->session, "NORMAL", NULL);
+	err = gnutls_priority_set_direct(ctxt->session, "NORMAL", NULL);
+    if (err != GNUTLS_E_SUCCESS)
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c, "gnutls_priority_set_direct failed!");
     /* Set Handshake function */
     gnutls_handshake_set_post_client_hello_function(ctxt->session,
             mgs_select_virtual_server_cb);
