@@ -27,7 +27,8 @@ static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
 {
     /* Try Run Post-Config Hook After mod_proxy */
     static const char * const aszPre[] = { "mod_proxy.c", NULL };
-    ap_hook_post_config(mgs_hook_post_config, aszPre, NULL,APR_HOOK_REALLY_LAST);
+    ap_hook_post_config(mgs_hook_post_config, aszPre, NULL,
+                        APR_HOOK_REALLY_LAST);
     /* HTTP Scheme Hook */
 #if USING_2_1_RECENT
     ap_hook_http_scheme(mgs_hook_http_scheme, NULL, NULL, APR_HOOK_MIDDLE);
@@ -35,18 +36,19 @@ static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
     ap_hook_http_method(mgs_hook_http_scheme, NULL, NULL, APR_HOOK_MIDDLE);
 #endif
     /* Default Port Hook */
-    ap_hook_default_port(mgs_hook_default_port,  NULL,NULL, APR_HOOK_MIDDLE);
+    ap_hook_default_port(mgs_hook_default_port, NULL, NULL, APR_HOOK_MIDDLE);
     /* Pre-Connect Hook */
-    ap_hook_pre_connection(mgs_hook_pre_connection, NULL, NULL, APR_HOOK_MIDDLE);
+    ap_hook_pre_connection(mgs_hook_pre_connection, NULL, NULL,
+                           APR_HOOK_MIDDLE);
     /* Pre-Config Hook */
     ap_hook_pre_config(mgs_hook_pre_config, NULL, NULL,
-            APR_HOOK_MIDDLE);
+                       APR_HOOK_MIDDLE);
     /* Child-Init Hook */
     ap_hook_child_init(mgs_hook_child_init, NULL, NULL,
-            APR_HOOK_MIDDLE);
+                       APR_HOOK_MIDDLE);
     /* Authentication Hook */
     ap_hook_access_checker(mgs_hook_authz, NULL, NULL,
-            APR_HOOK_REALLY_FIRST);
+                           APR_HOOK_REALLY_FIRST);
     /* Fixups Hook */
     ap_hook_fixups(mgs_hook_fixups, NULL, NULL, APR_HOOK_REALLY_FIRST);
 
@@ -56,20 +58,21 @@ static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
      */
 
     /* Input Filter */
-    ap_register_input_filter(GNUTLS_INPUT_FILTER_NAME,
-            mgs_filter_input, NULL,AP_FTYPE_CONNECTION + 5);
+    ap_register_input_filter(GNUTLS_INPUT_FILTER_NAME, mgs_filter_input,
+                             NULL, AP_FTYPE_CONNECTION + 5);
     /* Output Filter */
-    ap_register_output_filter(GNUTLS_OUTPUT_FILTER_NAME,
-            mgs_filter_output, NULL,AP_FTYPE_CONNECTION + 5);
+    ap_register_output_filter(GNUTLS_OUTPUT_FILTER_NAME, mgs_filter_output,
+                              NULL, AP_FTYPE_CONNECTION + 5);
 
     /* mod_proxy calls these functions */
     APR_REGISTER_OPTIONAL_FN(ssl_proxy_enable);
     APR_REGISTER_OPTIONAL_FN(ssl_engine_disable);
 }
 
-int ssl_is_https(conn_rec *c) {
+int ssl_is_https(conn_rec *c)
+{
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
-            ap_get_module_config(c->base_server->module_config, &gnutls_module);
+        ap_get_module_config(c->base_server->module_config, &gnutls_module);
     if(sc->enabled == 0 || sc->non_ssl_request == 1) {
         /* SSL/TLS Disabled or Plain HTTP Connection Detected */
         return 0;
@@ -87,10 +90,12 @@ int ssl_engine_disable(conn_rec *c)
     }
 
     /* disable TLS for this connection */
-    mgs_handle_t *ctxt = (mgs_handle_t *) ap_get_module_config(c->conn_config, &gnutls_module);
+    mgs_handle_t *ctxt = (mgs_handle_t *)
+        ap_get_module_config(c->conn_config, &gnutls_module);
     if (ctxt == NULL)
     {
-        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c, "%s: allocating connection memory", __func__);
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c,
+                      "%s: allocating connection memory", __func__);
         ctxt = apr_pcalloc(c->pool, sizeof (*ctxt));
         ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
     }
@@ -104,9 +109,10 @@ int ssl_engine_disable(conn_rec *c)
     return 1;
 }
 
-int ssl_proxy_enable(conn_rec *c) {
+int ssl_proxy_enable(conn_rec *c)
+{
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
-            ap_get_module_config(c->base_server->module_config, &gnutls_module);
+        ap_get_module_config(c->base_server->module_config, &gnutls_module);
     sc->proxy_enabled = GNUTLS_ENABLED_TRUE;
     sc->enabled = GNUTLS_ENABLED_FALSE;
     return 1;
