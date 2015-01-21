@@ -10,18 +10,14 @@ want to at least test for some basic/common configurations.
 Running the tests
 =================
 
-from the top level of the source, just run:
+from the top level of the source, or from t/ (where this README is),
+just run:
 
  make check
 
-from t/ (where this README is), just run:
+from t/ you can also run specific tests (identified by number) with:
 
- make
-
-also from t/ you can also run specific tests (identified by number)
-with:
-
- make t-3
+ make -f TestMakefile t-3
 
 This should be handy when you're just trying to experiment with a new
 test and don't want to wait for the full test suite to run.
