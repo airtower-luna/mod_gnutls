@@ -16,3 +16,6 @@ TESTS = test-00_basic.bash \
 	test-15_basic_msva.bash \
 	test-16_view-status.bash \
 	test-17_cgi_vars_large_cert.bash
+
+clean-local:
+	make -f TestMakefile clean
