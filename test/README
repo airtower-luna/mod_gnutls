@@ -10,12 +10,12 @@ want to at least test for some basic/common configurations.
 Running the tests
 =================
 
-from the top level of the source, or from t/ (where this README is),
+from the top level of the source, or from test/ (where this README is),
 just run:
 
  make check
 
-from t/ you can also run specific tests (identified by number) with:
+from test/ you can also run specific tests (identified by number) with:
 
  make -f TestMakefile t-3
 
@@ -28,18 +28,20 @@ Adding a Test
 
 Please add more tests!
 
-The simplest way to add a test is (from t/):
+The simplest way to add a test is (from test/):
 
  ./newtest
 
-This will prompt you for a simple name for the test and then copy a starting
-set of files from tests/00_basic.
+This will prompt you for a simple name for the test and then copy a
+starting set of files from tests/00_basic, and create a script which
+you can add to TESTS in Makefile.am when your test is ready for
+inclusion in the test suite.
 
 
 Implementation
 ==============
 
-Each test consists of a directory in t/tests/, which will cause the
+Each test consists of a directory in test/tests/, which will cause the
 test suite to spin up an isolated apache instance and try to connect
 to it with gnutls-cli and make a simple HTTP 1.1 request.
 
