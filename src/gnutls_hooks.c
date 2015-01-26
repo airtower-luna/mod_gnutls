@@ -752,8 +752,7 @@ int mgs_hook_pre_connection(conn_rec * c, void *csd __attribute__((unused)))
     mgs_handle_t *ctxt = (mgs_handle_t *)
         ap_get_module_config(c->conn_config, &gnutls_module);
 
-    if ((sc && (!sc->enabled || sc->proxy_enabled == GNUTLS_ENABLED_TRUE))
-        || (ctxt && ctxt->enabled == GNUTLS_ENABLED_FALSE))
+    if ((sc && (!sc->enabled)) || (ctxt && ctxt->enabled == GNUTLS_ENABLED_FALSE))
     {
         ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c, "%s declined connection",
                       __func__);

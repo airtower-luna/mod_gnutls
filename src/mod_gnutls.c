@@ -111,10 +111,28 @@ int ssl_engine_disable(conn_rec *c)
 
 int ssl_proxy_enable(conn_rec *c)
 {
+    /* check if TLS proxy support is enabled */
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(c->base_server->module_config, &gnutls_module);
-    sc->proxy_enabled = GNUTLS_ENABLED_TRUE;
-    sc->enabled = GNUTLS_ENABLED_FALSE;
+    if (sc->proxy_enabled != GNUTLS_ENABLED_TRUE)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+                      "%s: mod_proxy requested TLS proxy, but not enabled "
+                      "for %s", __func__, sc->cert_cn);
+        return 0;
+    }
+
+    /* enable TLS for this connection */
+    mgs_handle_t *ctxt = (mgs_handle_t *)
+        ap_get_module_config(c->conn_config, &gnutls_module);
+    if (ctxt == NULL)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c,
+                      "%s: allocating connection memory", __func__);
+        ctxt = apr_pcalloc(c->pool, sizeof (*ctxt));
+        ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
+    }
+    ctxt->enabled = GNUTLS_ENABLED_TRUE;
     return 1;
 }
 
