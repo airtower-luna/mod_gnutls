@@ -12,9 +12,11 @@ TESTS = test-00_basic.bash \
 	test-11_basic_client_verification_fail.bash \
 	test-12_cgi_variables.bash \
 	test-13_cgi_variables_no_client_cert.bash \
-	test-14_basic_openpgp.bash \
-	test-15_basic_msva.bash \
-	test-16_view-status.bash \
+	test-14_basic_openpgp.bash
+if USE_MSVA
+TESTS += test-15_basic_msva.bash
+endif
+TESTS += test-16_view-status.bash \
 	test-17_cgi_vars_large_cert.bash
 
 clean-local:

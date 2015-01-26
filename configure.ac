@@ -58,6 +58,7 @@ AC_ARG_ENABLE(msva,
        AS_HELP_STRING([--enable-msva],
                [enable Monkeysphere client certificate verification]),
        use_msva=$enableval, use_msva=no)
+AM_CONDITIONAL([USE_MSVA], [test "$use_msva" = "$enableval"])
 
 MSVA_CFLAGS=""
 if test "$use_msva" != "no"; then
