@@ -19,7 +19,7 @@ if [ 0 != "$BADVARS" ]; then
 fi
 
 if [ . != "$(dirname "$0")" ]; then
-    printf "You should only run this mod-gnutls test suite from the t/ directory of the mod_gnutls source.\n" >&2
+    printf "You should only run this mod-gnutls test suite from the test/ directory of the mod_gnutls source.\n" >&2
     exit 1
 fi
 
@@ -52,7 +52,7 @@ trap stop_msva EXIT
 sleep "$TEST_GAP"
 
 printf "TESTING: initial MSVA verification\n"
-MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT" msva-query-agent https "$(cat client.uid)" x509pem client < client/x509.pem  
+MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT" msva-query-agent https "$(cat client.uid)" x509pem client < client/x509.pem
 printf "\nSUCCESS: initial MSVA verification\n"
 
 for t in $tests; do 

@@ -81,7 +81,7 @@ MODULE_LIBS="${APR_MEMCACHE_LIBS} ${LIBGNUTLS_LIBS}"
 AC_SUBST(MODULE_CFLAGS)
 AC_SUBST(MODULE_LIBS)
 
-AC_CONFIG_FILES([Makefile src/Makefile t/Makefile include/mod_gnutls.h])
+AC_CONFIG_FILES([Makefile src/Makefile test/Makefile include/mod_gnutls.h])
 AC_OUTPUT
 
 echo "---"
