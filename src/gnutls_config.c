@@ -619,6 +619,17 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p, char** err) {
                             gnutls_strerror(ret));
         return NULL;
     }
+
+    /* FIXME: not ideal, should be called only if SSLProxyEngine is
+     * enabled */
+    ret = gnutls_anon_allocate_client_credentials(&sc->anon_client_creds);
+    if (ret < 0)
+    {
+        *err = apr_psprintf(p, "GnuTLS: Failed to initialize"
+                            ": (%d) %s", ret,
+                            gnutls_strerror(ret));
+        return NULL;
+    }
 #ifdef ENABLE_SRP
     ret = gnutls_srp_allocate_server_credentials(&sc->srp_creds);
     if (ret < 0) {
@@ -695,6 +706,7 @@ void *mgs_config_server_merge(apr_pool_t *p, void *BASE, void *ADD) {
      */
     gnutls_srvconf_assign(certs);
     gnutls_srvconf_assign(anon_creds);
+    gnutls_srvconf_assign(anon_client_creds);
     gnutls_srvconf_assign(srp_creds);
     gnutls_srvconf_assign(certs_x509_chain);
     gnutls_srvconf_assign(certs_x509_chain_num);

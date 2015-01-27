@@ -107,8 +107,11 @@ typedef struct {
     gnutls_certificate_credentials_t certs;
 	/* SRP Certificate Structure*/
     gnutls_srp_server_credentials_t srp_creds;
-	/* Annonymous Certificate Structure */
+    /* Anonymous Certificate Structure */
     gnutls_anon_server_credentials_t anon_creds;
+    /* Anonymous Client Certificate Structure, used for proxy
+     * connections */
+    gnutls_anon_client_credentials_t anon_client_creds;
 	/* Current x509 Certificate CN [Common Name] */
     char* cert_cn;
 	/* Current x509 Certificate SAN [Subject Alternate Name]s*/

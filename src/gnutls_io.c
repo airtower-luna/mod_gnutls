@@ -404,7 +404,7 @@ tryagain:
             errcode = gnutls_alert_get(ctxt->session);
             ap_log_error(APLOG_MARK, APLOG_INFO, 0,
                     ctxt->c->base_server,
-                    "GnuTLS: Hanshake Alert (%d) '%s'.",
+                    "GnuTLS: Handshake Alert (%d) '%s'.",
                     errcode,
                     gnutls_alert_get_name(errcode));
         }

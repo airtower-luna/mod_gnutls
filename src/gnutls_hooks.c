@@ -146,9 +146,9 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session) {
 
     gnutls_certificate_server_set_request(session, ctxt->sc->client_verify_mode);
 
-    /* Set Anon credentials */
+    /* Set x509 credentials */
     gnutls_credentials_set(session, GNUTLS_CRD_CERTIFICATE, ctxt->sc->certs);
-	/* Set x509 credentials */
+    /* Set Anon credentials */
     gnutls_credentials_set(session, GNUTLS_CRD_ANON, ctxt->sc->anon_creds);
 
 #ifdef ENABLE_SRP
@@ -713,14 +713,38 @@ static void create_gnutls_handle(conn_rec * c)
     ctxt->output_length = 0;
 
     /* Initialize GnuTLS Library */
-    int err = gnutls_init(&ctxt->session, GNUTLS_SERVER);
-    if (err != GNUTLS_E_SUCCESS)
-        ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c, "gnutls_init failed!");
-    /* Initialize Session Tickets */
-    if (session_ticket_key.data != NULL && ctxt->sc->tickets != 0) {
-        err = gnutls_session_ticket_enable_server(ctxt->session, &session_ticket_key);
+    int err = 0;
+    if (ctxt->is_proxy == GNUTLS_ENABLED_TRUE)
+    {
+        /* this is an outgoing proxy connection, client mode */
+        err = gnutls_init(&ctxt->session, GNUTLS_CLIENT);
         if (err != GNUTLS_E_SUCCESS)
-            ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c, "gnutls_session_ticket_enable_server failed!");
+            ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
+                          "gnutls_init for proxy connection failed: %s (%d)",
+                          gnutls_strerror(err), err);
+        err = gnutls_session_ticket_enable_client(ctxt->session);
+        if (err != GNUTLS_E_SUCCESS)
+            ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
+                          "gnutls_session_ticket_enable_client failed: %s (%d)",
+                          gnutls_strerror(err), err);
+    }
+    else
+    {
+        /* incoming connection, server mode */
+        err = gnutls_init(&ctxt->session, GNUTLS_SERVER);
+        if (err != GNUTLS_E_SUCCESS)
+            ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
+                          "gnutls_init for server side failed: %s (%d)",
+                          gnutls_strerror(err), err);
+        /* Initialize Session Tickets */
+        if (session_ticket_key.data != NULL && ctxt->sc->tickets != 0)
+        {
+            err = gnutls_session_ticket_enable_server(ctxt->session, &session_ticket_key);
+            if (err != GNUTLS_E_SUCCESS)
+                ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
+                              "gnutls_session_ticket_enable_server failed: %s (%d)",
+                              gnutls_strerror(err), err);
+        }
     }
 
     /* Set Default Priority */
@@ -730,6 +754,27 @@ static void create_gnutls_handle(conn_rec * c)
     /* Set Handshake function */
     gnutls_handshake_set_post_client_hello_function(ctxt->session,
             mgs_select_virtual_server_cb);
+
+    /* If mod_gnutls is the TLS server, mgs_select_virtual_server_cb
+     * will load appropriate credentials during handshake. However,
+     * when handling a proxy backend connection, mod_gnutls acts as
+     * TLS client and credentials must be loaded here. */
+    if (ctxt->is_proxy == GNUTLS_ENABLED_TRUE)
+    {
+        /* Set anonymous client credentials for proxy connections */
+        gnutls_credentials_set(ctxt->session, GNUTLS_CRD_ANON,
+                               ctxt->sc->anon_client_creds);
+        /* Set x509 credentials */
+        gnutls_credentials_set(ctxt->session, GNUTLS_CRD_CERTIFICATE,
+                               ctxt->sc->certs);
+        /* Load priorities from the server configuration */
+        err = gnutls_priority_set(ctxt->session, ctxt->sc->priorities);
+        if (err != GNUTLS_E_SUCCESS)
+            ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
+                          "%s: setting priorities for proxy connection failed: %s (%d)",
+                          __func__, gnutls_strerror(err), err);
+    }
+
     /* Initialize Session Cache */
     mgs_cache_session_init(ctxt);
 
