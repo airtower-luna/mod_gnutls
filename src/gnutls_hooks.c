@@ -698,6 +698,7 @@ static void create_gnutls_handle(conn_rec * c)
         ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c, "%s: allocating connection memory", __func__);
         ctxt = apr_pcalloc(c->pool, sizeof (*ctxt));
         ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
+        ctxt->is_proxy = GNUTLS_ENABLED_FALSE;
     }
     ctxt->enabled = GNUTLS_ENABLED_TRUE;
     ctxt->c = c;

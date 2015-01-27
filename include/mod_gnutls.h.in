@@ -172,6 +172,8 @@ typedef struct {
     conn_rec* c;
 	/* Is TLS enabled for this connection? */
     int enabled;
+    /* Is this a proxy connection? */
+    int is_proxy;
 	/* GnuTLS Session handle */
     gnutls_session_t session;
 	/* module input status */

@@ -100,6 +100,7 @@ int ssl_engine_disable(conn_rec *c)
         ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
     }
     ctxt->enabled = GNUTLS_ENABLED_FALSE;
+    ctxt->is_proxy = GNUTLS_ENABLED_TRUE;
 
     if (c->input_filters)
         ap_remove_input_filter(c->input_filters);
@@ -133,6 +134,7 @@ int ssl_proxy_enable(conn_rec *c)
         ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
     }
     ctxt->enabled = GNUTLS_ENABLED_TRUE;
+    ctxt->is_proxy = GNUTLS_ENABLED_TRUE;
     return 1;
 }
 
