@@ -619,7 +619,8 @@ static int vhost_cb(void *baton, conn_rec * conn __attribute__((unused)), server
 }
 #endif
 
-mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session) {
+mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
+{
     int rv;
     unsigned int sni_type;
     size_t data_len = MAX_HOST_LEN;
@@ -670,13 +671,14 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session) {
     for (s = ap_server_conf; s; s = s->next) {
 
         tsc = (mgs_srvconf_rec *) ap_get_module_config(s->module_config,
-                &gnutls_module);
+                                                       &gnutls_module);
 
         if (tsc->enabled != GNUTLS_ENABLED_TRUE) { continue; }
 
-				if(check_server_aliases(x, s, tsc)) {
-					return tsc;
-				}
+        if(check_server_aliases(x, s, tsc)) {
+            return tsc;
+        }
+    }
 #endif
     return NULL;
 }
