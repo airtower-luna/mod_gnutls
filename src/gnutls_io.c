@@ -44,26 +44,24 @@ static apr_status_t gnutls_io_filter_error(ap_filter_t * f,
     apr_bucket *bucket;
 
     switch (status) {
-        case HTTP_BAD_REQUEST:
-            /* log the situation */
-            ap_log_error(APLOG_MARK, APLOG_INFO, 0,
-                    f->c->base_server,
-                    "GnuTLS handshake failed: HTTP spoken on HTTPS port; "
-                    "trying to send HTML error page");
+    case HTTP_BAD_REQUEST:
+        /* log the situation */
+        ap_log_error(APLOG_MARK, APLOG_INFO, 0,
+                     f->c->base_server,
+                     "GnuTLS handshake failed: HTTP spoken on HTTPS port; "
+                     "trying to send HTML error page");
+        mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+            ap_get_module_config(f->c->base_server->module_config,
+                                 &gnutls_module);
+        ctxt->status = -1;
+        sc->non_ssl_request = 1;
 
-				    mgs_srvconf_rec *sc = (mgs_srvconf_rec *) ap_get_module_config(
-																												f->c->base_server->module_config,
-																												&gnutls_module
-																											);
-            ctxt->status = -1;
-            sc->non_ssl_request = 1;
+        /* fake the request line */
+        bucket = HTTP_ON_HTTPS_PORT_BUCKET(f->c->bucket_alloc);
+        break;
 
-            /* fake the request line */
-            bucket = HTTP_ON_HTTPS_PORT_BUCKET(f->c->bucket_alloc);
-            break;
-
-        default:
-            return status;
+    default:
+        return status;
     }
 
     APR_BRIGADE_INSERT_TAIL(bb, bucket);
