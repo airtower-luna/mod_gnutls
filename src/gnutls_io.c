@@ -230,8 +230,10 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
 
     while (1) {
 
-        rc = gnutls_record_recv(ctxt->session, buf + bytes,
-                wanted - bytes);
+        do
+            rc = gnutls_record_recv(ctxt->session, buf + bytes,
+                                    wanted - bytes);
+        while (rc == GNUTLS_E_INTERRUPTED || rc == GNUTLS_E_AGAIN);
 
         if (rc > 0) {
             *len += rc;
@@ -311,6 +313,9 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
             }
 
             if (ctxt->input_rc == APR_SUCCESS) {
+                ap_log_cerror(APLOG_MARK, APLOG_INFO, ctxt->input_rc, ctxt->c,
+                              "%s: GnuTLS error: %s (%d)",
+                              __func__, gnutls_strerror(rc), rc);
                 ctxt->input_rc = APR_EGENERAL;
             }
             break;
