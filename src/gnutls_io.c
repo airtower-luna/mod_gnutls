@@ -183,7 +183,8 @@ static apr_status_t brigade_consume(apr_bucket_brigade * bb,
 }
 
 static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
-        char *buf, apr_size_t * len) {
+        char *buf, apr_size_t * len)
+{
     apr_size_t wanted = *len;
     apr_size_t bytes = 0;
     int rc;
@@ -222,6 +223,8 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
     }
 
     if (ctxt->session == NULL) {
+        ap_log_cerror(APLOG_MARK, APLOG_INFO, 0, ctxt->c,
+                      "%s: GnuTLS session is NULL!", __func__);
         return APR_EGENERAL;
     }
 
@@ -267,25 +270,25 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
 
             if (rc == GNUTLS_E_REHANDSHAKE) {
                 /* A client has asked for a new Hankshake. Currently, we don't do it */
-                ap_log_error(APLOG_MARK, APLOG_INFO,
+                ap_log_cerror(APLOG_MARK, APLOG_INFO,
                         ctxt->input_rc,
-                        ctxt->c->base_server,
+                        ctxt->c,
                         "GnuTLS: Error reading data. Client Requested a New Handshake."
                         " (%d) '%s'", rc,
                         gnutls_strerror(rc));
             } else if (rc == GNUTLS_E_WARNING_ALERT_RECEIVED) {
                 rc = gnutls_alert_get(ctxt->session);
-                ap_log_error(APLOG_MARK, APLOG_INFO,
+                ap_log_cerror(APLOG_MARK, APLOG_INFO,
                         ctxt->input_rc,
-                        ctxt->c->base_server,
+                        ctxt->c,
                         "GnuTLS: Warning Alert From Client: "
                         " (%d) '%s'", rc,
                         gnutls_alert_get_name(rc));
             } else if (rc == GNUTLS_E_FATAL_ALERT_RECEIVED) {
                 rc = gnutls_alert_get(ctxt->session);
-                ap_log_error(APLOG_MARK, APLOG_INFO,
+                ap_log_cerror(APLOG_MARK, APLOG_INFO,
                         ctxt->input_rc,
-                        ctxt->c->base_server,
+                        ctxt->c,
                         "GnuTLS: Fatal Alert From Client: "
                         "(%d) '%s'", rc,
                         gnutls_alert_get_name(rc));
@@ -294,10 +297,10 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
             } else {
                 /* Some Other Error. Report it. Die. */
                 if (gnutls_error_is_fatal(rc)) {
-                    ap_log_error(APLOG_MARK,
+                    ap_log_cerror(APLOG_MARK,
                             APLOG_INFO,
                             ctxt->input_rc,
-                            ctxt->c->base_server,
+                            ctxt->c,
                             "GnuTLS: Error reading data. (%d) '%s'",
                             rc,
                             gnutls_strerror(rc));
