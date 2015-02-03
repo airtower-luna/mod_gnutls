@@ -37,6 +37,9 @@ APLOG_USE_MODULE(gnutls);
                                sizeof(HTTP_ON_HTTPS_PORT) - 1, \
                                alloc)
 
+#define IS_PROXY_STR(c) \
+    ((c->is_proxy == GNUTLS_ENABLED_TRUE) ? "proxy " : "")
+
 static apr_status_t gnutls_io_filter_error(ap_filter_t * f,
         apr_bucket_brigade * bb,
         apr_status_t status) {
@@ -484,7 +487,8 @@ int mgs_rehandshake(mgs_handle_t * ctxt) {
 apr_status_t mgs_filter_input(ap_filter_t * f,
         apr_bucket_brigade * bb,
         ap_input_mode_t mode,
-        apr_read_type_e block, apr_off_t readbytes) {
+        apr_read_type_e block, apr_off_t readbytes)
+{
     apr_status_t status = APR_SUCCESS;
     mgs_handle_t *ctxt = (mgs_handle_t *) f->ctx;
     apr_size_t len = sizeof (ctxt->input_buffer);
@@ -493,14 +497,22 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
         apr_bucket *bucket =
                 apr_bucket_eos_create(f->c->bucket_alloc);
         APR_BRIGADE_INSERT_TAIL(bb, bucket);
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
+                      "%s: %sconnection aborted",
+                      __func__, IS_PROXY_STR(ctxt));
         return APR_ECONNABORTED;
     }
 
     if (ctxt->status == 0) {
         gnutls_do_handshake(ctxt);
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
+                      "%s: TLS %sconnection opened.",
+                      __func__, IS_PROXY_STR(ctxt));
     }
 
     if (ctxt->status < 0) {
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
+                      "%s %s: ap_get_brigade", __func__, IS_PROXY_STR(ctxt));
         return ap_get_brigade(f->next, bb, mode, block, readbytes);
     }
 
@@ -594,6 +606,9 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
 
     if (ctxt->status == 0) {
         gnutls_do_handshake(ctxt);
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
+                      "%s: TLS %sconnection opened.",
+                      __func__, IS_PROXY_STR(ctxt));
     }
 
     if (ctxt->status < 0) {
@@ -620,6 +635,9 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
                 do {
                     ret = gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
                 } while (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
+                ap_log_cerror(APLOG_MARK, APLOG_DEBUG, ret, ctxt->c,
+                              "%s: TLS %sconnection closed.",
+                              __func__, IS_PROXY_STR(ctxt));
                 /* De-Initialize Session */
                 gnutls_deinit(ctxt->session);
                 ctxt->session = NULL;
