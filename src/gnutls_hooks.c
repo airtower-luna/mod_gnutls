@@ -39,6 +39,9 @@ extern server_rec *ap_server_conf;
 static apr_file_t *debug_log_fp;
 #endif
 
+#define IS_PROXY_STR(c) \
+    ((c->is_proxy == GNUTLS_ENABLED_TRUE) ? "proxy " : "")
+
 static gnutls_datum_t session_ticket_key = {NULL, 0};
 
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt);
@@ -683,6 +686,44 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
     return NULL;
 }
 
+/*
+ * This function is intended as a cleanup handler for connections
+ * using GnuTLS.
+ *
+ * @param data must point to the mgs_handle_t associated with the
+ * connection
+ */
+static apr_status_t cleanup_gnutls_session(void *data)
+{
+    /* nothing to do */
+    if (data == NULL)
+        return APR_SUCCESS;
+
+    /* check if session needs closing */
+    mgs_handle_t *ctxt = (mgs_handle_t *) data;
+    if (ctxt->session != NULL)
+    {
+        int ret;
+        /* Try A Clean Shutdown */
+        do
+            ret = gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
+        while (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
+        if (ret != GNUTLS_E_SUCCESS)
+            ap_log_cerror(APLOG_MARK, APLOG_INFO, ret, ctxt->c,
+                          "%s: error while closing TLS %sconnection: %s (%d)",
+                          __func__, IS_PROXY_STR(ctxt),
+                          gnutls_strerror(ret), ret);
+        else
+            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, ret, ctxt->c,
+                          "%s: TLS %sconnection closed.",
+                          __func__, IS_PROXY_STR(ctxt));
+        /* De-Initialize Session */
+        gnutls_deinit(ctxt->session);
+        ctxt->session = NULL;
+    }
+    return APR_SUCCESS;
+}
+
 static void create_gnutls_handle(conn_rec * c)
 {
     /* Get mod_gnutls server configuration */
@@ -726,6 +767,12 @@ static void create_gnutls_handle(conn_rec * c)
             ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
                           "gnutls_session_ticket_enable_client failed: %s (%d)",
                           gnutls_strerror(err), err);
+        /* Try to close and deinit the session when the connection
+         * pool is cleared. Note that mod_proxy might not close
+         * connections immediately, if you need that, look at the
+         * "proxy-nokeepalive" environment variable for
+         * mod_proxy_http. */
+        apr_pool_pre_cleanup_register(c->pool, ctxt, cleanup_gnutls_session);
     }
     else
     {
