@@ -94,8 +94,6 @@ int ssl_engine_disable(conn_rec *c)
         ap_get_module_config(c->conn_config, &gnutls_module);
     if (ctxt == NULL)
     {
-        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c,
-                      "%s: allocating connection memory", __func__);
         ctxt = apr_pcalloc(c->pool, sizeof (*ctxt));
         ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
     }
@@ -128,8 +126,6 @@ int ssl_proxy_enable(conn_rec *c)
         ap_get_module_config(c->conn_config, &gnutls_module);
     if (ctxt == NULL)
     {
-        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c,
-                      "%s: allocating connection memory", __func__);
         ctxt = apr_pcalloc(c->pool, sizeof (*ctxt));
         ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
     }
