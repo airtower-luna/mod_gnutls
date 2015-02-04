@@ -14,11 +14,13 @@ export MSVA_PORT ?= 9933
 export TEST_GAP ?= 1.5
 export TEST_QUERY_DELAY ?= 2
 
+TEST_LOCK := ./test.lock
+
 all: setup.done
-	./runtests
+	TEST_LOCK=$(TEST_LOCK) ./runtests
 
 t-%: setup.done
-	./runtests $@
+	TEST_LOCK=$(TEST_LOCK) ./runtests $@
 
 
 

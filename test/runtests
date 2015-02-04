@@ -6,6 +6,11 @@ set -e
 
 tests="${1##t-}"
 
+if [ -n "${TEST_LOCK}" ]; then
+    TEST_LOCK="$(realpath ${TEST_LOCK})"
+    flock_cmd="flock -w 10 ${TEST_LOCK}"
+fi
+
 BADVARS=0
 for v in TEST_HOST TEST_IP TEST_PORT TEST_QUERY_DELAY TEST_GAP MSVA_PORT; do
     if [ ! -v "$v" ]; then
@@ -58,8 +63,11 @@ if [ -n "${USE_MSVA}" ]; then
     printf "\nSUCCESS: initial MSVA verification\n"
 fi
 
-for t in $tests; do 
-    sleep "$TEST_GAP"
+for t in $tests; do
+    if [ -z "${flock_cmd}" ]; then
+	echo "Warning: no lock file set"
+	sleep "$TEST_GAP"
+    fi
     export TEST_NAME="$(basename "$t")"
     output="../../outputs/${TEST_NAME}.output"
     rm -f "$output"
@@ -72,9 +80,14 @@ for t in $tests; do
     printf "TESTING: %s%s\n" "$TEST_NAME" "$EXPECTED_FAILURE"
     trap apache_down_err EXIT
     if [ -n "${USE_MSVA}" ]; then
-	MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT" /usr/sbin/apache2 -f "$(pwd)/apache.conf" -k start || [ -e fail.server ]
+	${flock_cmd} \
+	    MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT" \
+	    /usr/sbin/apache2 -f "$(pwd)/apache.conf" -k start \
+	    || [ -e fail.server ]
     else
-	/usr/sbin/apache2 -f "$(pwd)/apache.conf" -k start || [ -e fail.server ]
+	${flock_cmd} \
+	    /usr/sbin/apache2 -f "$(pwd)/apache.conf" -k start \
+	    || [ -e fail.server ]
     fi
 
     if (sed "s/__HOSTNAME__/${TEST_HOST}/" < ./input && sleep "$TEST_QUERY_DELAY") | \
