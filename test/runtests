@@ -36,7 +36,9 @@ function apache_down_err() {
     fi
     printf "\nApache error logs:\n"
     tail "../../logs/${TEST_NAME}.error.log"
-    stop_msva
+    if [ -n "${USE_MSVA}" ]; then
+	stop_msva
+    fi
 }
 
 if [ -z "$tests" ] ; then
@@ -45,15 +47,16 @@ else
     tests=./tests/"$(printf "%02d" "$tests")"_*
 fi
 
-GNUPGHOME=$(pwd)/msva.gnupghome MSVA_KEYSERVER_POLICY=never monkeysphere-validation-agent &
+if [ -n "${USE_MSVA}" ]; then
+    GNUPGHOME=$(pwd)/msva.gnupghome MSVA_KEYSERVER_POLICY=never monkeysphere-validation-agent &
+    trap stop_msva EXIT
 
-trap stop_msva EXIT
+    sleep "$TEST_GAP"
 
-sleep "$TEST_GAP"
-
-printf "TESTING: initial MSVA verification\n"
-MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT" msva-query-agent https "$(cat client.uid)" x509pem client < client/x509.pem
-printf "\nSUCCESS: initial MSVA verification\n"
+    printf "TESTING: initial MSVA verification\n"
+    MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT" msva-query-agent https "$(cat client.uid)" x509pem client < client/x509.pem
+    printf "\nSUCCESS: initial MSVA verification\n"
+fi
 
 for t in $tests; do 
     sleep "$TEST_GAP"
@@ -68,7 +71,11 @@ for t in $tests; do
     fi
     printf "TESTING: %s%s\n" "$TEST_NAME" "$EXPECTED_FAILURE"
     trap apache_down_err EXIT
-    MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT" /usr/sbin/apache2 -f "$(pwd)/apache.conf" -k start || [ -e fail.server ]
+    if [ -n "${USE_MSVA}" ]; then
+	MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT" /usr/sbin/apache2 -f "$(pwd)/apache.conf" -k start || [ -e fail.server ]
+    else
+	/usr/sbin/apache2 -f "$(pwd)/apache.conf" -k start || [ -e fail.server ]
+    fi
 
     if (sed "s/__HOSTNAME__/${TEST_HOST}/" < ./input && sleep "$TEST_QUERY_DELAY") | \
         gnutls-cli -p "${TEST_PORT}" $(cat ./gnutls-cli.args) "${TEST_HOST}" > \
@@ -87,9 +94,15 @@ for t in $tests; do
         diff -q -u output <( tail -n "$(wc -l < output)" "$output" )
     fi
     /usr/sbin/apache2 -f "$(pwd)/apache.conf" -k stop || [ -e fail.server ]
-    trap stop_msva EXIT
+    if [ -n "${USE_MSVA}" ]; then
+	trap stop_msva EXIT
+    else
+	trap - EXIT
+    fi
     printf "SUCCESS: %s\n" "$TEST_NAME"
     cd ../..
 done
 
-stop_msva
+if [ -n "${USE_MSVA}" ]; then
+    stop_msva
+fi

@@ -1,2 +1,2 @@
 #!/bin/bash
-make -f TestMakefile t-15
+USE_MSVA="yes" make -f TestMakefile t-15
