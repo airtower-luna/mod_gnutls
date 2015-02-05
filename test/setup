@@ -12,7 +12,7 @@ if [ -z "$TEST_HOST" ]; then
 fi
 
 if [ . != "$(dirname "$0")" ]; then
-    printf "You should only run this mod-gnutls test suite from the t/ directory of the mod_gnutls source.\n" >&2
+    printf "You should only run this mod-gnutls test suite from the test/ directory of the mod_gnutls source.\n" >&2
     exit 1
 fi
 

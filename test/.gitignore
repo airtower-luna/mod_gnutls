@@ -13,3 +13,6 @@ server.template
 client.template
 authority.template
 msva.gnupghome
+*.log
+*.trs
+test.lock
