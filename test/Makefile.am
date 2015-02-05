@@ -17,7 +17,8 @@ if USE_MSVA
 TESTS += test-15_basic_msva.bash
 endif
 TESTS += test-16_view-status.bash \
-	test-17_cgi_vars_large_cert.bash
+	test-17_cgi_vars_large_cert.bash \
+	test-18_client_verification_wrong_cert.bash
 
 clean-local:
 	make -f TestMakefile clean
