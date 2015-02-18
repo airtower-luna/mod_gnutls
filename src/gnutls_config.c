@@ -535,9 +535,8 @@ int mgs_pkcs11_reinit(server_rec * base_server)
     return -1;
 }
 
-const char *mgs_set_dh_file(cmd_parms * parms, void *dummy,
-			    const char *arg)
-{
+const char *mgs_set_dh_file(cmd_parms * parms, void *dummy __attribute__((unused)),
+        const char *arg) {
     mgs_srvconf_rec *sc =
 	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
 						 module_config,
@@ -548,9 +547,7 @@ const char *mgs_set_dh_file(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
-const char *mgs_set_cert_file(cmd_parms * parms, void *dummy,
-			      const char *arg)
-{
+const char *mgs_set_cert_file(cmd_parms * parms, void *dummy __attribute__((unused)), const char *arg) {
 
     mgs_srvconf_rec *sc =
 	(mgs_srvconf_rec *) ap_get_module_config(parms->
@@ -563,9 +560,7 @@ const char *mgs_set_cert_file(cmd_parms * parms, void *dummy,
 
 }
 
-const char *mgs_set_key_file(cmd_parms * parms, void *dummy,
-			     const char *arg)
-{
+const char *mgs_set_key_file(cmd_parms * parms, void *dummy __attribute__((unused)), const char *arg) {
 
     mgs_srvconf_rec *sc =
 	(mgs_srvconf_rec *) ap_get_module_config(parms->
@@ -577,9 +572,8 @@ const char *mgs_set_key_file(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
-const char *mgs_set_pgpcert_file(cmd_parms * parms, void *dummy,
-				 const char *arg)
-{
+const char *mgs_set_pgpcert_file(cmd_parms * parms, void *dummy __attribute__((unused)),
+        const char *arg) {
     mgs_srvconf_rec *sc =
 	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
 						 module_config,
@@ -590,9 +584,8 @@ const char *mgs_set_pgpcert_file(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
-const char *mgs_set_pgpkey_file(cmd_parms * parms, void *dummy,
-				const char *arg)
-{
+const char *mgs_set_pgpkey_file(cmd_parms * parms, void *dummy __attribute__((unused)),
+        const char *arg) {
     mgs_srvconf_rec *sc =
 	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
 						 module_config,
@@ -603,9 +596,8 @@ const char *mgs_set_pgpkey_file(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
-const char *mgs_set_tickets(cmd_parms * parms, void *dummy,
-			    const char *arg)
-{
+const char *mgs_set_tickets(cmd_parms * parms, void *dummy __attribute__((unused)),
+        const char *arg) {
     mgs_srvconf_rec *sc =
 	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
 						 module_config,
@@ -622,9 +614,8 @@ const char *mgs_set_tickets(cmd_parms * parms, void *dummy,
 
 #ifdef ENABLE_SRP
 
-const char *mgs_set_srp_tpasswd_file(cmd_parms * parms, void *dummy,
-				     const char *arg)
-{
+const char *mgs_set_srp_tpasswd_file(cmd_parms * parms, void *dummy __attribute__((unused)),
+        const char *arg) {
     mgs_srvconf_rec *sc =
 	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
 						 module_config,
@@ -635,9 +626,8 @@ const char *mgs_set_srp_tpasswd_file(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
-const char *mgs_set_srp_tpasswd_conf_file(cmd_parms * parms, void *dummy,
-					  const char *arg)
-{
+const char *mgs_set_srp_tpasswd_conf_file(cmd_parms * parms, void *dummy __attribute__((unused)),
+        const char *arg) {
     mgs_srvconf_rec *sc =
 	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
 						 module_config,
@@ -650,9 +640,8 @@ const char *mgs_set_srp_tpasswd_conf_file(cmd_parms * parms, void *dummy,
 
 #endif
 
-const char *mgs_set_cache(cmd_parms * parms, void *dummy,
-			  const char *type, const char *arg)
-{
+const char *mgs_set_cache(cmd_parms * parms, void *dummy __attribute__((unused)),
+        const char *type, const char *arg) {
     const char *err;
     mgs_srvconf_rec *sc =
 	ap_get_module_config(parms->server->module_config,
@@ -692,9 +681,8 @@ const char *mgs_set_cache(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
-const char *mgs_set_cache_timeout(cmd_parms * parms, void *dummy,
-				  const char *arg)
-{
+const char *mgs_set_cache_timeout(cmd_parms * parms, void *dummy __attribute__((unused)),
+        const char *arg) {
     int argint;
     const char *err;
     mgs_srvconf_rec *sc =
@@ -719,13 +707,9 @@ const char *mgs_set_cache_timeout(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
-const char *mgs_set_client_verify_method(cmd_parms * parms, void *dummy,
-					 const char *arg)
-{
-    mgs_srvconf_rec *sc =
-	(mgs_srvconf_rec *) ap_get_module_config(parms->
-						 server->module_config,
-						 &gnutls_module);
+const char *mgs_set_client_verify_method(cmd_parms * parms, void *dummy __attribute__((unused)),
+        const char *arg) {
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)ap_get_module_config(parms->server->module_config, &gnutls_module);
 
     if (strcasecmp("cartel", arg) == 0) {
 	sc->client_verify_method = mgs_cvm_cartel;
@@ -742,9 +726,9 @@ const char *mgs_set_client_verify_method(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
-const char *mgs_set_client_verify(cmd_parms * parms, void *dummy,
-				  const char *arg)
-{
+const char *mgs_set_client_verify(cmd_parms * parms,
+                                  void *dirconf,
+                                  const char *arg) {
     int mode;
 
     if (strcasecmp("none", arg) == 0 || strcasecmp("ignore", arg) == 0) {
@@ -760,8 +744,8 @@ const char *mgs_set_client_verify(cmd_parms * parms, void *dummy,
 
     /* This was set from a directory context */
     if (parms->path) {
-	mgs_dirconf_rec *dc = (mgs_dirconf_rec *) dummy;
-	dc->client_verify_mode = mode;
+        mgs_dirconf_rec *dc = (mgs_dirconf_rec *) dirconf;
+        dc->client_verify_mode = mode;
     } else {
 	mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
 	    ap_get_module_config(parms->server->module_config,
@@ -772,9 +756,8 @@ const char *mgs_set_client_verify(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
-const char *mgs_set_client_ca_file(cmd_parms * parms, void *dummy,
-				   const char *arg)
-{
+const char *mgs_set_client_ca_file(cmd_parms * parms, void *dummy __attribute__((unused)),
+        const char *arg) {
     mgs_srvconf_rec *sc =
 	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
 						 module_config,
@@ -785,9 +768,8 @@ const char *mgs_set_client_ca_file(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
-const char *mgs_set_keyring_file(cmd_parms * parms, void *dummy,
-				 const char *arg)
-{
+const char *mgs_set_keyring_file(cmd_parms * parms, void *dummy __attribute__((unused)),
+        const char *arg) {
     mgs_srvconf_rec *sc =
 	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
 						 module_config,
@@ -798,9 +780,8 @@ const char *mgs_set_keyring_file(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
-const char *mgs_set_proxy_engine(cmd_parms * parms, void *dummy,
-				 const char *arg)
-{
+const char *mgs_set_proxy_engine(cmd_parms * parms, void *dummy __attribute__((unused)),
+        const char *arg) {
 
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
 	ap_get_module_config(parms->server->module_config, &gnutls_module);
@@ -816,9 +797,8 @@ const char *mgs_set_proxy_engine(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
-const char *mgs_set_enabled(cmd_parms * parms, void *dummy,
-			    const char *arg)
-{
+const char *mgs_set_enabled(cmd_parms * parms, void *dummy __attribute__((unused)),
+        const char *arg) {
     mgs_srvconf_rec *sc =
 	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
 						 module_config,
@@ -834,13 +814,8 @@ const char *mgs_set_enabled(cmd_parms * parms, void *dummy,
     return NULL;
 }
 
-const char *mgs_set_export_certificates_size(cmd_parms * parms,
-					     void *dummy, const char *arg)
-{
-    mgs_srvconf_rec *sc =
-	(mgs_srvconf_rec *) ap_get_module_config(parms->
-						 server->module_config,
-						 &gnutls_module);
+const char *mgs_set_export_certificates_size(cmd_parms * parms, void *dummy __attribute__((unused)), const char *arg) {
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *) ap_get_module_config(parms->server->module_config, &gnutls_module);
     if (!strcasecmp(arg, "On")) {
 	sc->export_certificates_size = 16 * 1024;
     } else if (!strcasecmp(arg, "Off")) {
@@ -863,9 +838,7 @@ const char *mgs_set_export_certificates_size(cmd_parms * parms,
     return NULL;
 }
 
-const char *mgs_set_priorities(cmd_parms * parms, void *dummy,
-			       const char *arg)
-{
+const char *mgs_set_priorities(cmd_parms * parms, void *dummy __attribute__((unused)), const char *arg) {
 
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
 	ap_get_module_config(parms->server->module_config, &gnutls_module);
@@ -924,8 +897,8 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
     return sc;
 }
 
-void *mgs_config_server_create(apr_pool_t * p, server_rec * s)
-{
+void *mgs_config_server_create(apr_pool_t * p,
+                               server_rec * s __attribute__((unused))) {
     char *err = NULL;
     mgs_srvconf_rec *sc = _mgs_config_server_create(p, &err);
     if (sc)
@@ -994,8 +967,9 @@ void *mgs_config_server_merge(apr_pool_t * p, void *BASE, void *ADD)
 #undef gnutls_srvconf_merge
 #undef gnutls_srvconf_assign
 
-void *mgs_config_dir_merge(apr_pool_t * p, void *basev, void *addv)
-{
+void *mgs_config_dir_merge(apr_pool_t * p,
+                           void *basev __attribute__((unused)),
+                           void *addv __attribute__((unused))) {
     mgs_dirconf_rec *new;
     /*    mgs_dirconf_rec *base = (mgs_dirconf_rec *) basev; */
     mgs_dirconf_rec *add = (mgs_dirconf_rec *) addv;
@@ -1005,9 +979,9 @@ void *mgs_config_dir_merge(apr_pool_t * p, void *basev, void *addv)
     return new;
 }
 
-void *mgs_config_dir_create(apr_pool_t * p, char *dir)
-{
-    mgs_dirconf_rec *dc = apr_palloc(p, sizeof(*dc));
+void *mgs_config_dir_create(apr_pool_t * p,
+                            char *dir __attribute__((unused))) {
+    mgs_dirconf_rec *dc = apr_palloc(p, sizeof (*dc));
     dc->client_verify_mode = -1;
     return dc;
 }
