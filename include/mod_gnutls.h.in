@@ -127,7 +127,7 @@ typedef struct {
     char *pgp_ring_file;
 
     char *dh_file;
-    
+
     char *priorities_str;
 
     const char* srp_tpasswd_file;

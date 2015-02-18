@@ -467,10 +467,8 @@ int mgs_load_files(apr_pool_t * p, server_rec * s)
     }
 
     if (sc->priorities_str) {
-    	const char *err;
-	ret =
-	    gnutls_priority_init(&sc->priorities, sc->priorities_str,
-				 &err);
+        const char *err;
+        ret = gnutls_priority_init(&sc->priorities, sc->priorities_str, &err);
 
 	if (ret < 0) {
 	    if (ret == GNUTLS_E_INVALID_REQUEST) {
