@@ -80,8 +80,8 @@ for t in $tests; do
     printf "TESTING: %s%s\n" "$TEST_NAME" "$EXPECTED_FAILURE"
     trap apache_down_err EXIT
     if [ -n "${USE_MSVA}" ]; then
-	${flock_cmd} \
-	    MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT" \
+	MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT" \
+	    ${flock_cmd} \
 	    /usr/sbin/apache2 -f "$(pwd)/apache.conf" -k start \
 	    || [ -e fail.server ]
     else
