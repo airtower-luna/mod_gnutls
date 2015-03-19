@@ -152,15 +152,15 @@ as the last certificate in the list.
 `GnuTLSKeyFile`
 ---------------
 
-Set to the PEM Encoded Server Certificate
+Set to the PEM Encoded Server Private Key
 
-    GnuTLSCertificateFile FILEPATH
+    GnuTLSKeyFile FILEPATH
 
 Default: *none*\
 Context: server config, virtual host
 
-Takes an absolute or relative path to the Server Private Key.  This
-key cannot currently be password protected.
+Takes an absolute or relative path to the Server Private Key. This key
+cannot currently be password protected.
 
 **Security Warning:**\
  This private key must be protected. It is read while Apache is still
