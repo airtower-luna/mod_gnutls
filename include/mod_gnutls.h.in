@@ -103,9 +103,14 @@ typedef struct {
 
 /* Server Configuration Record */
 typedef struct {
-	/* x509 Certificate Structure */
+    /* x509 Certificate Structure */
     gnutls_certificate_credentials_t certs;
-	/* SRP Certificate Structure*/
+    /* x509 credentials for proxy connections */
+    gnutls_certificate_credentials_t proxy_x509_creds;
+    const char* proxy_x509_key_file;
+    const char* proxy_x509_cert_file;
+    const char* proxy_x509_ca_file;
+    /* SRP Certificate Structure*/
     gnutls_srp_server_credentials_t srp_creds;
     /* Anonymous Certificate Structure */
     gnutls_anon_server_credentials_t anon_creds;
@@ -386,6 +391,10 @@ const char *mgs_set_require_bytecode(cmd_parms *cmd,
                                     void *mconfig, const char *arg);
 
 mgs_srvconf_rec* mgs_find_sni_server(gnutls_session_t session);
+
+const char *mgs_store_cred_path(cmd_parms * parms,
+                                void *dummy __attribute__((unused)),
+                                const char *arg);
 
 /* mod_gnutls Hooks. */
 

@@ -223,6 +223,18 @@ static const command_rec mgs_config_cmds[] = {
     NULL,
     RSRC_CONF,
     "Max size to export PEM encoded certificates to CGIs (or off to disable). Default: off"),
+    AP_INIT_TAKE1("GnuTLSProxyKeyFile", mgs_store_cred_path,
+    NULL,
+    RSRC_CONF,
+    "X509 client private file for proxy connections"),
+    AP_INIT_TAKE1("GnuTLSProxyCertificateFile", mgs_store_cred_path,
+    NULL,
+    RSRC_CONF,
+    "X509 client certificate file for proxy connections"),
+    AP_INIT_TAKE1("GnuTLSProxyCAFile", mgs_store_cred_path,
+    NULL,
+    RSRC_CONF,
+    "X509 trusted CA file for proxy connections"),
     { NULL },
 };
 

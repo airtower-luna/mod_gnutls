@@ -52,6 +52,7 @@ static int mgs_status_hook(request_rec *r, int flags);
 #ifdef ENABLE_MSVA
 static const char* mgs_x509_construct_uid(request_rec * pool, gnutls_x509_crt_t cert);
 #endif
+static int load_proxy_x509_credentials(server_rec *s);
 
 /* Pool Cleanup Function */
 apr_status_t mgs_cleanup_pre_config(void *data __attribute__((unused))) {
@@ -457,6 +458,12 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
                 continue;
             }
         }
+
+        if (sc->enabled == GNUTLS_ENABLED_TRUE
+            && sc->proxy_enabled == GNUTLS_ENABLED_TRUE)
+        {
+            load_proxy_x509_credentials(s);
+        }
     }
 
 
@@ -801,6 +808,10 @@ static void create_gnutls_handle(conn_rec * c)
     gnutls_handshake_set_post_client_hello_function(ctxt->session,
             mgs_select_virtual_server_cb);
 
+    /* Set GnuTLS user pointer, so we can access the module session
+     * context in GnuTLS callbacks */
+    gnutls_session_set_ptr(ctxt->session, ctxt);
+
     /* If mod_gnutls is the TLS server, mgs_select_virtual_server_cb
      * will load appropriate credentials during handshake. However,
      * when handling a proxy backend connection, mod_gnutls acts as
@@ -812,7 +823,7 @@ static void create_gnutls_handle(conn_rec * c)
                                ctxt->sc->anon_client_creds);
         /* Set x509 credentials */
         gnutls_credentials_set(ctxt->session, GNUTLS_CRD_CERTIFICATE,
-                               ctxt->sc->certs);
+                               ctxt->sc->proxy_x509_creds);
         /* Load priorities from the server configuration */
         err = gnutls_priority_set(ctxt->session, ctxt->sc->priorities);
         if (err != GNUTLS_E_SUCCESS)
@@ -1668,3 +1679,120 @@ static int mgs_status_hook(request_rec *r, int flags __attribute__((unused)))
     return OK;
 }
 
+
+
+/*
+ * Callback to check the server certificate for proxy HTTPS
+ * connections, to be used with
+ * gnutls_certificate_set_verify_function.
+
+ * Returns: 0 if certificate check was successful (certificate
+ * trusted), non-zero otherwise (error during check or untrusted
+ * certificate).
+ */
+static int gtls_check_server_cert(gnutls_session_t session)
+{
+    mgs_handle_t *ctxt = (mgs_handle_t *) gnutls_session_get_ptr(session);
+    unsigned int status;
+
+    int err = gnutls_certificate_verify_peers3(session, NULL, &status);
+    if (err != GNUTLS_E_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_INFO, 0, ctxt->c,
+                      "%s: server certificate check failed: %s (%d)",
+                      __func__, gnutls_strerror(err), err);
+        return err;
+    }
+
+    gnutls_datum_t * out = gnutls_malloc(sizeof(gnutls_datum_t));
+    /* GNUTLS_CRT_X509: ATM, only X509 is supported for proxy certs
+     * 0: according to function API, the last argument should be 0 */
+    err = gnutls_certificate_verification_status_print(status, GNUTLS_CRT_X509,
+                                                       out, 0);
+    if (err != GNUTLS_E_SUCCESS)
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
+                      "%s: server verify print failed: %s (%d)",
+                      __func__, gnutls_strerror(err), err);
+    else
+    {
+        /* If the certificate is trusted, logging the result is just
+         * nice for debugging. But if the back end server provided an
+         * untrusted certificate, warn! */
+        int level = (status == 0 ? APLOG_DEBUG : APLOG_WARNING);
+        ap_log_cerror(APLOG_MARK, level, 0, ctxt->c,
+                      "%s: server certificate verify result: %s",
+                      __func__, out->data);
+    }
+
+    gnutls_free(out);
+    return status;
+}
+
+
+
+static int load_proxy_x509_credentials(server_rec *s)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(s->module_config, &gnutls_module);
+
+    if (sc == NULL)
+        return APR_EGENERAL;
+
+    int ret = APR_SUCCESS;
+    int err = GNUTLS_E_SUCCESS;
+    if (sc->proxy_x509_key_file && sc->proxy_x509_cert_file)
+    {
+        err = gnutls_certificate_set_x509_key_file(sc->proxy_x509_creds,
+                                                   sc->proxy_x509_cert_file,
+                                                   sc->proxy_x509_key_file,
+                                                   GNUTLS_X509_FMT_PEM);
+        if (err != GNUTLS_E_SUCCESS)
+        {
+            ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+                         "%s: loading proxy client credentials failed: %s (%d)",
+                         __func__, gnutls_strerror(err), err);
+            ret = APR_EGENERAL;
+        }
+    }
+    else if (!sc->proxy_x509_key_file && sc->proxy_x509_cert_file)
+    {
+        ap_log_error(APLOG_MARK, APLOG_WARNING, 0, s,
+                     "%s: proxy key file not set!", __func__);
+        ret = APR_EGENERAL;
+    }
+    else if (!sc->proxy_x509_cert_file && sc->proxy_x509_key_file)
+    {
+        ap_log_error(APLOG_MARK, APLOG_WARNING, 0, s,
+                     "%s: proxy certificate file not set!", __func__);
+        ret = APR_EGENERAL;
+    }
+    else
+        /* if both key and cert are NULL, client auth is not used */
+        ap_log_error(APLOG_MARK, APLOG_WARNING, 0, s,
+                     "%s: no client credentials for proxy", __func__);
+
+    /* must be set if the server certificate is to be checked */
+    if (sc->proxy_x509_ca_file)
+    {
+        /* returns number of loaded certificates */
+        err = gnutls_certificate_set_x509_trust_file(sc->proxy_x509_creds,
+                                                     sc->proxy_x509_ca_file,
+                                                     GNUTLS_X509_FMT_PEM);
+        if (err <= 0)
+            ap_log_error(APLOG_MARK, APLOG_WARNING, 0, s,
+                         "%s: proxy CA trust list is empty",
+                         __func__);
+        else
+            ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
+                         "%s: proxy CA trust list: %d certificates loaded",
+                         __func__, err);
+    }
+    else
+        ap_log_error(APLOG_MARK, APLOG_WARNING, 0, s,
+                     "%s: no CA trust list for proxy connections missing, "
+                     "TLS connections will fail!", __func__);
+
+    gnutls_certificate_set_verify_function(sc->proxy_x509_creds,
+                                           gtls_check_server_cert);
+    return ret;
+}

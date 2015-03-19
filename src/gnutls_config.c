@@ -100,8 +100,8 @@ const char *mgs_set_dh_file(cmd_parms * parms, void *dummy __attribute__((unused
     return NULL;
 }
 
-const char *mgs_set_cert_file(cmd_parms * parms, void *dummy __attribute__((unused)), const char *arg) {
-
+const char *mgs_set_cert_file(cmd_parms * parms, void *dummy __attribute__((unused)), const char *arg)
+{
     int ret;
     gnutls_datum_t data;
     const char *file;
@@ -630,6 +630,19 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p, char** err) {
                             gnutls_strerror(ret));
         return NULL;
     }
+
+    sc->proxy_x509_key_file = NULL;
+    sc->proxy_x509_cert_file = NULL;
+    sc->proxy_x509_ca_file = NULL;
+    ret = gnutls_certificate_allocate_credentials(&sc->proxy_x509_creds);
+    if (ret < 0)
+    {
+        *err = apr_psprintf(p, "GnuTLS: Failed to initialize"
+                            ": (%d) %s", ret,
+                            gnutls_strerror(ret));
+        return NULL;
+    }
+
 #ifdef ENABLE_SRP
     ret = gnutls_srp_allocate_server_credentials(&sc->srp_creds);
     if (ret < 0) {
@@ -697,6 +710,10 @@ void *mgs_config_server_merge(apr_pool_t *p, void *BASE, void *ADD) {
     gnutls_srvconf_merge(priorities, NULL);
     gnutls_srvconf_merge(dh_params, NULL);
 
+    gnutls_srvconf_merge(proxy_x509_key_file, NULL);
+    gnutls_srvconf_merge(proxy_x509_cert_file, NULL);
+    gnutls_srvconf_merge(proxy_x509_ca_file, NULL);
+
     /* FIXME: the following items are pre-allocated, and should be
      * properly disposed of before assigning in order to avoid leaks;
      * so at the moment, we can't actually have them in the config.
@@ -747,3 +764,29 @@ void *mgs_config_dir_create(apr_pool_t * p,
     return dc;
 }
 
+/*
+ * Store paths to proxy credentials
+ *
+ * This function copies the paths provided in the configuration file
+ * into the server configuration. The post configuration hook takes
+ * care of actually loading the credentials, which means than invalid
+ * paths or the like will be detected there.
+ */
+const char *mgs_store_cred_path(cmd_parms * parms,
+                                void *dummy __attribute__((unused)),
+                                const char *arg)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(parms->server->module_config, &gnutls_module);
+
+    /* parms->directive->directive contains the directive string */
+    if (!strcasecmp(parms->directive->directive, "GnuTLSProxyKeyFile"))
+        sc->proxy_x509_key_file = apr_pstrdup(parms->pool, arg);
+    else if (!strcasecmp(parms->directive->directive,
+                         "GnuTLSProxyCertificateFile"))
+        sc->proxy_x509_cert_file = apr_pstrdup(parms->pool, arg);
+    else if (!strcasecmp(parms->directive->directive, "GnuTLSProxyCAFile"))
+        sc->proxy_x509_ca_file = apr_pstrdup(parms->pool, arg);
+    /* TODO: Add CRL parameter */
+    return NULL;
+}
