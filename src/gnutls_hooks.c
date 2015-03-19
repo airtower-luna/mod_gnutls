@@ -1695,7 +1695,19 @@ static int gtls_check_server_cert(gnutls_session_t session)
     mgs_handle_t *ctxt = (mgs_handle_t *) gnutls_session_get_ptr(session);
     unsigned int status;
 
-    int err = gnutls_certificate_verify_peers3(session, NULL, &status);
+    /* Get peer hostname from a note left by mod_proxy */
+    const char *peer_hostname =
+        apr_table_get(ctxt->c->notes, "proxy-request-hostname");
+    if (peer_hostname == NULL)
+        ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, ctxt->c,
+                      "%s: proxy-request-hostname is NULL, cannot check "
+                      "peer's hostname", __func__);
+
+    /* Verify certificate, including hostname match. Should
+     * peer_hostname be NULL for some reason, the name is not
+     * checked. */
+    int err = gnutls_certificate_verify_peers3(session, peer_hostname,
+                                               &status);
     if (err != GNUTLS_E_SUCCESS)
     {
         ap_log_cerror(APLOG_MARK, APLOG_INFO, 0, ctxt->c,
