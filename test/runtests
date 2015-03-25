@@ -90,9 +90,18 @@ for t in $tests; do
 	    || [ -e fail.server ]
     fi
 
-    if (sed "s/__HOSTNAME__/${TEST_HOST}/" < ./input && sleep "$TEST_QUERY_DELAY") | \
-        gnutls-cli -p "${TEST_PORT}" $(cat ./gnutls-cli.args) "${TEST_HOST}" > \
-        "$output" ; then
+    # The sleep call keeps the pipe from the subshell to gnutls-cli
+    # open. Without it gnutls-cli would terminate as soon as sed is
+    # done, and not wait for a response from the server, leading to
+    # failing tests. Sending sleep to the background allows the test
+    # case to proceed instead of waiting for it to return, but has the
+    # disadvantage of leaving the sleep process dangling until it
+    # eventually times out. Still preferable to a fixed delay.
+    if (sed "s/__HOSTNAME__/${TEST_HOST}/" <./input && \
+	sleep "${TEST_QUERY_DELAY}" &) | \
+	gnutls-cli -p "${TEST_PORT}" $(cat ./gnutls-cli.args) "${TEST_HOST}" \
+	>"$output";
+    then
         if [ -e fail* ]; then
             printf "%s should have failed but succeeded\n" "$(basename "$t")" >&2
             exit 1
@@ -103,6 +112,7 @@ for t in $tests; do
             exit 1
         fi
     fi
+
     if [ -e output ] ; then
         diff -q -u output <( tail -n "$(wc -l < output)" "$output" )
     fi
