@@ -1790,14 +1790,18 @@ static int load_proxy_x509_credentials(server_rec *s)
         err = gnutls_certificate_set_x509_trust_file(sc->proxy_x509_creds,
                                                      sc->proxy_x509_ca_file,
                                                      GNUTLS_X509_FMT_PEM);
-        if (err <= 0)
-            ap_log_error(APLOG_MARK, APLOG_WARNING, 0, s,
-                         "%s: proxy CA trust list is empty",
-                         __func__);
-        else
+        if (err > 0)
             ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
                          "%s: proxy CA trust list: %d certificates loaded",
                          __func__, err);
+        else if (err == 0)
+            ap_log_error(APLOG_MARK, APLOG_WARNING, 0, s,
+                         "%s: proxy CA trust list is empty (%d)",
+                         __func__, err);
+        else /* err < 0 */
+            ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+                         "%s: error loading proxy CA trust list: %s (%d)",
+                         __func__, gnutls_strerror(err), err);
     }
     else
         ap_log_error(APLOG_MARK, APLOG_WARNING, 0, s,
