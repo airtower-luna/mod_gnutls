@@ -12,7 +12,7 @@ if [ -z "${BACKEND_PORT}" ]; then
     export BACKEND_PORT="9934"
 fi
 if [ -z "${BACKEND_LOCK}" ] && [ -n "${testdir}" ]; then
-    BACKEND_LOCK="$(realpath ${testdir}/backend.lock)"
+    BACKEND_LOCK="$(realpath ${testdir}/../../backend.lock)"
 fi
 
 function backend_apache

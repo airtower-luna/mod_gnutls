@@ -19,7 +19,9 @@ endif
 TESTS += test-16_view-status.bash \
 	test-17_cgi_vars_large_cert.bash \
 	test-18_client_verification_wrong_cert.bash \
-	test-19_TLS_reverse_proxy.bash
+	test-19_TLS_reverse_proxy.bash \
+	test-20_TLS_reverse_proxy_client_auth.bash \
+	test-21_TLS_reverse_proxy_wrong_cert.bash
 
 clean-local:
 	make -f TestMakefile clean
