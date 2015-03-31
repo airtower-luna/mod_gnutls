@@ -15,4 +15,4 @@ authority.template
 msva.gnupghome
 *.log
 *.trs
-test.lock
+*.lock
