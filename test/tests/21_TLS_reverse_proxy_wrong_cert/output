@@ -1,5 +1,4 @@
 HTTP/1.1 502 Proxy Error
-Server: Apache/2.4.10 (Ubuntu) mod_gnutls/0.6 GnuTLS/3.2.16
 Content-Length: 407
 Connection: close
 Content-Type: text/html; charset=iso-8859-1

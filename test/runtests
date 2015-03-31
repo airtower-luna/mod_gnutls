@@ -32,20 +32,23 @@ function stop_msva() {
     kill %1
 }
 
-# Compare expected/actual outputs, filtering out the "Date" header
-# from actual output because it is expected to change. It must have
-# been manually excluded from the expected output.
+# Compare expected/actual outputs, filtering out headers from actual
+# output that are expected to change between runs or builds (currently
+# "Date" and "Server"). The headers must be excluded in the expected
+# output.
 #
 # Parameters:
 # $1: path to expected output
 # $2: path to actual output
 # $3: additional options for diff (optional)
-function diff_output_filter_date()
+function diff_output_filter_headers()
 {
     expected="$1"
     actual="$2"
     diff $3 -u "${expected}" <( cat "${actual}" | \
-	grep -v -P '^Date:\s.*GMT\s?$' | tail -n "$(wc -l < ${expected})" )
+	grep -v -P '^Date:\s.*GMT\s?$' | \
+	grep -v -P '^Server:\sApache'  | \
+	tail -n "$(wc -l < ${expected})" )
 }
 
 function apache_down_err() {
@@ -53,7 +56,7 @@ function apache_down_err() {
     /usr/sbin/apache2 -f "$(pwd)/apache.conf" -k stop || true
     if [ -e output ]; then
 	printf "\ngnutls-cli outputs:\n"
-	diff_output_filter_date "output" "$output" || true
+	diff_output_filter_headers "output" "$output" || true
     fi
     printf "\nApache error logs:\n"
     tail "../../logs/${TEST_NAME}.error.log"
@@ -130,7 +133,7 @@ for t in $tests; do
     fi
 
     if [ -e output ] ; then
-	diff_output_filter_date "output" "$output" "-q"
+	diff_output_filter_headers "output" "$output" "-q"
     fi
     /usr/sbin/apache2 -f "$(pwd)/apache.conf" -k stop || [ -e fail.server ]
     if [ -n "${USE_MSVA}" ]; then
