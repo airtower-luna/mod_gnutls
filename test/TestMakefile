@@ -12,7 +12,7 @@ export TEST_PORT ?= 9932
 export MSVA_PORT ?= 9933
 
 export TEST_GAP ?= 1.5
-export TEST_QUERY_DELAY ?= 6
+export TEST_QUERY_DELAY ?= 30
 
 TEST_LOCK := ./test.lock
 

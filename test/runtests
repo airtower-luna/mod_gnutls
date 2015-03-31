@@ -43,12 +43,43 @@ function stop_msva() {
 # $3: additional options for diff (optional)
 function diff_output_filter_headers()
 {
-    expected="$1"
-    actual="$2"
+    local expected="$1"
+    local actual="$2"
     diff $3 -u "${expected}" <( cat "${actual}" | \
 	grep -v -P '^Date:\s.*GMT\s?$' | \
 	grep -v -P '^Server:\sApache'  | \
 	tail -n "$(wc -l < ${expected})" )
+}
+
+# Run a command, storing its PID in the given file
+# Usage: run_with_pidfile PIDFILE COMMAND [ARGS]
+function run_with_pidfile()
+{
+    local pidfile=$1
+    local cmd=$2
+    shift 2
+    echo $BASHPID >${pidfile}
+    exec ${cmd} $*
+}
+
+# Kills the process with the PID contained in a given file, then
+# deletes the file.
+# Usage: kill_by_pidfile PIDFILE
+function kill_by_pidfile()
+{
+    local pidfile="${1}"
+    # In some testcases with expected failure, gnutls-cli sometimes
+    # failed before the subshell in front of the pipe (see gnutls-cli
+    # call below) got so far as to write the PID, much less exec
+    # sleep. So we need to check if there actually is anything to
+    # kill.
+    if [ -n "${pidfile}" ]; then
+	local pid=$(cat "${pidfile}")
+	if [ -n "${pid}" ] && ps -p "${pid}"; then
+	    kill "${pid}"
+	fi
+	rm "${pidfile}"
+    fi
 }
 
 function apache_down_err() {
@@ -58,8 +89,14 @@ function apache_down_err() {
 	printf "\ngnutls-cli outputs:\n"
 	diff_output_filter_headers "output" "$output" || true
     fi
+
+    if [ -n "${sleep_pidfile}" ]; then
+	kill_by_pidfile "${sleep_pidfile}"
+    fi
+
     printf "\nApache error logs:\n"
     tail "../../logs/${TEST_NAME}.error.log"
+
     if [ -n "${USE_MSVA}" ]; then
 	stop_msva
     fi
@@ -109,15 +146,17 @@ for t in $tests; do
 	    || [ -e fail.server ]
     fi
 
+    # PID file for sleep command (explanation below)
+    sleep_pidfile="$(mktemp mod_gnutls_test-XXXXXX.pid)"
+
     # The sleep call keeps the pipe from the subshell to gnutls-cli
     # open. Without it gnutls-cli would terminate as soon as sed is
     # done, and not wait for a response from the server, leading to
     # failing tests. Sending sleep to the background allows the test
-    # case to proceed instead of waiting for it to return, but has the
-    # disadvantage of leaving the sleep process dangling until it
-    # eventually times out. Still preferable to a fixed delay.
+    # case to proceed instead of waiting for it to return. The sleep
+    # process is stopped after gnutls-cli terminates.
     if (sed "s/__HOSTNAME__/${TEST_HOST}/" <./input && \
-	sleep "${TEST_QUERY_DELAY}" &) | \
+	run_with_pidfile "${sleep_pidfile}" sleep "${TEST_QUERY_DELAY}" &) | \
 	gnutls-cli -p "${TEST_PORT}" $(cat ./gnutls-cli.args) "${TEST_HOST}" \
 	>"$output";
     then
@@ -131,6 +170,8 @@ for t in $tests; do
             exit 1
         fi
     fi
+
+    kill_by_pidfile "${sleep_pidfile}"
 
     if [ -e output ] ; then
 	diff_output_filter_headers "output" "$output" "-q"
