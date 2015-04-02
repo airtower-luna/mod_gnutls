@@ -107,6 +107,8 @@ typedef struct {
     gnutls_certificate_credentials_t certs;
     /* x509 credentials for proxy connections */
     gnutls_certificate_credentials_t proxy_x509_creds;
+    /* trust list for proxy_x509_creds */
+    gnutls_x509_trust_list_t proxy_x509_tl;
     const char* proxy_x509_key_file;
     const char* proxy_x509_cert_file;
     const char* proxy_x509_ca_file;

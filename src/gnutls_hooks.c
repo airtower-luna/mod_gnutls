@@ -1752,6 +1752,8 @@ static int load_proxy_x509_credentials(server_rec *s)
 
     int ret = APR_SUCCESS;
     int err = GNUTLS_E_SUCCESS;
+
+    /* load certificate and key for client auth, if configured */
     if (sc->proxy_x509_key_file && sc->proxy_x509_cert_file)
     {
         err = gnutls_certificate_set_x509_key_file(sc->proxy_x509_creds,
@@ -1786,13 +1788,26 @@ static int load_proxy_x509_credentials(server_rec *s)
     /* must be set if the server certificate is to be checked */
     if (sc->proxy_x509_ca_file)
     {
-        /* returns number of loaded certificates */
-        err = gnutls_certificate_set_x509_trust_file(sc->proxy_x509_creds,
-                                                     sc->proxy_x509_ca_file,
-                                                     GNUTLS_X509_FMT_PEM);
+        /* initialize the trust list */
+        err = gnutls_x509_trust_list_init(&sc->proxy_x509_tl, 0);
+        if (err != GNUTLS_E_SUCCESS)
+        {
+            ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+                         "%s: gnutls_x509_trust_list_init failed: %s (%d)",
+                         __func__, gnutls_strerror(err), err);
+            ret = APR_EGENERAL;
+        }
+
+        /* returns number of loaded elements */
+        err = gnutls_x509_trust_list_add_trust_file(sc->proxy_x509_tl,
+                                                    sc->proxy_x509_ca_file,
+                                                    NULL /* crl_file */,
+                                                    GNUTLS_X509_FMT_PEM,
+                                                    0 /* tl_flags */,
+                                                    0 /* tl_vflags */);
         if (err > 0)
             ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
-                         "%s: proxy CA trust list: %d certificates loaded",
+                         "%s: proxy CA trust list: %d structures loaded",
                          __func__, err);
         else if (err == 0)
             ap_log_error(APLOG_MARK, APLOG_WARNING, 0, s,
@@ -1802,10 +1817,14 @@ static int load_proxy_x509_credentials(server_rec *s)
             ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
                          "%s: error loading proxy CA trust list: %s (%d)",
                          __func__, gnutls_strerror(err), err);
+
+        /* attach trust list to credentials */
+        gnutls_certificate_set_trust_list(sc->proxy_x509_creds,
+                                          sc->proxy_x509_tl, 0);
     }
     else
         ap_log_error(APLOG_MARK, APLOG_WARNING, 0, s,
-                     "%s: no CA trust list for proxy connections missing, "
+                     "%s: no CA trust list for proxy connections, "
                      "TLS connections will fail!", __func__);
 
     gnutls_certificate_set_verify_function(sc->proxy_x509_creds,
