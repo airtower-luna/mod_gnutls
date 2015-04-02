@@ -87,8 +87,10 @@ setup.done: $(all_tokens) msva.gnupghome/trustdb.gpg
 
 
 clean:
-	rm -rf server client authority logs cache outputs setup.done server.template msva.gnupghome \
-	 */*.pgp */*.gpg */*.gpg~ */*.pem */*.key authority.template client.template server.uid
-	rmdir imposter rogueca
+	rm -rf server client authority logs cache outputs setup.done \
+	server.template msva.gnupghome \
+	*/*.pgp */*.gpg */*.gpg~ */*.pem */*.key authority.template \
+	client.template server.uid *.lock
+	rmdir imposter rogueca || true
 
 .PHONY: all clean
