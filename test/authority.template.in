@@ -2,3 +2,4 @@ serial=1
 cn="Testing Authority"
 ca
 cert_signing_key
+crl_signing_key

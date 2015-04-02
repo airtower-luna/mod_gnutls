@@ -2,3 +2,4 @@ serial=1
 cn="Rogue Certificate Authority"
 ca
 cert_signing_key
+crl_signing_key
