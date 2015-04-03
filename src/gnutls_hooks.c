@@ -1801,7 +1801,7 @@ static int load_proxy_x509_credentials(server_rec *s)
         /* returns number of loaded elements */
         err = gnutls_x509_trust_list_add_trust_file(sc->proxy_x509_tl,
                                                     sc->proxy_x509_ca_file,
-                                                    NULL /* crl_file */,
+                                                    sc->proxy_x509_crl_file,
                                                     GNUTLS_X509_FMT_PEM,
                                                     0 /* tl_flags */,
                                                     0 /* tl_vflags */);

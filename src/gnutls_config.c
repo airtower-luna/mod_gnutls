@@ -634,6 +634,7 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p, char** err) {
     sc->proxy_x509_key_file = NULL;
     sc->proxy_x509_cert_file = NULL;
     sc->proxy_x509_ca_file = NULL;
+    sc->proxy_x509_crl_file = NULL;
     ret = gnutls_certificate_allocate_credentials(&sc->proxy_x509_creds);
     if (ret < 0)
     {
@@ -713,6 +714,7 @@ void *mgs_config_server_merge(apr_pool_t *p, void *BASE, void *ADD) {
     gnutls_srvconf_merge(proxy_x509_key_file, NULL);
     gnutls_srvconf_merge(proxy_x509_cert_file, NULL);
     gnutls_srvconf_merge(proxy_x509_ca_file, NULL);
+    gnutls_srvconf_merge(proxy_x509_crl_file, NULL);
 
     /* FIXME: the following items are pre-allocated, and should be
      * properly disposed of before assigning in order to avoid leaks;
@@ -787,6 +789,7 @@ const char *mgs_store_cred_path(cmd_parms * parms,
         sc->proxy_x509_cert_file = apr_pstrdup(parms->pool, arg);
     else if (!strcasecmp(parms->directive->directive, "GnuTLSProxyCAFile"))
         sc->proxy_x509_ca_file = apr_pstrdup(parms->pool, arg);
-    /* TODO: Add CRL parameter */
+    else if (!strcasecmp(parms->directive->directive, "GnuTLSProxyCRLFile"))
+        sc->proxy_x509_crl_file = apr_pstrdup(parms->pool, arg);
     return NULL;
 }

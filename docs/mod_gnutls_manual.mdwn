@@ -412,30 +412,44 @@ host.
 `GnuTLSProxyCAFile`
 --------------------
 
-Set to the PEM Encoded Certificate Authority Certificate
+Set to the PEM encoded Certificate Authority Certificate
 
     GnuTLSProxyCAFile FILEPATH
 
 Default: *none*\
 Context: server config, virtual host
 
-Takes an absolute or relative path to a PEM Encoded Certificate to use
+Takes an absolute or relative path to a PEM encoded certificate to use
 as a Certificate Authority when verifying certificates provided by
 proxy back end servers. This file may contain a list of trusted
 authorities. If not set, verification of TLS back end servers will
 always fail due to lack of a trusted CA.
 
+`GnuTLSProxyCRLFile`
+--------------------
+
+Set to the PEM encoded Certificate Revocation List
+
+    GnuTLSProxyCRLFile FILEPATH
+
+Default: *none*\
+Context: server config, virtual host
+
+Takes an absolute or relative path to a PEM encoded Certificate
+Revocation List to use when verifying certificates provided by proxy
+back end servers. The file may contain a list of CRLs.
+
 `GnuTLSProxyCertificateFile`
 -----------------------
 
-Set to the PEM Encoded Client Certificate
+Set to the PEM encoded Client Certificate
 
     GnuTLSProxyCertificateFile FILEPATH
 
 Default: *none*\
 Context: server config, virtual host
 
-Takes an absolute or relative path to a PEM-encoded X.509 certificate
+Takes an absolute or relative path to a PEM encoded X.509 certificate
 to use as this Server's End Entity (EE) client certificate for TLS
 client authentication in proxy TLS connections. If you need to supply
 certificates for intermediate Certificate Authorities (iCAs), they
@@ -450,7 +464,7 @@ provide the matching private key.
 `GnuTLSProxyKeyFile`
 ---------------
 
-Set to the PEM Encoded Private Key
+Set to the PEM encoded Private Key
 
     GnuTLSProxyKeyFile FILEPATH
 

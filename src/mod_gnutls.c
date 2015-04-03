@@ -235,6 +235,10 @@ static const command_rec mgs_config_cmds[] = {
     NULL,
     RSRC_CONF,
     "X509 trusted CA file for proxy connections"),
+    AP_INIT_TAKE1("GnuTLSProxyCRLFile", mgs_store_cred_path,
+    NULL,
+    RSRC_CONF,
+    "X509 CRL file for proxy connections"),
     { NULL },
 };
 
