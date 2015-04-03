@@ -172,6 +172,7 @@ for t in $tests; do
     fi
 
     kill_by_pidfile "${sleep_pidfile}"
+    unset sleep_pidfile
 
     if [ -e output ] ; then
 	diff_output_filter_headers "output" "$output" "-q"
