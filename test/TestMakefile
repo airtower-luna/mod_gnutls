@@ -90,7 +90,7 @@ clean:
 	rm -rf server client authority logs cache outputs setup.done \
 	server.template msva.gnupghome \
 	*/*.pgp */*.gpg */*.gpg~ */*.pem */*.key authority.template \
-	client.template server.uid *.lock
+	client.template server.uid *.lock tests/*/*.pem
 	rmdir imposter rogueca || true
 
 .PHONY: all clean
