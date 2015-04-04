@@ -19,7 +19,7 @@
 
 #include "mod_gnutls.h"
 
-static void gnutls_hooks(apr_pool_t * p) {
+static void gnutls_hooks(apr_pool_t * p __attribute__((unused))) {
 
     /* Try Run Post-Config Hook After mod_proxy */
     static const char * const aszPre[] = { "mod_proxy.c", NULL };

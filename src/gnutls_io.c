@@ -509,8 +509,12 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
 
     if (ctxt->input_mode == AP_MODE_READBYTES ||
             ctxt->input_mode == AP_MODE_SPECULATIVE) {
+        if (readbytes < 0) {
+            /* you're asking us to speculatively read a negative number of bytes! */
+            return APR_ENOTIMPL;
+        }
         /* Err. This is bad. readbytes *can* be a 64bit int! len.. is NOT */
-        if (readbytes < len) {
+        if ((apr_size_t) readbytes < len) {
             len = (apr_size_t) readbytes;
         }
         status =
@@ -572,7 +576,7 @@ static ssize_t write_flush(mgs_handle_t * ctxt) {
 }
 
 apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
-    apr_size_t ret;
+    int ret;
     mgs_handle_t *ctxt = (mgs_handle_t *) f->ctx;
     apr_status_t status = APR_SUCCESS;
     apr_read_type_e rblock = APR_NONBLOCK_READ;
@@ -671,7 +675,8 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
                                 APR_EGENERAL;
                         return ctxt->output_rc;
                     }
-                } else if (ret != len) {
+                } else if ((apr_size_t)(ret) != len) {
+                    /* we know the above cast is OK because len > 0 and ret >= 0 */
                     /* Not able to send the entire bucket,
                        split it and send it again. */
                     apr_bucket_split(bucket, ret);

@@ -61,15 +61,15 @@ server.uid: server.uid.in
 
 # special cases for the authorities' root certs:
 authority/x509.pem: authority.template authority/secret.key
-	certtool --generate-self-signed --load-privkey=authority/secret.key --template=authority.template > $@
+	certtool --generate-self-signed --load-privkey authority/secret.key --template authority.template > $@
 rogueca/x509.pem: rogueca.template rogueca/secret.key
-	certtool --generate-self-signed --load-privkey=rogueca/secret.key --template=rogueca.template > $@
+	certtool --generate-self-signed --load-privkey rogueca/secret.key --template rogueca.template > $@
 
 %/cert-request: %.template %/secret.key 
-	certtool --generate-request --load-privkey=$(dir $@)secret.key --template=$< > $@
+	certtool --generate-request --load-privkey $(dir $@)secret.key --template $< > $@
 
 %/x509.pem: %.template %/cert-request authority/secret.key authority/x509.pem 
-	certtool --generate-certificate --load-ca-certificate=authority/x509.pem --load-ca-privkey=authority/secret.key --load-request=$(dir $@)cert-request --template=$< > $@
+	certtool --generate-certificate --load-ca-certificate authority/x509.pem --load-ca-privkey authority/secret.key --load-request $(dir $@)cert-request --template $< > $@
 
 msva.gnupghome/trustdb.gpg: authority/minimal.pgp client/cert.pgp
 	mkdir -p -m 0700 $(dir $@)

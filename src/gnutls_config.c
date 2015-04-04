@@ -27,9 +27,10 @@
 APLOG_USE_MODULE(gnutls);
 #endif
 
-static int pin_callback(void *user, int attempt, const char *token_url,
-			const char *token_label, unsigned int flags,
-			char *pin, size_t pin_max)
+static int pin_callback(void *user, int attempt __attribute__((unused)),
+                        const char *token_url __attribute__((unused)),
+                        const char *token_label, unsigned int flags,
+                        char *pin, size_t pin_max)
 {
     mgs_srvconf_rec *sc = user;
 
@@ -173,7 +174,6 @@ int mgs_load_files(apr_pool_t * p, server_rec * s)
 	    ret = -1;
 	    goto cleanup;
 	}
-
 
 	ret =
 	    gnutls_dh_params_import_pkcs3(sc->dh_params, &data,
@@ -573,7 +573,8 @@ const char *mgs_set_key_file(cmd_parms * parms, void *dummy __attribute__((unuse
 }
 
 const char *mgs_set_pgpcert_file(cmd_parms * parms, void *dummy __attribute__((unused)),
-        const char *arg) {
+        const char *arg)
+{
     mgs_srvconf_rec *sc =
 	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
 						 module_config,
@@ -838,8 +839,8 @@ const char *mgs_set_export_certificates_size(cmd_parms * parms, void *dummy __at
     return NULL;
 }
 
-const char *mgs_set_priorities(cmd_parms * parms, void *dummy __attribute__((unused)), const char *arg) {
-
+const char *mgs_set_priorities(cmd_parms * parms, void *dummy __attribute__((unused)), const char *arg)
+{
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
 	ap_get_module_config(parms->server->module_config, &gnutls_module);
 
@@ -848,7 +849,8 @@ const char *mgs_set_priorities(cmd_parms * parms, void *dummy __attribute__((unu
     return NULL;
 }
 
-const char *mgs_set_pin(cmd_parms * parms, void *dummy, const char *arg)
+const char *mgs_set_pin(cmd_parms * parms, void *dummy __attribute__((unused)),
+                        const char *arg)
 {
 
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
@@ -859,7 +861,9 @@ const char *mgs_set_pin(cmd_parms * parms, void *dummy, const char *arg)
     return NULL;
 }
 
-const char *mgs_set_srk_pin(cmd_parms * parms, void *dummy, const char *arg)
+const char *mgs_set_srk_pin(cmd_parms * parms,
+                            void *dummy __attribute__((unused)),
+                            const char *arg)
 {
 
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
@@ -871,7 +875,7 @@ const char *mgs_set_srk_pin(cmd_parms * parms, void *dummy, const char *arg)
 }
 
 static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
-						  char **err)
+						  char **err __attribute__((unused)))
 {
     mgs_srvconf_rec *sc = apr_pcalloc(p, sizeof(*sc));
 

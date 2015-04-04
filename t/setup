@@ -37,7 +37,7 @@ genkey "$PWD/authority" "Testing Authority"
 genkey "$PWD/server" "https://${TEST_HOST}"
 genkey "$PWD/client" "Test User <test0@modgnutls.test>"
 
-certtool -q --load-privkey=server/secret.key  --template=server.template > server/server.req
+certtool -q --load-privkey server/secret.key  --template server.template > server/server.req
 
 
 mkdir -p logs cache outputs

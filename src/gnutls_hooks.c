@@ -43,13 +43,15 @@ static gnutls_datum_t session_ticket_key = {NULL, 0};
 
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt);
 /* use side==0 for server and side==1 for client */
-static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, int side, int export_cert_size);
-static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t cert, int side, int export_cert_size);
-static const char* mgs_x509_construct_uid(request_rec * pool, gnutls_x509_crt_t cert);
+static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, int side, size_t export_cert_size);
+static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t cert, int side, size_t export_cert_size);
 static int mgs_status_hook(request_rec *r, int flags);
+#ifdef ENABLE_MSVA
+static const char* mgs_x509_construct_uid(request_rec * pool, gnutls_x509_crt_t cert);
+#endif
 
 /* Pool Cleanup Function */
-apr_status_t mgs_cleanup_pre_config(void *data) {
+apr_status_t mgs_cleanup_pre_config(void *data __attribute__((unused))) {
 	/* Free all session data */
     gnutls_free(session_ticket_key.data);
     session_ticket_key.data = NULL;
@@ -82,7 +84,7 @@ static const char* mgs_readable_cvm(mgs_client_verification_method_e m) {
 }
 
 /* Pre-Configuration HOOK: Runs First */
-int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog, apr_pool_t * ptemp) {
+int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog, apr_pool_t * ptemp __attribute__((unused))) {
 
 /* Maintainer Logging */
 #if MOD_GNUTLS_DEBUG
@@ -168,9 +170,12 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session) {
 }
 
 static int cert_retrieve_fn(gnutls_session_t session,
-			    const gnutls_datum_t * req_ca_rdn, int nreqs,
-			    const gnutls_pk_algorithm_t * pk_algos, int pk_algos_length,
-			    gnutls_pcert_st **pcerts, unsigned int *pcert_length,
+                            const gnutls_datum_t * req_ca_rdn __attribute__((unused)),
+                            int nreqs __attribute__((unused)),
+                            const gnutls_pk_algorithm_t * pk_algos __attribute__((unused)),
+                            int pk_algos_length __attribute__((unused)),
+                            gnutls_pcert_st **pcerts,
+                            unsigned int *pcert_length,
                             gnutls_privkey_t *privkey)
 {
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
@@ -283,7 +288,7 @@ static int read_pgpcrt_cn(server_rec * s, apr_pool_t * p,
     return rv;
 }
 
-int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog, apr_pool_t * ptemp, server_rec * base_server) {
+int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused)), apr_pool_t * ptemp __attribute__((unused)), server_rec * base_server) {
 
     int rv;
     server_rec *s;
@@ -534,7 +539,7 @@ int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc) 
 	return rv;
 }
 
-static int vhost_cb(void *baton, conn_rec * conn, server_rec * s) {
+static int vhost_cb(void *baton, conn_rec * conn __attribute__((unused)), server_rec * s) {
     mgs_srvconf_rec *tsc;
     vhost_cb_rec *x = baton;
     int ret;
@@ -674,7 +679,7 @@ static void create_gnutls_handle(conn_rec * c) {
             ctxt, NULL, c);
 }
 
-int mgs_hook_pre_connection(conn_rec * c, void *csd) {
+int mgs_hook_pre_connection(conn_rec * c, void *csd __attribute__((unused))) {
     mgs_srvconf_rec *sc;
 
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
@@ -846,7 +851,7 @@ int mgs_hook_authz(request_rec * r) {
  */
 #define MGS_SIDE(suffix) ((side==0) ? "SSL_SERVER" suffix : "SSL_CLIENT" suffix)
 
-static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, int side, int export_cert_size) {
+static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, int side, size_t export_cert_size) {
     unsigned char sbuf[64]; /* buffer to hold serials */
     char buf[AP_IOBUFSIZE];
     const char *tmp;
@@ -965,7 +970,7 @@ static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, in
  * @param export_cert_size (int) maximum size for environment variable
  * to use for the PEM-encoded certificate (0 means do not export)
  */
-static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t cert, int side, int export_cert_size) {
+static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t cert, int side, size_t export_cert_size) {
 
 	unsigned char sbuf[64]; /* buffer to hold serials */
     char buf[AP_IOBUFSIZE];
@@ -1281,7 +1286,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
 
 exit:
     if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_X509) {
-        int i;
+        unsigned int i;
         for (i = 0; i < ch_size; i++) {
             gnutls_x509_crt_deinit(cert.x509[i]);
         }
@@ -1293,6 +1298,8 @@ exit:
 
 }
 
+#ifdef ENABLE_MSVA
+/* this section of code is used only when trying to talk to the MSVA */
 static const char* mgs_x509_leaf_oid_from_dn(apr_pool_t *pool, const char* oid, gnutls_x509_crt_t cert) {
     int rv=GNUTLS_E_SUCCESS, i;
     size_t sz=0, lastsz=0;
@@ -1329,13 +1336,14 @@ static const char* mgs_x509_first_type_from_san(apr_pool_t *pool, gnutls_x509_su
         if (rv == GNUTLS_E_SHORT_MEMORY_BUFFER && thistype == target) {
             data = apr_palloc(pool, sz);
             rv = gnutls_x509_crt_get_subject_alt_name2(cert, i, data, &sz, &thistype, NULL);
-            if (rv == target)
+            if (rv >=0 && (thistype == target))
                 return data;
         }
         i++;
     }
     return NULL;
 }
+
 
 /* Create a string representing a candidate User ID from an X.509
  * certificate
@@ -1451,8 +1459,9 @@ end:
     apr_pool_destroy(sp);
     return ret;
 }
+#endif /* ENABLE_MSVA */
 
-static int mgs_status_hook(request_rec *r, int flags)
+static int mgs_status_hook(request_rec *r, int flags __attribute__((unused)))
 {
     mgs_srvconf_rec *sc;
 
