@@ -848,9 +848,12 @@ int mgs_hook_authz(request_rec * r) {
             return DECLINED;
         }
         rv = mgs_cert_verify(r, ctxt);
-        if (rv != DECLINED &&
-                (rv != HTTP_FORBIDDEN ||
-                dc->client_verify_mode == GNUTLS_CERT_REQUIRE)) {
+        if (rv != DECLINED
+            && (rv != HTTP_FORBIDDEN
+                || dc->client_verify_mode == GNUTLS_CERT_REQUIRE
+                || (dc->client_verify_mode == -1
+                    && ctxt->sc->client_verify_mode == GNUTLS_CERT_REQUIRE)))
+        {
             return rv;
         }
     }
