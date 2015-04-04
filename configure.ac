@@ -58,6 +58,7 @@ AC_ARG_ENABLE(msva,
        AS_HELP_STRING([--enable-msva],
                [enable Monkeysphere client certificate verification]),
        use_msva=$enableval, use_msva=no)
+AM_CONDITIONAL([USE_MSVA], [test "$use_msva" = "$enableval"])
 
 MSVA_CFLAGS=""
 if test "$use_msva" != "no"; then
@@ -81,7 +82,7 @@ MODULE_LIBS="${APR_MEMCACHE_LIBS} ${LIBGNUTLS_LIBS}"
 AC_SUBST(MODULE_CFLAGS)
 AC_SUBST(MODULE_LIBS)
 
-AC_CONFIG_FILES([Makefile src/Makefile include/mod_gnutls.h])
+AC_CONFIG_FILES([Makefile src/Makefile test/Makefile include/mod_gnutls.h])
 AC_OUTPUT
 
 echo "---"

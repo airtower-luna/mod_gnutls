@@ -202,6 +202,8 @@ typedef struct {
     mgs_srvconf_rec *sc;
 	/* Connection record */
     conn_rec* c;
+	/* Is TLS enabled for this connection? */
+    int enabled;
 	/* GnuTLS Session handle */
     gnutls_session_t session;
 	/* module input status */

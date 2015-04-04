@@ -7,6 +7,5 @@ EXTRA_DIST = m4/outoforder.m4 m4/apache.m4 \
 		README README.ENV NEWS \
 		NOTICE LICENSE autogen.sh
 
-SUBDIRS = src
+SUBDIRS = src test
 ACLOCAL_AMFLAGS = -I m4
-TESTS = run_tests.sh

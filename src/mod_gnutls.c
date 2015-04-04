@@ -19,8 +19,12 @@
 
 #include "mod_gnutls.h"
 
-static void gnutls_hooks(apr_pool_t * p __attribute__((unused))) {
+#ifdef APLOG_USE_MODULE
+APLOG_USE_MODULE(gnutls);
+#endif
 
+static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
+{
     /* Try Run Post-Config Hook After mod_proxy */
     static const char * const aszPre[] = { "mod_proxy.c", NULL };
     ap_hook_post_config(mgs_hook_post_config, aszPre, NULL,APR_HOOK_REALLY_LAST);
@@ -74,24 +78,37 @@ int ssl_is_https(conn_rec *c) {
     return 1;
 }
 
-int ssl_engine_disable(conn_rec *c) {
+int ssl_engine_disable(conn_rec *c)
+{
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
-            ap_get_module_config(c->base_server->module_config, &gnutls_module);
+        ap_get_module_config(c->base_server->module_config, &gnutls_module);
     if(sc->enabled == GNUTLS_ENABLED_FALSE) {
         return 1;
     }
-    ap_remove_input_filter(c->input_filters);
-    ap_remove_input_filter(c->output_filters);
-    mgs_cleanup_pre_config(c->pool);
-    sc->enabled = 0;
+
+    /* disable TLS for this connection */
+    mgs_handle_t *ctxt = (mgs_handle_t *) ap_get_module_config(c->conn_config, &gnutls_module);
+    if (ctxt == NULL)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c, "%s: allocating connection memory", __func__);
+        ctxt = apr_pcalloc(c->pool, sizeof (*ctxt));
+        ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
+    }
+    ctxt->enabled = GNUTLS_ENABLED_FALSE;
+
+    if (c->input_filters)
+        ap_remove_input_filter(c->input_filters);
+    if (c->output_filters)
+        ap_remove_output_filter(c->output_filters);
+
     return 1;
 }
 
 int ssl_proxy_enable(conn_rec *c) {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
             ap_get_module_config(c->base_server->module_config, &gnutls_module);
-    sc->proxy_enabled = 1;
-    sc->enabled = 0;
+    sc->proxy_enabled = GNUTLS_ENABLED_TRUE;
+    sc->enabled = GNUTLS_ENABLED_FALSE;
     return 1;
 }
 

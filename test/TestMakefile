@@ -14,11 +14,13 @@ export MSVA_PORT ?= 9933
 export TEST_GAP ?= 1.5
 export TEST_QUERY_DELAY ?= 2
 
+TEST_LOCK := ./test.lock
+
 all: setup.done
-	./runtests
+	TEST_LOCK=$(TEST_LOCK) ./runtests
 
 t-%: setup.done
-	./runtests $@
+	TEST_LOCK=$(TEST_LOCK) ./runtests $@
 
 
 
@@ -86,6 +88,7 @@ setup.done: $(all_tokens) msva.gnupghome/trustdb.gpg
 
 clean:
 	rm -rf server client authority logs cache outputs setup.done server.template msva.gnupghome \
-	 */*.pgp */*.gpg */*.pem */*.key authority.template client.template server.uid
+	 */*.pgp */*.gpg */*.gpg~ */*.pem */*.key authority.template client.template server.uid
+	rmdir imposter rogueca
 
 .PHONY: all clean
