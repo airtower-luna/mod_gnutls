@@ -360,6 +360,21 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
             gnutls_anon_set_server_dh_params(sc->anon_creds, dh_params);
         }
 
+        /* The call after this comment is a workaround for bug in
+         * gnutls_certificate_set_retrieve_function2 that ignores
+         * supported certificate types. Should be fixed in GnuTLS
+         * 3.3.12.
+         *
+         * Details:
+         * https://lists.gnupg.org/pipermail/gnutls-devel/2015-January/007377.html
+         * Workaround from:
+         * https://github.com/vanrein/tlspool/commit/4938102d3d1b086491d147e6c8e4e2a02825fc12
+         *
+         * TODO: add appropriate version guards */
+#if GNUTLS_VERSION_NUMBER < 0x030312
+        gnutls_certificate_set_retrieve_function(sc->certs, (void *) exit);
+#endif
+
         gnutls_certificate_set_retrieve_function2(sc->certs, cert_retrieve_fn);
 
         if ((sc->certs_x509_chain == NULL || sc->certs_x509_chain_num < 1) &&
