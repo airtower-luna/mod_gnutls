@@ -1742,7 +1742,7 @@ static int gtls_check_server_cert(gnutls_session_t session)
 
 
 
-static int load_proxy_x509_credentials(server_rec *s)
+static apr_status_t load_proxy_x509_credentials(server_rec *s)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
@@ -1750,15 +1750,29 @@ static int load_proxy_x509_credentials(server_rec *s)
     if (sc == NULL)
         return APR_EGENERAL;
 
-    int ret = APR_SUCCESS;
+    apr_status_t ret = APR_SUCCESS;
     int err = GNUTLS_E_SUCCESS;
+
+    /* Function pool, gets destroyed before exit. */
+    apr_pool_t *pool;
+    ret = apr_pool_create(&pool, s->process->pool);
+    if (ret != APR_SUCCESS)
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, ret, s,
+                     "%s: failed to allocate function memory pool.", __func__);
+        return ret;
+    }
 
     /* load certificate and key for client auth, if configured */
     if (sc->proxy_x509_key_file && sc->proxy_x509_cert_file)
     {
+        char* cert_file = ap_server_root_relative(pool,
+                                                  sc->proxy_x509_cert_file);
+        char* key_file = ap_server_root_relative(pool,
+                                                 sc->proxy_x509_key_file);
         err = gnutls_certificate_set_x509_key_file(sc->proxy_x509_creds,
-                                                   sc->proxy_x509_cert_file,
-                                                   sc->proxy_x509_key_file,
+                                                   cert_file,
+                                                   key_file,
                                                    GNUTLS_X509_FMT_PEM);
         if (err != GNUTLS_E_SUCCESS)
         {
@@ -1782,7 +1796,7 @@ static int load_proxy_x509_credentials(server_rec *s)
     }
     else
         /* if both key and cert are NULL, client auth is not used */
-        ap_log_error(APLOG_MARK, APLOG_WARNING, 0, s,
+        ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
                      "%s: no client credentials for proxy", __func__);
 
     /* must be set if the server certificate is to be checked */
@@ -1798,10 +1812,18 @@ static int load_proxy_x509_credentials(server_rec *s)
             ret = APR_EGENERAL;
         }
 
+        char* ca_file = ap_server_root_relative(pool,
+                                                sc->proxy_x509_ca_file);
+        /* if no CRL is used, sc->proxy_x509_crl_file is NULL */
+        char* crl_file = NULL;
+        if (sc->proxy_x509_crl_file)
+            crl_file = ap_server_root_relative(pool,
+                                               sc->proxy_x509_crl_file);
+
         /* returns number of loaded elements */
         err = gnutls_x509_trust_list_add_trust_file(sc->proxy_x509_tl,
-                                                    sc->proxy_x509_ca_file,
-                                                    sc->proxy_x509_crl_file,
+                                                    ca_file,
+                                                    crl_file,
                                                     GNUTLS_X509_FMT_PEM,
                                                     0 /* tl_flags */,
                                                     0 /* tl_vflags */);
@@ -1814,9 +1836,12 @@ static int load_proxy_x509_credentials(server_rec *s)
                          "%s: proxy CA trust list is empty (%d)",
                          __func__, err);
         else /* err < 0 */
+        {
             ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
                          "%s: error loading proxy CA trust list: %s (%d)",
                          __func__, gnutls_strerror(err), err);
+            ret = APR_EGENERAL;
+        }
 
         /* attach trust list to credentials */
         gnutls_certificate_set_trust_list(sc->proxy_x509_creds,
@@ -1829,5 +1854,6 @@ static int load_proxy_x509_credentials(server_rec *s)
 
     gnutls_certificate_set_verify_function(sc->proxy_x509_creds,
                                            gtls_check_server_cert);
+    apr_pool_destroy(pool);
     return ret;
 }
