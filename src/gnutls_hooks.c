@@ -368,9 +368,7 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
          * Details:
          * https://lists.gnupg.org/pipermail/gnutls-devel/2015-January/007377.html
          * Workaround from:
-         * https://github.com/vanrein/tlspool/commit/4938102d3d1b086491d147e6c8e4e2a02825fc12
-         *
-         * TODO: add appropriate version guards */
+         * https://github.com/vanrein/tlspool/commit/4938102d3d1b086491d147e6c8e4e2a02825fc12 */
 #if GNUTLS_VERSION_NUMBER < 0x030312
         gnutls_certificate_set_retrieve_function(sc->certs, (void *) exit);
 #endif

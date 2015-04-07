@@ -169,9 +169,13 @@ typedef struct {
 
 	/* OpenPGP Certificate Private Key */
     gnutls_privkey_t privkey_pgp;
-    /* Internal structure for the OpenPGP private key. DO NOT USE
-     * outside key loading. */
+#if GNUTLS_VERSION_NUMBER < 0x030312
+    /* Internal structure for the OpenPGP private key, used in the
+     * workaround for a bug in gnutls_privkey_import_openpgp_raw that
+     * frees memory that is still needed. DO NOT USE for any other
+     * purpose. */
     gnutls_openpgp_privkey_t privkey_pgp_internal;
+#endif
 
     /* Export full certificates to CGI environment: */
     int export_certificates_size;

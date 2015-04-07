@@ -421,16 +421,15 @@ int mgs_load_files(apr_pool_t * p, server_rec * s)
 	    goto cleanup;
 	}
 
-        /* Theoretically, this chain of gnutls_openpgp_privkey_init,
+#if GNUTLS_VERSION_NUMBER < 0x030312
+        /* GnuTLS versions before 3.3.12 contain a bug in
+         * gnutls_privkey_import_openpgp_raw which frees data that is
+         * accessed when the key is used, leading to segfault. Loading
+         * the key into a gnutls_openpgp_privkey_t and then assigning
+         * it to the gnutls_privkey_t works around the bug, hence this
+         * chain of gnutls_openpgp_privkey_init,
          * gnutls_openpgp_privkey_import and
-         * gnutls_privkey_import_openpgp could be replaced with one
-         * call to gnutls_privkey_import_openpgp_raw as shown
-         * below. However, that led to a segfault during handshake
-         * which disappeared with the three step method.
-         *
-         * ret = gnutls_privkey_import_openpgp_raw(sc->privkey_pgp, &data,
-         *                                         GNUTLS_OPENPGP_FMT_BASE64,
-         *                                         NULL, NULL); */
+         * gnutls_privkey_import_openpgp. */
         ret = gnutls_openpgp_privkey_init(&sc->privkey_pgp_internal);
 	if (ret != 0) {
 	    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
@@ -463,6 +462,20 @@ int mgs_load_files(apr_pool_t * p, server_rec * s)
 	    ret = -1;
 	    goto cleanup;
 	}
+#else
+        ret = gnutls_privkey_import_openpgp_raw(sc->privkey_pgp, &data,
+                                                GNUTLS_OPENPGP_FMT_BASE64,
+                                                NULL, NULL);
+	if (ret != 0)
+        {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Failed to Import "
+                         "PGP Private Key '%s': (%d) %s",
+                         sc->pgp_key_file, ret, gnutls_strerror(ret));
+	    ret = -1;
+	    goto cleanup;
+	}
+#endif
     }
 
     /* Load the keyring file */
