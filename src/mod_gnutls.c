@@ -239,6 +239,11 @@ static const command_rec mgs_config_cmds[] = {
     NULL,
     RSRC_CONF,
     "X509 CRL file for proxy connections"),
+    AP_INIT_RAW_ARGS("GnuTLSProxyPriorities", mgs_set_priorities,
+    NULL,
+    RSRC_CONF,
+    "The priorities to enable for proxy connections (ciphers, key exchange, "
+    "MACs, compression)."),
     { NULL },
 };
 

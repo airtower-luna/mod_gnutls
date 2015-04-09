@@ -113,6 +113,8 @@ typedef struct {
     const char* proxy_x509_cert_file;
     const char* proxy_x509_ca_file;
     const char* proxy_x509_crl_file;
+    /* GnuTLS priorities for proxy connections */
+    gnutls_priority_t proxy_priorities;
     /* SRP Certificate Structure*/
     gnutls_srp_server_credentials_t srp_creds;
     /* Anonymous Certificate Structure */

@@ -462,6 +462,16 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
         if (sc->enabled == GNUTLS_ENABLED_TRUE
             && sc->proxy_enabled == GNUTLS_ENABLED_TRUE)
         {
+            /* Check if the proxy priorities have been set */
+            if (sc->proxy_priorities == NULL)
+            {
+                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                             "Host '%s:%d' is missing the "
+                             "GnuTLSProxyPriorities directive!",
+                             s->server_hostname, s->port);
+                exit(-1);
+            }
+            /* Set up proxy credentials */
             load_proxy_x509_credentials(s);
         }
     }
@@ -825,10 +835,11 @@ static void create_gnutls_handle(conn_rec * c)
         gnutls_credentials_set(ctxt->session, GNUTLS_CRD_CERTIFICATE,
                                ctxt->sc->proxy_x509_creds);
         /* Load priorities from the server configuration */
-        err = gnutls_priority_set(ctxt->session, ctxt->sc->priorities);
+        err = gnutls_priority_set(ctxt->session, ctxt->sc->proxy_priorities);
         if (err != GNUTLS_E_SUCCESS)
             ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
-                          "%s: setting priorities for proxy connection failed: %s (%d)",
+                          "%s: setting priorities for proxy connection "
+                          "failed: %s (%d)",
                           __func__, gnutls_strerror(err), err);
     }
 

@@ -577,22 +577,46 @@ const char *mgs_set_export_certificates_size(cmd_parms * parms, void *dummy __at
     return NULL;
 }
 
-const char *mgs_set_priorities(cmd_parms * parms, void *dummy __attribute__((unused)), const char *arg) {
 
-	int ret;
+
+/*
+ * Initialize a GnuTLS priorities cache from a configuration
+ * string. Used for GnuTLSPriorities and GnuTLSProxyPriorities.
+ */
+const char *mgs_set_priorities(cmd_parms * parms,
+                               void *dummy __attribute__((unused)),
+                               const char *arg)
+{
+    int ret;
     const char *err;
 
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
-						  ap_get_module_config(parms->server->module_config, &gnutls_module);
+        ap_get_module_config(parms->server->module_config, &gnutls_module);
 
-    ret = gnutls_priority_init(&sc->priorities, arg, &err);
+    /* Setting a priority cache works the same no matter for which
+     * option. Just point the pointer at the right one. */
+    gnutls_priority_t *prio = NULL;
+    if (!strcasecmp(parms->directive->directive, "GnuTLSPriorities"))
+        prio = &sc->priorities;
+    else if (!strcasecmp(parms->directive->directive, "GnuTLSProxyPriorities"))
+        prio = &sc->proxy_priorities;
+    else
+        /* Can't happen unless there's a serious bug in mod_gnutls or Apache */
+        return apr_psprintf(parms->pool,
+                            "mod_gnutls: %s called for invalid option '%s'",
+                            __func__, parms->directive->directive);
 
-    if (ret < 0) {
-        if (ret == GNUTLS_E_INVALID_REQUEST) {
+    ret = gnutls_priority_init(prio, arg, &err);
+    if (ret < 0)
+    {
+        if (ret == GNUTLS_E_INVALID_REQUEST)
             return apr_psprintf(parms->pool,
-								"GnuTLS: Syntax error parsing priorities string at: %s", err);
-		}
-        return "Error setting priorities";
+                                "mod_gnutls: Syntax error parsing priorities "
+                                "string for %s at: %s",
+                                parms->directive->directive, err);
+        return  apr_psprintf(parms->pool,
+                             "Error setting priorities: %s (%d)",
+                             gnutls_strerror(ret), ret);
     }
 
     return NULL;
@@ -635,6 +659,7 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p, char** err) {
     sc->proxy_x509_cert_file = NULL;
     sc->proxy_x509_ca_file = NULL;
     sc->proxy_x509_crl_file = NULL;
+    sc->proxy_priorities = NULL;
     ret = gnutls_certificate_allocate_credentials(&sc->proxy_x509_creds);
     if (ret < 0)
     {
@@ -715,6 +740,7 @@ void *mgs_config_server_merge(apr_pool_t *p, void *BASE, void *ADD) {
     gnutls_srvconf_merge(proxy_x509_cert_file, NULL);
     gnutls_srvconf_merge(proxy_x509_ca_file, NULL);
     gnutls_srvconf_merge(proxy_x509_crl_file, NULL);
+    gnutls_srvconf_merge(proxy_priorities, NULL);
 
     /* FIXME: the following items are pre-allocated, and should be
      * properly disposed of before assigning in order to avoid leaks;

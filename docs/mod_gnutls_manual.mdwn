@@ -480,6 +480,22 @@ This private key must be protected. It is read while Apache is still
 running as root, and does not need to be readable by the nobody or
 apache user.
 
+`GnuTLSProxyPriorities`
+------------------
+
+Set the allowed ciphers, key exchange algorithms, MACs and compression
+methods for proxy connections
+
+    GnuTLSProxyPriorities NORMAL:+CIPHER_0:+CIPHER_1:...:+CIPHER_N
+
+Default: *none*\
+Context: server config, virtual host
+
+This option is used to set the allowed ciphers, key exchange
+algorithms, MACs and compression methods for proxy connections. It
+takes the same parameters as `GnuTLSPriorities`. Required if
+`SSLProxyEngine` is `On`.
+
 * * * * *
 
 Configuration Examples

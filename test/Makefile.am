@@ -22,7 +22,8 @@ TESTS += test-16_view-status.bash \
 	test-19_TLS_reverse_proxy.bash \
 	test-20_TLS_reverse_proxy_client_auth.bash \
 	test-21_TLS_reverse_proxy_wrong_cert.bash \
-	test-22_TLS_reverse_proxy_crl_revoke.bash
+	test-22_TLS_reverse_proxy_crl_revoke.bash \
+	test-23_TLS_reverse_proxy_mismatched_priorities.bash
 
 clean-local:
 	make -f TestMakefile clean
