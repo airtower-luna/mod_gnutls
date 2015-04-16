@@ -457,7 +457,7 @@ tryagain:
                 ctxt->sc = sc;
             }
         }
-        return 0;
+        return GNUTLS_E_SUCCESS;
     }
 }
 
@@ -504,10 +504,11 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
     }
 
     if (ctxt->status == 0) {
-        gnutls_do_handshake(ctxt);
-        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
-                      "%s: TLS %sconnection opened.",
-                      __func__, IS_PROXY_STR(ctxt));
+        int ret = gnutls_do_handshake(ctxt);
+        if (ret == GNUTLS_E_SUCCESS)
+            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
+                          "%s: TLS %sconnection opened.",
+                          __func__, IS_PROXY_STR(ctxt));
     }
 
     if (ctxt->status < 0) {
@@ -605,10 +606,11 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
     }
 
     if (ctxt->status == 0) {
-        gnutls_do_handshake(ctxt);
-        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
-                      "%s: TLS %sconnection opened.",
-                      __func__, IS_PROXY_STR(ctxt));
+        ret = gnutls_do_handshake(ctxt);
+        if (ret == GNUTLS_E_SUCCESS)
+            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
+                          "%s: TLS %sconnection opened.",
+                          __func__, IS_PROXY_STR(ctxt));
     }
 
     if (ctxt->status < 0) {
