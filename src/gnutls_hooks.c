@@ -414,19 +414,14 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
         }
 
         if (sc->enabled == GNUTLS_ENABLED_TRUE
-            && sc->proxy_enabled == GNUTLS_ENABLED_TRUE)
+            && sc->proxy_enabled == GNUTLS_ENABLED_TRUE
+            && load_proxy_x509_credentials(s) != APR_SUCCESS)
         {
-            /* Check if the proxy priorities have been set */
-            if (sc->proxy_priorities == NULL)
-            {
-                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                             "Host '%s:%d' is missing the "
-                             "GnuTLSProxyPriorities directive!",
-                             s->server_hostname, s->port);
-                exit(-1);
-            }
-            /* Set up proxy credentials */
-            load_proxy_x509_credentials(s);
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "%s: loading proxy credentials for host "
+                         "'%s:%d' failed, exiting!",
+                         __func__, s->server_hostname, s->port);
+            exit(-1);
         }
     }
 
@@ -1753,6 +1748,34 @@ static apr_status_t load_proxy_x509_credentials(server_rec *s)
                      "%s: Failed to initialize anon credentials for proxy: "
                      "(%d) %s", __func__, err, gnutls_strerror(err));
         return APR_EGENERAL;
+    }
+
+    /* Check if the proxy priorities have been set, fail immediately
+     * if not */
+    if (sc->proxy_priorities_str == NULL)
+    {
+        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                     "Host '%s:%d' is missing the GnuTLSProxyPriorities "
+                     "directive!",
+                     s->server_hostname, s->port);
+        return APR_EGENERAL;
+    }
+    /* parse proxy priorities */
+    const char *err_pos = NULL;
+    err = gnutls_priority_init(&sc->proxy_priorities,
+                               sc->proxy_priorities_str, &err_pos);
+    if (err != GNUTLS_E_SUCCESS)
+    {
+        if (ret == GNUTLS_E_INVALID_REQUEST)
+            ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+                         "%s: Syntax error parsing proxy priorities "
+                         "string at: %s",
+                         __func__, err_pos);
+        else
+            ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+                         "Error setting proxy priorities: %s (%d)",
+                         gnutls_strerror(err), err);
+        ret = APR_EGENERAL;
     }
 
     /* load certificate and key for client auth, if configured */

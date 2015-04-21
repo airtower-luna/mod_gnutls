@@ -129,6 +129,7 @@ typedef struct {
     char *dh_file;
 
     char *priorities_str;
+    char *proxy_priorities_str;
 
     const char* srp_tpasswd_file;
     const char* srp_tpasswd_conf_file;
