@@ -174,58 +174,42 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session) {
 }
 
 static int cert_retrieve_fn(gnutls_session_t session,
-							const gnutls_datum_t * req_ca_rdn __attribute__((unused)), int nreqs __attribute__((unused)),
-							const gnutls_pk_algorithm_t * pk_algos __attribute__((unused)), int pk_algos_length __attribute__((unused)),
-							gnutls_retr2_st *ret) {
+                            const gnutls_datum_t * req_ca_rdn __attribute__((unused)),
+                            int nreqs __attribute__((unused)),
+                            const gnutls_pk_algorithm_t * pk_algos __attribute__((unused)),
+                            int pk_algos_length __attribute__((unused)),
+                            gnutls_pcert_st **pcerts,
+                            unsigned int *pcert_length,
+                            gnutls_privkey_t *privkey)
+{
+    _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
 
-
-	_gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
-
-	mgs_handle_t *ctxt;
+    mgs_handle_t *ctxt;
 
     if (session == NULL) {
 		// ERROR INVALID SESSION
-		ret->ncerts = 0;
-		ret->deinit_all = 1;
         return -1;
-	}
+    }
+
     ctxt = gnutls_transport_get_ptr(session);
 
     if (gnutls_certificate_type_get(session) == GNUTLS_CRT_X509) {
 		// X509 CERTIFICATE
-		ret->cert_type = GNUTLS_CRT_X509;
-		ret->key_type = GNUTLS_PRIVKEY_X509;
-        ret->ncerts = ctxt->sc->certs_x509_chain_num;
-        ret->deinit_all = 0;
-        ret->cert.x509 = ctxt->sc->certs_x509_chain;
-        ret->key.x509 = ctxt->sc->privkey_x509;
+        *pcerts = ctxt->sc->certs_x509_chain;
+        *pcert_length = ctxt->sc->certs_x509_chain_num;
+        *privkey = ctxt->sc->privkey_x509;
         return 0;
     } else if (gnutls_certificate_type_get(session) == GNUTLS_CRT_OPENPGP) {
 		// OPENPGP CERTIFICATE
-		ret->cert_type = GNUTLS_CRT_OPENPGP;
-		ret->key_type = GNUTLS_PRIVKEY_OPENPGP;
-        ret->ncerts = 1;
-        ret->deinit_all = 0;
-        ret->cert.pgp = ctxt->sc->cert_pgp;
-        ret->key.pgp = ctxt->sc->privkey_pgp;
+        *pcerts = ctxt->sc->cert_pgp;
+        *pcert_length = 1;
+        *privkey = ctxt->sc->privkey_pgp;
         return 0;
     } else {
 		// UNKNOWN CERTIFICATE
-		ret->ncerts = 0;
-		ret->deinit_all = 1;
 	    return -1;
 	}
 }
-
-/* 2048-bit group parameters from SRP specification */
-const char static_dh_params[] = "-----BEGIN DH PARAMETERS-----\n"
-        "MIIBBwKCAQCsa9tBMkqam/Fm3l4TiVgvr3K2ZRmH7gf8MZKUPbVgUKNzKcu0oJnt\n"
-        "gZPgdXdnoT3VIxKrSwMxDc1/SKnaBP1Q6Ag5ae23Z7DPYJUXmhY6s2YaBfvV+qro\n"
-        "KRipli8Lk7hV+XmT7Jde6qgNdArb9P90c1nQQdXDPqcdKB5EaxR3O8qXtDoj+4AW\n"
-        "dr0gekNsZIHx0rkHhxdGGludMuaI+HdIVEUjtSSw1X1ep3onddLs+gMs+9v1L7N4\n"
-        "YWAnkATleuavh05zA85TKZzMBBx7wwjYKlaY86jQw4JxrjX46dv7tpS1yAPYn3rk\n"
-        "Nd4jbVJfVHWbZeNy/NaO8g+nER+eSv9zAgEC\n"
-        "-----END DH PARAMETERS-----\n";
 
 /* Read the common name or the alternative name of the certificate.
  * We only support a single name per certificate.
@@ -325,40 +309,9 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
         apr_pool_userdata_set((const void *) 1, userdata_key, apr_pool_cleanup_null, base_server->process->pool);
     }
 
-
     s = base_server;
     sc_base = (mgs_srvconf_rec *) ap_get_module_config(s->module_config, &gnutls_module);
 
-    gnutls_dh_params_init(&dh_params);
-
-    if (sc_base->dh_params == NULL) {
-        gnutls_datum_t pdata = {
-            (void *) static_dh_params,
-            sizeof(static_dh_params)
-        };
-        rv = gnutls_dh_params_import_pkcs3(dh_params, &pdata, GNUTLS_X509_FMT_PEM);
-        /* Generate DH Params
-        int dh_bits = gnutls_sec_param_to_pk_bits(GNUTLS_PK_DH,
-                GNUTLS_SEC_PARAM_NORMAL);
-        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-            "GnuTLS: Generating DH Params of %i bits.  "
-            "To avoid this use GnuTLSDHFile to specify DH Params for this host",
-            dh_bits);
-#if MOD_GNUTLS_DEBUG
-            ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
-                    "GnuTLS: Generated DH Params of %i bits",dh_bits);
-#endif
-        rv = gnutls_dh_params_generate2 (dh_params,dh_bits);
-        */
-        if (rv < 0) {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                    "GnuTLS: Unable to generate or load DH Params: (%d) %s",
-                    rv, gnutls_strerror(rv));
-            exit(rv);
-        }
-    } else {
-        dh_params = sc_base->dh_params;
-    }
 
     rv = mgs_cache_post_config(p, s, sc_base);
     if (rv != 0) {
@@ -374,6 +327,14 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
         sc->cache_config = sc_base->cache_config;
         sc->cache_timeout = sc_base->cache_timeout;
 
+        rv = mgs_load_files(p, s);
+        if (rv != 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                "GnuTLS: Loading required files failed."
+                " Shutting Down.");
+            exit(-1);
+        }
+
         /* defaults for unset values: */
         if (sc->enabled == GNUTLS_ENABLED_UNSET)
             sc->enabled = GNUTLS_ENABLED_FALSE;
@@ -385,7 +346,6 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
             sc->client_verify_mode = GNUTLS_CERT_IGNORE;
         if (sc->client_verify_method ==  mgs_cvm_unset)
             sc->client_verify_method = mgs_cvm_cartel;
-
 
         /* Check if the priorities have been set */
         if (sc->priorities == NULL && sc->enabled == GNUTLS_ENABLED_TRUE) {
@@ -404,39 +364,33 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
             gnutls_anon_set_server_dh_params(sc->anon_creds, dh_params);
         }
 
-        gnutls_certificate_set_retrieve_function(sc->certs, cert_retrieve_fn);
-
-#ifdef ENABLE_SRP
-        if (sc->srp_tpasswd_conf_file != NULL
-                && sc->srp_tpasswd_file != NULL) {
-            rv = gnutls_srp_set_server_credentials_file
-                    (sc->srp_creds, sc->srp_tpasswd_file,
-                    sc->srp_tpasswd_conf_file);
-
-            if (rv < 0 && sc->enabled == GNUTLS_ENABLED_TRUE) {
-                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0,
-                        s,
-                        "[GnuTLS] - Host '%s:%d' is missing a "
-                        "SRP password or conf File!",
-                        s->server_hostname, s->port);
-                exit(-1);
-            }
-        }
+        /* The call after this comment is a workaround for bug in
+         * gnutls_certificate_set_retrieve_function2 that ignores
+         * supported certificate types. Should be fixed in GnuTLS
+         * 3.3.12.
+         *
+         * Details:
+         * https://lists.gnupg.org/pipermail/gnutls-devel/2015-January/007377.html
+         * Workaround from:
+         * https://github.com/vanrein/tlspool/commit/4938102d3d1b086491d147e6c8e4e2a02825fc12 */
+#if GNUTLS_VERSION_NUMBER < 0x030312
+        gnutls_certificate_set_retrieve_function(sc->certs, (void *) exit);
 #endif
+
+        gnutls_certificate_set_retrieve_function2(sc->certs, cert_retrieve_fn);
 
         if ((sc->certs_x509_chain == NULL || sc->certs_x509_chain_num < 1) &&
             sc->cert_pgp == NULL && sc->enabled == GNUTLS_ENABLED_TRUE) {
 			ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-						"[GnuTLS] - Host '%s:%d' is missing a Certificate File!",
+						"GnuTLS: Host '%s:%d' is missing a Certificate File!",
 						s->server_hostname, s->port);
             exit(-1);
         }
-
         if (sc->enabled == GNUTLS_ENABLED_TRUE &&
-            ((sc->certs_x509_chain != NULL && sc->certs_x509_chain_num > 0 && sc->privkey_x509 == NULL) ||
-             (sc->cert_pgp != NULL && sc->privkey_pgp == NULL))) {
+            ((sc->certs_x509_chain_num > 0 && sc->privkey_x509 == NULL) ||
+             (sc->cert_crt_pgp[0] != NULL && sc->privkey_pgp == NULL))) {
 			ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-						"[GnuTLS] - Host '%s:%d' is missing a Private Key File!",
+						"GnuTLS: Host '%s:%d' is missing a Private Key File!",
 						s->server_hostname, s->port);
             exit(-1);
         }
@@ -444,15 +398,15 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
         if (sc->enabled == GNUTLS_ENABLED_TRUE) {
             rv = -1;
             if (sc->certs_x509_chain_num > 0) {
-                rv = read_crt_cn(s, p, sc->certs_x509_chain[0], &sc->cert_cn);
+                rv = read_crt_cn(s, p, sc->certs_x509_crt_chain[0], &sc->cert_cn);
             }
             if (rv < 0 && sc->cert_pgp != NULL) {
-                rv = read_pgpcrt_cn(s, p, sc->cert_pgp, &sc->cert_cn);
+                rv = read_pgpcrt_cn(s, p, sc->cert_crt_pgp[0], &sc->cert_cn);
 			}
 
             if (rv < 0) {
                 ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-							"[GnuTLS] - Cannot find a certificate for host '%s:%d'!",
+							"GnuTLS: Cannot find a certificate for host '%s:%d'!",
 							s->server_hostname, s->port);
                 sc->cert_cn = NULL;
                 continue;
@@ -493,17 +447,25 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
     return OK;
 }
 
-void mgs_hook_child_init(apr_pool_t * p, server_rec * s) {
+void mgs_hook_child_init(apr_pool_t * p, server_rec *s) {
     apr_status_t rv = APR_SUCCESS;
-    mgs_srvconf_rec *sc = ap_get_module_config(s->module_config,
-            &gnutls_module);
+    mgs_srvconf_rec *sc =
+        (mgs_srvconf_rec *) ap_get_module_config(s->module_config, &gnutls_module);
 
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
+    /* if we use PKCS #11 reinitialize it */
+
+    if (mgs_pkcs11_reinit(s) < 0) {
+            ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
+                    "GnuTLS: Failed to reinitialize PKCS #11");
+	    exit(-1);
+    }
+
     if (sc->cache_type != mgs_cache_none) {
         rv = mgs_cache_child_init(p, s, sc);
         if (rv != APR_SUCCESS) {
             ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
-                    "[GnuTLS] - Failed to run Cache Init");
+                    "GnuTLS: Failed to run Cache Init");
         }
     }
     /* Block SIGPIPE Signals */
@@ -624,11 +586,12 @@ static int vhost_cb(void *baton, conn_rec * conn __attribute__((unused)), server
     }
 
     if (tsc->certs_x509_chain_num > 0) {
-        /* why are we doing this check? */
-        ret = gnutls_x509_crt_check_hostname(tsc->certs_x509_chain[0], s->server_hostname);
+        /* this check is there to warn administrator of any missing hostname
+         * in the certificate. */
+        ret = gnutls_x509_crt_check_hostname(tsc->certs_x509_crt_chain[0], s->server_hostname);
         if (0 == ret)
-            ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
-                         "GnuTLS: Error checking certificate for hostname "
+            ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
+                         "GnuTLS: the certificate doesn't match requested hostname "
                          "'%s'", s->server_hostname);
     } else {
         ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
@@ -955,10 +918,10 @@ int mgs_hook_fixups(request_rec * r) {
     apr_table_setn(env, "SSL_SESSION_ID", apr_pstrdup(r->pool, tmp));
 
     if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_X509) {
-		mgs_add_common_cert_vars(r, ctxt->sc->certs_x509_chain[0], 0, ctxt->sc->export_certificates_size);
-	} else if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_OPENPGP) {
-        mgs_add_common_pgpcert_vars(r, ctxt->sc->cert_pgp, 0, ctxt->sc->export_certificates_size);
-	}
+	mgs_add_common_cert_vars(r, ctxt->sc->certs_x509_crt_chain[0], 0, ctxt->sc->export_certificates_size);
+    } else if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_OPENPGP) {
+        mgs_add_common_pgpcert_vars(r, ctxt->sc->cert_crt_pgp[0], 0, ctxt->sc->export_certificates_size);
+    }
 
     return rv;
 }
@@ -1772,6 +1735,24 @@ static apr_status_t load_proxy_x509_credentials(server_rec *s)
         ap_log_error(APLOG_MARK, APLOG_ERR, ret, s,
                      "%s: failed to allocate function memory pool.", __func__);
         return ret;
+    }
+
+    /* allocate credentials structures */
+    err = gnutls_certificate_allocate_credentials(&sc->proxy_x509_creds);
+    if (err != GNUTLS_E_SUCCESS)
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+                     "%s: Failed to initialize proxy credentials: (%d) %s",
+                     __func__, err, gnutls_strerror(err));
+        return APR_EGENERAL;
+    }
+    err = gnutls_anon_allocate_client_credentials(&sc->anon_client_creds);
+    if (err != GNUTLS_E_SUCCESS)
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+                     "%s: Failed to initialize anon credentials for proxy: "
+                     "(%d) %s", __func__, err, gnutls_strerror(err));
+        return APR_EGENERAL;
     }
 
     /* load certificate and key for client auth, if configured */
