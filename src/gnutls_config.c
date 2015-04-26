@@ -947,6 +947,7 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
     sc->privkey_x509 = NULL;
     sc->privkey_pgp = NULL;
     sc->certs_x509_chain_num = 0;
+    sc->p11_module = NULL;
     sc->pin = NULL;
     sc->priorities_str = NULL;
     sc->cache_timeout = -1;	/* -1 means "unset" */
@@ -1007,6 +1008,7 @@ void *mgs_config_server_merge(apr_pool_t * p, void *BASE, void *ADD)
 
     gnutls_srvconf_merge(x509_key_file, NULL);
     gnutls_srvconf_merge(x509_ca_file, NULL);
+    gnutls_srvconf_merge(p11_module, NULL);
     gnutls_srvconf_merge(pin, NULL);
     gnutls_srvconf_merge(pgp_cert_file, NULL);
     gnutls_srvconf_merge(pgp_key_file, NULL);
@@ -1097,5 +1099,22 @@ const char *mgs_store_cred_path(cmd_parms * parms,
         sc->proxy_x509_ca_file = apr_pstrdup(parms->pool, arg);
     else if (!strcasecmp(parms->directive->directive, "GnuTLSProxyCRLFile"))
         sc->proxy_x509_crl_file = apr_pstrdup(parms->pool, arg);
+    return NULL;
+}
+
+
+
+/*
+ * Record additional PKCS #11 module to load. Note that the value is
+ * only used in the base config, settings in virtual hosts are
+ * ignored.
+ */
+const char *mgs_set_p11_module(cmd_parms * parms,
+                               void *dummy __attribute__((unused)),
+                               const char *arg)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(parms->server->module_config, &gnutls_module);
+    sc->p11_module = apr_pstrdup(parms->pool, arg);
     return NULL;
 }

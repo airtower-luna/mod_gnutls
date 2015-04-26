@@ -112,6 +112,10 @@ typedef struct {
 	/* A Plain HTTP request */
     int non_ssl_request;
 
+    /* Additional PKCS #11 provider module to load, only valid in the
+     * base config, ignored in virtual hosts */
+    char *p11_module;
+
     /* PIN used for PKCS #11 operations */
     char *pin;
 
@@ -418,6 +422,10 @@ const char *mgs_set_client_verify_method(cmd_parms * parms, void *dummy,
 
 const char *mgs_set_client_ca_file(cmd_parms * parms, void *dummy,
                                    const char *arg);
+
+const char *mgs_set_p11_module(cmd_parms * parms, void *dummy,
+                               const char *arg);
+
 const char *mgs_set_pin(cmd_parms * parms, void *dummy,
                                    const char *arg);
 
