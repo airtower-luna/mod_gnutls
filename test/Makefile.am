@@ -23,7 +23,8 @@ check_SCRIPTS += test-16_view-status.bash \
 	test-20_TLS_reverse_proxy_client_auth.bash \
 	test-21_TLS_reverse_proxy_wrong_cert.bash \
 	test-22_TLS_reverse_proxy_crl_revoke.bash \
-	test-23_TLS_reverse_proxy_mismatched_priorities.bash
+	test-23_TLS_reverse_proxy_mismatched_priorities.bash \
+	test-24_pkcs11_cert.bash
 
 TESTS = $(check_SCRIPTS)
 
@@ -48,3 +49,12 @@ MOSTLYCLEANFILES = cache/* logs/* outputs/*
 
 clean-local:
 	$(MAKE) -f TestMakefile $(AM_MAKEFLAGS) clean
+
+check_DATA += server/softhsm.db
+MOSTLYCLEANFILES += tests/24_pkcs11_cert/softhsm.conf
+
+# The dependency on setup.done is necessary to avoid race conditions
+# between multiple calls to TestMakefile for key and certificate
+# generation.
+server/softhsm.db: setup.done
+	$(MAKE) -f TestMakefile $(AM_MAKEFLAGS) server/softhsm.db
