@@ -1,4 +1,4 @@
-TESTS = test-00_basic.bash \
+check_SCRIPTS = test-00_basic.bash \
 	test-01_serverwide_priorities.bash \
 	test-02_cache_in_vhost.bash \
 	test-03_cachetimeout_in_vhost.bash \
@@ -14,9 +14,9 @@ TESTS = test-00_basic.bash \
 	test-13_cgi_variables_no_client_cert.bash \
 	test-14_basic_openpgp.bash
 if USE_MSVA
-TESTS += test-15_basic_msva.bash
+check_SCRIPTS += test-15_basic_msva.bash
 endif
-TESTS += test-16_view-status.bash \
+check_SCRIPTS += test-16_view-status.bash \
 	test-17_cgi_vars_large_cert.bash \
 	test-18_client_verification_wrong_cert.bash \
 	test-19_TLS_reverse_proxy.bash \
@@ -24,6 +24,8 @@ TESTS += test-16_view-status.bash \
 	test-21_TLS_reverse_proxy_wrong_cert.bash \
 	test-22_TLS_reverse_proxy_crl_revoke.bash \
 	test-23_TLS_reverse_proxy_mismatched_priorities.bash
+
+TESTS = $(check_SCRIPTS)
 
 # Test cases trying to create keys and certificates in parallel causes
 # race conditions. Ensure that all keys and certificates are generated
