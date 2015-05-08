@@ -44,5 +44,7 @@ check_DATA = setup.done
 setup.done:
 	$(MAKE) -f TestMakefile $(AM_MAKEFLAGS) -j1 $@
 
+MOSTLYCLEANFILES = cache/* logs/* outputs/*
+
 clean-local:
-	make -f TestMakefile clean
+	$(MAKE) -f TestMakefile $(AM_MAKEFLAGS) clean
