@@ -40,19 +40,18 @@ TESTS = $(check_SCRIPTS)
 # other - just not in any particular order.
 check_DATA = setup.done
 
-setup.done:
-	$(MAKE) -f TestMakefile $(AM_MAKEFLAGS) $@
-
 MOSTLYCLEANFILES = cache/* logs/* outputs/*
 
 clean-local:
 	$(MAKE) -f TestMakefile $(AM_MAKEFLAGS) clean
 
+# SoftHSM files
 check_DATA += server/softhsm.db
 MOSTLYCLEANFILES += tests/24_pkcs11_cert/softhsm.conf
 
-# The dependency on setup.done is necessary to avoid race conditions
-# between multiple calls to TestMakefile for key and certificate
-# generation.
-server/softhsm.db: setup.done
-	$(MAKE) -f TestMakefile $(AM_MAKEFLAGS) server/softhsm.db
+# This rule can be used for any TestMakefile target not included in
+# setup.done. The dependency on setup.done is used to avoid race
+# conditions between multiple calls to TestMakefile for key and
+# certificate generation. It is ignored for setup.done itself.
+server/softhsm.db setup.done: setup.done
+	$(MAKE) -f TestMakefile $(AM_MAKEFLAGS) $@
