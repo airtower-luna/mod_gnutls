@@ -40,10 +40,8 @@ TESTS = $(check_SCRIPTS)
 # other - just not in any particular order.
 check_DATA = setup.done
 
-# Sadly, TestMakefile breaks when trying to generate keys and
-# certificates with parallel make. Until that's fixed, enforce "-j1".
 setup.done:
-	$(MAKE) -f TestMakefile $(AM_MAKEFLAGS) -j1 $@
+	$(MAKE) -f TestMakefile $(AM_MAKEFLAGS) $@
 
 MOSTLYCLEANFILES = cache/* logs/* outputs/*
 
