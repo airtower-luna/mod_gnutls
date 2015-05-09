@@ -25,5 +25,22 @@ TESTS += test-16_view-status.bash \
 	test-22_TLS_reverse_proxy_crl_revoke.bash \
 	test-23_TLS_reverse_proxy_mismatched_priorities.bash
 
+# Test cases trying to create keys and certificates in parallel causes
+# race conditions. Ensure that all keys and certificates are generated
+# before tests get to run.
+#
+# NOTE: Once the support files have been generated, test cases can be
+# run with multiple jobs, but real parallelization would require
+# dynamic port assignments. At the moment, lock files ensure that only
+# one Apache instance (possibly plus a proxy back end instance) is
+# running at any time, so test cases actually have to wait for each
+# other - just not in any particular order.
+check_DATA = setup.done
+
+# Sadly, TestMakefile breaks when trying to generate keys and
+# certificates with parallel make. Until that's fixed, enforce "-j1".
+setup.done:
+	$(MAKE) -f TestMakefile $(AM_MAKEFLAGS) -j1 $@
+
 clean-local:
 	make -f TestMakefile clean
