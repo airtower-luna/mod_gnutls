@@ -1,2 +1,2 @@
 #!/bin/bash
-make -f TestMakefile t-6
+make -f $(dirname ${0})/TestMakefile t-6

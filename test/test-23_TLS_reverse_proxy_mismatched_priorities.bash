@@ -1,9 +1,10 @@
 #!/bin/bash
 
 set -e
+: ${srcdir:="."}
 
-testdir="./tests/23_TLS_reverse_proxy_mismatched_priorities"
-. ./proxy_backend.bash
+testdir="${srcdir}/tests/23_TLS_reverse_proxy_mismatched_priorities"
+. $(dirname ${0})/proxy_backend.bash
 
 # This test checks if server and proxy priorities are applied
 # properly. The proxy server requries a TLS 1.2 connection, but the
@@ -17,7 +18,7 @@ function stop_backend
 backend_apache "${testdir}" "backend.conf" start "${BACKEND_LOCK}"
 trap stop_backend EXIT
 
-make -f TestMakefile t-23
+make -f $(dirname ${0})/TestMakefile t-23
 
 backend_apache "${testdir}" "backend.conf" stop
 trap - EXIT

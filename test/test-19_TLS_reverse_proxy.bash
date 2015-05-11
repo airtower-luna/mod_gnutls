@@ -1,9 +1,10 @@
 #!/bin/bash
 
 set -e
+: ${srcdir:="."}
 
-testdir="./tests/19_TLS_reverse_proxy"
-. ./proxy_backend.bash
+testdir="${srcdir}/tests/19_TLS_reverse_proxy"
+. $(dirname ${0})/proxy_backend.bash
 
 function stop_backend
 {
@@ -12,7 +13,7 @@ function stop_backend
 backend_apache "${testdir}" "backend.conf" start "${BACKEND_LOCK}"
 trap stop_backend EXIT
 
-make -f TestMakefile t-19
+make -f $(dirname ${0})/TestMakefile t-19
 
 backend_apache "${testdir}" "backend.conf" stop
 trap - EXIT

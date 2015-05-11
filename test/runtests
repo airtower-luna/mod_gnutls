@@ -23,11 +23,6 @@ if [ 0 != "$BADVARS" ]; then
     exit 1
 fi
 
-if [ . != "$(dirname "$0")" ]; then
-    printf "You should only run this mod-gnutls test suite from the test/ directory of the mod_gnutls source.\n" >&2
-    exit 1
-fi
-
 function stop_msva() {
     kill %1
 }
@@ -84,7 +79,7 @@ function kill_by_pidfile()
 
 function apache_down_err() {
     printf "FAILURE: %s\n" "$TEST_NAME"
-    /usr/sbin/apache2 -f "$(pwd)/apache.conf" -k stop || true
+    /usr/sbin/apache2 -f "${t}/apache.conf" -k stop || true
     if [ -e output ]; then
 	printf "\ngnutls-cli outputs:\n"
 	diff_output_filter_headers "output" "$output" || true
@@ -95,7 +90,7 @@ function apache_down_err() {
     fi
 
     printf "\nApache error logs:\n"
-    tail "../../logs/${TEST_NAME}.error.log"
+    tail "logs/${TEST_NAME}.error.log"
 
     if [ -n "${USE_MSVA}" ]; then
 	stop_msva
@@ -103,13 +98,13 @@ function apache_down_err() {
 }
 
 if [ -z "$tests" ] ; then
-    tests=./tests/*
+    tests=${srcdir}/tests/*
 else
-    tests=./tests/"$(printf "%02d" "$tests")"_*
+    tests=${srcdir}/tests/"$(printf "%02d" "$tests")"_*
 fi
 
 if [ -n "${USE_MSVA}" ]; then
-    GNUPGHOME=$(pwd)/msva.gnupghome MSVA_KEYSERVER_POLICY=never monkeysphere-validation-agent &
+    GNUPGHOME=msva.gnupghome MSVA_KEYSERVER_POLICY=never monkeysphere-validation-agent &
     trap stop_msva EXIT
 
     sleep "$TEST_GAP"
@@ -124,11 +119,13 @@ for t in $tests; do
 	echo "Warning: no lock file set"
 	sleep "$TEST_GAP"
     fi
+    t="$(realpath ${t})"
+    export srcdir="$(realpath ${srcdir})"
     export TEST_NAME="$(basename "$t")"
-    output="../../outputs/${TEST_NAME}.output"
+    output="outputs/${TEST_NAME}.output"
     rm -f "$output"
-    cd "$t"
-    if [ -e fail.* ]; then
+
+    if [ -e ${t}/fail.* ]; then
         EXPECTED_FAILURE="$(printf " (expected: %s)" fail.*)"
     else
         unset EXPECTED_FAILURE
@@ -138,12 +135,12 @@ for t in $tests; do
     if [ -n "${USE_MSVA}" ]; then
 	MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT" \
 	    ${flock_cmd} \
-	    /usr/sbin/apache2 -f "$(pwd)/apache.conf" -k start \
-	    || [ -e fail.server ]
+	    /usr/sbin/apache2 -f "${t}/apache.conf" -k start \
+	    || [ -e "${t}/fail.server" ]
     else
 	${flock_cmd} \
-	    /usr/sbin/apache2 -f "$(pwd)/apache.conf" -k start \
-	    || [ -e fail.server ]
+	    /usr/sbin/apache2 -f "${t}/apache.conf" -k start \
+	    || [ -e "${t}/fail.server" ]
     fi
 
     # PID file for sleep command (explanation below)
@@ -155,17 +152,17 @@ for t in $tests; do
     # failing tests. Sending sleep to the background allows the test
     # case to proceed instead of waiting for it to return. The sleep
     # process is stopped after gnutls-cli terminates.
-    if (sed "s/__HOSTNAME__/${TEST_HOST}/" <./input && \
+    if (sed "s/__HOSTNAME__/${TEST_HOST}/" <${t}/input && \
 	run_with_pidfile "${sleep_pidfile}" sleep "${TEST_QUERY_DELAY}" &) | \
-	gnutls-cli -p "${TEST_PORT}" $(cat ./gnutls-cli.args) "${TEST_HOST}" \
+	gnutls-cli -p "${TEST_PORT}" $(cat ${t}/gnutls-cli.args) "${TEST_HOST}" \
 	>"$output";
     then
-        if [ -e fail* ]; then
+        if [ -e ${t}/fail* ]; then
             printf "%s should have failed but succeeded\n" "$(basename "$t")" >&2
             exit 1
         fi
     else
-        if [ ! -e fail* ]; then
+        if [ ! -e ${t}/fail* ]; then
             printf "%s should have succeeded but failed\n" "$(basename "$t")" >&2
             exit 1
         fi
@@ -174,17 +171,16 @@ for t in $tests; do
     kill_by_pidfile "${sleep_pidfile}"
     unset sleep_pidfile
 
-    if [ -e output ] ; then
-	diff_output_filter_headers "output" "$output" "-q"
+    if [ -e ${t}/output ] ; then
+	diff_output_filter_headers "${t}/output" "$output" "-q"
     fi
-    /usr/sbin/apache2 -f "$(pwd)/apache.conf" -k stop || [ -e fail.server ]
+    /usr/sbin/apache2 -f "${t}/apache.conf" -k stop || [ -e ${t}/fail.server ]
     if [ -n "${USE_MSVA}" ]; then
 	trap stop_msva EXIT
     else
 	trap - EXIT
     fi
     printf "SUCCESS: %s\n" "$TEST_NAME"
-    cd ../..
 done
 
 if [ -n "${USE_MSVA}" ]; then

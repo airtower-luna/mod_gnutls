@@ -11,9 +11,8 @@ fi
 if [ -z "${BACKEND_PORT}" ]; then
     export BACKEND_PORT="9934"
 fi
-if [ -z "${BACKEND_LOCK}" ] && [ -n "${testdir}" ]; then
-    BACKEND_LOCK="$(realpath ${testdir}/../../backend.lock)"
-fi
+: ${BACKEND_LOCK:="backend.lock"}
+: ${srcdir:="."}
 
 function backend_apache
 {
@@ -31,15 +30,14 @@ function backend_apache
 	export TEST_NAME
 	export TEST_IP="${BACKEND_IP}"
 	export TEST_PORT="${BACKEND_PORT}"
+	export srcdir="$(realpath ${srcdir})"
 	case $action in
 	    start)
-		cd "${dir}"
 		${flock_cmd} \
-		    /usr/sbin/apache2 -f "$(pwd)/${conf}" -k start || return 1
+		    /usr/sbin/apache2 -f "$(realpath ${testdir}/${conf})" -k start || return 1
 		;;
 	    stop)
-		cd "${dir}"
-		/usr/sbin/apache2 -f "$(pwd)/${conf}" -k stop || return 1
+		/usr/sbin/apache2 -f "$(realpath ${testdir}/${conf})" -k stop || return 1
 		;;
 	esac
     )

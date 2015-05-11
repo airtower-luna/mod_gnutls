@@ -13,8 +13,6 @@ server.template
 client.template
 authority.template
 msva.gnupghome
-crl.pem
 *.log
 *.trs
 *.lock
-tests/24_pkcs11_cert/softhsm.conf

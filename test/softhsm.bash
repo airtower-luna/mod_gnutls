@@ -94,15 +94,10 @@ set -e
 softhsm_prefix="$(realpath $(dirname ${softhsm})/..)"
 softhsm_lib="${softhsm_prefix}/lib/softhsm/libsofthsm.so"
 
-# provided SOFTHSM_CONF always takes precedence, otherwise try to
-# guess based on testdir
+# fail if SOFTHSM_CONF is not set
 if [ -z "${SOFTHSM_CONF}" ]; then
-    if [ -n "${testdir}" ]; then
-	export SOFTHSM_CONF="$(realpath ${testdir}/softhsm.conf)"
-    else
-	echo "ERROR: Neither SOFTHSM_CONF nor testdir set!" 2>&1
-	exit 1
-    fi
+    echo "ERROR: SOFTHSM_CONF not set!" 1>&2
+    exit 1
 else
     export SOFTHSM_CONF
 fi
@@ -114,15 +109,6 @@ so_pin="123456"
 export GNUTLS_PIN="1234"
 key_label="privkey"
 cert_label="certificate"
-
-# The Apache/SoftHSM configuration mixes up directories, so generate
-# softhsm.conf with an absolute path to the token database if a
-# template is present. Generating it on every run avoids problems if
-# the source tree was moved.
-if [ -e "${SOFTHSM_CONF}.in" ]; then
-    cat "${SOFTHSM_CONF}.in" | sed "s,__DIR__,$(realpath $(dirname ${SOFTHSM_CONF}))," \
-	>"${SOFTHSM_CONF}"
-fi
 
 if [ "${init}" = "true" ]; then
     prepare_token "${token_label}" "${2}" "${3}"

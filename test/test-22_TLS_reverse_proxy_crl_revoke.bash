@@ -1,19 +1,10 @@
 #!/bin/bash
 
 set -e
+: ${srcdir:="."}
 
-testdir="./tests/22_TLS_reverse_proxy_crl_revoke"
-. ./proxy_backend.bash
-
-# Generate CRL revoking the server certificate. Using it as
-# GnuTLSProxyCRLFile should cause the connection to the back end
-# server to fail.
-certtool --generate-crl \
-    --load-ca-privkey authority/secret.key \
-    --load-ca-certificate authority/x509.pem \
-    --load-certificate server/x509.pem \
-    --template "${testdir}/crl.template" \
-    >"${testdir}/crl.pem"
+testdir="${srcdir}/tests/22_TLS_reverse_proxy_crl_revoke"
+. $(dirname ${0})/proxy_backend.bash
 
 function stop_backend
 {
@@ -22,7 +13,7 @@ function stop_backend
 backend_apache "${testdir}" "backend.conf" start "${BACKEND_LOCK}"
 trap stop_backend EXIT
 
-make -f TestMakefile t-22
+make -f $(dirname ${0})/TestMakefile t-22
 
 backend_apache "${testdir}" "backend.conf" stop
 trap - EXIT
