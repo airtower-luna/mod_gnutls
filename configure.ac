@@ -76,13 +76,24 @@ have_apr_memcache=0
 CHECK_APR_MEMCACHE([have_apr_memcache=1], [have_apr_memcache=0])
 AC_SUBST(have_apr_memcache)
 
+# Building documentation requires pandoc, which in turn needs pdflatex
+# to build PDF output.
+AC_PATH_PROG([PANDOC], [pandoc], [no])
+if test "$PANDOC" != "no"; then
+	AC_PATH_PROG([PDFLATEX], [pdflatex], [no])
+fi
+AM_CONDITIONAL([USE_PANDOC], [test "$PANDOC" != "no"])
+AM_CONDITIONAL([USE_PDFLATEX], [test "$PANDOC" != "no" && \
+			       test "$PDFLATEX" != "no"])
+
 MODULE_CFLAGS="${LIBGNUTLS_CFLAGS} ${SRP_CFLAGS} ${MSVA_CFLAGS} ${APR_MEMCACHE_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES} ${STRICT_CFLAGS}"
 MODULE_LIBS="${APR_MEMCACHE_LIBS} ${LIBGNUTLS_LIBS}"
 
 AC_SUBST(MODULE_CFLAGS)
 AC_SUBST(MODULE_LIBS)
 
-AC_CONFIG_FILES([Makefile src/Makefile test/Makefile test/tests/Makefile include/mod_gnutls.h])
+AC_CONFIG_FILES([Makefile src/Makefile test/Makefile test/tests/Makefile \
+			  doc/Makefile include/mod_gnutls.h])
 AC_OUTPUT
 
 echo "---"

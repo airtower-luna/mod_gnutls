@@ -7,5 +7,5 @@ EXTRA_DIST = m4/outoforder.m4 m4/apache.m4 \
 		README CHANGELOG \
 		NOTICE LICENSE
 
-SUBDIRS = src test
+SUBDIRS = src test doc
 ACLOCAL_AMFLAGS = -I m4
