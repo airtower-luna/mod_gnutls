@@ -8,10 +8,12 @@ client
 authority
 imposter
 rogueca
+client.uid
 server.uid
 server.template
 client.template
 authority.template
+imposter.template
 msva.gnupghome
 *.log
 *.trs
