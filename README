@@ -26,6 +26,7 @@ Prerequisites
  * autotools & gcc
  * APR Memcache    >= 0.7.0 (Optional)
  * libmsv          >= 0.1 (Optional)
+ * pandoc (for documentation, optional)
 
 Installation
 ------------

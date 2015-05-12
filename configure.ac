@@ -78,9 +78,15 @@ AC_SUBST(have_apr_memcache)
 
 # Building documentation requires pandoc, which in turn needs pdflatex
 # to build PDF output.
+build_doc=no
 AC_PATH_PROG([PANDOC], [pandoc], [no])
 if test "$PANDOC" != "no"; then
 	AC_PATH_PROG([PDFLATEX], [pdflatex], [no])
+	if test "$PDFLATEX" != "no"; then
+		build_doc=yes
+	else
+		build_doc="html only"
+	fi
 fi
 AM_CONDITIONAL([USE_PANDOC], [test "$PANDOC" != "no"])
 AM_CONDITIONAL([USE_PDFLATEX], [test "$PANDOC" != "no" && \
@@ -102,7 +108,8 @@ echo ""
 echo "   * mod_gnutls version:	${MOD_GNUTLS_VERSION}"
 echo "   * Apache Modules directory:	${AP_LIBEXECDIR}"
 echo "   * GnuTLS Library version:	${LIBGNUTLS_VERSION}"
-echo "   * SRP Authentication:          ${use_srp}"
-echo "   * MSVA Client Verification:    ${use_msva}"
+echo "   * SRP Authentication:	${use_srp}"
+echo "   * MSVA Client Verification:	${use_msva}"
+echo "   * Build documentation:	${build_doc}"
 echo ""
 echo "---"
