@@ -579,8 +579,16 @@ int mgs_cache_post_config(apr_pool_t * p, server_rec * s,
     return 0;
 }
 
-int mgs_cache_child_init(apr_pool_t * p, server_rec * s,
-        mgs_srvconf_rec * sc) {
+#if HAVE_APR_MEMCACHE
+int mgs_cache_child_init(apr_pool_t * p,
+                         server_rec * s,
+                         mgs_srvconf_rec * sc)
+#else
+int mgs_cache_child_init(apr_pool_t * p __attribute__((unused)),
+                         server_rec * s __attribute__((unused)),
+                         mgs_srvconf_rec * sc)
+#endif
+{
     if (sc->cache_type == mgs_cache_dbm
             || sc->cache_type == mgs_cache_gdbm) {
         return 0;
