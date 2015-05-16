@@ -25,7 +25,7 @@ Prerequisites
  * Apache HTTPD    >= 2.2 <http://httpd.apache.org/> (2.4.* preferred)
  * autotools & gcc
  * APR Memcache    >= 0.7.0 (Optional)
- * libmsv          >= 0.1 (Optional)
+ * libmsv          >= 0.1 (Optional, enable with ./configure --enable-msva)
  * pandoc (for documentation, optional)
 
 Installation
@@ -34,7 +34,7 @@ Installation
  tar xzvf mod_gnutls-version.tar.gz
  cd mod_gnutls-version/
  autoreconf -fiv
- ./configure --with-apxs=PATH --enable-msva
+ ./configure
  make
  make install
  # Configure & restart apache
