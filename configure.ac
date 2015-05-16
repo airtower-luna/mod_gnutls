@@ -36,6 +36,9 @@ AC_ARG_ENABLE(srp,
                [unconditionally disable the SRP functionality]),
        use_srp=$enableval, use_srp=yes)
 
+# check if the available GnuTLS library supports SRP
+AC_SEARCH_LIBS([gnutls_srp_server_get_username], [gnutls], [], [use_srp="no"])
+
 SRP_CFLAGS=""
 if test "$use_srp" != "no"; then
  	SRP_CFLAGS="-DENABLE_SRP=1"
