@@ -89,8 +89,11 @@ function apache_down_err() {
 	kill_by_pidfile "${sleep_pidfile}"
     fi
 
-    printf "\nApache error logs:\n"
-    tail "logs/${TEST_NAME}.error.log"
+    local errlog="logs/${TEST_NAME}.error.log"
+    if [ -r "${errlog}" ]; then
+	printf "\nApache error logs:\n"
+	tail "${errlog}"
+    fi
 
     if [ -n "${USE_MSVA}" ]; then
 	stop_msva
@@ -174,12 +177,12 @@ for t in $tests; do
     if [ -e ${t}/output ] ; then
 	diff_output_filter_headers "${t}/output" "$output" "-q"
     fi
-    /usr/sbin/apache2 -f "${t}/apache.conf" -k stop || [ -e ${t}/fail.server ]
     if [ -n "${USE_MSVA}" ]; then
 	trap stop_msva EXIT
     else
 	trap - EXIT
     fi
+    /usr/sbin/apache2 -f "${t}/apache.conf" -k stop || [ -e ${t}/fail.server ]
     printf "SUCCESS: %s\n" "$TEST_NAME"
 done
 
