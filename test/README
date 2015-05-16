@@ -15,9 +15,10 @@ just run:
 
  make check
 
-from test/ you can also run specific tests (identified by number) with:
+from test/ you can also run specific tests by passing their script
+names to make in the TESTS variable:
 
- make -f TestMakefile t-3
+ TESTS="test-03_cachetimeout_in_vhost.bash" make -e check
 
 This should be handy when you're just trying to experiment with a new
 test and don't want to wait for the full test suite to run.
