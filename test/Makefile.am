@@ -65,3 +65,5 @@ apache_data = base_apache.conf data/* mime.types
 EXTRA_DIST = $(apache_data) $(cert_templates) *.uid.in proxy_backend.bash \
 	runtests server-crl.template server-softhsm.conf softhsm.bash \
 	TestMakefile
+
+AM_TESTS_ENVIRONMENT = export APACHECTL=$(APACHECTL);

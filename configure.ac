@@ -92,6 +92,13 @@ AM_CONDITIONAL([USE_PANDOC], [test "$PANDOC" != "no"])
 AM_CONDITIONAL([USE_PDFLATEX], [test "$PANDOC" != "no" && \
 			       test "$PDFLATEX" != "no"])
 
+# Check for apache2ctl or apachectl
+AC_PATH_PROGS([APACHECTL], [apache2ctl apachectl], [no])
+if test "${APACHECTL}" = "no"; then
+	AC_MSG_WARN([Neither apache2ctl nor apachectl found in \
+		     PATH. Test suite will fail.])
+fi
+
 MODULE_CFLAGS="${LIBGNUTLS_CFLAGS} ${SRP_CFLAGS} ${MSVA_CFLAGS} ${APR_MEMCACHE_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES} ${STRICT_CFLAGS}"
 MODULE_LIBS="${APR_MEMCACHE_LIBS} ${LIBGNUTLS_LIBS}"
 

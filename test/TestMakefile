@@ -6,6 +6,9 @@
 # simple configuration choices.
 
 export srcdir ?= .
+# try default PATH for apachectl if missing (should only happen when
+# the test script is run manually)
+export APACHECTL ?= apachectl
 
 export TEST_HOST ?= localhost
 export TEST_IP ?= ::1
