@@ -41,7 +41,7 @@ AC_SEARCH_LIBS([gnutls_srp_server_get_username], [gnutls], [], [use_srp="no"])
 
 SRP_CFLAGS=""
 if test "$use_srp" != "no"; then
- 	SRP_CFLAGS="-DENABLE_SRP=1"
+	SRP_CFLAGS="-DENABLE_SRP=1"
 fi
 
 AC_ARG_ENABLE(strict,
@@ -61,15 +61,15 @@ AC_ARG_ENABLE(msva,
        AS_HELP_STRING([--enable-msva],
                [enable Monkeysphere client certificate verification]),
        use_msva=$enableval, use_msva=no)
-AM_CONDITIONAL([USE_MSVA], [test "$use_msva" = "$enableval"])
+AM_CONDITIONAL([USE_MSVA], [test "$use_msva" != "no"])
 
 MSVA_CFLAGS=""
 if test "$use_msva" != "no"; then
- 	AC_CHECK_HEADERS([msv/msv.h], [], 
+	AC_CHECK_HEADERS([msv/msv.h], [],
                          [AC_MSG_ERROR([*** No libmsv headers found!])])
         AC_SEARCH_LIBS([msv_query_agent], [msv], [],
                          [AC_MSG_ERROR([*** No libmsv found with msv_query_agent!])])
- 	MSVA_CFLAGS="-DENABLE_MSVA=1"
+	MSVA_CFLAGS="-DENABLE_MSVA=1"
 fi
 
 AC_MSG_CHECKING([whether to enable MSVA functionality])
