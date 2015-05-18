@@ -6,9 +6,9 @@
 # simple configuration choices.
 
 export srcdir ?= .
-# try default PATH for apachectl if missing (should only happen when
-# the test script is run manually)
-export APACHECTL ?= apachectl
+# If the Apache binary is not set, try to find apache2 in default PATH
+# (should only happen when the test script is run manually)
+export APACHE2 ?= apache2
 
 export TEST_HOST ?= localhost
 export TEST_IP ?= ::1

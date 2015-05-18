@@ -12,7 +12,7 @@ if [ -n "${TEST_LOCK}" ]; then
 fi
 
 BADVARS=0
-for v in APACHECTL TEST_HOST TEST_IP TEST_PORT TEST_QUERY_DELAY TEST_GAP MSVA_PORT; do
+for v in APACHE2 TEST_HOST TEST_IP TEST_PORT TEST_QUERY_DELAY TEST_GAP MSVA_PORT; do
     if [ ! -v "$v" ]; then
         printf "You need to set the %s environment variable\n" "$v" >&2
         BADVARS=1
@@ -79,7 +79,7 @@ function kill_by_pidfile()
 
 function apache_down_err() {
     printf "FAILURE: %s\n" "$TEST_NAME"
-    ${APACHECTL} -f "${t}/apache.conf" -k stop || true
+    ${APACHE2} -f "${t}/apache.conf" -k stop || true
     if [ -e output ]; then
 	printf "\ngnutls-cli outputs:\n"
 	diff_output_filter_headers "output" "$output" || true
@@ -138,11 +138,11 @@ for t in $tests; do
     if [ -n "${USE_MSVA}" ]; then
 	MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT" \
 	    ${flock_cmd} \
-	    ${APACHECTL} -f "${t}/apache.conf" -k start \
+	    ${APACHE2} -f "${t}/apache.conf" -k start \
 	    || [ -e "${t}/fail.server" ]
     else
 	${flock_cmd} \
-	    ${APACHECTL} -f "${t}/apache.conf" -k start \
+	    ${APACHE2} -f "${t}/apache.conf" -k start \
 	    || [ -e "${t}/fail.server" ]
     fi
 
@@ -182,7 +182,7 @@ for t in $tests; do
     else
 	trap - EXIT
     fi
-    ${APACHECTL} -f "${t}/apache.conf" -k stop || [ -e ${t}/fail.server ]
+    ${APACHE2} -f "${t}/apache.conf" -k stop || [ -e ${t}/fail.server ]
     printf "SUCCESS: %s\n" "$TEST_NAME"
 done
 

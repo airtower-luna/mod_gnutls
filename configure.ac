@@ -95,10 +95,10 @@ AM_CONDITIONAL([USE_PANDOC], [test "$PANDOC" != "no"])
 AM_CONDITIONAL([USE_PDFLATEX], [test "$PANDOC" != "no" && \
 			       test "$PDFLATEX" != "no"])
 
-# Check for apache2ctl or apachectl
-AC_PATH_PROGS([APACHECTL], [apache2ctl apachectl], [no])
-if test "${APACHECTL}" = "no"; then
-	AC_MSG_WARN([Neither apache2ctl nor apachectl found in \
+# Check for Apache binary
+AC_PATH_PROGS([APACHE2], [apache2 httpd], [no])
+if test "${APACHE2}" = "no"; then
+	AC_MSG_WARN([Neither apache2 nor httpd found in \
 		     PATH. Test suite will fail.])
 fi
 

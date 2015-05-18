@@ -13,7 +13,7 @@ if [ -z "${BACKEND_PORT}" ]; then
 fi
 : ${BACKEND_LOCK:="backend.lock"}
 : ${srcdir:="."}
-: ${APACHECTL:="apachectl"}
+: ${APACHE2:="apache2"}
 
 function backend_apache
 {
@@ -35,10 +35,10 @@ function backend_apache
 	case $action in
 	    start)
 		${flock_cmd} \
-		    ${APACHECTL} -f "$(realpath ${testdir}/${conf})" -k start || return 1
+		    ${APACHE2} -f "$(realpath ${testdir}/${conf})" -k start || return 1
 		;;
 	    stop)
-		${APACHECTL} -f "$(realpath ${testdir}/${conf})" -k stop || return 1
+		${APACHE2} -f "$(realpath ${testdir}/${conf})" -k stop || return 1
 		;;
 	esac
     )
