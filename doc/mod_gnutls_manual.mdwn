@@ -423,12 +423,12 @@ With GnuTLSExportCertificates enabled, `mod_gnutls` exports the same
 environment variables to the CGI process as `mod_ssl`.
 
 
-`SSLProxyEngine`
+`GnuTLSProxyEngine`
 --------------
 
 Enable TLS proxy connections for this virtual host
 
-    SSLProxyEngine [on|off]
+    GnuTLSProxyEngine [on|off]
 
 Default: *off*\
 Context: virtual host
@@ -521,7 +521,7 @@ Context: server config, virtual host
 This option is used to set the allowed ciphers, key exchange
 algorithms, MACs and compression methods for proxy connections. It
 takes the same parameters as `GnuTLSPriorities`. Required if
-`SSLProxyEngine` is `On`.
+`GnuTLSProxyEngine` is `On`.
 
 * * * * *
 

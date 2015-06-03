@@ -135,7 +135,7 @@ int ssl_proxy_enable(conn_rec *c)
 }
 
 static const command_rec mgs_config_cmds[] = {
-    AP_INIT_TAKE1("SSLProxyEngine", mgs_set_proxy_engine,
+    AP_INIT_TAKE1("GnuTLSProxyEngine", mgs_set_proxy_engine,
     NULL,
     RSRC_CONF | OR_AUTHCFG,
     "Enable SSL Proxy Engine"),

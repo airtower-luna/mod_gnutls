@@ -835,7 +835,7 @@ const char *mgs_set_proxy_engine(cmd_parms * parms, void *dummy __attribute__((u
     } else if (!strcasecmp(arg, "Off")) {
 	sc->proxy_enabled = GNUTLS_ENABLED_FALSE;
     } else {
-	return "SSLProxyEngine must be set to 'On' or 'Off'";
+	return "GnuTLSProxyEngine must be set to 'On' or 'Off'";
     }
 
     return NULL;
