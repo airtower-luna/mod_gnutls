@@ -4,12 +4,15 @@
 
 ** Version 0.7 beta (2015-06-27)
 - Security fix for TLS client authentication (CVE-2015-2091)
-- Bug fixed that enable support for reverse proxy operation
+- Bug fixes that enable support for reverse proxy operation
 - Various test suite improvements. Tests are configured through autoconf,
   so the test suite now works for builds without Monkeysphere support.
 - Add support for TLS connections to back end servers when operating as a
   reverse proxy (X.509 authentication only at the moment).
 - PKCS #11 support for server keys and certificates
+- Use strict compiler arguments by default (-Wall -Werror -Wextra)
+- Allow limiting the size of certificates exported as SSL_SERVER_CERT
+  and SSL_CLIENT_CERT through the GnuTLSExportCertificates directive
 
 ** Version 0.6 (2014-02-17)
 - Generating DH Params instead of using static ones.
