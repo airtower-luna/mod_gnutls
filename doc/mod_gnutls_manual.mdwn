@@ -149,6 +149,8 @@ should be listed in sequence in the file, from EE to the iCA closest to
 the root CA. Optionally, you can also include the root CA's certificate
 as the last certificate in the list.
 
+Since version 0.7 this can be a PKCS #11 URL.
+
 `GnuTLSKeyFile`
 ---------------
 
@@ -159,11 +161,13 @@ Set to the PEM Encoded Server Private Key
 Default: *none*\
 Context: server config, virtual host
 
-Takes an absolute or relative path to the Server Private Key. This key
-cannot currently be password protected.
+Takes an absolute or relative path to the Server Private Key. Set
+`GnuTLSPIN` if the key file is encrypted.
+
+Since version 0.7 this can be a PKCS #11 URL.
 
 **Security Warning:**\
- This private key must be protected. It is read while Apache is still
+This private key must be protected. It is read while Apache is still
 running as root, and does not need to be readable by the nobody or
 apache user.
 
