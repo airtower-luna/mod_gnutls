@@ -1,6 +1,6 @@
 /**
  *  Copyright 2004-2005 Paul Querna
- *  Copyright 2008 Nikos Mavrogiannopoulos
+ *  Copyright 2008, 2014 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
  *  Copyright 2015 Thomas Klute
  *
