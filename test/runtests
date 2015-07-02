@@ -115,11 +115,31 @@ if [ -n "${USE_MSVA}" ]; then
     GNUPGHOME=msva.gnupghome MSVA_KEYSERVER_POLICY=never run_with_pidfile "${msva_pidfile}" monkeysphere-validation-agent &
     trap stop_msva EXIT
 
-    sleep "$TEST_GAP"
-
     printf "TESTING: initial MSVA verification\n"
-    MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT" msva-query-agent https "$(cat client.uid)" x509pem client < client/x509.pem
-    printf "\nSUCCESS: initial MSVA verification\n"
+    # set to 0 if MSVA is up
+    ret=1
+    export MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT"
+    # wait at most TEST_MSVA_MAX_WAIT seconds for MSVA to get ready
+    waited=0.0
+    until [ ${ret} -eq 0 ] \
+	      || [ $(echo "${waited} > ${TEST_MSVA_MAX_WAIT}" | bc) -eq 1 ]; do
+	if msva-query-agent https "$(cat client.uid)" x509pem client < client/x509.pem
+	then
+	    ret=0
+	else
+	    echo "MSVA not ready yet"
+	fi
+	sleep "${TEST_GAP}"
+	waited=$(echo "${waited} + ${TEST_GAP}" | bc)
+    done
+
+    # check if MSVA is up, fail if not
+    if [ ${ret} -eq 0 ]; then
+	printf "\nSUCCESS: initial MSVA verification\n"
+    else
+	printf "\nFAIL: initial MSVA verification\n"
+	exit 1
+    fi
 fi
 
 for t in $tests; do
