@@ -1,6 +1,8 @@
 #!/bin/bash
 
-# Author: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
+# Authors:
+# Daniel Kahn Gillmor <dkg@fifthhorseman.net>
+# Thomas Klute <thomas2.klute@uni-dortmund.de>
 
 set -e
 
@@ -23,8 +25,10 @@ if [ 0 != "$BADVARS" ]; then
     exit 1
 fi
 
-function stop_msva() {
-    kill %1
+function stop_msva()
+{
+    kill_by_pidfile "${msva_pidfile}"
+    unset msva_pidfile
 }
 
 # Compare expected/actual outputs, filtering out headers from actual
@@ -107,7 +111,8 @@ else
 fi
 
 if [ -n "${USE_MSVA}" ]; then
-    GNUPGHOME=msva.gnupghome MSVA_KEYSERVER_POLICY=never monkeysphere-validation-agent &
+    msva_pidfile="$(mktemp mod_gnutls_test-XXXXXX.pid)"
+    GNUPGHOME=msva.gnupghome MSVA_KEYSERVER_POLICY=never run_with_pidfile "${msva_pidfile}" monkeysphere-validation-agent &
     trap stop_msva EXIT
 
     sleep "$TEST_GAP"
@@ -188,4 +193,9 @@ done
 
 if [ -n "${USE_MSVA}" ]; then
     stop_msva
+    # Without explicitly resetting the trap function, it would be
+    # called again on exit. Of course, we could just not stop MSVA and
+    # let the trap do the work, but I think the code is easier to
+    # understand like this.
+    trap - EXIT
 fi
