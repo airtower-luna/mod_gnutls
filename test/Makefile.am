@@ -42,7 +42,13 @@ TESTS = $(dist_check_SCRIPTS)
 # other - just not in any particular order.
 check_DATA = setup.done server/crl.pem
 
-MOSTLYCLEANFILES = cache/* logs/* outputs/* server/crl.pem
+MOSTLYCLEANFILES = setup.done cache/* logs/* outputs/* server/crl.pem
+
+# Delete PGP keyrings on "mostlyclean" target. They are created from
+# the X.509 private keys and certificates with an expiration time of
+# one day, so regenerating them is both fast and frequently
+# necessary.
+MOSTLYCLEANFILES += */*.pgp */*.gpg */*.gpg~ */gpg.conf
 
 clean-local:
 	$(MAKE) -f $(srcdir)/TestMakefile $(AM_MAKEFLAGS) clean
