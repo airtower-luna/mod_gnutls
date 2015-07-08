@@ -44,6 +44,18 @@ check_DATA = setup.done server/crl.pem
 
 MOSTLYCLEANFILES = setup.done cache/* logs/* outputs/* server/crl.pem
 
+cert_templates = authority.template.in client.template.in \
+	imposter.template.in rogueca.template server.template.in
+generated_templates = authority.template client.template \
+	imposter.template server.template
+
+# Delete X.509 certificates and generated templates on "mostlyclean"
+# target. Certificates can be rebuilt without generating new key
+# pairs, and regenerating them makes it possible to change identities
+# (e.g. host names) without wasting entropy on new keys (which would
+# happen after "clean").
+MOSTLYCLEANFILES += */x509.pem $(generated_templates)
+
 # Delete PGP keyrings on "mostlyclean" target. They are created from
 # the X.509 private keys and certificates with an expiration time of
 # one day, so regenerating them is both fast and frequently
@@ -64,8 +76,6 @@ MOSTLYCLEANFILES += tests/24_pkcs11_cert/softhsm.conf
 server/crl.pem server/softhsm.db setup.done: setup.done
 	srcdir=$(srcdir) $(MAKE) -f $(srcdir)/TestMakefile $(AM_MAKEFLAGS) $@
 
-cert_templates = authority.template.in client.template.in \
-	imposter.template.in rogueca.template server.template.in
 apache_data = base_apache.conf cgi_module.conf data/* mime.types proxy_mods.conf
 
 EXTRA_DIST = $(apache_data) $(cert_templates) *.uid.in proxy_backend.bash \
