@@ -74,7 +74,8 @@ MOSTLYCLEANFILES += tests/24_pkcs11_cert/softhsm.conf
 # conditions between multiple calls to TestMakefile for key and
 # certificate generation. It is ignored for setup.done itself.
 server/crl.pem server/softhsm.db setup.done: setup.done
-	srcdir=$(srcdir) $(MAKE) -f $(srcdir)/TestMakefile $(AM_MAKEFLAGS) $@
+	TEST_HOST="$(TEST_HOST)" TEST_IP="$(TEST_IP)" srcdir=$(srcdir) \
+	$(MAKE) -f $(srcdir)/TestMakefile $(AM_MAKEFLAGS) $@
 
 apache_data = base_apache.conf cgi_module.conf data/* mime.types proxy_mods.conf
 
@@ -83,4 +84,8 @@ EXTRA_DIST = $(apache_data) $(cert_templates) *.uid.in proxy_backend.bash \
 	TestMakefile
 
 AM_TESTS_ENVIRONMENT = export APACHE2=$(APACHE2); \
-	export AP_LIBEXECDIR=$(AP_LIBEXECDIR);
+	export AP_LIBEXECDIR=$(AP_LIBEXECDIR); \
+	export TEST_HOST="$(TEST_HOST)"; \
+	export TEST_IP="$(TEST_IP)"; \
+	export BACKEND_HOST="$(TEST_HOST)"; \
+	export BACKEND_IP="$(TEST_IP)";

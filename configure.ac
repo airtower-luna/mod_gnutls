@@ -108,6 +108,16 @@ MODULE_LIBS="${APR_MEMCACHE_LIBS} ${LIBGNUTLS_LIBS}"
 AC_SUBST(MODULE_CFLAGS)
 AC_SUBST(MODULE_LIBS)
 
+# assign default values to TEST_HOST and TEST_IP if necessary
+: ${TEST_HOST:="localhost"}
+: ${TEST_IP:="[::1]"}
+AC_ARG_VAR([TEST_HOST], [Host name to use for server instances started by \
+			"make check", must resolve to TEST_IP. The default \
+			is "localhost".])
+AC_ARG_VAR([TEST_IP], [IP address to use for server instances started by \
+		      "make check". The default is the IPv6 loopback address \
+		      [::1].])
+
 AC_CONFIG_FILES([Makefile src/Makefile test/Makefile test/tests/Makefile \
 			  doc/Makefile include/mod_gnutls.h])
 AC_OUTPUT

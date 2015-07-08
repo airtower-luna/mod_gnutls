@@ -1,7 +1,8 @@
 Unit Tests for Apache's mod_gnutls
 ==================================
 
-Initial Author: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
+Authors: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
+	 Thomas Klute <thomas2.klute@uni-dortmund.de>
 
 There are a lot of ways that a TLS-capable web server can go wrong.  I
 want to at least test for some basic/common configurations.
@@ -23,6 +24,13 @@ names to make in the TESTS variable:
 This should be handy when you're just trying to experiment with a new
 test and don't want to wait for the full test suite to run.
 
+The default configuration assumes that an IPv6 loopback device is
+available (TEST_IP=[::1]) and that TEST_HOST="localhost" resolves to
+the IPv6 loopback address [::1]. If this does not apply to your
+system, you can pass different values to ./configure, e.g. to use IPv4
+instead:
+
+  TEST_HOST="localhost" TEST_IP="127.0.0.1" ./configure
 
 Adding a Test
 =============
@@ -80,16 +88,12 @@ Here are some things that you might want to tune based on your
 expected setup (along with the variables that can be passed to "make
 check" to adjust them):
 
- * they need a functioning loopback device and expect (by default) to
-   have IPv6 functionality. [TEST_IP]
+ * they need a functioning loopback device.
 
- * they expect (by default) the IPv6 loopback to have port 9932
+ * they expect (by default) the TEST_IP to have port 9932
    open. [TEST_PORT]
 
  * if a machine is particularly slow or under heavy load, it's
    possible that these tests will fail for timing
    reasons. [TEST_QUERY_DELAY (seconds for the http request to be sent
    and responded to)] and [TEST_GAP (seconds to wait between tests)]
-
- * they assume that the name "localhost" is associated with the IPv6
-   loopback address [TEST_HOST]
