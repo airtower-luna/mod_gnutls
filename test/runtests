@@ -25,6 +25,13 @@ if [ 0 != "$BADVARS" ]; then
     exit 1
 fi
 
+# write script file and line to stderr on error
+function pinpoint_error()
+{
+    echo "${1} failed at line ${2}!" >&2
+}
+trap 'pinpoint_error ${BASH_SOURCE} ${LINENO}' ERR
+
 function stop_msva()
 {
     kill_by_pidfile "${msva_pidfile}"
