@@ -20,10 +20,8 @@ install: make_so
 	@echo ""
 	@echo "***********************************************"
 	@echo ""
-	@echo "   Please read the documentation at            "
-	@echo "   http://modgnutls.sourceforge.net/?p=docs for   "
-	@echo "   details on configuration of this module     "
+	@echo "  Please read the manual in the doc/ directory for"
+	@echo "  details on the configuration of this module"
 	@echo ""
 	@echo "***********************************************"
 	@echo ""
-

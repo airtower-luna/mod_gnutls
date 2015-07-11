@@ -26,7 +26,8 @@ Prerequisites
  * autotools & gcc
  * APR Memcache    >= 0.7.0 (Optional)
  * libmsv          >= 0.1 (Optional, enable with ./configure --enable-msva)
- * pandoc (for documentation, optional)
+ * pandoc   (for documentation, optional)
+ * pdflatex (for PDF documentation, optional)
 
 Installation
 ------------
@@ -39,7 +40,13 @@ Installation
  make install
  # Configure & restart apache
 
+It is recommended to run "make check" before "make install". You may
+need to pass TEST_HOST or TEST_IP to ./configure for the tests to work
+correctly, please see test/README for details.
+
 Configuration
 -------------
 
- Please see doc/mod_gnutls_manual.mdwn for more details.
+Please see doc/mod_gnutls_manual.mdwn for more details. If pandoc is
+available, HTML and PDF (requires pdflatex) documentation will be
+built and installed as well.
