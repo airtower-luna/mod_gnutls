@@ -8,7 +8,4 @@ SUCCESS
 RFC822NAME:test0@modgnutls.test
 
 DH prime bits: 2048
-
-0
-
 - Peer has closed the GnuTLS connection
