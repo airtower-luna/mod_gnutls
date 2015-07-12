@@ -14,6 +14,7 @@ fi
 : ${BACKEND_LOCK:="backend.lock"}
 : ${srcdir:="."}
 : ${APACHE2:="apache2"}
+: ${TEST_LOCK_WAIT:="30"}
 
 function backend_apache
 {
@@ -23,7 +24,7 @@ function backend_apache
     lockfile="${4}"
 
     if [ -n "${lockfile}" ]; then
-	flock_cmd="flock -w 10 ${lockfile}"
+	flock_cmd="flock -w ${TEST_LOCK_WAIT} ${lockfile}"
     fi
 
     TEST_NAME="$(basename "${dir}")"

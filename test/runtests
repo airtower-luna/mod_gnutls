@@ -10,7 +10,7 @@ tests="${1##t-}"
 
 if [ -n "${TEST_LOCK}" ]; then
     TEST_LOCK="$(realpath ${TEST_LOCK})"
-    flock_cmd="flock -w 10 ${TEST_LOCK}"
+    flock_cmd="flock -w ${TEST_LOCK_WAIT} ${TEST_LOCK}"
 fi
 
 BADVARS=0

@@ -83,8 +83,12 @@ EXTRA_DIST = $(apache_data) $(cert_templates) *.uid.in proxy_backend.bash \
 	runtests server-crl.template server-softhsm.conf softhsm.bash \
 	TestMakefile
 
+# Maximum wait time in seconds for flock to aquire instance lock files
+lock_wait = 30
+
 AM_TESTS_ENVIRONMENT = export APACHE2=$(APACHE2); \
 	export AP_LIBEXECDIR=$(AP_LIBEXECDIR); \
+	export TEST_LOCK_WAIT=$(lock_wait); \
 	export TEST_HOST="$(TEST_HOST)"; \
 	export TEST_IP="$(TEST_IP)"; \
 	export BACKEND_HOST="$(TEST_HOST)"; \
