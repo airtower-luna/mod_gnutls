@@ -638,9 +638,16 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
                 do {
                     ret = gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
                 } while (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
-                ap_log_cerror(APLOG_MARK, APLOG_DEBUG, ret, ctxt->c,
-                              "%s: TLS %sconnection closed.",
-                              __func__, IS_PROXY_STR(ctxt));
+                if (ret != GNUTLS_E_SUCCESS)
+                    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
+                                  "%s: Error while closing TLS %sconnection: "
+                                  "'%s' (%d)",
+                                  __func__, IS_PROXY_STR(ctxt),
+                                  gnutls_strerror(ret), (int) ret);
+                else
+                    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
+                                  "%s: TLS %sconnection closed.",
+                                  __func__, IS_PROXY_STR(ctxt));
                 /* De-Initialize Session */
                 gnutls_deinit(ctxt->session);
                 ctxt->session = NULL;
