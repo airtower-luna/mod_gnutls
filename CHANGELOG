@@ -2,7 +2,7 @@
 - Handle Unclean Shutdowns
 - make session cache use generic apache caches
 
-** Version 0.7 beta (2015-06-27)
+** Version 0.7 (2015-07-12)
 - Security fix for TLS client authentication (CVE-2015-2091)
 - Bug fixes that enable support for reverse proxy operation
 - Various test suite improvements. Tests are configured through autoconf,
