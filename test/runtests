@@ -150,74 +150,72 @@ if [ -n "${USE_MSVA}" ]; then
     fi
 fi
 
-for t in $testid; do
-    if [ -z "${flock_cmd}" ]; then
-	echo "Warning: no lock file set"
-	sleep "$TEST_GAP"
-    fi
-    t="$(realpath ${t})"
-    export srcdir="$(realpath ${srcdir})"
-    export TEST_NAME="$(basename "$t")"
-    output="outputs/${TEST_NAME}.output"
-    rm -f "$output"
+if [ -z "${flock_cmd}" ]; then
+    echo "Warning: no lock file set"
+    sleep "$TEST_GAP"
+fi
+t="$(realpath ${testid})"
+export srcdir="$(realpath ${srcdir})"
+export TEST_NAME="$(basename "$t")"
+output="outputs/${TEST_NAME}.output"
+rm -f "$output"
 
-    if [ -e ${t}/fail.* ]; then
-        EXPECTED_FAILURE="$(printf " (expected: %s)" fail.*)"
-    else
-        unset EXPECTED_FAILURE
-    fi
-    printf "TESTING: %s%s\n" "$TEST_NAME" "$EXPECTED_FAILURE"
-    trap apache_down_err EXIT
-    if [ -n "${USE_MSVA}" ]; then
-	MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT" \
-	    ${flock_cmd} \
-	    ${APACHE2} -f "${t}/apache.conf" -k start \
-	    || [ -e "${t}/fail.server" ]
-    else
-	${flock_cmd} \
-	    ${APACHE2} -f "${t}/apache.conf" -k start \
-	    || [ -e "${t}/fail.server" ]
-    fi
+if [ -e ${t}/fail.* ]; then
+    EXPECTED_FAILURE="$(printf " (expected: %s)" fail.*)"
+else
+    unset EXPECTED_FAILURE
+fi
+printf "TESTING: %s%s\n" "$TEST_NAME" "$EXPECTED_FAILURE"
+trap apache_down_err EXIT
+if [ -n "${USE_MSVA}" ]; then
+    MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT" \
+					${flock_cmd} \
+					${APACHE2} -f "${t}/apache.conf" -k start \
+	|| [ -e "${t}/fail.server" ]
+else
+    ${flock_cmd} \
+	${APACHE2} -f "${t}/apache.conf" -k start \
+	|| [ -e "${t}/fail.server" ]
+fi
 
-    # PID file for sleep command (explanation below)
-    sleep_pidfile="$(mktemp mod_gnutls_test-XXXXXX.pid)"
+# PID file for sleep command (explanation below)
+sleep_pidfile="$(mktemp mod_gnutls_test-XXXXXX.pid)"
 
-    # The sleep call keeps the pipe from the subshell to gnutls-cli
-    # open. Without it gnutls-cli would terminate as soon as sed is
-    # done, and not wait for a response from the server, leading to
-    # failing tests. Sending sleep to the background allows the test
-    # case to proceed instead of waiting for it to return. The sleep
-    # process is stopped after gnutls-cli terminates.
-    if (sed "s/__HOSTNAME__/${TEST_HOST}/" <${t}/input && \
-	run_with_pidfile "${sleep_pidfile}" sleep "${TEST_QUERY_DELAY}" &) | \
-	gnutls-cli -p "${TEST_PORT}" $(cat ${t}/gnutls-cli.args) "${TEST_HOST}" \
-	>"$output";
-    then
-        if [ -e ${t}/fail* ]; then
-            printf "%s should have failed but succeeded\n" "$(basename "$t")" >&2
-            exit 1
-        fi
-    else
-        if [ ! -e ${t}/fail* ]; then
-            printf "%s should have succeeded but failed\n" "$(basename "$t")" >&2
-            exit 1
-        fi
+# The sleep call keeps the pipe from the subshell to gnutls-cli
+# open. Without it gnutls-cli would terminate as soon as sed is
+# done, and not wait for a response from the server, leading to
+# failing tests. Sending sleep to the background allows the test
+# case to proceed instead of waiting for it to return. The sleep
+# process is stopped after gnutls-cli terminates.
+if (sed "s/__HOSTNAME__/${TEST_HOST}/" <${t}/input && \
+	   run_with_pidfile "${sleep_pidfile}" sleep "${TEST_QUERY_DELAY}" &) | \
+       gnutls-cli -p "${TEST_PORT}" $(cat ${t}/gnutls-cli.args) "${TEST_HOST}" \
+		  >"$output";
+then
+    if [ -e ${t}/fail* ]; then
+        printf "%s should have failed but succeeded\n" "$(basename "$t")" >&2
+        exit 1
     fi
+else
+    if [ ! -e ${t}/fail* ]; then
+        printf "%s should have succeeded but failed\n" "$(basename "$t")" >&2
+        exit 1
+    fi
+fi
 
-    kill_by_pidfile "${sleep_pidfile}"
-    unset sleep_pidfile
+kill_by_pidfile "${sleep_pidfile}"
+unset sleep_pidfile
 
-    if [ -e ${t}/output ] ; then
-	diff_output_filter_headers "${t}/output" "$output" "-q"
-    fi
-    if [ -n "${USE_MSVA}" ]; then
-	trap stop_msva EXIT
-    else
-	trap - EXIT
-    fi
-    ${APACHE2} -f "${t}/apache.conf" -k stop || [ -e ${t}/fail.server ]
-    printf "SUCCESS: %s\n" "$TEST_NAME"
-done
+if [ -e ${t}/output ] ; then
+    diff_output_filter_headers "${t}/output" "$output" "-q"
+fi
+if [ -n "${USE_MSVA}" ]; then
+    trap stop_msva EXIT
+else
+    trap - EXIT
+fi
+${APACHE2} -f "${t}/apache.conf" -k stop || [ -e ${t}/fail.server ]
+printf "SUCCESS: %s\n" "$TEST_NAME"
 
 if [ -n "${USE_MSVA}" ]; then
     stop_msva
