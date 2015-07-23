@@ -42,7 +42,7 @@ TESTS = $(dist_check_SCRIPTS)
 # other - just not in any particular order.
 check_DATA = setup.done server/crl.pem
 
-MOSTLYCLEANFILES = setup.done cache/* logs/* outputs/* server/crl.pem
+MOSTLYCLEANFILES = cache/* logs/* outputs/* server/crl.pem
 
 cert_templates = authority.template.in client.template.in \
 	imposter.template.in rogueca.template server.template.in
@@ -73,6 +73,7 @@ MOSTLYCLEANFILES += tests/24_pkcs11_cert/softhsm.conf
 # setup.done. The dependency on setup.done is used to avoid race
 # conditions between multiple calls to TestMakefile for key and
 # certificate generation. It is ignored for setup.done itself.
+.PHONY: setup.done
 server/crl.pem server/softhsm.db setup.done: setup.done
 	TEST_HOST="$(TEST_HOST)" TEST_IP="$(TEST_IP)" srcdir=$(srcdir) \
 	$(MAKE) -f $(srcdir)/TestMakefile $(AM_MAKEFLAGS) $@

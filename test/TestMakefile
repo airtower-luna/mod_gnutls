@@ -107,8 +107,6 @@ msva.gnupghome/trustdb.gpg: authority/minimal.pgp client/cert.pgp
 
 setup.done: $(all_tokens) msva.gnupghome/trustdb.gpg client.uid
 	mkdir -p logs cache outputs
-	touch setup.done
-
 
 clean:
 	rm -rf server client authority logs cache outputs setup.done \
@@ -117,4 +115,4 @@ clean:
 	client.template client.uid server.uid *.lock tests/*/*.pem
 	rmdir imposter rogueca || true
 
-.PHONY: all clean
+.PHONY: all clean setup.done
