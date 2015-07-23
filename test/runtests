@@ -6,7 +6,14 @@
 
 set -e
 
-tests="${1##t-}"
+testid="${1##t-}"
+
+if [ -z "$testid" ] ; then
+    echo -e "No test case selected.\nUsage: ${0} t-N" >&2
+    exit 1
+else
+    testid=${srcdir}/tests/"$(printf "%02d" "$testid")"_*
+fi
 
 if [ -n "${TEST_LOCK}" ]; then
     TEST_LOCK="$(realpath ${TEST_LOCK})"
@@ -111,12 +118,6 @@ function apache_down_err() {
     fi
 }
 
-if [ -z "$tests" ] ; then
-    tests=${srcdir}/tests/*
-else
-    tests=${srcdir}/tests/"$(printf "%02d" "$tests")"_*
-fi
-
 if [ -n "${USE_MSVA}" ]; then
     msva_pidfile="$(mktemp mod_gnutls_test-XXXXXX.pid)"
     GNUPGHOME=msva.gnupghome MSVA_KEYSERVER_POLICY=never run_with_pidfile "${msva_pidfile}" monkeysphere-validation-agent &
@@ -149,7 +150,7 @@ if [ -n "${USE_MSVA}" ]; then
     fi
 fi
 
-for t in $tests; do
+for t in $testid; do
     if [ -z "${flock_cmd}" ]; then
 	echo "Warning: no lock file set"
 	sleep "$TEST_GAP"
