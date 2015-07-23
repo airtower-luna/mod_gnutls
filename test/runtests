@@ -15,13 +15,9 @@ else
     testid=${srcdir}/tests/"$(printf "%02d" "$testid")"_*
 fi
 
-if [ -n "${TEST_LOCK}" ]; then
-    TEST_LOCK="$(realpath ${TEST_LOCK})"
-    flock_cmd="flock -w ${TEST_LOCK_WAIT} ${TEST_LOCK}"
-fi
-
 BADVARS=0
-for v in APACHE2 TEST_HOST TEST_IP TEST_PORT TEST_QUERY_DELAY TEST_GAP MSVA_PORT; do
+for v in APACHE2 TEST_HOST TEST_IP TEST_PORT TEST_QUERY_DELAY TEST_GAP \
+		 MSVA_PORT TEST_LOCK; do
     if [ ! -v "$v" ]; then
         printf "You need to set the %s environment variable\n" "$v" >&2
         BADVARS=1
@@ -150,10 +146,9 @@ if [ -n "${USE_MSVA}" ]; then
     fi
 fi
 
-if [ -z "${flock_cmd}" ]; then
-    echo "Warning: no lock file set"
-    sleep "$TEST_GAP"
-fi
+# configure locking for the Apache process
+flock_cmd="flock -w ${TEST_LOCK_WAIT} $(realpath ${TEST_LOCK})"
+
 t="$(realpath ${testid})"
 export srcdir="$(realpath ${srcdir})"
 export TEST_NAME="$(basename "$t")"
