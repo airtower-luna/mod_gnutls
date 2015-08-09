@@ -1203,7 +1203,10 @@ static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t ce
 /* TODO: Allow client sending a X.509 certificate chain */
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
     const gnutls_datum_t *cert_list;
-    unsigned int cert_list_size, status;
+    unsigned int cert_list_size;
+    /* assume the certificate is invalid unless explicitly set
+     * otherwise */
+    unsigned int status = GNUTLS_CERT_INVALID;
     int rv = GNUTLS_E_NO_CERTIFICATE_FOUND, ret;
     unsigned int ch_size = 0;
 
@@ -1337,9 +1340,13 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
             break;
 #endif
         default:
+            /* If this block is reached, that indicates a
+             * configuration error or bug in mod_gnutls (invalid value
+             * of ctxt->sc->client_verify_method). */
             ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
                           "GnuTLS: Failed to Verify X.509 Peer: method '%s' is not supported",
                           mgs_readable_cvm(ctxt->sc->client_verify_method));
+            rv = GNUTLS_E_UNIMPLEMENTED_FEATURE;
         }
 
     } else {
@@ -1355,19 +1362,24 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
             break;
 #ifdef ENABLE_MSVA
         case mgs_cvm_msva:
-            /* need to set status and rv */
             ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
                           "GnuTLS:  OpenPGP verification via MSVA is not yet implemented");
             rv = GNUTLS_E_UNIMPLEMENTED_FEATURE;
             break;
 #endif
         default:
+            /* If this block is reached, that indicates a
+             * configuration error or bug in mod_gnutls (invalid value
+             * of ctxt->sc->client_verify_method). */
             ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
                           "GnuTLS: Failed to Verify OpenPGP Peer: method '%s' is not supported",
                           mgs_readable_cvm(ctxt->sc->client_verify_method));
+            rv = GNUTLS_E_UNIMPLEMENTED_FEATURE;
         }
     }
 
+    /* "goto exit" at the end of this block skips evaluation of the
+     * "status" variable */
     if (rv < 0) {
         ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
                 "GnuTLS: Failed to Verify Peer certificate: (%d) %s",
