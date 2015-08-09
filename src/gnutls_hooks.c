@@ -354,9 +354,9 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
             sc->tickets = GNUTLS_ENABLED_TRUE;
         if (sc->export_certificates_size < 0)
             sc->export_certificates_size = 0;
-        if (sc->client_verify_mode ==  -1)
+        if (sc->client_verify_mode == -1)
             sc->client_verify_mode = GNUTLS_CERT_IGNORE;
-        if (sc->client_verify_method ==  mgs_cvm_unset)
+        if (sc->client_verify_method == mgs_cvm_unset)
             sc->client_verify_method = mgs_cvm_cartel;
 
         /* Check if the priorities have been set */
