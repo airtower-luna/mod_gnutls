@@ -1,3 +1,2 @@
-proxy-segfault-fix.patch
 enable-tls-per-connection.patch
 no-deinit-on-proxy-disable.patch
