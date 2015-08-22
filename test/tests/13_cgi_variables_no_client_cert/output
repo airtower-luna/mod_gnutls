@@ -1,0 +1,14 @@
+Connection: close
+Content-Type: text/plain
+
+----Certificate:----
+
+
+----Verification Status:----
+NONE
+
+----SubjectAltName:----
+
+
+DH prime bits: 
+- Peer has closed the GnuTLS connection

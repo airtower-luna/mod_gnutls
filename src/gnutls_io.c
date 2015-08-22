@@ -2,6 +2,7 @@
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2008 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
+ *  Copyright 2015 Thomas Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -19,6 +20,10 @@
 
 #include "mod_gnutls.h"
 
+#ifdef APLOG_USE_MODULE
+APLOG_USE_MODULE(gnutls);
+#endif
+
 /**
  * Describe how the GnuTLS Filter system works here
  *  - Basicly the same as what mod_ssl does with OpenSSL.
@@ -33,6 +38,9 @@
                                sizeof(HTTP_ON_HTTPS_PORT) - 1, \
                                alloc)
 
+#define IS_PROXY_STR(c) \
+    ((c->is_proxy == GNUTLS_ENABLED_TRUE) ? "proxy " : "")
+
 static apr_status_t gnutls_io_filter_error(ap_filter_t * f,
         apr_bucket_brigade * bb,
         apr_status_t status) {
@@ -40,26 +48,24 @@ static apr_status_t gnutls_io_filter_error(ap_filter_t * f,
     apr_bucket *bucket;
 
     switch (status) {
-        case HTTP_BAD_REQUEST:
-            /* log the situation */
-            ap_log_error(APLOG_MARK, APLOG_INFO, 0,
-                    f->c->base_server,
-                    "GnuTLS handshake failed: HTTP spoken on HTTPS port; "
-                    "trying to send HTML error page");
+    case HTTP_BAD_REQUEST:
+        /* log the situation */
+        ap_log_error(APLOG_MARK, APLOG_INFO, 0,
+                     f->c->base_server,
+                     "GnuTLS handshake failed: HTTP spoken on HTTPS port; "
+                     "trying to send HTML error page");
+        mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+            ap_get_module_config(f->c->base_server->module_config,
+                                 &gnutls_module);
+        ctxt->status = -1;
+        sc->non_ssl_request = 1;
 
-				    mgs_srvconf_rec *sc = (mgs_srvconf_rec *) ap_get_module_config(
-																												f->c->base_server->module_config,
-																												&gnutls_module
-																											);
-            ctxt->status = -1;
-            sc->non_ssl_request = 1;
+        /* fake the request line */
+        bucket = HTTP_ON_HTTPS_PORT_BUCKET(f->c->bucket_alloc);
+        break;
 
-            /* fake the request line */
-            bucket = HTTP_ON_HTTPS_PORT_BUCKET(f->c->bucket_alloc);
-            break;
-
-        default:
-            return status;
+    default:
+        return status;
     }
 
     APR_BRIGADE_INSERT_TAIL(bb, bucket);
@@ -181,7 +187,8 @@ static apr_status_t brigade_consume(apr_bucket_brigade * bb,
 }
 
 static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
-        char *buf, apr_size_t * len) {
+        char *buf, apr_size_t * len)
+{
     apr_size_t wanted = *len;
     apr_size_t bytes = 0;
     int rc;
@@ -220,13 +227,17 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
     }
 
     if (ctxt->session == NULL) {
+        ap_log_cerror(APLOG_MARK, APLOG_INFO, 0, ctxt->c,
+                      "%s: GnuTLS session is NULL!", __func__);
         return APR_EGENERAL;
     }
 
     while (1) {
 
-        rc = gnutls_record_recv(ctxt->session, buf + bytes,
-                wanted - bytes);
+        do
+            rc = gnutls_record_recv(ctxt->session, buf + bytes,
+                                    wanted - bytes);
+        while (rc == GNUTLS_E_INTERRUPTED || rc == GNUTLS_E_AGAIN);
 
         if (rc > 0) {
             *len += rc;
@@ -265,25 +276,25 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
 
             if (rc == GNUTLS_E_REHANDSHAKE) {
                 /* A client has asked for a new Hankshake. Currently, we don't do it */
-                ap_log_error(APLOG_MARK, APLOG_INFO,
+                ap_log_cerror(APLOG_MARK, APLOG_INFO,
                         ctxt->input_rc,
-                        ctxt->c->base_server,
+                        ctxt->c,
                         "GnuTLS: Error reading data. Client Requested a New Handshake."
                         " (%d) '%s'", rc,
                         gnutls_strerror(rc));
             } else if (rc == GNUTLS_E_WARNING_ALERT_RECEIVED) {
                 rc = gnutls_alert_get(ctxt->session);
-                ap_log_error(APLOG_MARK, APLOG_INFO,
+                ap_log_cerror(APLOG_MARK, APLOG_INFO,
                         ctxt->input_rc,
-                        ctxt->c->base_server,
+                        ctxt->c,
                         "GnuTLS: Warning Alert From Client: "
                         " (%d) '%s'", rc,
                         gnutls_alert_get_name(rc));
             } else if (rc == GNUTLS_E_FATAL_ALERT_RECEIVED) {
                 rc = gnutls_alert_get(ctxt->session);
-                ap_log_error(APLOG_MARK, APLOG_INFO,
+                ap_log_cerror(APLOG_MARK, APLOG_INFO,
                         ctxt->input_rc,
-                        ctxt->c->base_server,
+                        ctxt->c,
                         "GnuTLS: Fatal Alert From Client: "
                         "(%d) '%s'", rc,
                         gnutls_alert_get_name(rc));
@@ -292,10 +303,10 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
             } else {
                 /* Some Other Error. Report it. Die. */
                 if (gnutls_error_is_fatal(rc)) {
-                    ap_log_error(APLOG_MARK,
+                    ap_log_cerror(APLOG_MARK,
                             APLOG_INFO,
                             ctxt->input_rc,
-                            ctxt->c->base_server,
+                            ctxt->c,
                             "GnuTLS: Error reading data. (%d) '%s'",
                             rc,
                             gnutls_strerror(rc));
@@ -306,6 +317,9 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
             }
 
             if (ctxt->input_rc == APR_SUCCESS) {
+                ap_log_cerror(APLOG_MARK, APLOG_INFO, ctxt->input_rc, ctxt->c,
+                              "%s: GnuTLS error: %s (%d)",
+                              __func__, gnutls_strerror(rc), rc);
                 ctxt->input_rc = APR_EGENERAL;
             }
             break;
@@ -400,7 +414,7 @@ tryagain:
             errcode = gnutls_alert_get(ctxt->session);
             ap_log_error(APLOG_MARK, APLOG_INFO, 0,
                     ctxt->c->base_server,
-                    "GnuTLS: Hanshake Alert (%d) '%s'.",
+                    "GnuTLS: Handshake Alert (%d) '%s'.",
                     errcode,
                     gnutls_alert_get_name(errcode));
         }
@@ -444,7 +458,7 @@ tryagain:
                 ctxt->sc = sc;
             }
         }
-        return 0;
+        return GNUTLS_E_SUCCESS;
     }
 }
 
@@ -474,7 +488,8 @@ int mgs_rehandshake(mgs_handle_t * ctxt) {
 apr_status_t mgs_filter_input(ap_filter_t * f,
         apr_bucket_brigade * bb,
         ap_input_mode_t mode,
-        apr_read_type_e block, apr_off_t readbytes) {
+        apr_read_type_e block, apr_off_t readbytes)
+{
     apr_status_t status = APR_SUCCESS;
     mgs_handle_t *ctxt = (mgs_handle_t *) f->ctx;
     apr_size_t len = sizeof (ctxt->input_buffer);
@@ -483,14 +498,23 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
         apr_bucket *bucket =
                 apr_bucket_eos_create(f->c->bucket_alloc);
         APR_BRIGADE_INSERT_TAIL(bb, bucket);
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
+                      "%s: %sconnection aborted",
+                      __func__, IS_PROXY_STR(ctxt));
         return APR_ECONNABORTED;
     }
 
     if (ctxt->status == 0) {
-        gnutls_do_handshake(ctxt);
+        int ret = gnutls_do_handshake(ctxt);
+        if (ret == GNUTLS_E_SUCCESS)
+            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
+                          "%s: TLS %sconnection opened.",
+                          __func__, IS_PROXY_STR(ctxt));
     }
 
     if (ctxt->status < 0) {
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
+                      "%s %s: ap_get_brigade", __func__, IS_PROXY_STR(ctxt));
         return ap_get_brigade(f->next, bb, mode, block, readbytes);
     }
 
@@ -505,8 +529,12 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
 
     if (ctxt->input_mode == AP_MODE_READBYTES ||
             ctxt->input_mode == AP_MODE_SPECULATIVE) {
+        if (readbytes < 0) {
+            /* you're asking us to speculatively read a negative number of bytes! */
+            return APR_ENOTIMPL;
+        }
         /* Err. This is bad. readbytes *can* be a 64bit int! len.. is NOT */
-        if (readbytes < len) {
+        if ((apr_size_t) readbytes < len) {
             len = (apr_size_t) readbytes;
         }
         status =
@@ -568,7 +596,7 @@ static ssize_t write_flush(mgs_handle_t * ctxt) {
 }
 
 apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
-    apr_size_t ret;
+    int ret;
     mgs_handle_t *ctxt = (mgs_handle_t *) f->ctx;
     apr_status_t status = APR_SUCCESS;
     apr_read_type_e rblock = APR_NONBLOCK_READ;
@@ -579,7 +607,11 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
     }
 
     if (ctxt->status == 0) {
-        gnutls_do_handshake(ctxt);
+        ret = gnutls_do_handshake(ctxt);
+        if (ret == GNUTLS_E_SUCCESS)
+            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
+                          "%s: TLS %sconnection opened.",
+                          __func__, IS_PROXY_STR(ctxt));
     }
 
     if (ctxt->status < 0) {
@@ -606,6 +638,16 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
                 do {
                     ret = gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
                 } while (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
+                if (ret != GNUTLS_E_SUCCESS)
+                    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
+                                  "%s: Error while closing TLS %sconnection: "
+                                  "'%s' (%d)",
+                                  __func__, IS_PROXY_STR(ctxt),
+                                  gnutls_strerror(ret), (int) ret);
+                else
+                    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
+                                  "%s: TLS %sconnection closed.",
+                                  __func__, IS_PROXY_STR(ctxt));
                 /* De-Initialize Session */
                 gnutls_deinit(ctxt->session);
                 ctxt->session = NULL;
@@ -667,7 +709,8 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
                                 APR_EGENERAL;
                         return ctxt->output_rc;
                     }
-                } else if (ret != len) {
+                } else if ((apr_size_t)(ret) != len) {
+                    /* we know the above cast is OK because len > 0 and ret >= 0 */
                     /* Not able to send the entire bucket,
                        split it and send it again. */
                     apr_bucket_split(bucket, ret);

@@ -1,0 +1,99 @@
+Unit Tests for Apache's mod_gnutls
+==================================
+
+Authors: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
+	 Thomas Klute <thomas2.klute@uni-dortmund.de>
+
+There are a lot of ways that a TLS-capable web server can go wrong.  I
+want to at least test for some basic/common configurations.
+
+
+Running the tests
+=================
+
+from the top level of the source, or from test/ (where this README is),
+just run:
+
+ make check
+
+from test/ you can also run specific tests by passing their script
+names to make in the TESTS variable:
+
+ TESTS="test-03_cachetimeout_in_vhost.bash" make -e check
+
+This should be handy when you're just trying to experiment with a new
+test and don't want to wait for the full test suite to run.
+
+The default configuration assumes that an IPv6 loopback device is
+available (TEST_IP=[::1]) and that TEST_HOST="localhost" resolves to
+the IPv6 loopback address [::1]. If this does not apply to your
+system, you can pass different values to ./configure, e.g. to use IPv4
+instead:
+
+  TEST_HOST="localhost" TEST_IP="127.0.0.1" ./configure
+
+Adding a Test
+=============
+
+Please add more tests!
+
+The simplest way to add a test is (from test/):
+
+ ./newtest
+
+This will prompt you for a simple name for the test and then copy a
+starting set of files from tests/00_basic, and create a script which
+you can add to TESTS in Makefile.am when your test is ready for
+inclusion in the test suite.
+
+
+Implementation
+==============
+
+Each test consists of a directory in test/tests/, which will cause the
+test suite to spin up an isolated apache instance and try to connect
+to it with gnutls-cli and make a simple HTTP 1.1 request.
+
+By default, these tests are expected to succeed, by having 
+
+In each directory, you can put the following files:
+
+ * apache.conf --  the apache configuration to be used
+
+ * gnutls-cli.args --  the arguments to pass to gnutls-cli
+
+ * input -- the full HTTP request (including the final blank line)
+
+ * output [optional] -- the lines of this file will be checked against
+   the same number of lines at the end of the output produced by the
+   gnutls-cli process.
+
+ * fail.server [optional] -- if this file exists, it means we expect
+   the web server to fail to even start due to some serious
+   configuration problem.
+
+ * fail.client [optional] -- if this file exists, it means we expect
+   the client to fail to fetch its file.  If you already have
+   fail.server, do not also specify this; we know that a failed server
+   should result in a failed file retrieval.
+
+
+Robustness and Tuning
+=====================
+
+These tests aren't nearly as robust as i'd like them to be, but they
+work for the moment and they're better than no tests at all.
+
+Here are some things that you might want to tune based on your
+expected setup (along with the variables that can be passed to "make
+check" to adjust them):
+
+ * they need a functioning loopback device.
+
+ * they expect (by default) the TEST_IP to have port 9932
+   open. [TEST_PORT]
+
+ * if a machine is particularly slow or under heavy load, it's
+   possible that these tests will fail for timing
+   reasons. [TEST_QUERY_DELAY (seconds for the http request to be sent
+   and responded to)] and [TEST_GAP (seconds to wait between tests)]

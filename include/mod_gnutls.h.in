@@ -1,5 +1,7 @@
 /**
  *  Copyright 2004-2005 Paul Querna
+ *  Copyright 2014 Nikos Mavrogiannopoulos
+ *  Copyright 2015 Thomas Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -33,6 +35,7 @@
 #if GNUTLS_VERSION_MAJOR == 2
 #include <gnutls/extra.h>
 #endif
+#include <gnutls/abstract.h>
 #include <gnutls/openpgp.h>
 #include <gnutls/x509.h>
 
@@ -103,41 +106,103 @@ typedef struct {
 
 /* Server Configuration Record */
 typedef struct {
-	/* x509 Certificate Structure */
-    gnutls_certificate_credentials_t certs;
-	/* SRP Certificate Structure*/
-    gnutls_srp_server_credentials_t srp_creds;
-	/* Annonymous Certificate Structure */
-    gnutls_anon_server_credentials_t anon_creds;
-	/* Current x509 Certificate CN [Common Name] */
-    char* cert_cn;
-	/* Current x509 Certificate SAN [Subject Alternate Name]s*/
-	char* cert_san[MAX_CERT_SAN];
-	/* A x509 Certificate Chain */
-    gnutls_x509_crt_t *certs_x509_chain;
-	/* Current x509 Certificate Private Key */
-    gnutls_x509_privkey_t privkey_x509;
-	/* OpenPGP Certificate */
-    gnutls_openpgp_crt_t cert_pgp;
-	/* OpenPGP Certificate Private Key */
-    gnutls_openpgp_privkey_t privkey_pgp;
-	/* Number of Certificates in Chain */
-    unsigned int certs_x509_chain_num;
+    /* --- Configuration values --- */
 	/* Is the module enabled? */
     int enabled;
-    /* Export full certificates to CGI environment: */
-    int export_certificates_enabled;
-	/* GnuTLS Priorities */
-    gnutls_priority_t priorities;
-	/* GnuTLS DH Parameters */
-    gnutls_dh_params_t dh_params;
+	/* Is mod_proxy enabled? */
+    int proxy_enabled;
+	/* A Plain HTTP request */
+    int non_ssl_request;
+
+    /* Additional PKCS #11 provider module to load, only valid in the
+     * base config, ignored in virtual hosts */
+    char *p11_module;
+
+    /* PIN used for PKCS #11 operations */
+    char *pin;
+
+    /* the SRK PIN used in TPM operations */
+    char *srk_pin;
+
+    char *x509_cert_file;
+    char *x509_key_file;
+    char *x509_ca_file;
+
+    char *pgp_cert_file;
+    char *pgp_key_file;
+    char *pgp_ring_file;
+
+    char *dh_file;
+
+    char *priorities_str;
+    char *proxy_priorities_str;
+
+    const char* srp_tpasswd_file;
+    const char* srp_tpasswd_conf_file;
+
 	/* Cache timeout value */
     int cache_timeout;
 	/* Chose Cache Type */
     mgs_cache_e cache_type;
     const char* cache_config;
-    const char* srp_tpasswd_file;
-    const char* srp_tpasswd_conf_file;
+
+	/* GnuTLS uses Session Tickets */
+    int tickets;
+
+    /* --- Things initialized at _child_init --- */
+
+    /* x509 Certificate Structure */
+    gnutls_certificate_credentials_t certs;
+    /* x509 credentials for proxy connections */
+    gnutls_certificate_credentials_t proxy_x509_creds;
+    /* trust list for proxy_x509_creds */
+    gnutls_x509_trust_list_t proxy_x509_tl;
+    const char* proxy_x509_key_file;
+    const char* proxy_x509_cert_file;
+    const char* proxy_x509_ca_file;
+    const char* proxy_x509_crl_file;
+    /* GnuTLS priorities for proxy connections */
+    gnutls_priority_t proxy_priorities;
+    /* SRP Certificate Structure*/
+    gnutls_srp_server_credentials_t srp_creds;
+    /* Anonymous Certificate Structure */
+    gnutls_anon_server_credentials_t anon_creds;
+    /* Anonymous Client Certificate Structure, used for proxy
+     * connections */
+    gnutls_anon_client_credentials_t anon_client_creds;
+	/* Current x509 Certificate CN [Common Name] */
+    char* cert_cn;
+	/* Current x509 Certificate SAN [Subject Alternate Name]s*/
+    char* cert_san[MAX_CERT_SAN];
+	/* An x509 Certificate Chain */
+    gnutls_pcert_st *certs_x509_chain;
+    gnutls_x509_crt_t *certs_x509_crt_chain;
+	/* Number of Certificates in Chain */
+    unsigned int certs_x509_chain_num;
+
+	/* Current x509 Certificate Private Key */
+    gnutls_privkey_t privkey_x509;
+
+	/* OpenPGP Certificate */
+    gnutls_pcert_st *cert_pgp;
+    gnutls_openpgp_crt_t *cert_crt_pgp;
+
+	/* OpenPGP Certificate Private Key */
+    gnutls_privkey_t privkey_pgp;
+#if GNUTLS_VERSION_NUMBER < 0x030312
+    /* Internal structure for the OpenPGP private key, used in the
+     * workaround for a bug in gnutls_privkey_import_openpgp_raw that
+     * frees memory that is still needed. DO NOT USE for any other
+     * purpose. */
+    gnutls_openpgp_privkey_t privkey_pgp_internal;
+#endif
+
+    /* Export full certificates to CGI environment: */
+    int export_certificates_size;
+	/* GnuTLS Priorities */
+    gnutls_priority_t priorities;
+	/* GnuTLS DH Parameters */
+    gnutls_dh_params_t dh_params;
 	/* A list of CA Certificates */
     gnutls_x509_crt_t *ca_list;
 	/* OpenPGP Key Ring */
@@ -150,12 +215,6 @@ typedef struct {
     mgs_client_verification_method_e client_verify_method;
 	/* Last Cache timestamp */
     apr_time_t last_cache_check;
-	/* GnuTLS uses Session Tickets */
-    int tickets;
-	/* Is mod_proxy enabled? */
-    int proxy_enabled;
-	/* A Plain HTTP request */
-    int non_ssl_request;
 } mgs_srvconf_rec;
 
 /* Character Buffer */
@@ -170,6 +229,10 @@ typedef struct {
     mgs_srvconf_rec *sc;
 	/* Connection record */
     conn_rec* c;
+	/* Is TLS enabled for this connection? */
+    int enabled;
+    /* Is this a proxy connection? */
+    int is_proxy;
 	/* GnuTLS Session handle */
     gnutls_session_t session;
 	/* module input status */
@@ -301,6 +364,11 @@ int mgs_cache_session_init(mgs_handle_t *ctxt);
     ((GNUTLS_MAX_SESSION_ID + 1) * 2)
 
 /**
+ * Perform any reinitialization required in PKCS #11
+ */
+int mgs_pkcs11_reinit(server_rec * s);
+
+/**
  * Convert a SSL Session ID into a Null Terminated Hex Encoded String
  * @param id raw SSL Session ID
  * @param idlen Length of the raw Session ID
@@ -320,6 +388,9 @@ char *mgs_time2sz(time_t t, char *str, int strsize);
 
 
 /* Configuration Functions */
+
+/* Loads all files set in the configuration */
+int mgs_load_files(apr_pool_t * p, server_rec * s);
 
 const char *mgs_set_srp_tpasswd_conf_file(cmd_parms * parms, void *dummy,
                                         const char *arg);
@@ -354,12 +425,21 @@ const char *mgs_set_client_verify_method(cmd_parms * parms, void *dummy,
 const char *mgs_set_client_ca_file(cmd_parms * parms, void *dummy,
                                    const char *arg);
 
+const char *mgs_set_p11_module(cmd_parms * parms, void *dummy,
+                               const char *arg);
+
+const char *mgs_set_pin(cmd_parms * parms, void *dummy,
+                                   const char *arg);
+
+const char *mgs_set_srk_pin(cmd_parms * parms, void *dummy,
+                                   const char *arg);
+
 const char *mgs_set_keyring_file(cmd_parms * parms, void *dummy,
                                    const char *arg);
 
 const char *mgs_set_enabled(cmd_parms * parms, void *dummy,
                             const char *arg);
-const char *mgs_set_export_certificates_enabled(cmd_parms * parms, void *dummy,
+const char *mgs_set_export_certificates_size(cmd_parms * parms, void *dummy,
                             const char *arg);
 const char *mgs_set_priorities(cmd_parms * parms, void *dummy,
                             const char *arg);
@@ -379,6 +459,10 @@ const char *mgs_set_require_bytecode(cmd_parms *cmd,
                                     void *mconfig, const char *arg);
 
 mgs_srvconf_rec* mgs_find_sni_server(gnutls_session_t session);
+
+const char *mgs_store_cred_path(cmd_parms * parms,
+                                void *dummy __attribute__((unused)),
+                                const char *arg);
 
 /* mod_gnutls Hooks. */
 
