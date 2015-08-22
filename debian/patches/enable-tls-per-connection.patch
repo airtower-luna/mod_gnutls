@@ -1,7 +1,6 @@
-From e8acf058857eae21cde2fca0f4e97338075f5f60 Mon Sep 17 00:00:00 2001
 From: Thomas Klute <thomas2.klute@uni-dortmund.de>
 Date: Tue, 20 Jan 2015 16:30:36 +0100
-Subject: [PATCH] Enable/disable TLS per connection in ssl_engine_disable
+Subject: Enable/disable TLS per connection in ssl_engine_disable
 
 Previously, ssl_engine_disable set the server wide variable sc->enabled
 to GNUTLS_ENABLED_FALSE, leading to mod_gnutls refusing to serve any
@@ -18,10 +17,10 @@ for proxy back end connections while continuing to serve TLS clients.
  src/mod_gnutls.c        | 23 +++++++++++++++++++----
  3 files changed, 53 insertions(+), 22 deletions(-)
 
-Index: mod-gnutls-0.6/include/mod_gnutls.h.in
-===================================================================
---- mod-gnutls-0.6.orig/include/mod_gnutls.h.in
-+++ mod-gnutls-0.6/include/mod_gnutls.h.in
+diff --git a/include/mod_gnutls.h.in b/include/mod_gnutls.h.in
+index 57aa52e..eba4cb2 100644
+--- a/include/mod_gnutls.h.in
++++ b/include/mod_gnutls.h.in
 @@ -170,6 +170,8 @@ typedef struct {
      mgs_srvconf_rec *sc;
  	/* Connection record */
@@ -31,11 +30,11 @@ Index: mod-gnutls-0.6/include/mod_gnutls.h.in
  	/* GnuTLS Session handle */
      gnutls_session_t session;
  	/* module input status */
-Index: mod-gnutls-0.6/src/gnutls_hooks.c
-===================================================================
---- mod-gnutls-0.6.orig/src/gnutls_hooks.c
-+++ mod-gnutls-0.6/src/gnutls_hooks.c
-@@ -674,14 +674,23 @@ mgs_srvconf_rec *mgs_find_sni_server(gnu
+diff --git a/src/gnutls_hooks.c b/src/gnutls_hooks.c
+index e6e7a67..9ba4ca1 100644
+--- a/src/gnutls_hooks.c
++++ b/src/gnutls_hooks.c
+@@ -674,14 +674,23 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session) {
      return NULL;
  }
  
@@ -65,7 +64,7 @@ Index: mod-gnutls-0.6/src/gnutls_hooks.c
      ctxt->c = c;
      ctxt->sc = sc;
      ctxt->status = 0;
-@@ -692,6 +701,7 @@ static void create_gnutls_handle(conn_re
+@@ -692,6 +701,7 @@ static void create_gnutls_handle(conn_rec * c) {
      ctxt->output_bb = apr_brigade_create(c->pool, c->bucket_alloc);
      ctxt->output_blen = 0;
      ctxt->output_length = 0;
@@ -73,7 +72,7 @@ Index: mod-gnutls-0.6/src/gnutls_hooks.c
      /* Initialize GnuTLS Library */
      gnutls_init(&ctxt->session, GNUTLS_SERVER);
      /* Initialize Session Tickets */
-@@ -707,8 +717,6 @@ static void create_gnutls_handle(conn_re
+@@ -707,8 +717,6 @@ static void create_gnutls_handle(conn_rec * c) {
      /* Initialize Session Cache */
      mgs_cache_session_init(ctxt);
  
@@ -82,7 +81,7 @@ Index: mod-gnutls-0.6/src/gnutls_hooks.c
      /* Set pull, push & ptr functions */
      gnutls_transport_set_pull_function(ctxt->session,
              mgs_transport_read);
-@@ -722,15 +730,20 @@ static void create_gnutls_handle(conn_re
+@@ -722,15 +730,20 @@ static void create_gnutls_handle(conn_rec * c) {
              ctxt, NULL, c);
  }
  
@@ -95,13 +94,12 @@ Index: mod-gnutls-0.6/src/gnutls_hooks.c
  
 -    sc = (mgs_srvconf_rec *) ap_get_module_config(c->base_server->module_config,
 -            &gnutls_module);
--
--    if (sc && (!sc->enabled || sc->proxy_enabled == GNUTLS_ENABLED_TRUE)) {
 +    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
 +        ap_get_module_config(c->base_server->module_config, &gnutls_module);
 +    mgs_handle_t *ctxt = (mgs_handle_t *)
 +        ap_get_module_config(c->conn_config, &gnutls_module);
-+
+ 
+-    if (sc && (!sc->enabled || sc->proxy_enabled == GNUTLS_ENABLED_TRUE)) {
 +    if ((sc && (!sc->enabled || sc->proxy_enabled == GNUTLS_ENABLED_TRUE))
 +        || (ctxt && ctxt->enabled == GNUTLS_ENABLED_FALSE))
 +    {
@@ -127,10 +125,10 @@ Index: mod-gnutls-0.6/src/gnutls_hooks.c
          return DECLINED;
      }
  
-Index: mod-gnutls-0.6/src/mod_gnutls.c
-===================================================================
---- mod-gnutls-0.6.orig/src/mod_gnutls.c
-+++ mod-gnutls-0.6/src/mod_gnutls.c
+diff --git a/src/mod_gnutls.c b/src/mod_gnutls.c
+index 0a32ffd..e974ae8 100644
+--- a/src/mod_gnutls.c
++++ b/src/mod_gnutls.c
 @@ -19,8 +19,12 @@
  
  #include "mod_gnutls.h"

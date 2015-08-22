@@ -1,16 +1,19 @@
 From: Jurica Stanojkovic <Jurica.Stanojkovic@imgtec.com>
-Subject: Re: FTBFS on many architectures, test suite errors
 Date: Wed, 29 Oct 2014 13:55:56 +0000
+Subject: FTBFS on many architectures, test suite errors
 
 https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=750857
 
 Use ip6-loopback for TEST_IP and increment the timeout values so the tests
 won't fail on slow build machines.
+---
+ t/Makefile | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Index: mod-gnutls-0.6/t/Makefile
-===================================================================
---- mod-gnutls-0.6.orig/t/Makefile
-+++ mod-gnutls-0.6/t/Makefile
+diff --git a/t/Makefile b/t/Makefile
+index c7e7e2c..4c39bac 100644
+--- a/t/Makefile
++++ b/t/Makefile
 @@ -6,13 +6,13 @@
  # simple configuration choices.
  

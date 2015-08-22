@@ -1,8 +1,6 @@
-From 3d361b8e5d7c4c971d344658728979fe978dc759 Mon Sep 17 00:00:00 2001
 From: Thomas Klute <thomas2.klute@uni-dortmund.de>
 Date: Tue, 13 Jan 2015 17:04:38 +0100
-Subject: [PATCH] Check if filters exist before removing them in
- ssl_engine_disable
+Subject: Check if filters exist before removing them in ssl_engine_disable
 
 Trying to remove filters that are NULL leads to a segfault in the worker
 thread. Check if c->input_filters and c->output_filters are defined
@@ -13,9 +11,11 @@ Also, output filters should be removed with the dedicated function.
  src/mod_gnutls.c | 6 ++++--
  1 file changed, 4 insertions(+), 2 deletions(-)
 
+diff --git a/src/mod_gnutls.c b/src/mod_gnutls.c
+index e576fb8..0a32ffd 100644
 --- a/src/mod_gnutls.c
 +++ b/src/mod_gnutls.c
-@@ -80,8 +80,10 @@
+@@ -80,8 +80,10 @@ int ssl_engine_disable(conn_rec *c) {
      if(sc->enabled == GNUTLS_ENABLED_FALSE) {
          return 1;
      }

@@ -1,7 +1,6 @@
-From 5a8a32bbfb8a83fe6358c5c31c443325a7775fc2 Mon Sep 17 00:00:00 2001
 From: Thomas Klute <thomas2.klute@uni-dortmund.de>
 Date: Thu, 5 Feb 2015 14:48:45 +0100
-Subject: [PATCH] TLS Client auth: Check server verify mode if unset for dir
+Subject: TLS Client auth: Check server verify mode if unset for dir
 
 The authentication hook (mgs_hook_authz) failed to consider the server's
 client verify mode, even if the verify mode was unset in the directory
@@ -22,10 +21,10 @@ configuration and applies the server wide configuration in that case.
  src/gnutls_hooks.c | 9 ++++++---
  1 file changed, 6 insertions(+), 3 deletions(-)
 
-Index: mod-gnutls-0.6/src/gnutls_hooks.c
-===================================================================
---- mod-gnutls-0.6.orig/src/gnutls_hooks.c
-+++ mod-gnutls-0.6/src/gnutls_hooks.c
+diff --git a/src/gnutls_hooks.c b/src/gnutls_hooks.c
+index 1c2e094..e6e7a67 100644
+--- a/src/gnutls_hooks.c
++++ b/src/gnutls_hooks.c
 @@ -871,9 +871,12 @@ int mgs_hook_authz(request_rec * r) {
              return DECLINED;
          }
