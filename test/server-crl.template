@@ -1,0 +1,4 @@
+# next CRL update will be in 2 days
+crl_next_update = 2
+# this is the 1st CRL by this CA
+crl_number = 1

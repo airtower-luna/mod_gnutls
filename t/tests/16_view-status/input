@@ -1,3 +1,0 @@
-GET /status HTTP/1.1
-Host: __HOSTNAME__
-

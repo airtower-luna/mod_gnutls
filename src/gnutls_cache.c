@@ -2,6 +2,7 @@
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2008 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
+ *  Copyright 2015 Thomas Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -42,6 +43,10 @@
 
 #if MODULE_MAGIC_NUMBER_MAJOR < 20081201
 #define ap_unixd_config unixd_config
+#endif
+
+#ifdef APLOG_USE_MODULE
+APLOG_USE_MODULE(gnutls);
 #endif
 
 char *mgs_session_id2sz(unsigned char *id, int idlen,
@@ -575,8 +580,16 @@ int mgs_cache_post_config(apr_pool_t * p, server_rec * s,
     return 0;
 }
 
-int mgs_cache_child_init(apr_pool_t * p, server_rec * s,
-        mgs_srvconf_rec * sc) {
+#if HAVE_APR_MEMCACHE
+int mgs_cache_child_init(apr_pool_t * p,
+                         server_rec * s,
+                         mgs_srvconf_rec * sc)
+#else
+int mgs_cache_child_init(apr_pool_t * p __attribute__((unused)),
+                         server_rec * s __attribute__((unused)),
+                         mgs_srvconf_rec * sc)
+#endif
+{
     if (sc->cache_type == mgs_cache_dbm
             || sc->cache_type == mgs_cache_gdbm) {
         return 0;

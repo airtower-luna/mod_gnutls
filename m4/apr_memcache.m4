@@ -44,7 +44,9 @@ elif test -n "$apr_memcache_prefix"; then
 else
     apr_memcache_includedir=$includedir/apr_memcache-0
 fi
+
 CFLAGS="-I$apr_memcache_includedir $CFLAGS"
+
 
 AC_CHECK_LIB(
     apr_memcache,
@@ -57,6 +59,28 @@ AC_CHECK_LIB(
 	APR_MEMCACHE_CFLAGS="-I$apr_memcache_includedir"
     ]
 )
+
+
+dnl # if the apr_memcache was not found, try apr-util
+if test -z "${APR_MEMCACHE_LIBS}"; then
+    if test -n "$apr_memcache_includes"; then
+	apr_memcache_includedir=$apr_memcache_includes
+    elif test -n "$apr_memcache_prefix"; then
+	apr_memcache_includedir=$apr_memcache_prefix/include/aprutil-1
+    else
+	apr_memcache_includedir=$includedir/aprutil-1
+    fi
+    AC_CHECK_LIB(
+	aprutil-1,
+	apr_memcache_create,
+	[
+	    APR_MEMCACHE_LIBS="`apu-1-config --link-ld`"
+	    APR_MEMCACHE_CFLAGS="`apu-1-config --includes`"
+	]
+    )
+fi
+
+
 CFLAGS=$save_CFLAGS
 LDFLAGS=$save_LDFLAGS
 

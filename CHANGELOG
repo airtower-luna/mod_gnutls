@@ -1,7 +1,18 @@
 **TODO:
-- Fix support for proxy termination
 - Handle Unclean Shutdowns
 - make session cache use generic apache caches
+
+** Version 0.7 (2015-07-12)
+- Security fix for TLS client authentication (CVE-2015-2091)
+- Bug fixes that enable support for reverse proxy operation
+- Various test suite improvements. Tests are configured through autoconf,
+  so the test suite now works for builds without Monkeysphere support.
+- Add support for TLS connections to back end servers when operating as a
+  reverse proxy (X.509 authentication only at the moment).
+- PKCS #11 support for server keys and certificates
+- Use strict compiler arguments by default (-Wall -Werror -Wextra)
+- Allow limiting the size of certificates exported as SSL_SERVER_CERT
+  and SSL_CLIENT_CERT through the GnuTLSExportCertificates directive
 
 ** Version 0.6 (2014-02-17)
 - Generating DH Params instead of using static ones.
@@ -87,7 +98,7 @@ http://issues.outoforder.cc/view.php?id=102
 ** Version 0.4.1 (2007-12-03)
 - Added support for subject alternative names in certificates.
 Only one per certificate is supported.
-- New enviroment variables: SSL_CLIENT_M_VERSION, SSL_CLIENT_S_SAN%, 
+- New enviroment variables: SSL_CLIENT_M_VERSION, SSL_CLIENT_S_SAN%,
 SSL_CLIENT_S_TYPE, SSL_SERVER_M_VERSION, SSL_SERVER_S_SAN%, SSL_SERVER_S_TYPE
 - The compatibility mode can now be enabled explicitely with the
 %COMPAT keyword at the GnuTLSPriorities string. It is no longer the default.
