@@ -1,3 +1,11 @@
+mod-gnutls (0.6-1.3) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Fix "GnuTLSClientVerify require is ignored", check server wide 
+    GnuTLSClientVerify if not set for directory (Closes: #578663)
+
+ -- Thomas Klute <thomas2.klute@uni-dortmund.de>  Fri, 20 Feb 2015 19:01:54 +0100
+
 mod-gnutls (0.6-1.2) unstable; urgency=low
 
   * Non-maintainer upload.

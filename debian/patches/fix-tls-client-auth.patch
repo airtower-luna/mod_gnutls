@@ -1,0 +1,44 @@
+From 5a8a32bbfb8a83fe6358c5c31c443325a7775fc2 Mon Sep 17 00:00:00 2001
+From: Thomas Klute <thomas2.klute@uni-dortmund.de>
+Date: Thu, 5 Feb 2015 14:48:45 +0100
+Subject: [PATCH] TLS Client auth: Check server verify mode if unset for dir
+
+The authentication hook (mgs_hook_authz) failed to consider the server's
+client verify mode, even if the verify mode was unset in the directory
+configuration. As a result, invalid certificates were ignored and
+clients could connect and receive data as long as they presented any
+certificate whatsoever. Logs showed that authorization was granted
+despite the certificate being invalid (timestamps removed for
+readability):
+
+[:debug] [pid 10806:tid 140242057148160] gnutls_hooks.c(1198): [client ::1:40992] GnuTLS: Verifying list of 1 certificate(s) via method 'cartel'
+[:info] [pid 10806:tid 140242057148160] [client ::1:40992] GnuTLS: Could not find Signer for Peer Certificate
+[:info] [pid 10806:tid 140242057148160] [client ::1:40992] GnuTLS: Peer Certificate is invalid.
+[authz_core:debug] [pid 10806:tid 140242057148160] mod_authz_core.c(835): [client ::1:40992] AH01628: authorization result: granted (no directives)
+
+This commit adds a check for undefined verify mode in the directory
+configuration and applies the server wide configuration in that case.
+---
+ src/gnutls_hooks.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+Index: mod-gnutls-0.6/src/gnutls_hooks.c
+===================================================================
+--- mod-gnutls-0.6.orig/src/gnutls_hooks.c
++++ mod-gnutls-0.6/src/gnutls_hooks.c
+@@ -871,9 +871,12 @@ int mgs_hook_authz(request_rec * r) {
+             return DECLINED;
+         }
+         rv = mgs_cert_verify(r, ctxt);
+-        if (rv != DECLINED &&
+-                (rv != HTTP_FORBIDDEN ||
+-                dc->client_verify_mode == GNUTLS_CERT_REQUIRE)) {
++        if (rv != DECLINED
++            && (rv != HTTP_FORBIDDEN
++                || dc->client_verify_mode == GNUTLS_CERT_REQUIRE
++                || (dc->client_verify_mode == -1
++                    && ctxt->sc->client_verify_mode == GNUTLS_CERT_REQUIRE)))
++        {
+             return rv;
+         }
+     }
