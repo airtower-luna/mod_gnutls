@@ -1,3 +1,9 @@
+mod-gnutls (0.7-1) unstable; urgency=medium
+
+  * new upstream release (welcome new upstream maintainer, Thomas Klute)
+
+ -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Sat, 22 Aug 2015 22:41:14 +0200
+
 mod-gnutls (0.6-1.4) unstable; urgency=low
 
   * Non-maintainer upload.
