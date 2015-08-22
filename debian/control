@@ -17,7 +17,7 @@ Build-Depends:
  msva-perl,
  pandoc,
  pkg-config
-Standards-Version: 3.9.5
+Standards-Version: 3.9.6
 Homepage: https://mod.gnutls.org/
 Vcs-Git: https://mod.gnutls.org/mod_gnutls
 

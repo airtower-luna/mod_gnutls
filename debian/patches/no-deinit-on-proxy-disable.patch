@@ -1,0 +1,45 @@
+From c782c1f12c0ed4d5048eb52fd3ef51037c53f426 Mon Sep 17 00:00:00 2001
+From: Thomas Klute <thomas2.klute@uni-dortmund.de>
+Date: Wed, 21 Jan 2015 09:41:51 +0100
+Subject: [PATCH] Don't do global deinit when disabling TLS for a proxy back
+ end connection
+
+Prior to this commit, ssl_engine_disable called mgs_cleanup_pre_config
+on the connection pool before returning:
+
+mgs_cleanup_pre_config(c->pool);
+
+mgs_cleanup_pre_config does not even touch the argument, as its
+signature shows.
+
+apr_status_t mgs_cleanup_pre_config(void *data __attribute__((unused)));
+
+It does, however, deinitialize the global session cache and, more
+importantly, the global GnuTLS data structures. Trying to use those
+deinitialized data structures led to segmentation faults during TLS
+handshake.
+
+Since there is no reason to globally deinitialize GnuTLS when disabling
+TLS for one specific proxy back end connection, the solution is to
+simply remove the call to mgs_cleanup_pre_config from
+ssl_engine_disable.
+---
+ src/mod_gnutls.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/mod_gnutls.c b/src/mod_gnutls.c
+index a77364d..2d0e6ea 100644
+--- a/src/mod_gnutls.c
++++ b/src/mod_gnutls.c
+@@ -100,7 +100,7 @@ int ssl_engine_disable(conn_rec *c)
+         ap_remove_input_filter(c->input_filters);
+     if (c->output_filters)
+         ap_remove_output_filter(c->output_filters);
+-    mgs_cleanup_pre_config(c->pool);
++
+     return 1;
+ }
+ 
+-- 
+2.1.4
+
