@@ -1,0 +1,34 @@
+From: Jurica Stanojkovic <Jurica.Stanojkovic@imgtec.com>
+Subject: Re: FTBFS on many architectures, test suite errors
+Date: Mon, 29 Sep 2014 15:14:48 +0000
+
+https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=750857
+
+I have found while testing package on local build machine that package is
+failing due to configuration in /etc/hosts
+
+ip6-loopback was configured with
+127.0.0.1       localhost ip6-localhost ip6-loopback
+after replacing that with following
+::1       localhost ip6-localhost ip6-loopback
+package was built successfully without changes to source.
+
+I do not know how is this configured in /etc/hosts on official buildd for
+architectures that fail to build.
+
+Also if following patch is added to a source there is no need for changes in
+/etc/hosts:
+
+Index: mod-gnutls-0.6/t/Makefile
+===================================================================
+--- mod-gnutls-0.6.orig/t/Makefile
++++ mod-gnutls-0.6/t/Makefile
+@@ -6,7 +6,7 @@
+ # simple configuration choices.
+ 
+ export TEST_HOST ?= localhost
+-export TEST_IP ?= ::1
++export TEST_IP ?= 127.0.0.1
+ # chosen at random:
+ export TEST_PORT ?= 9932
+ export MSVA_PORT ?= 9933

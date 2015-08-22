@@ -1,3 +1,13 @@
+mod-gnutls (0.6-1.1) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Use 127.0.0.1 for TEST_IP.
+    Add test-ip.patch.
+    Patch by Jurica Stanojkovic <Jurica.Stanojkovic@imgtec.com>.
+    Closes: #750857.
+
+ -- Anibal Monsalve Salazar <anibal@debian.org>  Wed, 08 Oct 2014 08:16:43 +0100
+
 mod-gnutls (0.6-1) unstable; urgency=low
 
   * New upstream version
