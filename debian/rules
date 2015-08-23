@@ -10,7 +10,3 @@ override_dh_auto_install:
 override_dh_install:
 	mv src/.libs/libmod_gnutls.so src/.libs/mod_gnutls.so
 	dh_install
-
-override_dh_installdocs:
-	make -C docs mod_gnutls_manual.html
-	dh_installdocs
