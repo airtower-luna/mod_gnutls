@@ -5,3 +5,4 @@ t/*/*.key
 t/authority.template
 t/client.template
 t/server.uid
+config.nice
