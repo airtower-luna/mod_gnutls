@@ -325,12 +325,20 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
     /* Load additional PKCS #11 module, if requested */
     if (sc_base->p11_module != NULL)
     {
-        rv = gnutls_pkcs11_add_provider(sc_base->p11_module, NULL);
-        if (rv != GNUTLS_E_SUCCESS)
+	rv = gnutls_pkcs11_init(GNUTLS_PKCS11_FLAG_MANUAL, NULL);
+        if (rv < 0) {
             ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                         "GnuTLS: Loading PKCS #11 provider module %s "
+                         "GnuTLS: Initializing PKCS #11 "
                          "failed: %s (%d).",
-                         sc_base->p11_module, gnutls_strerror(rv), rv);
+                         gnutls_strerror(rv), rv);
+	} else {
+	    rv = gnutls_pkcs11_add_provider(sc_base->p11_module, NULL);
+	    if (rv != GNUTLS_E_SUCCESS)
+                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+	                     "GnuTLS: Loading PKCS #11 provider module %s "
+        	             "failed: %s (%d).",
+                	     sc_base->p11_module, gnutls_strerror(rv), rv);
+	}
     }
 
     for (s = base_server; s; s = s->next) {

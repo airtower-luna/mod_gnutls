@@ -143,7 +143,7 @@ static const command_rec mgs_config_cmds[] = {
     AP_INIT_TAKE1("GnuTLSP11Module", mgs_set_p11_module,
     NULL,
     RSRC_CONF,
-    "Load this additional PKCS #11 provider library"),
+    "Load this specific PKCS #11 provider library"),
     AP_INIT_RAW_ARGS("GnuTLSPIN", mgs_set_pin,
     NULL,
     RSRC_CONF,
