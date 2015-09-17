@@ -1,0 +1,24 @@
+From: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
+Date: Thu, 17 Sep 2015 05:39:56 -0400
+Subject: let a failed diff be verbose
+
+there is no reason to pass -q to diff when comparing output: if diff
+succeeds, it will be quiet.  If it fails, the test fails, and so we
+want it in our stderr!
+---
+ test/runtests | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/test/runtests b/test/runtests
+index bf172ec..1957168 100755
+--- a/test/runtests
++++ b/test/runtests
+@@ -207,7 +207,7 @@ for t in $tests; do
+     unset sleep_pidfile
+ 
+     if [ -e ${t}/output ] ; then
+-	diff_output_filter_headers "${t}/output" "$output" "-q"
++	diff_output_filter_headers "${t}/output" "$output" >&2
+     fi
+     if [ -n "${USE_MSVA}" ]; then
+ 	trap stop_msva EXIT
