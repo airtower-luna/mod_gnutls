@@ -641,17 +641,17 @@ const char *mgs_set_pgpkey_file(cmd_parms * parms, void *dummy __attribute__((un
     return NULL;
 }
 
-const char *mgs_set_tickets(cmd_parms * parms, void *dummy __attribute__((unused)),
-        const char *arg) {
-    mgs_srvconf_rec *sc =
-	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
-						 module_config,
-						 &gnutls_module);
+const char *mgs_set_tickets(cmd_parms *parms,
+                            void *dummy __attribute__((unused)),
+                            const int arg)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(parms->server->module_config, &gnutls_module);
 
-    sc->tickets = 0;
-    if (strcasecmp("on", arg) == 0) {
-	sc->tickets = 1;
-    }
+    if (arg)
+        sc->tickets = GNUTLS_ENABLED_TRUE;
+    else
+        sc->tickets = GNUTLS_ENABLED_FALSE;
 
     return NULL;
 }
@@ -825,36 +825,39 @@ const char *mgs_set_keyring_file(cmd_parms * parms, void *dummy __attribute__((u
     return NULL;
 }
 
-const char *mgs_set_proxy_engine(cmd_parms * parms, void *dummy __attribute__((unused)),
-        const char *arg) {
-
+/*
+ * Enable TLS proxy operation if arg is true, disable it otherwise.
+ */
+const char *mgs_set_proxy_engine(cmd_parms *parms,
+                                 void *dummy __attribute__((unused)),
+                                 const int arg)
+{
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
-	ap_get_module_config(parms->server->module_config, &gnutls_module);
+        ap_get_module_config(parms->server->module_config, &gnutls_module);
 
-    if (!strcasecmp(arg, "On")) {
-	sc->proxy_enabled = GNUTLS_ENABLED_TRUE;
-    } else if (!strcasecmp(arg, "Off")) {
-	sc->proxy_enabled = GNUTLS_ENABLED_FALSE;
-    } else {
-	return "GnuTLSProxyEngine must be set to 'On' or 'Off'";
-    }
+    if (arg)
+        sc->proxy_enabled = GNUTLS_ENABLED_TRUE;
+    else
+        sc->proxy_enabled = GNUTLS_ENABLED_FALSE;
 
     return NULL;
 }
 
-const char *mgs_set_enabled(cmd_parms * parms, void *dummy __attribute__((unused)),
-        const char *arg) {
-    mgs_srvconf_rec *sc =
-	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
-						 module_config,
-						 &gnutls_module);
-    if (!strcasecmp(arg, "On")) {
-	sc->enabled = GNUTLS_ENABLED_TRUE;
-    } else if (!strcasecmp(arg, "Off")) {
-	sc->enabled = GNUTLS_ENABLED_FALSE;
-    } else {
-	return "GnuTLSEnable must be set to 'On' or 'Off'";
-    }
+/*
+ * Enable TLS for the server/vhost if arg is true, disable it
+ * otherwise.
+ */
+const char *mgs_set_enabled(cmd_parms *parms,
+                            void *dummy __attribute__((unused)),
+                            const int arg)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(parms->server->module_config, &gnutls_module);
+
+    if (arg)
+        sc->enabled = GNUTLS_ENABLED_TRUE;
+    else
+        sc->enabled = GNUTLS_ENABLED_FALSE;
 
     return NULL;
 }

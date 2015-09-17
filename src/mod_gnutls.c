@@ -136,10 +136,10 @@ int ssl_proxy_enable(conn_rec *c)
 }
 
 static const command_rec mgs_config_cmds[] = {
-    AP_INIT_TAKE1("GnuTLSProxyEngine", mgs_set_proxy_engine,
+    AP_INIT_FLAG("GnuTLSProxyEngine", mgs_set_proxy_engine,
     NULL,
     RSRC_CONF | OR_AUTHCFG,
-    "Enable SSL Proxy Engine"),
+    "Enable TLS Proxy Engine"),
     AP_INIT_TAKE1("GnuTLSP11Module", mgs_set_p11_module,
     NULL,
     RSRC_CONF,
@@ -219,7 +219,7 @@ static const command_rec mgs_config_cmds[] = {
     NULL,
     RSRC_CONF,
     "Cache Configuration"),
-    AP_INIT_TAKE1("GnuTLSSessionTickets", mgs_set_tickets,
+    AP_INIT_FLAG("GnuTLSSessionTickets", mgs_set_tickets,
     NULL,
     RSRC_CONF,
     "Session Tickets Configuration"),
@@ -227,7 +227,7 @@ static const command_rec mgs_config_cmds[] = {
     NULL,
     RSRC_CONF,
     "The priorities to enable (ciphers, Key exchange, macs, compression)."),
-    AP_INIT_TAKE1("GnuTLSEnable", mgs_set_enabled,
+    AP_INIT_FLAG("GnuTLSEnable", mgs_set_enabled,
     NULL,
     RSRC_CONF,
     "Whether this server has GnuTLS Enabled. Default: Off"),
