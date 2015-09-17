@@ -1,0 +1,32 @@
+From: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
+Date: Thu, 17 Sep 2015 05:06:34 -0400
+Subject: avoid unnecessary use of bc
+
+test/runtests has a shebang line of /bin/bash.  we can make use of
+bashisms to avoid depending on bc.
+---
+ test/runtests | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/test/runtests b/test/runtests
+index bf172ec..355df8f 100755
+--- a/test/runtests
++++ b/test/runtests
+@@ -129,7 +129,7 @@ if [ -n "${USE_MSVA}" ]; then
+     # wait at most TEST_MSVA_MAX_WAIT seconds for MSVA to get ready
+     waited=0.0
+     until [ ${ret} -eq 0 ] \
+-	      || [ $(echo "${waited} > ${TEST_MSVA_MAX_WAIT}" | bc) -eq 1 ]; do
++	      || [ "${waited}" -gt "${TEST_MSVA_MAX_WAIT}" ]; do
+ 	if msva-query-agent https "$(cat client.uid)" x509pem client < client/x509.pem
+ 	then
+ 	    ret=0
+@@ -137,7 +137,7 @@ if [ -n "${USE_MSVA}" ]; then
+ 	    echo "MSVA not ready yet"
+ 	fi
+ 	sleep "${TEST_GAP}"
+-	waited=$(echo "${waited} + ${TEST_GAP}" | bc)
++	waited=$((${waited} + ${TEST_GAP}))
+     done
+ 
+     # check if MSVA is up, fail if not
