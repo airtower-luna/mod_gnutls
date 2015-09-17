@@ -1106,9 +1106,8 @@ const char *mgs_store_cred_path(cmd_parms * parms,
 
 
 /*
- * Record additional PKCS #11 module to load. Note that the value is
- * only used in the base config, settings in virtual hosts are
- * ignored.
+ * Record PKCS #11 module to load. Note that the value is only used in
+ * the base config, settings in virtual hosts are ignored.
  */
 const char *mgs_set_p11_module(cmd_parms * parms,
                                void *dummy __attribute__((unused)),

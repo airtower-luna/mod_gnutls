@@ -374,15 +374,14 @@ achieve maximum compatibility (some broken mobile clients need this).
 `GnuTLSP11Module`
 ------------------
 
-Load an additional PKCS #11 module.
+Load this PKCS #11 module.
 
     GnuTLSP11Module PATH_TO_LIBRARY
 
 Default: *none*\
 Context: server config
 
-Load this PKCS #11 provider module, in addition to the system
-defaults.
+Load this PKCS #11 provider module, instead of the system defaults.
 
 `GnuTLSPIN`
 ------------------

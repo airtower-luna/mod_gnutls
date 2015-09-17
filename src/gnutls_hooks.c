@@ -322,7 +322,8 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
         exit(-1);
     }
 
-    /* Load additional PKCS #11 module, if requested */
+    /* If GnuTLSP11Module is set, load that PKCS #11 module. Otherwise
+     * system defaults will be used. */
     if (sc_base->p11_module != NULL)
     {
         rv = gnutls_pkcs11_init(GNUTLS_PKCS11_FLAG_MANUAL, NULL);
