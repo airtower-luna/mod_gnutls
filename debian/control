@@ -16,7 +16,8 @@ Build-Depends:
  monkeysphere (>= 0.36),
  msva-perl,
  pandoc,
- pkg-config
+ pkg-config,
+ softhsm
 Standards-Version: 3.9.6
 Homepage: https://mod.gnutls.org/
 Vcs-Git: https://mod.gnutls.org/git/mod_gnutls

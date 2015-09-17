@@ -1,6 +1,7 @@
 mod-gnutls (0.7-2) unstable; urgency=medium
 
   * avoid use of bc in test suite (Closes: #799249)
+  * added softhsm to the build-depends to enable testing of PKCS#11
 
  -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Thu, 17 Sep 2015 05:07:35 -0400
 
