@@ -2,22 +2,23 @@ Source: mod-gnutls
 Section: httpd
 Priority: extra
 Maintainer: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
-Build-Depends: apache2-bin,
+Build-Depends: apache2-bin <!nocheck>,
                apache2-dev,
-               bc,
-               debhelper (>= 9),
+               bc <!nocheck>,
+               debhelper (>= 9.20141010),
                dh-apache2,
                dh-autoreconf,
-               gnutls-bin,
+               dpkg-dev (>= 1.17.14),
+               gnutls-bin <!nocheck>,
                libapr-memcache-dev,
                libgnutls28-dev | libgnutls-dev (>= 2.4.0),
                libmsv-dev (>= 1.0),
                libwww-perl,
-               monkeysphere (>= 0.36),
-               msva-perl,
+               monkeysphere (>= 0.36) <!nocheck>,
+               msva-perl <!nocheck>,
                pandoc,
                pkg-config,
-               softhsm
+               softhsm <!nocheck>
 Standards-Version: 3.9.6
 Homepage: https://mod.gnutls.org/
 Vcs-Git: https://mod.gnutls.org/git/mod_gnutls
