@@ -19,7 +19,8 @@ Build-Depends:
  pkg-config
 Standards-Version: 3.9.6
 Homepage: https://mod.gnutls.org/
-Vcs-Git: https://mod.gnutls.org/mod_gnutls
+Vcs-Git: https://mod.gnutls.org/git/mod_gnutls
+Vcs-Browser: https://mod.gnutls.org/browser/mod_gnutls
 
 Package: libapache2-mod-gnutls
 Architecture: any
