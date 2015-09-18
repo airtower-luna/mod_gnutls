@@ -219,7 +219,7 @@ static int cert_retrieve_fn(gnutls_session_t session,
  */
 static int read_crt_cn(server_rec * s, apr_pool_t * p, gnutls_x509_crt_t cert, char **cert_cn) {
 
-    int rv = 0, i;
+    int rv = 0;
     size_t data_len;
 
 
@@ -241,7 +241,8 @@ static int read_crt_cn(server_rec * s, apr_pool_t * p, gnutls_x509_crt_t cert, c
                 s->server_hostname, s->port);
         rv = 0;
         /* read subject alternative name */
-        for (i = 0; !(rv < 0); i++) {
+        for (int i = 0; !(rv < 0); i++)
+        {
             data_len = 0;
             rv = gnutls_x509_crt_get_subject_alt_name(cert, i,
                     NULL,
@@ -336,8 +337,7 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
         }
         else
         {
-            int i;
-            for (i = 0; i < sc_base->p11_modules->nelts; i++)
+            for (int i = 0; i < sc_base->p11_modules->nelts; i++)
             {
                 char *p11_module =
                     APR_ARRAY_IDX(sc_base->p11_modules, i, char *);
@@ -558,7 +558,7 @@ typedef struct {
  */
 int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc) {
 	apr_array_header_t *names;
-	int i,rv = 0;
+	int rv = 0;
 	char ** name;
 
 	/* Check ServerName First! */
@@ -570,7 +570,8 @@ int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc) 
 	} else if(s->names->nelts) {
 		names = s->names;
 		name = (char **)names->elts;
-		for (i = 0; i < names->nelts; ++i) {
+		for (int i = 0; i < names->nelts; ++i)
+        {
 			if (!name[i]) { continue; }
 				if (apr_strnatcasecmp(x->sni_name, name[i]) == 0) {
 					// We have a match, save this server configuration
@@ -582,7 +583,8 @@ int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc) 
 	} else if(s->wild_names->nelts) {
 		names = s->wild_names;
     	name = (char **)names->elts;
-		for (i = 0; i < names->nelts; ++i) {
+		for (int i = 0; i < names->nelts; ++i)
+        {
 			if (!name[i]) { continue; }
 				if(apr_fnmatch(name[i], x->sni_name ,
 								APR_FNM_CASE_BLIND|
@@ -1033,7 +1035,7 @@ static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, in
     const char *tmp;
     char *tmp2;
     size_t len;
-    int ret, i;
+    int ret;
 
     if (r == NULL)
         return;
@@ -1108,7 +1110,8 @@ static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, in
     }
 
     /* export all the alternative names (DNS, RFC822 and URI) */
-    for (i = 0; !(ret < 0); i++) {
+    for (int i = 0; !(ret < 0); i++)
+    {
         const char *san, *sanlabel;
         len = 0;
         ret = gnutls_x509_crt_get_subject_alt_name(cert, i,
@@ -1473,18 +1476,16 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
     }
 
 exit:
-    if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_X509) {
-        unsigned int i;
-        for (i = 0; i < ch_size; i++) {
+    if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_X509)
+        for (unsigned int i = 0; i < ch_size; i++)
             gnutls_x509_crt_deinit(cert.x509[i]);
-        }
-    } else if (gnutls_certificate_type_get(ctxt->session) ==
-            GNUTLS_CRT_OPENPGP)
+    else if (gnutls_certificate_type_get(ctxt->session) ==
+             GNUTLS_CRT_OPENPGP)
         gnutls_openpgp_crt_deinit(cert.pgp);
     return ret;
-
-
 }
+
+
 
 #ifdef ENABLE_MSVA
 /* this section of code is used only when trying to talk to the MSVA */
