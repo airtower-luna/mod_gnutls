@@ -322,9 +322,9 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
         exit(-1);
     }
 
-    /* If GnuTLSP11Module is set, load that PKCS #11 module. Otherwise
-     * system defaults will be used. */
-    if (sc_base->p11_module != NULL)
+    /* If GnuTLSP11Module is set, load the listed PKCS #11
+     * modules. Otherwise system defaults will be used. */
+    if (sc_base->p11_modules != NULL)
     {
         rv = gnutls_pkcs11_init(GNUTLS_PKCS11_FLAG_MANUAL, NULL);
         if (rv < 0)
@@ -336,12 +336,18 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
         }
         else
         {
-            rv = gnutls_pkcs11_add_provider(sc_base->p11_module, NULL);
-            if (rv != GNUTLS_E_SUCCESS)
-                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                             "GnuTLS: Loading PKCS #11 provider module %s "
-                             "failed: %s (%d).",
-                             sc_base->p11_module, gnutls_strerror(rv), rv);
+            int i;
+            for (i = 0; i < sc_base->p11_modules->nelts; i++)
+            {
+                char *p11_module =
+                    APR_ARRAY_IDX(sc_base->p11_modules, i, char *);
+                rv = gnutls_pkcs11_add_provider(p11_module, NULL);
+                if (rv != GNUTLS_E_SUCCESS)
+                    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                                 "GnuTLS: Loading PKCS #11 provider module %s "
+                                 "failed: %s (%d).",
+                                 p11_module, gnutls_strerror(rv), rv);
+            }
         }
     }
 

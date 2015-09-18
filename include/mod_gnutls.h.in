@@ -114,9 +114,9 @@ typedef struct {
 	/* A Plain HTTP request */
     int non_ssl_request;
 
-    /* Additional PKCS #11 provider module to load, only valid in the
+    /* List of PKCS #11 provider modules to load, only valid in the
      * base config, ignored in virtual hosts */
-    char *p11_module;
+    apr_array_header_t *p11_modules;
 
     /* PIN used for PKCS #11 operations */
     char *pin;

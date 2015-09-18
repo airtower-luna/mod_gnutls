@@ -381,7 +381,8 @@ Load this PKCS #11 module.
 Default: *none*\
 Context: server config
 
-Load this PKCS #11 provider module, instead of the system defaults.
+Load this PKCS #11 provider module, instead of the system
+defaults. May occur multiple times to load multiple modules.
 
 `GnuTLSPIN`
 ------------------

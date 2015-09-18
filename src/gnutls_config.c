@@ -951,7 +951,7 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
     sc->privkey_x509 = NULL;
     sc->privkey_pgp = NULL;
     sc->certs_x509_chain_num = 0;
-    sc->p11_module = NULL;
+    sc->p11_modules = NULL;
     sc->pin = NULL;
     sc->priorities_str = NULL;
     sc->cache_timeout = -1;	/* -1 means "unset" */
@@ -1012,7 +1012,7 @@ void *mgs_config_server_merge(apr_pool_t * p, void *BASE, void *ADD)
 
     gnutls_srvconf_merge(x509_key_file, NULL);
     gnutls_srvconf_merge(x509_ca_file, NULL);
-    gnutls_srvconf_merge(p11_module, NULL);
+    gnutls_srvconf_merge(p11_modules, NULL);
     gnutls_srvconf_merge(pin, NULL);
     gnutls_srvconf_merge(pgp_cert_file, NULL);
     gnutls_srvconf_merge(pgp_key_file, NULL);
@@ -1118,6 +1118,11 @@ const char *mgs_set_p11_module(cmd_parms * parms,
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(parms->server->module_config, &gnutls_module);
-    sc->p11_module = apr_pstrdup(parms->pool, arg);
+    /* initialize PKCS #11 module list if necessary */
+    if (sc->p11_modules == NULL)
+        sc->p11_modules = apr_array_make(parms->pool, 2, sizeof(char*));
+
+    *(char **) apr_array_push(sc->p11_modules) = apr_pstrdup(parms->pool, arg);
+
     return NULL;
 }
