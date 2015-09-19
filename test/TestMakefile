@@ -11,23 +11,6 @@ export srcdir ?= .
 export APACHE2 ?= apache2
 
 export TEST_HOST ?= localhost
-export TEST_IP ?= ::1
-# chosen at random:
-export TEST_PORT ?= 9932
-export MSVA_PORT ?= 9933
-
-export TEST_GAP ?= 0.4
-export TEST_MSVA_MAX_WAIT ?= 10
-export TEST_QUERY_DELAY ?= 30
-export TEST_LOCK_WAIT ?= 30
-
-TEST_LOCK := ./test.lock
-
-all: setup.done
-	TEST_LOCK=$(TEST_LOCK) $(srcdir)/runtests
-
-t-%: setup.done
-	TEST_LOCK=$(TEST_LOCK) $(srcdir)/runtests $@
 
 
 

@@ -96,4 +96,4 @@ check" to adjust them):
  * if a machine is particularly slow or under heavy load, it's
    possible that these tests will fail for timing
    reasons. [TEST_QUERY_DELAY (seconds for the http request to be sent
-   and responded to)] and [TEST_GAP (seconds to wait between tests)]
+   and responded to)]

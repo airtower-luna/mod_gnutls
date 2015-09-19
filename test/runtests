@@ -16,7 +16,7 @@ else
 fi
 
 BADVARS=0
-for v in APACHE2 TEST_HOST TEST_IP TEST_PORT TEST_QUERY_DELAY TEST_GAP \
+for v in APACHE2 TEST_HOST TEST_IP TEST_PORT TEST_QUERY_DELAY TEST_MSVA_WAIT \
 		 MSVA_PORT TEST_LOCK; do
     if [ ! -v "$v" ]; then
         printf "You need to set the %s environment variable\n" "$v" >&2
@@ -133,8 +133,8 @@ if [ -n "${USE_MSVA}" ]; then
 	else
 	    echo "MSVA not ready yet"
 	fi
-	sleep "${TEST_GAP}"
-	waited=$(echo "${waited} + ${TEST_GAP}" | bc)
+	sleep "${TEST_MSVA_WAIT}"
+	waited=$(echo "${waited} + ${TEST_MSVA_WAIT}" | bc)
     done
 
     # check if MSVA is up, fail if not

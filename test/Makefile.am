@@ -84,13 +84,32 @@ EXTRA_DIST = $(apache_data) $(cert_templates) *.uid.in proxy_backend.bash \
 	runtests server-crl.template server-softhsm.conf softhsm.bash \
 	TestMakefile
 
+# Lockfile for the main Apache process
+test_lockfile = ./test.lock
 # Maximum wait time in seconds for flock to aquire instance lock files
 lock_wait = 30
 
+# port for the main Apache server
+TEST_PORT ?= 9932
+# port for MSVA in test cases that use it
+MSVA_PORT ?= 9933
+# maximum time to wait for MSVA startup
+TEST_MSVA_MAX_WAIT ?= 10
+# wait loop time for MSVA startup
+TEST_MSVA_WAIT ?= 0.4
+# seconds for the HTTP request to be sent and responded to
+TEST_QUERY_DELAY ?= 30
+
 AM_TESTS_ENVIRONMENT = export APACHE2=$(APACHE2); \
 	export AP_LIBEXECDIR=$(AP_LIBEXECDIR); \
-	export TEST_LOCK_WAIT=$(lock_wait); \
+	export TEST_LOCK="$(test_lockfile)"; \
+	export TEST_LOCK_WAIT="$(lock_wait)"; \
 	export TEST_HOST="$(TEST_HOST)"; \
 	export TEST_IP="$(TEST_IP)"; \
+	export TEST_PORT="$(TEST_PORT)"; \
+	export MSVA_PORT="$(MSVA_PORT)"; \
+	export TEST_MSVA_MAX_WAIT="$(TEST_MSVA_MAX_WAIT)"; \
+	export TEST_MSVA_WAIT="$(TEST_MSVA_WAIT)"; \
+	export TEST_QUERY_DELAY="$(TEST_QUERY_DELAY)"; \
 	export BACKEND_HOST="$(TEST_HOST)"; \
 	export BACKEND_IP="$(TEST_IP)";
