@@ -97,3 +97,8 @@ check" to adjust them):
    possible that these tests will fail for timing
    reasons. [TEST_QUERY_DELAY (seconds for the http request to be sent
    and responded to)]
+
+In some situations you may want to see the exact environment as
+configured by make, e.g. if you want to manually run an Apache
+instance with Valgrind using the same configuration as a test
+case. Use "make show-test-env" to dump AM_TESTS_ENVIRONMENT to stdout.

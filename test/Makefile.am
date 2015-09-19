@@ -113,3 +113,10 @@ AM_TESTS_ENVIRONMENT = export APACHE2=$(APACHE2); \
 	export TEST_QUERY_DELAY="$(TEST_QUERY_DELAY)"; \
 	export BACKEND_HOST="$(TEST_HOST)"; \
 	export BACKEND_IP="$(TEST_IP)";
+
+# Echo AM_TESTS_ENVIRONMENT. This can be useful for debugging, e.g. if
+# you want to manually run an Apache instance with Valgrind using the
+# same configuration as a test case.
+show-test-env: export TEST_ENV=$(AM_TESTS_ENVIRONMENT)
+show-test-env:
+	@echo "$${TEST_ENV}"
