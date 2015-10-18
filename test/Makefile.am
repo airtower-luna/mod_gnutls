@@ -42,7 +42,7 @@ x509_certs = $(identities:=/x509.pem)
 x509_tokens = $(x509_certs) $(x509_keys)
 tokens = $(x509_tokens) $(pgp_tokens)
 
-include $(srcdir)/TestMakefile
+include $(srcdir)/test_ca.mk
 
 # Test cases trying to create keys and certificates in parallel causes
 # race conditions. Ensure that all keys and certificates are generated
@@ -122,8 +122,7 @@ endif
 apache_data = base_apache.conf cgi_module.conf data/* mime.types proxy_mods.conf
 
 EXTRA_DIST = $(apache_data) $(cert_templates) *.uid.in proxy_backend.bash \
-	runtests server-crl.template server-softhsm.conf softhsm.bash \
-	TestMakefile
+	runtests server-crl.template server-softhsm.conf softhsm.bash
 
 # Lockfile for the main Apache process
 test_lockfile = ./test.lock
