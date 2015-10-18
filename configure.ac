@@ -9,7 +9,8 @@ AC_CONFIG_AUX_DIR(config)
 OOO_MAINTAIN_MODE
 AM_MAINTAINER_MODE
 AC_CANONICAL_TARGET
-AM_INIT_AUTOMAKE
+# mod_gnutls test suite requires GNU make
+AM_INIT_AUTOMAKE([-Wno-portability])
 AM_CONFIG_HEADER(include/mod_gnutls_config.h:config.in)
 
 AC_SUBST(MOD_GNUTLS_VERSION)
