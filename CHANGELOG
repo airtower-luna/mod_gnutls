@@ -2,6 +2,22 @@
 - Handle Unclean Shutdowns
 - make session cache use generic apache caches
 
+** Version 0.7.1 (2015-10-18)
+- Improved handling of PKCS #11 modules: mod_gnutls now loads either
+  modules specified using GnuTLSP11Module, or the system defaults, but
+  not both. Thanks to Nikos Mavrogiannopoulos for the report and
+  initial patch!
+- Initialize variables to safe defaults during client certificate
+  verification. Certain error code paths did not set them, but they
+  should never be hit due to config validation. This adds another line
+  of defense.
+- Enable C99 support via autoconf
+- Test suite improvements. Most importantly, automake now handles
+  environment setup without any external make calls. Rules to build
+  the certificates are included from the old test makefile. Note that
+  the dependency on GNU make is not new (the test makefile always used
+  GNU make syntax), it just wasn't listed explicitly.
+
 ** Version 0.7 (2015-07-12)
 - Security fix for TLS client authentication (CVE-2015-2091)
 - Bug fixes that enable support for reverse proxy operation

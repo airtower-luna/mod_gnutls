@@ -13,6 +13,14 @@
 # PARTICULAR PURPOSE.
 
 @SET_MAKE@
+
+#!/usr/bin/make -f
+# Authors:
+# Daniel Kahn Gillmor <dkg@fifthhorseman.net>
+# Thomas Klute <thomas2.klute@uni-dortmund.de>
+
+# General rules to set up a miniature CA & server & client environment
+# for the test suite
 VPATH = @srcdir@
 am__is_gnu_make = test -n '$(MAKEFILE_LIST)' && test -n '$(MAKELEVEL)'
 am__make_running_with_option = \
@@ -79,10 +87,12 @@ build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
 @USE_MSVA_TRUE@am__append_1 = test-15_basic_msva.bash
-subdir = test
-DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
-	$(am__dist_check_SCRIPTS_DIST) \
+DIST_COMMON = $(srcdir)/test_ca.mk $(srcdir)/Makefile.in \
+	$(srcdir)/Makefile.am $(am__dist_check_SCRIPTS_DIST) \
 	$(top_srcdir)/config/test-driver README
+@USE_MSVA_TRUE@am__append_2 = $(msva_home)/trustdb.gpg client.uid
+@USE_MSVA_TRUE@am__append_3 = $(msva_home)/trustdb.gpg
+subdir = test
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/apache.m4 \
 	$(top_srcdir)/m4/apache_test.m4 \
@@ -583,6 +593,19 @@ dist_check_SCRIPTS = test-00_basic.bash \
 	test-24_pkcs11_cert.bash
 TESTS = $(dist_check_SCRIPTS)
 
+# Identities in the miniature CA, server, and client environment for
+# the test suite
+identities = server authority client imposter rogueca
+# Append strings after ":=" to each identity to generate a list of
+# necessary files
+pgp_tokens = $(identities:=/secring.gpg) $(identities:=/cert.pgp) \
+	$(identities:=/secret.pgp)
+
+x509_keys = $(identities:=/secret.key)
+x509_certs = $(identities:=/x509.pem)
+x509_tokens = $(x509_certs) $(x509_keys)
+tokens = $(x509_tokens) $(pgp_tokens)
+
 # Test cases trying to create keys and certificates in parallel causes
 # race conditions. Ensure that all keys and certificates are generated
 # before tests get to run.
@@ -595,7 +618,8 @@ TESTS = $(dist_check_SCRIPTS)
 # other - just not in any particular order.
 
 # SoftHSM files
-check_DATA = setup.done server/crl.pem server/softhsm.db
+check_DATA = $(tokens) server/crl.pem $(am__append_2) \
+	server/softhsm.db make-test-dirs
 
 # Delete X.509 certificates and generated templates on "mostlyclean"
 # target. Certificates can be rebuilt without generating new key
@@ -607,28 +631,50 @@ check_DATA = setup.done server/crl.pem server/softhsm.db
 # the X.509 private keys and certificates with an expiration time of
 # one day, so regenerating them is both fast and frequently
 # necessary.
-MOSTLYCLEANFILES = setup.done cache/* logs/* outputs/* server/crl.pem \
-	*/x509.pem $(generated_templates) */*.pgp */*.gpg */*.gpg~ \
-	*/gpg.conf tests/24_pkcs11_cert/softhsm.conf
+
+# Delete lock files for test servers on "mostlyclean" target.
+MOSTLYCLEANFILES = cache/* logs/* outputs/* server/crl.pem */x509.pem \
+	$(generated_templates) *.uid */*.pgp */*.gpg */*.gpg~ \
+	*/gpg.conf authority/lock *.lock $(am__append_3) \
+	tests/24_pkcs11_cert/softhsm.conf server/softhsm.db
 cert_templates = authority.template.in client.template.in \
 	imposter.template.in rogueca.template server.template.in
 
 generated_templates = authority.template client.template \
 	imposter.template server.template
 
+
+# Delete X.509 private keys on full clean. Note that unless you need
+# to generate fresh keys, the "mostlyclean" target should be
+# sufficient (see below).
+# GnuPG random pool, no need to regenerate on every build
+CLEANFILES = $(x509_keys) authority/random_seed
+
+# rule to build MSVA trust database
+@USE_MSVA_TRUE@msva_home = msva.gnupghome
+extra_dirs = logs cache outputs
+
+# Apache configuration and data files
 apache_data = base_apache.conf cgi_module.conf data/* mime.types proxy_mods.conf
 EXTRA_DIST = $(apache_data) $(cert_templates) *.uid.in proxy_backend.bash \
-	runtests server-crl.template server-softhsm.conf softhsm.bash \
-	TestMakefile
+	runtests server-crl.template server-softhsm.conf softhsm.bash
 
 
+# Lockfile for the main Apache process
+test_lockfile = ./test.lock
 # Maximum wait time in seconds for flock to aquire instance lock files
 lock_wait = 30
 AM_TESTS_ENVIRONMENT = export APACHE2=$(APACHE2); \
 	export AP_LIBEXECDIR=$(AP_LIBEXECDIR); \
-	export TEST_LOCK_WAIT=$(lock_wait); \
+	export TEST_LOCK="$(test_lockfile)"; \
+	export TEST_LOCK_WAIT="$(lock_wait)"; \
 	export TEST_HOST="$(TEST_HOST)"; \
 	export TEST_IP="$(TEST_IP)"; \
+	export TEST_PORT="$(TEST_PORT)"; \
+	export MSVA_PORT="$(MSVA_PORT)"; \
+	export TEST_MSVA_MAX_WAIT="$(TEST_MSVA_MAX_WAIT)"; \
+	export TEST_MSVA_WAIT="$(TEST_MSVA_WAIT)"; \
+	export TEST_QUERY_DELAY="$(TEST_QUERY_DELAY)"; \
 	export BACKEND_HOST="$(TEST_HOST)"; \
 	export BACKEND_IP="$(TEST_IP)";
 
@@ -636,7 +682,7 @@ all: all-recursive
 
 .SUFFIXES:
 .SUFFIXES: .log .test .test$(EXEEXT) .trs
-$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__configure_deps)
+$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(srcdir)/test_ca.mk $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -657,6 +703,7 @@ Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	    echo ' cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe)'; \
 	    cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@ $(am__depfiles_maybe);; \
 	esac;
+$(srcdir)/test_ca.mk:
 
 $(top_builddir)/config.status: $(top_srcdir)/configure $(CONFIG_STATUS_DEPENDENCIES)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
@@ -1191,6 +1238,7 @@ mostlyclean-generic:
 	-test -z "$(TEST_SUITE_LOG)" || rm -f $(TEST_SUITE_LOG)
 
 clean-generic:
+	-test -z "$(CLEANFILES)" || rm -f $(CLEANFILES)
 
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
@@ -1282,16 +1330,96 @@ uninstall-am:
 	recheck tags tags-am uninstall uninstall-am
 
 
-clean-local:
-	$(MAKE) -f $(srcdir)/TestMakefile $(AM_MAKEFLAGS) clean
+%.template: $(srcdir)/%.template.in
+	sed s/__HOSTNAME__/$(TEST_HOST)/ < $< > $@
 
-# This rule can be used for any TestMakefile target not included in
-# setup.done. The dependency on setup.done is used to avoid race
-# conditions between multiple calls to TestMakefile for key and
-# certificate generation. It is ignored for setup.done itself.
-server/crl.pem server/softhsm.db setup.done: setup.done
-	TEST_HOST="$(TEST_HOST)" TEST_IP="$(TEST_IP)" srcdir=$(srcdir) \
-	$(MAKE) -f $(srcdir)/TestMakefile $(AM_MAKEFLAGS) $@
+%.uid: $(srcdir)/%.uid.in
+	sed s/__HOSTNAME__/$(TEST_HOST)/ < $< > $@
+
+%/secret.key:
+	mkdir -p $(dir $@)
+	chmod 0700 $(dir $@)
+	certtool --generate-privkey > $@
+
+%/secring.gpg: %.uid %/secret.key
+	rm -f $(dir $@)pubring.gpg $(dir $@)secring.gpg $(dir $@)trustdb.gpg
+	PEM2OPENPGP_EXPIRATION=86400 PEM2OPENPGP_USAGE_FLAGS=authenticate,certify,sign pem2openpgp "$$(cat $<)" < $(dir $@)secret.key | GNUPGHOME=$(dir $@) gpg --import
+	printf "%s:6:\n" "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" | GNUPGHOME=$(dir $@) gpg --import-ownertrust
+
+%/gpg.conf: %/secring.gpg
+	printf "default-key %s\n" "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" > $@
+
+%/secret.pgp: %/secring.gpg
+	GNUPGHOME=$(dir $@) gpg --armor --batch --no-tty --yes --export-secret-key "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" > $@
+
+%/minimal.pgp: %/secring.gpg
+	GNUPGHOME=$(dir $@) gpg --armor --export "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" > $@
+
+# Import and signing modify the shared keyring, which leads to race
+# conditions with parallel make. Locking avoids this problem.
+%/cert.pgp: %/minimal.pgp authority/gpg.conf
+	GNUPGHOME=authority flock authority/lock gpg --import $<
+	GNUPGHOME=authority flock authority/lock gpg --batch --sign-key --no-tty --yes "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)"
+	GNUPGHOME=authority gpg --armor --export "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" > $@
+
+# special cases for the authorities' root certs:
+authority/x509.pem: authority.template authority/secret.key
+	certtool --generate-self-signed --load-privkey authority/secret.key --template authority.template > $@
+rogueca/x509.pem: $(srcdir)/rogueca.template rogueca/secret.key
+	certtool --generate-self-signed --load-privkey rogueca/secret.key --template $(srcdir)/rogueca.template > $@
+
+%/cert-request: %.template %/secret.key 
+	certtool --generate-request --load-privkey $(dir $@)secret.key --template $< > $@
+
+%/x509.pem: %.template %/cert-request authority/secret.key authority/x509.pem 
+	certtool --generate-certificate --load-ca-certificate authority/x509.pem --load-ca-privkey authority/secret.key --load-request $(dir $@)cert-request --template $< > $@
+
+%/softhsm.db: %/x509.pem %/secret.key
+	SOFTHSM_CONF="$(srcdir)/$(*)-softhsm.conf" $(srcdir)/softhsm.bash init $(dir $@)secret.key $(dir $@)x509.pem
+
+# Generate CRL revoking a certain certificate. Currently used to
+# revoke the server certificate and check if setting the CRL as
+# GnuTLSProxyCRLFile causes the connection to the back end server to
+# fail.
+%/crl.pem: %/x509.pem ${srcdir}/%-crl.template
+	certtool --generate-crl \
+		--load-ca-privkey authority/secret.key \
+		--load-ca-certificate authority/x509.pem \
+		--load-certificate $< \
+		--template "${srcdir}/$(*)-crl.template" \
+		> $@
+@USE_MSVA_TRUE@$(msva_home)/trustdb.gpg: authority/minimal.pgp client/cert.pgp
+@USE_MSVA_TRUE@	mkdir -p -m 0700 $(dir $@)
+@USE_MSVA_TRUE@	GNUPGHOME=$(dir $@) gpg --import < $<
+@USE_MSVA_TRUE@	printf "%s:6:\n" "$$(GNUPGHOME=authority gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" | GNUPGHOME=$(dir $@) gpg --import-ownertrust
+@USE_MSVA_TRUE@	GNUPGHOME=$(dir $@) gpg --import < client/cert.pgp
+@USE_MSVA_TRUE@	printf "keyserver does-not-exist.example\n" > $(msva_home)/gpg.conf
+make-test-dirs:
+	mkdir -p $(extra_dirs)
+.PHONY: make-test-dirs
+
+clean-local:
+	-rmdir $(identities) || true
+	-rmdir $(extra_dirs) || true
+@USE_MSVA_TRUE@	-rmdir $(msva_home) || true
+
+# port for the main Apache server
+TEST_PORT ?= 9932
+# port for MSVA in test cases that use it
+MSVA_PORT ?= 9933
+# maximum time to wait for MSVA startup
+TEST_MSVA_MAX_WAIT ?= 10
+# wait loop time for MSVA startup
+TEST_MSVA_WAIT ?= 0.4
+# seconds for the HTTP request to be sent and responded to
+TEST_QUERY_DELAY ?= 30
+
+# Echo AM_TESTS_ENVIRONMENT. This can be useful for debugging, e.g. if
+# you want to manually run an Apache instance with Valgrind using the
+# same configuration as a test case.
+show-test-env: export TEST_ENV=$(AM_TESTS_ENVIRONMENT)
+show-test-env:
+	@echo "$${TEST_ENV}"
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

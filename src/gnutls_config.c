@@ -641,17 +641,17 @@ const char *mgs_set_pgpkey_file(cmd_parms * parms, void *dummy __attribute__((un
     return NULL;
 }
 
-const char *mgs_set_tickets(cmd_parms * parms, void *dummy __attribute__((unused)),
-        const char *arg) {
-    mgs_srvconf_rec *sc =
-	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
-						 module_config,
-						 &gnutls_module);
+const char *mgs_set_tickets(cmd_parms *parms,
+                            void *dummy __attribute__((unused)),
+                            const int arg)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(parms->server->module_config, &gnutls_module);
 
-    sc->tickets = 0;
-    if (strcasecmp("on", arg) == 0) {
-	sc->tickets = 1;
-    }
+    if (arg)
+        sc->tickets = GNUTLS_ENABLED_TRUE;
+    else
+        sc->tickets = GNUTLS_ENABLED_FALSE;
 
     return NULL;
 }
@@ -825,36 +825,39 @@ const char *mgs_set_keyring_file(cmd_parms * parms, void *dummy __attribute__((u
     return NULL;
 }
 
-const char *mgs_set_proxy_engine(cmd_parms * parms, void *dummy __attribute__((unused)),
-        const char *arg) {
-
+/*
+ * Enable TLS proxy operation if arg is true, disable it otherwise.
+ */
+const char *mgs_set_proxy_engine(cmd_parms *parms,
+                                 void *dummy __attribute__((unused)),
+                                 const int arg)
+{
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
-	ap_get_module_config(parms->server->module_config, &gnutls_module);
+        ap_get_module_config(parms->server->module_config, &gnutls_module);
 
-    if (!strcasecmp(arg, "On")) {
-	sc->proxy_enabled = GNUTLS_ENABLED_TRUE;
-    } else if (!strcasecmp(arg, "Off")) {
-	sc->proxy_enabled = GNUTLS_ENABLED_FALSE;
-    } else {
-	return "GnuTLSProxyEngine must be set to 'On' or 'Off'";
-    }
+    if (arg)
+        sc->proxy_enabled = GNUTLS_ENABLED_TRUE;
+    else
+        sc->proxy_enabled = GNUTLS_ENABLED_FALSE;
 
     return NULL;
 }
 
-const char *mgs_set_enabled(cmd_parms * parms, void *dummy __attribute__((unused)),
-        const char *arg) {
-    mgs_srvconf_rec *sc =
-	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
-						 module_config,
-						 &gnutls_module);
-    if (!strcasecmp(arg, "On")) {
-	sc->enabled = GNUTLS_ENABLED_TRUE;
-    } else if (!strcasecmp(arg, "Off")) {
-	sc->enabled = GNUTLS_ENABLED_FALSE;
-    } else {
-	return "GnuTLSEnable must be set to 'On' or 'Off'";
-    }
+/*
+ * Enable TLS for the server/vhost if arg is true, disable it
+ * otherwise.
+ */
+const char *mgs_set_enabled(cmd_parms *parms,
+                            void *dummy __attribute__((unused)),
+                            const int arg)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(parms->server->module_config, &gnutls_module);
+
+    if (arg)
+        sc->enabled = GNUTLS_ENABLED_TRUE;
+    else
+        sc->enabled = GNUTLS_ENABLED_FALSE;
 
     return NULL;
 }
@@ -948,7 +951,7 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
     sc->privkey_x509 = NULL;
     sc->privkey_pgp = NULL;
     sc->certs_x509_chain_num = 0;
-    sc->p11_module = NULL;
+    sc->p11_modules = NULL;
     sc->pin = NULL;
     sc->priorities_str = NULL;
     sc->cache_timeout = -1;	/* -1 means "unset" */
@@ -1009,7 +1012,7 @@ void *mgs_config_server_merge(apr_pool_t * p, void *BASE, void *ADD)
 
     gnutls_srvconf_merge(x509_key_file, NULL);
     gnutls_srvconf_merge(x509_ca_file, NULL);
-    gnutls_srvconf_merge(p11_module, NULL);
+    gnutls_srvconf_merge(p11_modules, NULL);
     gnutls_srvconf_merge(pin, NULL);
     gnutls_srvconf_merge(pgp_cert_file, NULL);
     gnutls_srvconf_merge(pgp_key_file, NULL);
@@ -1106,9 +1109,8 @@ const char *mgs_store_cred_path(cmd_parms * parms,
 
 
 /*
- * Record additional PKCS #11 module to load. Note that the value is
- * only used in the base config, settings in virtual hosts are
- * ignored.
+ * Record PKCS #11 module to load. Note that the value is only used in
+ * the base config, settings in virtual hosts are ignored.
  */
 const char *mgs_set_p11_module(cmd_parms * parms,
                                void *dummy __attribute__((unused)),
@@ -1116,6 +1118,11 @@ const char *mgs_set_p11_module(cmd_parms * parms,
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(parms->server->module_config, &gnutls_module);
-    sc->p11_module = apr_pstrdup(parms->pool, arg);
+    /* initialize PKCS #11 module list if necessary */
+    if (sc->p11_modules == NULL)
+        sc->p11_modules = apr_array_make(parms->pool, 2, sizeof(char*));
+
+    *(char **) apr_array_push(sc->p11_modules) = apr_pstrdup(parms->pool, arg);
+
     return NULL;
 }
