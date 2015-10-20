@@ -1,3 +1,3 @@
 version=3
 opts=pgpsigurlmangle=s/$/.asc/ \
- https://mod.gnutls.org/downloads/mod_gnutls-(.*)\.tar\.gz
+ https://mod.gnutls.org/downloads/mod_gnutls-(.*)\.tar\.bz2
