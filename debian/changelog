@@ -1,3 +1,9 @@
+mod-gnutls (0.7.1-1) unstable; urgency=medium
+
+  * New upstream version.
+
+ -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Mon, 19 Oct 2015 21:15:04 -0400
+
 mod-gnutls (0.7-2) unstable; urgency=medium
 
   * added bc to build-depends for use in msva test suite (Closes: #799249)
