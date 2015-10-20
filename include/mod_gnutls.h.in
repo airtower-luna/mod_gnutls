@@ -114,9 +114,9 @@ typedef struct {
 	/* A Plain HTTP request */
     int non_ssl_request;
 
-    /* Additional PKCS #11 provider module to load, only valid in the
+    /* List of PKCS #11 provider modules to load, only valid in the
      * base config, ignored in virtual hosts */
-    char *p11_module;
+    apr_array_header_t *p11_modules;
 
     /* PIN used for PKCS #11 operations */
     char *pin;
@@ -285,7 +285,7 @@ int ssl_is_https(conn_rec *c);
 int ssl_proxy_enable(conn_rec *c);
 int ssl_engine_disable(conn_rec *c);
 const char *mgs_set_proxy_engine(cmd_parms * parms, void *dummy,
-    const char *arg);
+                                 const int arg);
 apr_status_t mgs_cleanup_pre_config(void *data);
 
 /**
@@ -438,13 +438,13 @@ const char *mgs_set_keyring_file(cmd_parms * parms, void *dummy,
                                    const char *arg);
 
 const char *mgs_set_enabled(cmd_parms * parms, void *dummy,
-                            const char *arg);
+                            const int arg);
 const char *mgs_set_export_certificates_size(cmd_parms * parms, void *dummy,
                             const char *arg);
 const char *mgs_set_priorities(cmd_parms * parms, void *dummy,
                             const char *arg);
 const char *mgs_set_tickets(cmd_parms * parms, void *dummy,
-                            const char *arg);
+                            const int arg);
 
 const char *mgs_set_require_section(cmd_parms *cmd,
                                     void *mconfig, const char *arg);

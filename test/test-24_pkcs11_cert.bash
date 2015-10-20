@@ -24,7 +24,7 @@ cat "${tmp_softhsm_conf}"
 
 set -e
 
-make -f $(dirname ${0})/TestMakefile t-24
+${srcdir}/runtests t-24
 
 cleanup_tmpconf
 trap - EXIT

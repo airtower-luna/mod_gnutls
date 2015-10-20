@@ -219,7 +219,7 @@ static int cert_retrieve_fn(gnutls_session_t session,
  */
 static int read_crt_cn(server_rec * s, apr_pool_t * p, gnutls_x509_crt_t cert, char **cert_cn) {
 
-    int rv = 0, i;
+    int rv = 0;
     size_t data_len;
 
 
@@ -241,7 +241,8 @@ static int read_crt_cn(server_rec * s, apr_pool_t * p, gnutls_x509_crt_t cert, c
                 s->server_hostname, s->port);
         rv = 0;
         /* read subject alternative name */
-        for (i = 0; !(rv < 0); i++) {
+        for (int i = 0; !(rv < 0); i++)
+        {
             data_len = 0;
             rv = gnutls_x509_crt_get_subject_alt_name(cert, i,
                     NULL,
@@ -322,15 +323,32 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
         exit(-1);
     }
 
-    /* Load additional PKCS #11 module, if requested */
-    if (sc_base->p11_module != NULL)
+    /* If GnuTLSP11Module is set, load the listed PKCS #11
+     * modules. Otherwise system defaults will be used. */
+    if (sc_base->p11_modules != NULL)
     {
-        rv = gnutls_pkcs11_add_provider(sc_base->p11_module, NULL);
-        if (rv != GNUTLS_E_SUCCESS)
+        rv = gnutls_pkcs11_init(GNUTLS_PKCS11_FLAG_MANUAL, NULL);
+        if (rv < 0)
+        {
             ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                         "GnuTLS: Loading PKCS #11 provider module %s "
+                         "GnuTLS: Initializing PKCS #11 "
                          "failed: %s (%d).",
-                         sc_base->p11_module, gnutls_strerror(rv), rv);
+                         gnutls_strerror(rv), rv);
+        }
+        else
+        {
+            for (int i = 0; i < sc_base->p11_modules->nelts; i++)
+            {
+                char *p11_module =
+                    APR_ARRAY_IDX(sc_base->p11_modules, i, char *);
+                rv = gnutls_pkcs11_add_provider(p11_module, NULL);
+                if (rv != GNUTLS_E_SUCCESS)
+                    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                                 "GnuTLS: Loading PKCS #11 provider module %s "
+                                 "failed: %s (%d).",
+                                 p11_module, gnutls_strerror(rv), rv);
+            }
+        }
     }
 
     for (s = base_server; s; s = s->next) {
@@ -354,9 +372,9 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
             sc->tickets = GNUTLS_ENABLED_TRUE;
         if (sc->export_certificates_size < 0)
             sc->export_certificates_size = 0;
-        if (sc->client_verify_mode ==  -1)
+        if (sc->client_verify_mode == -1)
             sc->client_verify_mode = GNUTLS_CERT_IGNORE;
-        if (sc->client_verify_method ==  mgs_cvm_unset)
+        if (sc->client_verify_method == mgs_cvm_unset)
             sc->client_verify_method = mgs_cvm_cartel;
 
         /* Check if the priorities have been set */
@@ -540,7 +558,7 @@ typedef struct {
  */
 int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc) {
 	apr_array_header_t *names;
-	int i,rv = 0;
+	int rv = 0;
 	char ** name;
 
 	/* Check ServerName First! */
@@ -552,7 +570,8 @@ int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc) 
 	} else if(s->names->nelts) {
 		names = s->names;
 		name = (char **)names->elts;
-		for (i = 0; i < names->nelts; ++i) {
+		for (int i = 0; i < names->nelts; ++i)
+        {
 			if (!name[i]) { continue; }
 				if (apr_strnatcasecmp(x->sni_name, name[i]) == 0) {
 					// We have a match, save this server configuration
@@ -564,7 +583,8 @@ int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc) 
 	} else if(s->wild_names->nelts) {
 		names = s->wild_names;
     	name = (char **)names->elts;
-		for (i = 0; i < names->nelts; ++i) {
+		for (int i = 0; i < names->nelts; ++i)
+        {
 			if (!name[i]) { continue; }
 				if(apr_fnmatch(name[i], x->sni_name ,
 								APR_FNM_CASE_BLIND|
@@ -1015,7 +1035,7 @@ static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, in
     const char *tmp;
     char *tmp2;
     size_t len;
-    int ret, i;
+    int ret;
 
     if (r == NULL)
         return;
@@ -1090,7 +1110,8 @@ static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, in
     }
 
     /* export all the alternative names (DNS, RFC822 and URI) */
-    for (i = 0; !(ret < 0); i++) {
+    for (int i = 0; !(ret < 0); i++)
+    {
         const char *san, *sanlabel;
         len = 0;
         ret = gnutls_x509_crt_get_subject_alt_name(cert, i,
@@ -1203,7 +1224,10 @@ static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t ce
 /* TODO: Allow client sending a X.509 certificate chain */
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
     const gnutls_datum_t *cert_list;
-    unsigned int cert_list_size, status;
+    unsigned int cert_list_size;
+    /* assume the certificate is invalid unless explicitly set
+     * otherwise */
+    unsigned int status = GNUTLS_CERT_INVALID;
     int rv = GNUTLS_E_NO_CERTIFICATE_FOUND, ret;
     unsigned int ch_size = 0;
 
@@ -1337,9 +1361,13 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
             break;
 #endif
         default:
+            /* If this block is reached, that indicates a
+             * configuration error or bug in mod_gnutls (invalid value
+             * of ctxt->sc->client_verify_method). */
             ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
                           "GnuTLS: Failed to Verify X.509 Peer: method '%s' is not supported",
                           mgs_readable_cvm(ctxt->sc->client_verify_method));
+            rv = GNUTLS_E_UNIMPLEMENTED_FEATURE;
         }
 
     } else {
@@ -1355,19 +1383,24 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
             break;
 #ifdef ENABLE_MSVA
         case mgs_cvm_msva:
-            /* need to set status and rv */
             ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
                           "GnuTLS:  OpenPGP verification via MSVA is not yet implemented");
             rv = GNUTLS_E_UNIMPLEMENTED_FEATURE;
             break;
 #endif
         default:
+            /* If this block is reached, that indicates a
+             * configuration error or bug in mod_gnutls (invalid value
+             * of ctxt->sc->client_verify_method). */
             ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
                           "GnuTLS: Failed to Verify OpenPGP Peer: method '%s' is not supported",
                           mgs_readable_cvm(ctxt->sc->client_verify_method));
+            rv = GNUTLS_E_UNIMPLEMENTED_FEATURE;
         }
     }
 
+    /* "goto exit" at the end of this block skips evaluation of the
+     * "status" variable */
     if (rv < 0) {
         ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
                 "GnuTLS: Failed to Verify Peer certificate: (%d) %s",
@@ -1443,18 +1476,16 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
     }
 
 exit:
-    if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_X509) {
-        unsigned int i;
-        for (i = 0; i < ch_size; i++) {
+    if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_X509)
+        for (unsigned int i = 0; i < ch_size; i++)
             gnutls_x509_crt_deinit(cert.x509[i]);
-        }
-    } else if (gnutls_certificate_type_get(ctxt->session) ==
-            GNUTLS_CRT_OPENPGP)
+    else if (gnutls_certificate_type_get(ctxt->session) ==
+             GNUTLS_CRT_OPENPGP)
         gnutls_openpgp_crt_deinit(cert.pgp);
     return ret;
-
-
 }
+
+
 
 #ifdef ENABLE_MSVA
 /* this section of code is used only when trying to talk to the MSVA */

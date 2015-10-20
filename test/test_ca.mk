@@ -1,42 +1,10 @@
 #!/usr/bin/make -f
+# Authors:
+# Daniel Kahn Gillmor <dkg@fifthhorseman.net>
+# Thomas Klute <thomas2.klute@uni-dortmund.de>
 
-# Author: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
-
-# run these tests to ensure that mod_gnutls can handle a range of
-# simple configuration choices.
-
-export srcdir ?= .
-# If the Apache binary is not set, try to find apache2 in default PATH
-# (should only happen when the test script is run manually)
-export APACHE2 ?= apache2
-
-export TEST_HOST ?= localhost
-export TEST_IP ?= ::1
-# chosen at random:
-export TEST_PORT ?= 9932
-export MSVA_PORT ?= 9933
-
-export TEST_GAP ?= 0.4
-export TEST_MSVA_MAX_WAIT ?= 10
-export TEST_QUERY_DELAY ?= 30
-export TEST_LOCK_WAIT ?= 30
-
-TEST_LOCK := ./test.lock
-
-all: setup.done
-	TEST_LOCK=$(TEST_LOCK) $(srcdir)/runtests
-
-t-%: setup.done
-	TEST_LOCK=$(TEST_LOCK) $(srcdir)/runtests $@
-
-
-
-
-
-### for setting up a little miniature CA + server + client environment:
-identities := server authority client imposter rogueca
-tokens := x509.pem secring.gpg secret.key cert.pgp secret.pgp
-all_tokens := $(foreach id,$(identities),$(foreach token,$(tokens),$(id)/$(token)))
+# General rules to set up a miniature CA & server & client environment
+# for the test suite
 
 %.template: $(srcdir)/%.template.in
 	sed s/__HOSTNAME__/$(TEST_HOST)/ < $< > $@
@@ -96,25 +64,3 @@ rogueca/x509.pem: $(srcdir)/rogueca.template rogueca/secret.key
 		--load-certificate $< \
 		--template "${srcdir}/$(*)-crl.template" \
 		> $@
-
-msva.gnupghome/trustdb.gpg: authority/minimal.pgp client/cert.pgp
-	mkdir -p -m 0700 $(dir $@)
-	GNUPGHOME=$(dir $@) gpg --import < $<
-	printf "%s:6:\n" "$$(GNUPGHOME=authority gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" | GNUPGHOME=$(dir $@) gpg --import-ownertrust
-	GNUPGHOME=$(dir $@) gpg --import < client/cert.pgp
-	printf "keyserver does-not-exist.example\n" > msva.gnupghome/gpg.conf
-
-
-setup.done: $(all_tokens) msva.gnupghome/trustdb.gpg client.uid
-	mkdir -p logs cache outputs
-	touch setup.done
-
-
-clean:
-	rm -rf server client authority logs cache outputs setup.done \
-	server.template imposter.template msva.gnupghome \
-	*/*.pgp */*.gpg */*.gpg~ */*.pem */*.key authority.template \
-	client.template client.uid server.uid *.lock tests/*/*.pem
-	rmdir imposter rogueca || true
-
-.PHONY: all clean

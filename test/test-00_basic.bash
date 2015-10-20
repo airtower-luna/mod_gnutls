@@ -1,2 +1,2 @@
 #!/bin/bash
-make -f $(dirname ${0})/TestMakefile t-0
+${srcdir}/runtests t-0

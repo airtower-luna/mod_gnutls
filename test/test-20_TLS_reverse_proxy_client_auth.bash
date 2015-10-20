@@ -13,7 +13,7 @@ function stop_backend
 backend_apache "${testdir}" "backend.conf" start "${BACKEND_LOCK}"
 trap stop_backend EXIT
 
-make -f $(dirname ${0})/TestMakefile t-20
+${srcdir}/runtests t-20
 
 backend_apache "${testdir}" "backend.conf" stop
 trap - EXIT
