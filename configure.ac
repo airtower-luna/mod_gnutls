@@ -98,7 +98,7 @@ AM_CONDITIONAL([USE_PDFLATEX], [test "$PANDOC" != "no" && \
 			       test "$PDFLATEX" != "no"])
 
 # Check for Apache binary
-AC_PATH_PROGS([APACHE2], [apache2 httpd], [no])
+AC_PATH_PROGS([APACHE2], [apache2 httpd], [no], [$PATH:/usr/sbin])
 if test "${APACHE2}" = "no"; then
 	AC_MSG_WARN([Neither apache2 nor httpd found in \
 		     PATH. Test suite will fail.])
