@@ -205,7 +205,7 @@ kill_by_pidfile "${sleep_pidfile}"
 unset sleep_pidfile
 
 if [ -e ${t}/output ] ; then
-    diff_output_filter_headers "${t}/output" "$output" "-q"
+    diff_output_filter_headers "${t}/output" "$output" >&2
 fi
 if [ -n "${USE_MSVA}" ]; then
     trap stop_msva EXIT
