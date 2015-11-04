@@ -1,6 +1,7 @@
 mod-gnutls (0.7.1-1) unstable; urgency=medium
 
   * New upstream version.
+  * make tests more verbose.
 
  -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Mon, 19 Oct 2015 21:15:04 -0400
 

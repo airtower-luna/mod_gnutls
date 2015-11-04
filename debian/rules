@@ -5,6 +5,9 @@
 override_dh_auto_configure:
 	dh_auto_configure -- --with-apxs=/usr/bin/apxs2 --enable-msva
 
+override_dh_auto_test:
+	VERBOSE=1 dh_auto_test
+
 override_dh_auto_install:
 
 override_dh_install:
