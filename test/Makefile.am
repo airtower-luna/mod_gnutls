@@ -133,10 +133,10 @@ lock_wait = 30
 TEST_PORT ?= 9932
 # port for MSVA in test cases that use it
 MSVA_PORT ?= 9933
-# maximum time to wait for MSVA startup
-TEST_MSVA_MAX_WAIT ?= 10
-# wait loop time for MSVA startup
-TEST_MSVA_WAIT ?= 0.4
+# maximum time to wait for MSVA startup (milliseconds)
+TEST_MSVA_MAX_WAIT ?= 10000
+# wait loop time for MSVA startup (milliseconds)
+TEST_MSVA_WAIT ?= 400
 # seconds for the HTTP request to be sent and responded to
 TEST_QUERY_DELAY ?= 30
 

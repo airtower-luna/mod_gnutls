@@ -123,18 +123,21 @@ if [ -n "${USE_MSVA}" ]; then
     # set to 0 if MSVA is up
     ret=1
     export MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT"
-    # wait at most TEST_MSVA_MAX_WAIT seconds for MSVA to get ready
-    waited=0.0
+
+    # convert TEST_MSVA_WAIT to seconds because that's what "sleep" expects
+    TEST_MSVA_SLEEP="$((${TEST_MSVA_WAIT} / 1000)).$((${TEST_MSVA_WAIT} % 1000))"
+    # wait at most TEST_MSVA_MAX_WAIT milliseconds for MSVA to get ready
+    waited=0
     until [ ${ret} -eq 0 ] \
-	      || [ $(echo "${waited} > ${TEST_MSVA_MAX_WAIT}" | bc) -eq 1 ]; do
+	      || [ ${waited} -ge ${TEST_MSVA_MAX_WAIT} ]; do
 	if msva-query-agent https "$(cat client.uid)" x509pem client < client/x509.pem
 	then
 	    ret=0
 	else
 	    echo "MSVA not ready yet"
 	fi
-	sleep "${TEST_MSVA_WAIT}"
-	waited=$(echo "${waited} + ${TEST_MSVA_WAIT}" | bc)
+	sleep "${TEST_MSVA_SLEEP}"
+	waited=$((${waited} + ${TEST_MSVA_WAIT}))
     done
 
     # check if MSVA is up, fail if not
