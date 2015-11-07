@@ -44,10 +44,10 @@ authority/x509.pem: authority.template authority/secret.key
 rogueca/x509.pem: $(srcdir)/rogueca.template rogueca/secret.key
 	certtool --generate-self-signed --load-privkey rogueca/secret.key --template $(srcdir)/rogueca.template > $@
 
-%/cert-request: %.template %/secret.key 
+%/cert-request: %.template %/secret.key
 	certtool --generate-request --load-privkey $(dir $@)secret.key --template $< > $@
 
-%/x509.pem: %.template %/cert-request authority/secret.key authority/x509.pem 
+%/x509.pem: %.template %/cert-request authority/secret.key authority/x509.pem
 	certtool --generate-certificate --load-ca-certificate authority/x509.pem --load-ca-privkey authority/secret.key --load-request $(dir $@)cert-request --template $< > $@
 
 %/softhsm.db: %/x509.pem %/secret.key
