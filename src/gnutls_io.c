@@ -240,12 +240,14 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
         return APR_EGENERAL;
     }
 
-    while (1) {
+    while (1)
+    {
+        rc = gnutls_record_recv(ctxt->session, buf + bytes, wanted - bytes);
 
-        do
-            rc = gnutls_record_recv(ctxt->session, buf + bytes,
-                                    wanted - bytes);
-        while (rc == GNUTLS_E_INTERRUPTED || rc == GNUTLS_E_AGAIN);
+        if (rc == GNUTLS_E_INTERRUPTED)
+            ctxt->input_rc = APR_EINTR;
+        else if (rc == GNUTLS_E_AGAIN)
+            ctxt->input_rc = APR_EAGAIN;
 
         if (rc > 0) {
             *len += rc;
@@ -556,7 +558,12 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
         return APR_ENOTIMPL;
     }
 
-    if (status != APR_SUCCESS) {
+    if (status != APR_SUCCESS)
+    {
+        /* no data for nonblocking read, return APR_EAGAIN */
+        if ((block == APR_NONBLOCK_READ) && (status == APR_EINTR))
+            return APR_EAGAIN;
+
         return gnutls_io_filter_error(f, bb, status);
     }
 
