@@ -41,6 +41,14 @@ APLOG_USE_MODULE(gnutls);
 #define IS_PROXY_STR(c) \
     ((c->is_proxy == GNUTLS_ENABLED_TRUE) ? "proxy " : "")
 
+/**
+ * Convert APR_EINTR or APR_EAGAIN to the match raw error code. Needed
+ * to pass the status on to GnuTLS from the pull function.
+ */
+#define EAI_APR_TO_RAW(s) (APR_STATUS_IS_EAGAIN(s) ? EAGAIN : EINTR)
+
+
+
 static apr_status_t gnutls_io_filter_error(ap_filter_t * f,
         apr_bucket_brigade * bb,
         apr_status_t status) {
@@ -724,8 +732,12 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
     return status;
 }
 
+/**
+ * Pull function for GnuTLS
+ */
 ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
-        void *buffer, size_t len) {
+                           void *buffer, size_t len)
+{
     mgs_handle_t *ctxt = ptr;
     apr_status_t rc;
     apr_size_t in = len;
@@ -751,20 +763,21 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
         /* Not a problem, there was simply no data ready yet.
          */
         if (APR_STATUS_IS_EAGAIN(rc) || APR_STATUS_IS_EINTR(rc)
-                || (rc == APR_SUCCESS
-                && APR_BRIGADE_EMPTY(ctxt->input_bb))) {
-
-            if (APR_STATUS_IS_EOF(ctxt->input_rc)) {
+            || (rc == APR_SUCCESS
+                && APR_BRIGADE_EMPTY(ctxt->input_bb)))
+        {
+            if (APR_STATUS_IS_EOF(ctxt->input_rc))
+            {
                 return 0;
-            } else {
+            }
+            else
+            {
                 if (ctxt->session)
-                    gnutls_transport_set_errno(ctxt->
-                        session,
-                        EINTR);
+                    gnutls_transport_set_errno(ctxt->session,
+                                               EAI_APR_TO_RAW(ctxt->input_rc));
                 return -1;
             }
         }
-
 
         if (rc != APR_SUCCESS) {
             /* Unexpected errors discard the brigade */
@@ -782,11 +795,13 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
     }
 
     if (APR_STATUS_IS_EAGAIN(ctxt->input_rc)
-            || APR_STATUS_IS_EINTR(ctxt->input_rc)) {
-        if (len == 0) {
+        || APR_STATUS_IS_EINTR(ctxt->input_rc))
+    {
+        if (len == 0)
+        {
             if (ctxt->session)
                 gnutls_transport_set_errno(ctxt->session,
-                    EINTR);
+                                           EAI_APR_TO_RAW(ctxt->input_rc));
             return -1;
         }
 
