@@ -495,6 +495,41 @@ int mgs_rehandshake(mgs_handle_t * ctxt) {
     return rv;
 }
 
+
+
+/**
+ * Close the TLS session associated with the given connection
+ * structure and free its resources
+ */
+static int mgs_bye(mgs_handle_t* ctxt)
+{
+    int ret = GNUTLS_E_SUCCESS;
+    /* End Of Connection */
+    if (ctxt->session != NULL)
+    {
+        /* Try A Clean Shutdown */
+        do {
+            ret = gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
+        } while (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
+        if (ret != GNUTLS_E_SUCCESS)
+            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
+                          "%s: Error while closing TLS %sconnection: "
+                          "'%s' (%d)",
+                          __func__, IS_PROXY_STR(ctxt),
+                          gnutls_strerror(ret), (int) ret);
+        else
+            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
+                          "%s: TLS %sconnection closed.",
+                          __func__, IS_PROXY_STR(ctxt));
+        /* De-Initialize Session */
+        gnutls_deinit(ctxt->session);
+        ctxt->session = NULL;
+    }
+    return ret;
+}
+
+
+
 apr_status_t mgs_filter_input(ap_filter_t * f,
         apr_bucket_brigade * bb,
         ap_input_mode_t mode,
@@ -563,6 +598,11 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
         /* no data for nonblocking read, return APR_EAGAIN */
         if ((block == APR_NONBLOCK_READ) && (status == APR_EINTR))
             return APR_EAGAIN;
+
+        /* Close TLS session and free resources on EOF,
+         * gnutls_io_filter_error will add an EOS bucket */
+        if (status == APR_EOF)
+            mgs_bye(ctxt);
 
         return gnutls_io_filter_error(f, bb, status);
     }
@@ -647,26 +687,9 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
             /* cleanup! */
             apr_bucket_delete(bucket);
         } else if (AP_BUCKET_IS_EOC(bucket)) {
-            /* End Of Connection */
-            if (ctxt->session != NULL) {
-                /* Try A Clean Shutdown */
-                do {
-                    ret = gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
-                } while (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
-                if (ret != GNUTLS_E_SUCCESS)
-                    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
-                                  "%s: Error while closing TLS %sconnection: "
-                                  "'%s' (%d)",
-                                  __func__, IS_PROXY_STR(ctxt),
-                                  gnutls_strerror(ret), (int) ret);
-                else
-                    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
-                                  "%s: TLS %sconnection closed.",
-                                  __func__, IS_PROXY_STR(ctxt));
-                /* De-Initialize Session */
-                gnutls_deinit(ctxt->session);
-                ctxt->session = NULL;
-            }
+            /* End Of Connection, close TLS session and free
+             * resources */
+            mgs_bye(ctxt);
             /* cleanup! */
             apr_bucket_delete(bucket);
             /* Pass next brigade! */
