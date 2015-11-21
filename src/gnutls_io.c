@@ -596,12 +596,12 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
     if (status != APR_SUCCESS)
     {
         /* no data for nonblocking read, return APR_EAGAIN */
-        if ((block == APR_NONBLOCK_READ) && (status == APR_EINTR))
+        if ((block == APR_NONBLOCK_READ) && APR_STATUS_IS_EINTR(status))
             return APR_EAGAIN;
 
         /* Close TLS session and free resources on EOF,
          * gnutls_io_filter_error will add an EOS bucket */
-        if (status == APR_EOF)
+        if (APR_STATUS_IS_EOF(status))
             mgs_bye(ctxt);
 
         return gnutls_io_filter_error(f, bb, status);
