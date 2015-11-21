@@ -512,13 +512,13 @@ static int mgs_bye(mgs_handle_t* ctxt)
             ret = gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
         } while (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
         if (ret != GNUTLS_E_SUCCESS)
-            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
+            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_EGENERAL, ctxt->c,
                           "%s: Error while closing TLS %sconnection: "
                           "'%s' (%d)",
                           __func__, IS_PROXY_STR(ctxt),
                           gnutls_strerror(ret), (int) ret);
         else
-            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
+            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
                           "%s: TLS %sconnection closed.",
                           __func__, IS_PROXY_STR(ctxt));
         /* De-Initialize Session */

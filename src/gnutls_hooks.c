@@ -693,9 +693,11 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
     return NULL;
 }
 
-/*
+/**
  * This function is intended as a cleanup handler for connections
- * using GnuTLS.
+ * using GnuTLS. If attached to the connection pool, it ensures that
+ * session resources are released with the connection pool even if the
+ * session wasn't terminated properly.
  *
  * @param data must point to the mgs_handle_t associated with the
  * connection
@@ -710,18 +712,22 @@ static apr_status_t cleanup_gnutls_session(void *data)
     mgs_handle_t *ctxt = (mgs_handle_t *) data;
     if (ctxt->session != NULL)
     {
+        ap_log_cerror(APLOG_MARK, APLOG_WARNING, APR_ECONNABORTED, ctxt->c,
+                      "%s: connection pool cleanup in progress but %sTLS "
+                      "session hasn't been terminated, trying to close",
+                      __func__, IS_PROXY_STR(ctxt));
         int ret;
         /* Try A Clean Shutdown */
         do
             ret = gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
         while (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
         if (ret != GNUTLS_E_SUCCESS)
-            ap_log_cerror(APLOG_MARK, APLOG_INFO, ret, ctxt->c,
+            ap_log_cerror(APLOG_MARK, APLOG_INFO, APR_EGENERAL, ctxt->c,
                           "%s: error while closing TLS %sconnection: %s (%d)",
                           __func__, IS_PROXY_STR(ctxt),
                           gnutls_strerror(ret), ret);
         else
-            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, ret, ctxt->c,
+            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
                           "%s: TLS %sconnection closed.",
                           __func__, IS_PROXY_STR(ctxt));
         /* De-Initialize Session */
