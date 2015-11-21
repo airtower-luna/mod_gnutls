@@ -780,12 +780,6 @@ static void create_gnutls_handle(conn_rec * c)
             ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
                           "gnutls_session_ticket_enable_client failed: %s (%d)",
                           gnutls_strerror(err), err);
-        /* Try to close and deinit the session when the connection
-         * pool is cleared. Note that mod_proxy might not close
-         * connections immediately, if you need that, look at the
-         * "proxy-nokeepalive" environment variable for
-         * mod_proxy_http. */
-        apr_pool_pre_cleanup_register(c->pool, ctxt, cleanup_gnutls_session);
     }
     else
     {
@@ -805,6 +799,10 @@ static void create_gnutls_handle(conn_rec * c)
                               gnutls_strerror(err), err);
         }
     }
+
+    /* Ensure TLS session resources are released when the connection
+     * pool is cleared, if the filters haven't done that already. */
+    apr_pool_pre_cleanup_register(c->pool, ctxt, cleanup_gnutls_session);
 
     /* Set Default Priority */
 	err = gnutls_priority_set_direct(ctxt->session, "NORMAL", NULL);
