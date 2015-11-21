@@ -2,6 +2,21 @@
 - Handle Unclean Shutdowns
 - make session cache use generic apache caches
 
+** Version 0.7.2 (2015-11-21)
+- Bugfix: Non-blocking reads in the input filter could lead to a busy
+  wait in the gnutls_io_input_read function, causing high load on
+  Keep-Alive connections waiting for data, until either more data
+  could be received or the connection was closed. The fix is to pass
+  EAGAIN/EINTR results up to the input filter so they can be handled
+  properly.
+- Close TLS session if the input filter receives EOF (mostly relevant
+  for proper termination of proxy connections).
+- Remove dependency on APR Memcache, which is replaced by the newer
+  version included in the APR Utility Library (libaprutil).
+- Remove dependency on bc. It was used for floating point arithmetic
+  in the test suite, the calculations have been changed to use
+  integers and pure bash code.
+
 ** Version 0.7.1 (2015-10-18)
 - Improved handling of PKCS #11 modules: mod_gnutls now loads either
   modules specified using GnuTLSP11Module, or the system defaults, but
