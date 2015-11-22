@@ -10,10 +10,10 @@ want it in our stderr!
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/test/runtests b/test/runtests
-index 43f2560..470499b 100755
+index ccbf36e..9798276 100755
 --- a/test/runtests
 +++ b/test/runtests
-@@ -202,7 +202,7 @@ kill_by_pidfile "${sleep_pidfile}"
+@@ -205,7 +205,7 @@ kill_by_pidfile "${sleep_pidfile}"
  unset sleep_pidfile
  
  if [ -e ${t}/output ] ; then
