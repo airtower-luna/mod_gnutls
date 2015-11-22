@@ -1,3 +1,9 @@
+mod-gnutls (0.7.2-1) unstable; urgency=medium
+
+  * New upstream release
+
+ -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Sun, 22 Nov 2015 18:38:50 -0500
+
 mod-gnutls (0.7.1-1) unstable; urgency=medium
 
   * New upstream version.
