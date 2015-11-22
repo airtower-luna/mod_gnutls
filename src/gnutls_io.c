@@ -41,6 +41,14 @@ APLOG_USE_MODULE(gnutls);
 #define IS_PROXY_STR(c) \
     ((c->is_proxy == GNUTLS_ENABLED_TRUE) ? "proxy " : "")
 
+/**
+ * Convert APR_EINTR or APR_EAGAIN to the match raw error code. Needed
+ * to pass the status on to GnuTLS from the pull function.
+ */
+#define EAI_APR_TO_RAW(s) (APR_STATUS_IS_EAGAIN(s) ? EAGAIN : EINTR)
+
+
+
 static apr_status_t gnutls_io_filter_error(ap_filter_t * f,
         apr_bucket_brigade * bb,
         apr_status_t status) {
@@ -232,12 +240,14 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
         return APR_EGENERAL;
     }
 
-    while (1) {
+    while (1)
+    {
+        rc = gnutls_record_recv(ctxt->session, buf + bytes, wanted - bytes);
 
-        do
-            rc = gnutls_record_recv(ctxt->session, buf + bytes,
-                                    wanted - bytes);
-        while (rc == GNUTLS_E_INTERRUPTED || rc == GNUTLS_E_AGAIN);
+        if (rc == GNUTLS_E_INTERRUPTED)
+            ctxt->input_rc = APR_EINTR;
+        else if (rc == GNUTLS_E_AGAIN)
+            ctxt->input_rc = APR_EAGAIN;
 
         if (rc > 0) {
             *len += rc;
@@ -485,6 +495,41 @@ int mgs_rehandshake(mgs_handle_t * ctxt) {
     return rv;
 }
 
+
+
+/**
+ * Close the TLS session associated with the given connection
+ * structure and free its resources
+ */
+static int mgs_bye(mgs_handle_t* ctxt)
+{
+    int ret = GNUTLS_E_SUCCESS;
+    /* End Of Connection */
+    if (ctxt->session != NULL)
+    {
+        /* Try A Clean Shutdown */
+        do {
+            ret = gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
+        } while (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
+        if (ret != GNUTLS_E_SUCCESS)
+            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_EGENERAL, ctxt->c,
+                          "%s: Error while closing TLS %sconnection: "
+                          "'%s' (%d)",
+                          __func__, IS_PROXY_STR(ctxt),
+                          gnutls_strerror(ret), (int) ret);
+        else
+            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                          "%s: TLS %sconnection closed.",
+                          __func__, IS_PROXY_STR(ctxt));
+        /* De-Initialize Session */
+        gnutls_deinit(ctxt->session);
+        ctxt->session = NULL;
+    }
+    return ret;
+}
+
+
+
 apr_status_t mgs_filter_input(ap_filter_t * f,
         apr_bucket_brigade * bb,
         ap_input_mode_t mode,
@@ -548,7 +593,17 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
         return APR_ENOTIMPL;
     }
 
-    if (status != APR_SUCCESS) {
+    if (status != APR_SUCCESS)
+    {
+        /* no data for nonblocking read, return APR_EAGAIN */
+        if ((block == APR_NONBLOCK_READ) && APR_STATUS_IS_EINTR(status))
+            return APR_EAGAIN;
+
+        /* Close TLS session and free resources on EOF,
+         * gnutls_io_filter_error will add an EOS bucket */
+        if (APR_STATUS_IS_EOF(status))
+            mgs_bye(ctxt);
+
         return gnutls_io_filter_error(f, bb, status);
     }
 
@@ -632,26 +687,9 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
             /* cleanup! */
             apr_bucket_delete(bucket);
         } else if (AP_BUCKET_IS_EOC(bucket)) {
-            /* End Of Connection */
-            if (ctxt->session != NULL) {
-                /* Try A Clean Shutdown */
-                do {
-                    ret = gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
-                } while (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
-                if (ret != GNUTLS_E_SUCCESS)
-                    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
-                                  "%s: Error while closing TLS %sconnection: "
-                                  "'%s' (%d)",
-                                  __func__, IS_PROXY_STR(ctxt),
-                                  gnutls_strerror(ret), (int) ret);
-                else
-                    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
-                                  "%s: TLS %sconnection closed.",
-                                  __func__, IS_PROXY_STR(ctxt));
-                /* De-Initialize Session */
-                gnutls_deinit(ctxt->session);
-                ctxt->session = NULL;
-            }
+            /* End Of Connection, close TLS session and free
+             * resources */
+            mgs_bye(ctxt);
             /* cleanup! */
             apr_bucket_delete(bucket);
             /* Pass next brigade! */
@@ -724,8 +762,12 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
     return status;
 }
 
+/**
+ * Pull function for GnuTLS
+ */
 ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
-        void *buffer, size_t len) {
+                           void *buffer, size_t len)
+{
     mgs_handle_t *ctxt = ptr;
     apr_status_t rc;
     apr_size_t in = len;
@@ -751,20 +793,21 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
         /* Not a problem, there was simply no data ready yet.
          */
         if (APR_STATUS_IS_EAGAIN(rc) || APR_STATUS_IS_EINTR(rc)
-                || (rc == APR_SUCCESS
-                && APR_BRIGADE_EMPTY(ctxt->input_bb))) {
-
-            if (APR_STATUS_IS_EOF(ctxt->input_rc)) {
+            || (rc == APR_SUCCESS
+                && APR_BRIGADE_EMPTY(ctxt->input_bb)))
+        {
+            if (APR_STATUS_IS_EOF(ctxt->input_rc))
+            {
                 return 0;
-            } else {
+            }
+            else
+            {
                 if (ctxt->session)
-                    gnutls_transport_set_errno(ctxt->
-                        session,
-                        EINTR);
+                    gnutls_transport_set_errno(ctxt->session,
+                                               EAI_APR_TO_RAW(ctxt->input_rc));
                 return -1;
             }
         }
-
 
         if (rc != APR_SUCCESS) {
             /* Unexpected errors discard the brigade */
@@ -782,11 +825,13 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
     }
 
     if (APR_STATUS_IS_EAGAIN(ctxt->input_rc)
-            || APR_STATUS_IS_EINTR(ctxt->input_rc)) {
-        if (len == 0) {
+        || APR_STATUS_IS_EINTR(ctxt->input_rc))
+    {
+        if (len == 0)
+        {
             if (ctxt->session)
                 gnutls_transport_set_errno(ctxt->session,
-                    EINTR);
+                                           EAI_APR_TO_RAW(ctxt->input_rc));
             return -1;
         }
 

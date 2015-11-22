@@ -24,7 +24,6 @@ Prerequisites
  * GnuTLS          >= 3.1.4 <http://www.gnutls.org/> (3.2.* or newer preferred)
  * Apache HTTPD    >= 2.2 <http://httpd.apache.org/> (2.4.* preferred)
  * autotools, GNU make, & gcc
- * APR Memcache    >= 0.7.0 (Optional)
  * libmsv          >= 0.1 (Optional, enable with ./configure --enable-msva)
  * pandoc   (for documentation, optional)
  * pdflatex (for PDF documentation, optional)

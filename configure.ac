@@ -1,5 +1,5 @@
 dnl 
-AC_INIT(mod_gnutls, 0.7.1)
+AC_INIT(mod_gnutls, 0.7.2)
 OOO_CONFIG_NICE(config.nice)
 MOD_GNUTLS_VERSION=AC_PACKAGE_VERSION
 AC_PREREQ(2.53)
@@ -98,7 +98,7 @@ AM_CONDITIONAL([USE_PDFLATEX], [test "$PANDOC" != "no" && \
 			       test "$PDFLATEX" != "no"])
 
 # Check for Apache binary
-AC_PATH_PROGS([APACHE2], [apache2 httpd], [no])
+AC_PATH_PROGS([APACHE2], [apache2 httpd], [no], [$PATH:/usr/sbin])
 if test "${APACHE2}" = "no"; then
 	AC_MSG_WARN([Neither apache2 nor httpd found in \
 		     PATH. Test suite will fail.])
