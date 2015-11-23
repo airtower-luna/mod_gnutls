@@ -4,7 +4,6 @@ Priority: extra
 Maintainer: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
 Build-Depends: apache2-bin <!nocheck>,
                apache2-dev,
-               bc <!nocheck>,
                debhelper (>= 9.20141010),
                dh-apache2,
                dh-autoreconf,
@@ -18,6 +17,7 @@ Build-Depends: apache2-bin <!nocheck>,
                msva-perl <!nocheck>,
                pandoc,
                pkg-config,
+               procps <!nocheck>,
                softhsm <!nocheck>
 Standards-Version: 3.9.6
 Homepage: https://mod.gnutls.org/

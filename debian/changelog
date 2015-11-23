@@ -1,3 +1,9 @@
+mod-gnutls (0.7.2-2) unstable; urgency=medium
+
+  * update build-deps: test suite needs procps and no longer needs bc.
+
+ -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Mon, 23 Nov 2015 09:33:02 -0500
+
 mod-gnutls (0.7.2-1) unstable; urgency=medium
 
   * New upstream release
