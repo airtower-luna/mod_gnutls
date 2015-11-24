@@ -92,10 +92,17 @@ if test "$PANDOC" != "no"; then
 	else
 		build_doc="html only"
 	fi
+else
+	AC_PATH_PROG([MARKDOWN], [markdown], [no])
+	if test "$MARKDOWN" != "no"; then
+		build_doc="html stub"
+	fi
 fi
 AM_CONDITIONAL([USE_PANDOC], [test "$PANDOC" != "no"])
 AM_CONDITIONAL([USE_PDFLATEX], [test "$PANDOC" != "no" && \
 			       test "$PDFLATEX" != "no"])
+AM_CONDITIONAL([USE_MARKDOWN], [test -n "$MARKDOWN" && \
+			       test "$MARKDOWN" != "no"])
 
 # Check for Apache binary
 AC_PATH_PROGS([APACHE2], [apache2 httpd], [no], [$PATH:/usr/sbin])
