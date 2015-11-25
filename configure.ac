@@ -119,16 +119,27 @@ AC_SUBST(MODULE_LIBS)
 
 # assign default values to TEST_HOST and TEST_IP if necessary
 : ${TEST_HOST:="localhost"}
-: ${TEST_IP:="[::1]"}
+: ${TEST_IP:="[[::1]] 127.0.0.1"}
 AC_ARG_VAR([TEST_HOST], [Host name to use for server instances started by \
-			"make check", must resolve to TEST_IP. The default \
-			is "localhost".])
-AC_ARG_VAR([TEST_IP], [IP address to use for server instances started by \
-		      "make check". The default is the IPv6 loopback address \
-		      [::1].])
+			"make check", must resolve to addresses in TEST_IP. \
+			The default is "localhost".])
+AC_ARG_VAR([TEST_IP], [List of IP addresses to use for server instances \
+		      started by "make check". The default is \
+		      "[::1] 127.0.0.1". Note that IPv6 addresses must be \
+		      enclosed in square brackets.])
+AM_SUBST_NOTMAKE(TEST_IP)
+
+dnl Build list of "Listen" statements for Apache
+LISTEN_LIST="# Listen addresses for the test servers"
+for i in ${TEST_IP}; do
+	LISTEN_LIST="${LISTEN_LIST}
+Listen ${i}:\${TEST_PORT}"
+done
+AC_SUBST(LISTEN_LIST)
+AM_SUBST_NOTMAKE(LISTEN_LIST)
 
 AC_CONFIG_FILES([Makefile src/Makefile test/Makefile test/tests/Makefile \
-			  doc/Makefile include/mod_gnutls.h])
+			  doc/Makefile include/mod_gnutls.h test/listen.conf])
 AC_OUTPUT
 
 echo "---"

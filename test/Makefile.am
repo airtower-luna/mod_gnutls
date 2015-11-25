@@ -145,14 +145,12 @@ AM_TESTS_ENVIRONMENT = export APACHE2=$(APACHE2); \
 	export TEST_LOCK="$(test_lockfile)"; \
 	export TEST_LOCK_WAIT="$(lock_wait)"; \
 	export TEST_HOST="$(TEST_HOST)"; \
-	export TEST_IP="$(TEST_IP)"; \
 	export TEST_PORT="$(TEST_PORT)"; \
 	export MSVA_PORT="$(MSVA_PORT)"; \
 	export TEST_MSVA_MAX_WAIT="$(TEST_MSVA_MAX_WAIT)"; \
 	export TEST_MSVA_WAIT="$(TEST_MSVA_WAIT)"; \
 	export TEST_QUERY_DELAY="$(TEST_QUERY_DELAY)"; \
-	export BACKEND_HOST="$(TEST_HOST)"; \
-	export BACKEND_IP="$(TEST_IP)";
+	export BACKEND_HOST="$(TEST_HOST)";
 
 # Echo AM_TESTS_ENVIRONMENT. This can be useful for debugging, e.g. if
 # you want to manually run an Apache instance with Valgrind using the
