@@ -61,7 +61,8 @@ AC_MSG_RESULT($use_srp)
 
 dnl Optionally disable flock
 AC_ARG_ENABLE(flock,
-	AS_HELP_STRING([--disable-flock], [Disable use of flock during tests]),
+	AS_HELP_STRING([--disable-flock], [Disable use of flock during tests \
+	(some exotic architectures don't support it)]),
 	[use_flock=$enableval], [use_flock=yes])
 dnl If flock is not disabled, make sure it's available
 if test "$enable_flock" != "no"; then

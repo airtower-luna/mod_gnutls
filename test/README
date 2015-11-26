@@ -24,11 +24,11 @@ names to make in the TESTS variable:
 This should be handy when you're just trying to experiment with a new
 test and don't want to wait for the full test suite to run.
 
-The default configuration assumes that an IPv6 loopback device is
-available (TEST_IP=[::1]) and that TEST_HOST="localhost" resolves to
-the IPv6 loopback address [::1]. If this does not apply to your
-system, you can pass different values to ./configure, e.g. to use IPv4
-instead:
+The default configuration assumes that a loopback device with IPv4 and
+IPv6 support is available (TEST_IP="[::1] 127.0.0.1") and that
+TEST_HOST="localhost" resolves to at least one of these addresses. If
+this does not apply to your system, you can pass different values to
+./configure, e.g. to use IPv4 only:
 
   TEST_HOST="localhost" TEST_IP="127.0.0.1" ./configure
 
@@ -91,8 +91,8 @@ check" to adjust them):
 
  * they need a functioning loopback device.
 
- * they expect (by default) the TEST_IP to have port 9932
-   open. [TEST_PORT]
+ * they expect (by default) to have port 9932 [TEST_PORT] available
+   and open for connections on the addresses listed in TEST_IP.
 
  * if a machine is particularly slow or under heavy load, it's
    possible that these tests will fail for timing
