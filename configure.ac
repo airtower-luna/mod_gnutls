@@ -59,6 +59,17 @@ fi
 AC_MSG_CHECKING([whether to enable SRP functionality])
 AC_MSG_RESULT($use_srp)
 
+dnl Optionally disable flock
+AC_ARG_ENABLE(flock,
+	AS_HELP_STRING([--disable-flock], [Disable use of flock during tests]),
+	[use_flock=$enableval], [use_flock=yes])
+dnl If flock is not disabled, make sure it's available
+if test "$enable_flock" != "no"; then
+	AC_PATH_PROG([FLOCK], [flock], [no])
+	use_flock=${FLOCK}
+fi
+AM_CONDITIONAL([DISABLE_FLOCK], [test "$enable_flock" = "no"])
+
 AC_ARG_ENABLE(msva,
        AS_HELP_STRING([--enable-msva],
                [enable Monkeysphere client certificate verification]),

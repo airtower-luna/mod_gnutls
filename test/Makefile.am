@@ -126,7 +126,10 @@ EXTRA_DIST = $(apache_data) $(cert_templates) *.uid.in proxy_backend.bash \
 
 # Lockfile for the main Apache process
 test_lockfile = ./test.lock
-# Maximum wait time in seconds for flock to aquire instance lock files
+# Lockfile for the proxy backend Apache process (if any)
+backend_lockfile = ./backend.lock
+# Maximum wait time in seconds for flock to aquire instance lock
+# files, or Apache to remove its PID file
 lock_wait = 30
 
 # port for the main Apache server
@@ -142,7 +145,6 @@ TEST_QUERY_DELAY ?= 30
 
 AM_TESTS_ENVIRONMENT = export APACHE2=$(APACHE2); \
 	export AP_LIBEXECDIR=$(AP_LIBEXECDIR); \
-	export TEST_LOCK="$(test_lockfile)"; \
 	export TEST_LOCK_WAIT="$(lock_wait)"; \
 	export TEST_HOST="$(TEST_HOST)"; \
 	export TEST_PORT="$(TEST_PORT)"; \
@@ -151,6 +153,15 @@ AM_TESTS_ENVIRONMENT = export APACHE2=$(APACHE2); \
 	export TEST_MSVA_WAIT="$(TEST_MSVA_WAIT)"; \
 	export TEST_QUERY_DELAY="$(TEST_QUERY_DELAY)"; \
 	export BACKEND_HOST="$(TEST_HOST)";
+
+# Without flock tests must not run in parallel. Otherwise set lock files.
+if DISABLE_FLOCK
+.NOTPARALLEL:
+else
+AM_TESTS_ENVIRONMENT += export FLOCK="$(FLOCK)"; \
+	export TEST_LOCK="$(test_lockfile)"; \
+	export BACKEND_LOCK="$(backend_lockfile)";
+endif
 
 # Echo AM_TESTS_ENVIRONMENT. This can be useful for debugging, e.g. if
 # you want to manually run an Apache instance with Valgrind using the

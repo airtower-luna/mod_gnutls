@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+. ${srcdir}/common.bash
 
 if [ -z "${BACKEND_HOST}" ]; then
     export BACKEND_HOST="localhost"
@@ -11,7 +12,7 @@ fi
 if [ -z "${BACKEND_PORT}" ]; then
     export BACKEND_PORT="9934"
 fi
-: ${BACKEND_LOCK:="backend.lock"}
+: ${BACKEND_PID:="backend.pid"}
 : ${srcdir:="."}
 : ${APACHE2:="apache2"}
 : ${TEST_LOCK_WAIT:="30"}
@@ -23,10 +24,6 @@ function backend_apache
     action="${3}"
     lockfile="${4}"
 
-    if [ -n "${lockfile}" ]; then
-	flock_cmd="flock -w ${TEST_LOCK_WAIT} ${lockfile}"
-    fi
-
     TEST_NAME="$(basename "${dir}")"
     (
 	export TEST_NAME
@@ -35,6 +32,13 @@ function backend_apache
 	export srcdir="$(realpath ${srcdir})"
 	case $action in
 	    start)
+		if [ -n "${lockfile}" ]; then
+		    flock_cmd="${FLOCK} -w ${TEST_LOCK_WAIT} ${lockfile}"
+		else
+		    echo "Locking disabled, using wait based on proxy PID file."
+		    wait_pid_gone "${BACKEND_PID}"
+		    flock_cmd=""
+		fi
 		${flock_cmd} \
 		    ${APACHE2} -f "$(realpath ${testdir}/${conf})" -k start || return 1
 		;;
