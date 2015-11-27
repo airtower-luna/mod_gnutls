@@ -121,8 +121,9 @@ endif
 # Apache configuration and data files
 apache_data = base_apache.conf cgi_module.conf data/* mime.types proxy_mods.conf
 
-EXTRA_DIST = $(apache_data) $(cert_templates) *.uid.in proxy_backend.bash \
-	runtests server-crl.template server-softhsm.conf softhsm.bash
+EXTRA_DIST = $(apache_data) $(cert_templates) *.uid.in common.bash \
+	proxy_backend.bash runtests server-crl.template server-softhsm.conf \
+	softhsm.bash
 
 # Lockfile for the main Apache process
 test_lockfile = ./test.lock
