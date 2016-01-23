@@ -174,8 +174,9 @@ AC_SUBST(LISTEN_LIST)
 AM_SUBST_NOTMAKE(LISTEN_LIST)
 
 AC_CONFIG_FILES([Makefile src/Makefile test/Makefile test/tests/Makefile \
-			  doc/Makefile include/mod_gnutls.h test/listen.conf \
-			  test/apache-conf/netns.conf])
+			doc/Makefile include/mod_gnutls.h \
+			test/apache-conf/listen.conf \
+			test/apache-conf/netns.conf])
 AC_OUTPUT
 
 echo "---"
