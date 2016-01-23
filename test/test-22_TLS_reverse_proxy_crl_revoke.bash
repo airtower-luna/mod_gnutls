@@ -2,6 +2,8 @@
 
 set -e
 : ${srcdir:="."}
+. ${srcdir}/common.bash
+netns_reexec ${@}
 
 testdir="${srcdir}/tests/22_TLS_reverse_proxy_crl_revoke"
 . $(dirname ${0})/proxy_backend.bash

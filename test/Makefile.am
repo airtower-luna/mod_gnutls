@@ -155,6 +155,10 @@ AM_TESTS_ENVIRONMENT = export APACHE2=$(APACHE2); \
 	export TEST_QUERY_DELAY="$(TEST_QUERY_DELAY)"; \
 	export BACKEND_HOST="$(TEST_HOST)";
 
+if ENABLE_NETNS
+AM_TESTS_ENVIRONMENT += export UNSHARE="$(UNSHARE)"; \
+	export USE_TEST_NAMESPACE=1;
+endif
 # Without flock tests must not run in parallel. Otherwise set lock files.
 if DISABLE_FLOCK
 .NOTPARALLEL:

@@ -71,6 +71,29 @@ if test "$enable_flock" != "no"; then
 fi
 AM_CONDITIONAL([DISABLE_FLOCK], [test "$enable_flock" = "no"])
 
+dnl Enable test namespaces? Default is "yes".
+AC_ARG_ENABLE(test-namespaces,
+	AS_HELP_STRING([--disable-test-namespaces], [Disable use of network \
+	namespaces to run tests in parallel (some architectures might not \
+	support it)]),
+	[use_netns=$enableval], [use_netns=yes])
+dnl If namespaces are enabled, make sure "unshare" is available
+if test "$enable_test_namespaces" != "no"; then
+	AC_PATH_PROG([UNSHARE], [unshare], [no])
+	use_netns=${UNSHARE}
+	# default mutex breaks in namespace, use "pthread" instead
+	MUTEX_TYPE="pthread"
+	PID_AFFIX="-\${TEST_NAME}"
+else
+	MUTEX_TYPE="default"
+	PID_AFFIX=""
+fi
+AM_CONDITIONAL([ENABLE_NETNS], [test "$use_netns" != "no"])
+AC_SUBST(MUTEX_TYPE)
+AC_SUBST(PID_AFFIX)
+AM_SUBST_NOTMAKE(MUTEX_TYPE)
+AM_SUBST_NOTMAKE(PID_AFFIX)
+
 AC_ARG_ENABLE(msva,
        AS_HELP_STRING([--enable-msva],
                [enable Monkeysphere client certificate verification]),
@@ -151,7 +174,8 @@ AC_SUBST(LISTEN_LIST)
 AM_SUBST_NOTMAKE(LISTEN_LIST)
 
 AC_CONFIG_FILES([Makefile src/Makefile test/Makefile test/tests/Makefile \
-			  doc/Makefile include/mod_gnutls.h test/listen.conf])
+			  doc/Makefile include/mod_gnutls.h test/listen.conf \
+			  test/apache-conf/netns.conf])
 AC_OUTPUT
 
 echo "---"
