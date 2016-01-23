@@ -32,7 +32,11 @@ function backend_apache
 	export srcdir="$(realpath ${srcdir})"
 	case $action in
 	    start)
-		if [ -n "${lockfile}" ]; then
+		if [ -n "${USE_TEST_NAMESPACE}" ]; then
+		    echo "Using namespaces to isolate tests, no need for" \
+			 "locking."
+		    flock_cmd=""
+		elif [ -n "${lockfile}" ]; then
 		    flock_cmd="${FLOCK} -w ${TEST_LOCK_WAIT} ${lockfile}"
 		else
 		    echo "Locking disabled, using wait based on proxy PID file."

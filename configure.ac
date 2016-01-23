@@ -175,6 +175,7 @@ AM_SUBST_NOTMAKE(LISTEN_LIST)
 
 AC_CONFIG_FILES([Makefile src/Makefile test/Makefile test/tests/Makefile \
 			doc/Makefile include/mod_gnutls.h \
+			test/proxy_backend.conf \
 			test/apache-conf/listen.conf \
 			test/apache-conf/netns.conf])
 AC_OUTPUT

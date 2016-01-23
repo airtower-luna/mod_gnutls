@@ -1,4 +1,5 @@
 cache
+proxy_backend.conf
 *~
 logs
 outputs
