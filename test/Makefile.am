@@ -42,6 +42,11 @@ x509_certs = $(identities:=/x509.pem)
 x509_tokens = $(x509_certs) $(x509_keys)
 tokens = $(x509_tokens) $(pgp_tokens)
 
+if !DISABLE_FLOCK
+# flock command for write access to the authority keyring
+GPG_FLOCK = $(FLOCK) authority/lock
+endif
+
 include $(srcdir)/test_ca.mk
 
 # Test cases trying to create keys and certificates in parallel causes
