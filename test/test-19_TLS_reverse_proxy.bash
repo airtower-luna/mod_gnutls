@@ -10,7 +10,7 @@ testdir="${srcdir}/tests/19_TLS_reverse_proxy"
 
 function stop_backend
 {
-    backend_apache "${dir}" "backend.conf" stop
+    backend_apache "${testdir}" "backend.conf" stop
 }
 backend_apache "${testdir}" "backend.conf" start "${BACKEND_LOCK}"
 trap stop_backend EXIT
