@@ -11,15 +11,15 @@ want to at least test for some basic/common configurations.
 Running the tests
 =================
 
-from the top level of the source, or from test/ (where this README is),
+From the top level of the source, or from test/ (where this README is),
 just run:
 
- make check
+  make check
 
-from test/ you can also run specific tests by passing their script
-names to make in the TESTS variable:
+from test/. You can also run specific test cases by passing their
+script names to make in the TESTS variable:
 
- TESTS="test-03_cachetimeout_in_vhost.bash" make -e check
+  TESTS="test-03_cachetimeout_in_vhost.bash" make -e check
 
 This should be handy when you're just trying to experiment with a new
 test and don't want to wait for the full test suite to run.
@@ -40,7 +40,7 @@ Please add more tests!
 
 The simplest way to add a test is (from test/):
 
- ./newtest
+  ./newtest
 
 This will prompt you for a simple name for the test and then copy a
 starting set of files from tests/00_basic, and create a script which
@@ -51,23 +51,27 @@ inclusion in the test suite.
 Implementation
 ==============
 
-Each test consists of a directory in test/tests/, which will cause the
-test suite to spin up an isolated apache instance and try to connect
-to it with gnutls-cli and make a simple HTTP 1.1 request.
+Each test consists of a script in test/ and a directory in
+test/tests/, which the test suite uses to spin up an isolated Apache
+instance or two (for proxy tests) and try to connect to it with
+gnutls-cli and make a simple HTTP 1.1 or 1.0 request.
 
-By default, these tests are expected to succeed, by having 
+Test directories usually contain the following files:
 
-In each directory, you can put the following files:
+ * apache.conf -- Apache configuration to be used
 
- * apache.conf --  the apache configuration to be used
-
- * gnutls-cli.args --  the arguments to pass to gnutls-cli
+ * gnutls-cli.args -- the arguments to pass to gnutls-cli
 
  * input -- the full HTTP request (including the final blank line)
 
+ * backend.conf [optional] -- Apache configuration for the proxy
+   backend server, if any
+
  * output [optional] -- the lines of this file will be checked against
    the same number of lines at the end of the output produced by the
-   gnutls-cli process.
+   gnutls-cli process. "Date" and "Server" headers are filtered from
+   the response because they are expected to change between runs
+   (date) or builds (server version).
 
  * fail.server [optional] -- if this file exists, it means we expect
    the web server to fail to even start due to some serious
@@ -78,28 +82,58 @@ In each directory, you can put the following files:
    fail.server, do not also specify this; we know that a failed server
    should result in a failed file retrieval.
 
+The "runtests" script is used to start one Apache instance and send a
+request based on the files described above. Note that some tests take
+additional steps, e.g. starting another server to act as proxy
+backend, and there is no technical requirement to use "runtests".
+
+By default (if "unshare" is available and --disable-test-namespaces
+has NOT been passed to configure), each test case is run inside its
+own network namespace. This avoids address and port conflicts with
+other tests as well has the host system.
+
+When writing your own tests, make sure to call netns_reexec (defined
+in common.bash) if you need to start any network services outside of
+runtests (which will create the namespace if it doesn't exist
+already). However, some architectures might not support namespaces, so
+traditional locking (using flock) and serial execution are still
+supported.
+
 
 Robustness and Tuning
 =====================
 
-These tests aren't nearly as robust as i'd like them to be, but they
-work for the moment and they're better than no tests at all.
+Here are some things that you might want to tune about the tests based
+on your expected setup (along with the variables that can be passed to
+"make check" to adjust them):
 
-Here are some things that you might want to tune based on your
-expected setup (along with the variables that can be passed to "make
-check" to adjust them):
+ * They need a functioning loopback device.
 
- * they need a functioning loopback device.
-
- * they expect (by default) to have port 9932 [TEST_PORT] available
+ * They expect (by default) to have port 9932 [TEST_PORT] available
    and open for connections on the addresses listed in TEST_IP.
 
- * if a machine is particularly slow or under heavy load, it's
+ * Depending on the compile time configuration of the Apache binary
+   installed on your system you may need to load additional Apache
+   modules. The recommended way to do this is to drop a configuration
+   file into the test/apache-conf/ directory. Patches to detect such
+   situations and automatically configure the tests accordingly are
+   welcome.
+
+ * If a machine is particularly slow or under heavy load, it's
    possible that these tests will fail for timing
-   reasons. [TEST_QUERY_DELAY (seconds for the http request to be sent
+   reasons. [TEST_QUERY_DELAY (seconds for the HTTP request to be sent
    and responded to)]
+
+The first two of these issues are avoided when the tests are isolated
+using network namespaces, which is the default (see "Implementation"
+above).
 
 In some situations you may want to see the exact environment as
 configured by make, e.g. if you want to manually run an Apache
 instance with Valgrind using the same configuration as a test
 case. Use "make show-test-env" to dump AM_TESTS_ENVIRONMENT to stdout.
+
+If you are building on an exotic architecture which does not support
+flock (or timeouts using flock -w), you can disable it by passing
+"--disable-flock" to ./configure. This will force serial execution of
+tests, including environment setup.
