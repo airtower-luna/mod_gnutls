@@ -87,9 +87,9 @@ request based on the files described above. Note that some tests take
 additional steps, e.g. starting another server to act as proxy
 backend, and there is no technical requirement to use "runtests".
 
-By default (if "unshare" is available and --disable-test-namespaces
-has NOT been passed to configure), each test case is run inside its
-own network namespace. This avoids address and port conflicts with
+By default (if "unshare" is available and has the permissions required
+to create network and user namespaces), each test case is run inside
+its own network namespace. This avoids address and port conflicts with
 other tests as well has the host system.
 
 When writing your own tests, make sure to call netns_reexec (defined
@@ -126,7 +126,11 @@ on your expected setup (along with the variables that can be passed to
 
 The first two of these issues are avoided when the tests are isolated
 using network namespaces, which is the default (see "Implementation"
-above).
+above). The ./configure script tries to detect if namespaces can be
+used (some Linux distributions disable them for unprivileged
+users). If this detection returns a false positive or you do not want
+to use namespace isolation for some other reason, you can run
+configure with the --disable-test-namespaces option.
 
 In some situations you may want to see the exact environment as
 configured by make, e.g. if you want to manually run an Apache

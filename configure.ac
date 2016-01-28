@@ -77,18 +77,29 @@ AC_ARG_ENABLE(test-namespaces,
 	namespaces to run tests in parallel (some architectures might not \
 	support it)]),
 	[use_netns=$enableval], [use_netns=yes])
-dnl If namespaces are enabled, make sure "unshare" is available
-if test "$enable_test_namespaces" != "no"; then
-	AC_PATH_PROG([UNSHARE], [unshare], [no])
-	use_netns=${UNSHARE}
-	# default mutex breaks in namespace, use "pthread" instead
-	MUTEX_TYPE="pthread"
-	PID_AFFIX="-\${TEST_NAME}"
-else
-	MUTEX_TYPE="default"
-	PID_AFFIX=""
-fi
+
+# Check if "unshare" is available and has permission to create network
+# and user namespaces
+AC_PATH_PROG([UNSHARE], [unshare], [no])
+AS_IF([test "${UNSHARE}" != "no"],
+      [
+	AC_MSG_CHECKING([whether ${UNSHARE} allows network and user namespaces])
+	AS_IF([${UNSHARE} --net -r /bin/sh -c \
+		"ip link set up lo; ip addr show" >&AS_MESSAGE_LOG_FD 2>&1],
+	      [unshare_works="yes"], [unshare_works="no"])
+	AC_MSG_RESULT([$unshare_works])
+      ],
+      [unshare_works="yes"])
+# decide whether to enable network namespaces
+AS_IF([test "$enable_test_namespaces" != "no" \
+	    && test "$unshare_works" = "yes"],
+      [use_netns="yes"], [use_netns="no"])
 AM_CONDITIONAL([ENABLE_NETNS], [test "$use_netns" != "no"])
+# Adjust Apache configuration for tests accordingly: Use pthread mutex
+# and test specific PID files if using namespaces, defaults otherwise.
+AS_IF([test "$use_netns" = "yes"],
+      [MUTEX_TYPE="pthread"; PID_AFFIX="-\${TEST_NAME}"],
+      [MUTEX_TYPE="default"; PID_AFFIX=""])
 AC_SUBST(MUTEX_TYPE)
 AC_SUBST(PID_AFFIX)
 AM_SUBST_NOTMAKE(MUTEX_TYPE)
