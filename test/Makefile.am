@@ -33,13 +33,17 @@ TESTS = $(dist_check_SCRIPTS)
 
 # Identities in the miniature CA, server, and client environment for
 # the test suite
-identities = server authority client imposter rogueca
+shared_identities = server authority client imposter rogueca
+pgp_identities = $(shared_identities)
+x509_only_identities = rogueclient
+x509_identities = $(shared_identities) $(x509_only_identities)
+identities = $(shared_identities) $(x509_only_identities)
 # Append strings after ":=" to each identity to generate a list of
 # necessary files
-pgp_tokens = $(identities:=/secring.gpg) $(identities:=/cert.pgp) \
-	$(identities:=/secret.pgp)
-x509_keys = $(identities:=/secret.key)
-x509_certs = $(identities:=/x509.pem)
+pgp_tokens = $(pgp_identities:=/secring.gpg) $(pgp_identities:=/cert.pgp) \
+	$(pgp_identities:=/secret.pgp)
+x509_keys = $(x509_identities:=/secret.key)
+x509_certs = $(x509_identities:=/x509.pem)
 x509_tokens = $(x509_certs) $(x509_keys)
 tokens = $(x509_tokens) $(pgp_tokens)
 
