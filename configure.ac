@@ -85,7 +85,7 @@ AS_IF([test "${UNSHARE}" != "no"],
       [
 	AC_MSG_CHECKING([whether ${UNSHARE} allows network and user namespaces])
 	AS_IF([${UNSHARE} --net -r /bin/sh -c \
-		"ip link set up lo; ip addr show" >&AS_MESSAGE_LOG_FD 2>&1],
+		"ip link set up lo && ip addr show" >&AS_MESSAGE_LOG_FD 2>&1],
 	      [unshare_works="yes"], [unshare_works="no"])
 	AC_MSG_RESULT([$unshare_works])
       ],
