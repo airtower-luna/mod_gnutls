@@ -13,9 +13,9 @@ function cleanup_tmpconf
 }
 trap cleanup_tmpconf EXIT
 
-sed "s,__DIR__,$(realpath $(pwd))," \
-    "${testdir}/softhsm.conf.in" \
-    >"${tmp_softhsm_conf}"
+cat - >"${tmp_softhsm_conf}" <<EOF
+0:$(realpath $(pwd))/server/softhsm.db
+EOF
 export SOFTHSM_CONF="${tmp_softhsm_conf}"
 echo "Generated temporary SoftHSM config ${tmp_softhsm_conf}:"
 cat "${tmp_softhsm_conf}"
