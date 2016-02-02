@@ -89,7 +89,7 @@ AS_IF([test "${UNSHARE}" != "no"],
 	      [unshare_works="yes"], [unshare_works="no"])
 	AC_MSG_RESULT([$unshare_works])
       ],
-      [unshare_works="yes"])
+      [unshare_works="no"])
 # decide whether to enable network namespaces
 AS_IF([test "$enable_test_namespaces" != "no" \
 	    && test "$unshare_works" = "yes"],
