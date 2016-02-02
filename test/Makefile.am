@@ -69,9 +69,10 @@ check_DATA = $(tokens) server/crl.pem
 MOSTLYCLEANFILES = cache/* logs/* outputs/* server/crl.pem
 
 cert_templates = authority.template.in client.template.in \
-	imposter.template.in rogueca.template server.template.in
+	imposter.template.in rogueca.template rogueclient.template.in \
+	server.template.in
 generated_templates = authority.template client.template \
-	imposter.template server.template
+	imposter.template rogueclient.template server.template
 
 # Delete X.509 private keys on full clean. Note that unless you need
 # to generate fresh keys, the "mostlyclean" target should be
