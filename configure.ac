@@ -64,12 +64,21 @@ AC_ARG_ENABLE(flock,
 	AS_HELP_STRING([--disable-flock], [Disable use of flock during tests \
 	(some exotic architectures don't support it)]),
 	[use_flock=$enableval], [use_flock=yes])
-dnl If flock is not disabled, make sure it's available
-if test "$enable_flock" != "no"; then
-	AC_PATH_PROG([FLOCK], [flock], [no])
-	use_flock=${FLOCK}
-fi
-AM_CONDITIONAL([DISABLE_FLOCK], [test "$enable_flock" = "no"])
+# Check if flock is available and supports --timeout
+AC_PATH_PROG([FLOCK], [flock], [no])
+AS_IF([test "${FLOCK}" != "no"],
+      [
+	AC_MSG_CHECKING([whether ${FLOCK} supports --timeout])
+	lockfile="$(mktemp)"
+	AS_IF([${FLOCK} --timeout 1 ${lockfile} true >&AS_MESSAGE_LOG_FD 2>&1],
+	      [flock_works="yes"], [flock_works="no"])
+	rm "${lockfile}"
+	AC_MSG_RESULT([$flock_works])
+      ],
+      [flock_works="no"])
+# disable flock if requested by user or it doesn't support timeout
+AM_CONDITIONAL([DISABLE_FLOCK],
+	       [test "$enable_flock" = "no" || test "$flock_works" = "no"])
 
 dnl Enable test namespaces? Default is "yes".
 AC_ARG_ENABLE(test-namespaces,

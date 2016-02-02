@@ -138,6 +138,7 @@ instance with Valgrind using the same configuration as a test
 case. Use "make show-test-env" to dump AM_TESTS_ENVIRONMENT to stdout.
 
 If you are building on an exotic architecture which does not support
-flock (or timeouts using flock -w), you can disable it by passing
+flock (or timeouts using flock -w), ./configure should detect that and
+disable locking, or you can disable it manually by passing
 "--disable-flock" to ./configure. This will force serial execution of
 tests, including environment setup.
