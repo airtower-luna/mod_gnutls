@@ -32,6 +32,14 @@ this does not apply to your system, you can pass different values to
 
   TEST_HOST="localhost" TEST_IP="127.0.0.1" ./configure
 
+If tests fail due to expired certificates or PGP signatures, run
+
+  make mostlyclean
+
+to delete them and create fresh ones on the next test run. You could
+also use "make clean", but in that case the keys will be deleted as
+well and have to be recreated, too, which takes more time.
+
 
 Adding a Test
 =============

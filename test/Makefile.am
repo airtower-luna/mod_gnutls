@@ -82,7 +82,7 @@ CLEANFILES = $(x509_keys)
 # Delete X.509 certificates and generated templates on "mostlyclean"
 # target. Certificates can be rebuilt without generating new key
 # pairs, and regenerating them makes it possible to change identities
-# (e.g. host names) without wasting entropy on new keys (which would
+# (e.g. host names) without wasting time on new keys (which would
 # happen after "clean").
 MOSTLYCLEANFILES += */x509.pem $(generated_templates) *.uid
 
