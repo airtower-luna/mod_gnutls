@@ -93,7 +93,7 @@ Test directories usually contain the following files:
 The "runtests" script is used to start one Apache instance and send a
 request based on the files described above. Note that some tests take
 additional steps, e.g. starting another server to act as proxy
-backend, and there is no technical requirement to use "runtests".
+backend, and at least one does not use "runtests" at all.
 
 By default (if "unshare" is available and has the permissions required
 to create network and user namespaces), each test case is run inside

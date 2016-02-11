@@ -190,6 +190,15 @@ for i in ${TEST_IP}; do
 	LISTEN_LIST="${LISTEN_LIST}
 Listen ${i}:\${TEST_PORT}"
 done
+dnl HTTP ports, only active if TEST_HTTP_PORT is defined
+LISTEN_LIST="${LISTEN_LIST}
+<IfDefine TEST_HTTP_PORT>"
+for i in ${TEST_IP}; do
+	LISTEN_LIST="${LISTEN_LIST}
+	Listen ${i}:\${TEST_HTTP_PORT}"
+done
+LISTEN_LIST="${LISTEN_LIST}
+</IfDefine>"
 AC_SUBST(LISTEN_LIST)
 AM_SUBST_NOTMAKE(LISTEN_LIST)
 

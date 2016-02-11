@@ -27,7 +27,8 @@ dist_check_SCRIPTS += test-16_view-status.bash \
 	test-22_TLS_reverse_proxy_crl_revoke.bash \
 	test-23_TLS_reverse_proxy_mismatched_priorities.bash \
 	test-24_pkcs11_cert.bash \
-	test-25_Disable_TLS_1.0.bash
+	test-25_Disable_TLS_1.0.bash \
+	test-26_HTTPS_server_var.bash
 
 TESTS = $(dist_check_SCRIPTS)
 
