@@ -8,7 +8,7 @@ set -e
 . ${srcdir}/common.bash
 netns_reexec ${@}
 
-testdir="${srcdir}/tests/26_HTTPS_server_var"
+testdir="${srcdir}/tests/26_redirect_HTTP_to_HTTPS"
 TEST_NAME="$(basename ${testdir})"
 . $(dirname ${0})/proxy_backend.bash
 

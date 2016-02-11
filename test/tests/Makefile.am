@@ -25,4 +25,4 @@ EXTRA_DIST = \
 	23_TLS_reverse_proxy_mismatched_priorities/apache.conf 23_TLS_reverse_proxy_mismatched_priorities/backend.conf 23_TLS_reverse_proxy_mismatched_priorities/gnutls-cli.args 23_TLS_reverse_proxy_mismatched_priorities/input 23_TLS_reverse_proxy_mismatched_priorities/output \
 	24_pkcs11_cert/apache.conf 24_pkcs11_cert/gnutls-cli.args 24_pkcs11_cert/input 24_pkcs11_cert/output \
 	25_Disable_TLS_1.0/apache.conf 25_Disable_TLS_1.0/fail.client 25_Disable_TLS_1.0/gnutls-cli.args 25_Disable_TLS_1.0/input \
-	26_HTTPS_server_var/apache.conf
+	26_redirect_HTTP_to_HTTPS/apache.conf
