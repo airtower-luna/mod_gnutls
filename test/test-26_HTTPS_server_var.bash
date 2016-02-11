@@ -16,8 +16,10 @@ TEST_NAME="$(basename ${testdir})"
 export TEST_HTTP_PORT
 
 # "Proxy backend" functions are used to start the only instance needed
-# here without "runtests". We have to override BACKEND_PORT to use the
-# right port.
+# here without "runtests". We have to override BACKEND_PID and
+# BACKEND_PORT to make them match what a runtests-based test would
+# use.
+export BACKEND_PID="apache2.pid"
 export BACKEND_PORT="${TEST_PORT}"
 function stop_backend
 {
