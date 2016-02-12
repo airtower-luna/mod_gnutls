@@ -34,7 +34,8 @@ rm -f "$output"
 # Send status request over HTTP. This should get redirected to HTTPS.
 URL="http://${TEST_HOST}:${TEST_HTTP_PORT}/status?auto"
 if [ "$(basename ${HTTP_CLI})" = "curl" ]; then
-    ${HTTP_CLI} --location --cacert authority/x509.pem "${URL}" >"${output}"
+    ${HTTP_CLI} --location --verbose --cacert authority/x509.pem "${URL}" \
+		>"${output}"
 elif [ "$(basename ${HTTP_CLI})" = "wget" ]; then
     ${HTTP_CLI} --ca-certificate=authority/x509.pem -O "${output}" "${URL}"
 else
