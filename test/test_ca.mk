@@ -55,9 +55,13 @@ rogueca/x509.pem: $(srcdir)/rogueca.template rogueca/secret.key
 rogue%/x509.pem: rogue%.template rogue%/cert-request rogueca/x509.pem
 	certtool --generate-certificate --load-ca-certificate rogueca/x509.pem --load-ca-privkey rogueca/secret.key --load-request $(dir $@)cert-request --template $< > $@
 
-%/softhsm.db: %/x509.pem %/secret.key
+%/softhsm.conf: %/secret.key
+	echo "0:$(dir $@)softhsm.db" > $@
+
+%/softhsm.db: %/x509.pem %/secret.key %/softhsm.conf
 	SOFTHSM="$(SOFTHSM)" \
-	SOFTHSM_CONF="$(srcdir)/$(*)-softhsm.conf" $(srcdir)/softhsm.bash init $(dir $@)secret.key $(dir $@)x509.pem
+	SOFTHSM_CONF="$(dir $@)softhsm.conf" \
+	$(srcdir)/softhsm.bash init $(dir $@)secret.key $(dir $@)x509.pem
 
 # Generate CRL revoking a certain certificate. Currently used to
 # revoke the server certificate and check if setting the CRL as
