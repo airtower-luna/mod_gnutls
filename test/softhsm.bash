@@ -16,7 +16,7 @@ function store_privkey
     local keyfile="${2}"
     local label="${3}"
 
-    p11tool --provider=${softhsm_lib} --login --write --label "${label}" \
+    p11tool --provider=${SOFTHSM_LIB} --login --write --label "${label}" \
 	    --load-privkey "${keyfile}" "${token}"
 }
 
@@ -27,7 +27,7 @@ function store_cert
     local certfile="${2}"
     local label="${3}"
 
-    p11tool --provider=${softhsm_lib} --login --write --no-mark-private \
+    p11tool --provider=${SOFTHSM_LIB} --login --write --no-mark-private \
 	    --label "${label}" --load-certificate "${certfile}" "${token}"
 }
 
@@ -35,7 +35,7 @@ function store_cert
 function get_token_url
 {
     local label="${1}"
-    p11tool --provider=${softhsm_lib} --list-tokens | \
+    p11tool --provider=${SOFTHSM_LIB} --list-tokens | \
 	grep -o -P "(?<=URL:\s)(.*token=${label}.*)$"
 }
 
@@ -43,7 +43,7 @@ function get_token_url
 # Usage: get_object_url TOKEN OBJECTNAME
 function get_object_url
 {
-    p11tool --provider=${softhsm_lib} --list-all --login "${1}" | \
+    p11tool --provider=${SOFTHSM_LIB} --list-all --login "${1}" | \
 	grep -o -P "(?<=URL:\s)(.*object=${2}.*)$"
 }
 
@@ -64,7 +64,49 @@ function prepare_token
 
 
 # try to find SoftHSM
-softhsm="$(which softhsm)"
+softhsm="$(basename ${SOFTHSM})"
+
+if [ "${softhsm}" = "softhsm" ]; then
+    softhsm_libname="libsofthsm.so"
+    # fail if SOFTHSM_CONF is not set
+    if [ -z "${SOFTHSM_CONF}" ]; then
+	echo "ERROR: SOFTHSM_CONF not set!" 1>&2
+	exit 1
+    else
+	export SOFTHSM_CONF
+    fi
+    echo "using SOFTHSM_CONF=\"${SOFTHSM_CONF}\""
+elif [ "${softhsm}" = "softhsm2-util" ]; then
+    softhsm_libname="libsofthsm2.so"
+    # fail if SOFTHSM2_CONF is not set
+    if [ -z "${SOFTHSM2_CONF}" ]; then
+	echo "ERROR: SOFTHSM2_CONF not set!" 1>&2
+	exit 1
+    else
+	export SOFTHSM2_CONF
+    fi
+else
+    # no SoftHSM
+    echo "No SoftHSM!" >&2
+    exit 77
+fi
+
+# Try to find the libsofthsm[2] module in some common locations.
+softhsm_searchpath=(/usr/lib64/pkcs11 /usr/lib/softhsm /usr/lib/x86_64-linux-gnu/softhsm /usr/lib /usr/lib64/softhsm)
+for i in ${softhsm_searchpath[@]} ""; do
+    SOFTHSM_LIB="${i}/${softhsm_libname}"
+    echo "checking ${SOFTHSM_LIB} ..."
+    if [ -f "${SOFTHSM_LIB}" ]; then
+	echo "found!"
+	export SOFTHSM_LIB
+	break;
+    fi
+done
+
+if [ ! -f "${SOFTHSM_LIB}" ]; then
+    echo "${softhsm_libname} not found!" >&2
+    exit 77
+fi
 
 case "${1}" in
     (init)
@@ -86,22 +128,6 @@ case "${1}" in
 esac
 
 set -e
-
-# Guess location of libsofthsm based on softhsm binary. The path
-# matches SoftHSM upstream, but this might fail if someone changes the
-# libdir or bindir of the SoftHSM installation independently of its
-# general prefix.
-softhsm_prefix="$(realpath $(dirname ${softhsm})/..)"
-softhsm_lib="${softhsm_prefix}/lib/softhsm/libsofthsm.so"
-
-# fail if SOFTHSM_CONF is not set
-if [ -z "${SOFTHSM_CONF}" ]; then
-    echo "ERROR: SOFTHSM_CONF not set!" 1>&2
-    exit 1
-else
-    export SOFTHSM_CONF
-fi
-echo "using SOFTHSM_CONF=\"${SOFTHSM_CONF}\""
 
 # variables for token configuration
 token_label="mod_gnutls-test"
