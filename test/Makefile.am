@@ -112,16 +112,35 @@ $(msva_home)/trustdb.gpg: authority/minimal.pgp client/cert.pgp
 	printf "keyserver does-not-exist.example\n" > $(msva_home)/gpg.conf
 endif
 
-# SoftHSM files
-check_DATA += server/softhsm.db
-MOSTLYCLEANFILES += tests/24_pkcs11_cert/softhsm.conf server/softhsm.db
 
+# SoftHSM tokens. Note that the SoftHSM 2 token is a directory and
+# hence has to be treated slightly differently.
+SOFTHSM_TOKEN = server/softhsm.db
+SOFTHSM2_TOKEN = server/softhsm2.db
+
+# Tokens should be cleaned whether or not the matching SoftHSM version
+# was detected on the last ./configure run.
+MOSTLYCLEANFILES += $(SOFTHSM_TOKEN)
+# included in mostlyclean-local below
+clean-softhsm2-db:
+	-rm -rf $(SOFTHSM2_TOKEN)
+
+if HAVE_SOFTHSM1
+check_DATA += $(SOFTHSM_TOKEN)
+endif HAVE_SOFTHSM1
+
+if HAVE_SOFTHSM2
+check_DATA += $(SOFTHSM2_TOKEN)
+endif HAVE_SOFTHSM2
 
 check_DATA += make-test-dirs
 extra_dirs = logs cache outputs
 make-test-dirs:
 	mkdir -p $(extra_dirs)
-.PHONY: make-test-dirs
+
+.PHONY: make-test-dirs clean-softhsm2-db
+
+mostlyclean-local: clean-softhsm2-db
 
 clean-local:
 	-rmdir $(identities) || true

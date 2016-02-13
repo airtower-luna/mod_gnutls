@@ -63,6 +63,16 @@ rogue%/x509.pem: rogue%.template rogue%/cert-request rogueca/x509.pem
 	SOFTHSM_CONF="$(dir $@)softhsm.conf" \
 	$(srcdir)/softhsm.bash init $(dir $@)secret.key $(dir $@)x509.pem
 
+%/softhsm2.conf: %/secret.key
+	echo "objectstore.backend = file" > $@
+	echo "directories.tokendir = $(dir $@)softhsm2.db" >> $@
+
+%/softhsm2.db: %/x509.pem %/secret.key %/softhsm2.conf
+	mkdir -p $@
+	SOFTHSM="@SOFTHSM@" \
+	SOFTHSM2_CONF="$(dir $@)softhsm2.conf" \
+	$(srcdir)/softhsm.bash init $(dir $@)secret.key $(dir $@)x509.pem
+
 # Generate CRL revoking a certain certificate. Currently used to
 # revoke the server certificate and check if setting the CRL as
 # GnuTLSProxyCRLFile causes the connection to the back end server to

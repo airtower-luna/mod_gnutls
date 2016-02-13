@@ -171,7 +171,7 @@ AC_PATH_PROGS([HTTP_CLI], [curl wget], [no])
 MODULE_CFLAGS="${LIBGNUTLS_CFLAGS} ${SRP_CFLAGS} ${MSVA_CFLAGS} ${APR_MEMCACHE_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES} ${STRICT_CFLAGS}"
 MODULE_LIBS="${APR_MEMCACHE_LIBS} ${LIBGNUTLS_LIBS}"
 
-AC_PATH_PROGS([SOFTHSM], [softhsm], [no])
+AC_PATH_PROGS([SOFTHSM], [softhsm2-util softhsm], [no])
 if test "${SOFTHSM}" != "no"; then
 	softhsm_version=$(${SOFTHSM} --version)
 	AS_VERSION_COMPARE([$(${SOFTHSM} --version)], [2.0.0],
