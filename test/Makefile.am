@@ -26,21 +26,32 @@ dist_check_SCRIPTS += test-16_view-status.bash \
 	test-21_TLS_reverse_proxy_wrong_cert.bash \
 	test-22_TLS_reverse_proxy_crl_revoke.bash \
 	test-23_TLS_reverse_proxy_mismatched_priorities.bash \
-	test-24_pkcs11_cert.bash
+	test-24_pkcs11_cert.bash \
+	test-25_Disable_TLS_1.0.bash \
+	test-26_redirect_HTTP_to_HTTPS.bash
 
 TESTS = $(dist_check_SCRIPTS)
 
 # Identities in the miniature CA, server, and client environment for
 # the test suite
-identities = server authority client imposter rogueca
+shared_identities = server authority client imposter rogueca
+pgp_identities = $(shared_identities)
+x509_only_identities = rogueclient
+x509_identities = $(shared_identities) $(x509_only_identities)
+identities = $(shared_identities) $(x509_only_identities)
 # Append strings after ":=" to each identity to generate a list of
 # necessary files
-pgp_tokens = $(identities:=/secring.gpg) $(identities:=/cert.pgp) \
-	$(identities:=/secret.pgp)
-x509_keys = $(identities:=/secret.key)
-x509_certs = $(identities:=/x509.pem)
+pgp_tokens = $(pgp_identities:=/secring.gpg) $(pgp_identities:=/cert.pgp) \
+	$(pgp_identities:=/secret.pgp)
+x509_keys = $(x509_identities:=/secret.key)
+x509_certs = $(x509_identities:=/x509.pem)
 x509_tokens = $(x509_certs) $(x509_keys)
 tokens = $(x509_tokens) $(pgp_tokens)
+
+if !DISABLE_FLOCK
+# flock command for write access to the authority keyring
+GPG_FLOCK = $(FLOCK) authority/lock
+endif
 
 include $(srcdir)/test_ca.mk
 
@@ -59,9 +70,10 @@ check_DATA = $(tokens) server/crl.pem
 MOSTLYCLEANFILES = cache/* logs/* outputs/* server/crl.pem
 
 cert_templates = authority.template.in client.template.in \
-	imposter.template.in rogueca.template server.template.in
+	imposter.template.in rogueca.template rogueclient.template.in \
+	server.template.in
 generated_templates = authority.template client.template \
-	imposter.template server.template
+	imposter.template rogueclient.template server.template
 
 # Delete X.509 private keys on full clean. Note that unless you need
 # to generate fresh keys, the "mostlyclean" target should be
@@ -71,7 +83,7 @@ CLEANFILES = $(x509_keys)
 # Delete X.509 certificates and generated templates on "mostlyclean"
 # target. Certificates can be rebuilt without generating new key
 # pairs, and regenerating them makes it possible to change identities
-# (e.g. host names) without wasting entropy on new keys (which would
+# (e.g. host names) without wasting time on new keys (which would
 # happen after "clean").
 MOSTLYCLEANFILES += */x509.pem $(generated_templates) *.uid
 
@@ -121,12 +133,16 @@ endif
 # Apache configuration and data files
 apache_data = base_apache.conf cgi_module.conf data/* mime.types proxy_mods.conf
 
-EXTRA_DIST = $(apache_data) $(cert_templates) *.uid.in proxy_backend.bash \
-	runtests server-crl.template server-softhsm.conf softhsm.bash
+EXTRA_DIST = $(apache_data) $(cert_templates) *.uid.in common.bash \
+	proxy_backend.bash runtests server-crl.template server-softhsm.conf \
+	softhsm.bash
 
 # Lockfile for the main Apache process
 test_lockfile = ./test.lock
-# Maximum wait time in seconds for flock to aquire instance lock files
+# Lockfile for the proxy backend Apache process (if any)
+backend_lockfile = ./backend.lock
+# Maximum wait time in seconds for flock to aquire instance lock
+# files, or Apache to remove its PID file
 lock_wait = 30
 
 # port for the main Apache server
@@ -142,17 +158,28 @@ TEST_QUERY_DELAY ?= 30
 
 AM_TESTS_ENVIRONMENT = export APACHE2=$(APACHE2); \
 	export AP_LIBEXECDIR=$(AP_LIBEXECDIR); \
-	export TEST_LOCK="$(test_lockfile)"; \
 	export TEST_LOCK_WAIT="$(lock_wait)"; \
 	export TEST_HOST="$(TEST_HOST)"; \
-	export TEST_IP="$(TEST_IP)"; \
 	export TEST_PORT="$(TEST_PORT)"; \
 	export MSVA_PORT="$(MSVA_PORT)"; \
 	export TEST_MSVA_MAX_WAIT="$(TEST_MSVA_MAX_WAIT)"; \
 	export TEST_MSVA_WAIT="$(TEST_MSVA_WAIT)"; \
 	export TEST_QUERY_DELAY="$(TEST_QUERY_DELAY)"; \
 	export BACKEND_HOST="$(TEST_HOST)"; \
-	export BACKEND_IP="$(TEST_IP)";
+	export HTTP_CLI="@HTTP_CLI@";
+
+if ENABLE_NETNS
+AM_TESTS_ENVIRONMENT += export UNSHARE="$(UNSHARE)"; \
+	export USE_TEST_NAMESPACE=1;
+endif
+# Without flock tests must not run in parallel. Otherwise set lock files.
+if DISABLE_FLOCK
+.NOTPARALLEL:
+else
+AM_TESTS_ENVIRONMENT += export FLOCK="$(FLOCK)"; \
+	export TEST_LOCK="$(test_lockfile)"; \
+	export BACKEND_LOCK="$(backend_lockfile)";
+endif
 
 # Echo AM_TESTS_ENVIRONMENT. This can be useful for debugging, e.g. if
 # you want to manually run an Apache instance with Valgrind using the

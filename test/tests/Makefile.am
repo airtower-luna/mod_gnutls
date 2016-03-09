@@ -23,4 +23,6 @@ EXTRA_DIST = \
 	21_TLS_reverse_proxy_wrong_cert/apache.conf 21_TLS_reverse_proxy_wrong_cert/backend.conf 21_TLS_reverse_proxy_wrong_cert/gnutls-cli.args 21_TLS_reverse_proxy_wrong_cert/input 21_TLS_reverse_proxy_wrong_cert/output \
 	22_TLS_reverse_proxy_crl_revoke/apache.conf 22_TLS_reverse_proxy_crl_revoke/backend.conf 22_TLS_reverse_proxy_crl_revoke/gnutls-cli.args 22_TLS_reverse_proxy_crl_revoke/input 22_TLS_reverse_proxy_crl_revoke/output \
 	23_TLS_reverse_proxy_mismatched_priorities/apache.conf 23_TLS_reverse_proxy_mismatched_priorities/backend.conf 23_TLS_reverse_proxy_mismatched_priorities/gnutls-cli.args 23_TLS_reverse_proxy_mismatched_priorities/input 23_TLS_reverse_proxy_mismatched_priorities/output \
-	24_pkcs11_cert/apache.conf 24_pkcs11_cert/gnutls-cli.args 24_pkcs11_cert/input 24_pkcs11_cert/output 24_pkcs11_cert/softhsm.conf.in
+	24_pkcs11_cert/apache.conf 24_pkcs11_cert/gnutls-cli.args 24_pkcs11_cert/input 24_pkcs11_cert/output \
+	25_Disable_TLS_1.0/apache.conf 25_Disable_TLS_1.0/fail.client 25_Disable_TLS_1.0/gnutls-cli.args 25_Disable_TLS_1.0/input \
+	26_redirect_HTTP_to_HTTPS/apache.conf
