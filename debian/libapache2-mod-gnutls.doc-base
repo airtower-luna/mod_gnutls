@@ -1,0 +1,8 @@
+Document: mod-gnutls
+Title: mod_gnutls Manual
+Abstract: This handbook describes the configuration of mod_gnutls.
+Section: Network/Communication
+
+Format: HTML
+Index: /usr/share/doc/libapache2-mod-gnutls/mod_gnutls_manual.html
+Files: /usr/share/doc/libapache2-mod-gnutls/*.html
