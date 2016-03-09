@@ -1,3 +1,16 @@
+mod-gnutls (0.7.3-1~3.gbpc898aa) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @c898aaa29261d96af4f80de6058d7ce481a9db8b **
+
+  * New upstream release.
+  * New test case: Disable TLS 1.0 (Closes: #754960)
+  * Register "ssl_is_https" function for mod_rewrite (Closes: #514005)
+  * Disable Monkeysphere support on non-Linux arches (Closes: #769493)
+  * Install HTML documentation
+  * Drop 0001-let-a-failed-diff-be-verbose.patch (included upstream)
+
+ -- Thomas Klute <thomas2.klute@uni-dortmund.de>  Wed, 09 Mar 2016 13:07:29 +0100
+
 mod-gnutls (0.7.2-2) unstable; urgency=medium
 
   * update build-deps: test suite needs procps and no longer needs bc.
