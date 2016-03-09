@@ -3,7 +3,11 @@
 	dh $@ --with apache2,autoreconf
 
 override_dh_auto_configure:
-	dh_auto_configure -- --with-apxs=/usr/bin/apxs2 --enable-msva
+	if [ "$(DEB_HOST_ARCH_OS)" = "linux" ]; then \
+		dh_auto_configure -- --with-apxs=/usr/bin/apxs2 --enable-msva; \
+	else \
+		dh_auto_configure -- --with-apxs=/usr/bin/apxs2; \
+	fi
 
 override_dh_auto_test:
 	VERBOSE=1 dh_auto_test
