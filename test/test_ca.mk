@@ -69,7 +69,7 @@ rogue%/x509.pem: rogue%.template rogue%/cert-request rogueca/x509.pem
 
 %/softhsm2.db: %/x509.pem %/secret.key %/softhsm2.conf
 	mkdir -p $@
-	SOFTHSM="@SOFTHSM@" \
+	SOFTHSM="$(SOFTHSM)" \
 	SOFTHSM2_CONF="$(dir $@)softhsm2.conf" \
 	$(srcdir)/softhsm.bash init $(dir $@)secret.key $(dir $@)x509.pem
 

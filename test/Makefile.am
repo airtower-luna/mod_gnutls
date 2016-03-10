@@ -50,7 +50,7 @@ tokens = $(x509_tokens) $(pgp_tokens)
 
 if !DISABLE_FLOCK
 # flock command for write access to the authority keyring
-GPG_FLOCK = $(FLOCK) authority/lock
+GPG_FLOCK = @FLOCK@ authority/lock
 endif
 
 include $(srcdir)/test_ca.mk
@@ -174,16 +174,16 @@ TEST_MSVA_WAIT ?= 400
 # seconds for the HTTP request to be sent and responded to
 TEST_QUERY_DELAY ?= 30
 
-AM_TESTS_ENVIRONMENT = export APACHE2=$(APACHE2); \
-	export AP_LIBEXECDIR=$(AP_LIBEXECDIR); \
+AM_TESTS_ENVIRONMENT = export APACHE2=@APACHE2@; \
+	export AP_LIBEXECDIR=@AP_LIBEXECDIR@; \
 	export TEST_LOCK_WAIT="$(lock_wait)"; \
-	export TEST_HOST="$(TEST_HOST)"; \
+	export TEST_HOST="@TEST_HOST@"; \
 	export TEST_PORT="$(TEST_PORT)"; \
 	export MSVA_PORT="$(MSVA_PORT)"; \
 	export TEST_MSVA_MAX_WAIT="$(TEST_MSVA_MAX_WAIT)"; \
 	export TEST_MSVA_WAIT="$(TEST_MSVA_WAIT)"; \
 	export TEST_QUERY_DELAY="$(TEST_QUERY_DELAY)"; \
-	export BACKEND_HOST="$(TEST_HOST)"; \
+	export BACKEND_HOST="@TEST_HOST@"; \
 	export HTTP_CLI="@HTTP_CLI@";
 
 if HAVE_SOFTHSM
@@ -193,14 +193,14 @@ AM_TESTS_ENVIRONMENT += export SOFTHSM="@SOFTHSM@"; \
 endif
 
 if ENABLE_NETNS
-AM_TESTS_ENVIRONMENT += export UNSHARE="$(UNSHARE)"; \
+AM_TESTS_ENVIRONMENT += export UNSHARE="@UNSHARE@"; \
 	export USE_TEST_NAMESPACE=1;
 endif
 # Without flock tests must not run in parallel. Otherwise set lock files.
 if DISABLE_FLOCK
 .NOTPARALLEL:
 else
-AM_TESTS_ENVIRONMENT += export FLOCK="$(FLOCK)"; \
+AM_TESTS_ENVIRONMENT += export FLOCK="@FLOCK@"; \
 	export TEST_LOCK="$(test_lockfile)"; \
 	export BACKEND_LOCK="$(backend_lockfile)";
 endif
