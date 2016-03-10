@@ -198,6 +198,11 @@ AC_ARG_VAR([TEST_IP], [List of IP addresses to use for server instances \
 		      enclosed in square brackets.])
 AM_SUBST_NOTMAKE(TEST_IP)
 
+dnl Allow user to set SoftHSM PKCS #11 module
+AC_ARG_VAR([SOFTHSM_LIB], [Absolute path of the SoftHSM PKCS @%:@11 module to \
+			  use. By default the test suite will search common \
+			  library paths.])
+
 dnl Build list of "Listen" statements for Apache
 LISTEN_LIST="# Listen addresses for the test servers"
 for i in ${TEST_IP}; do

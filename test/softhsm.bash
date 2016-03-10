@@ -91,17 +91,21 @@ else
     exit 77
 fi
 
-# Try to find the libsofthsm[2] module in some common locations.
-softhsm_searchpath=(/usr/lib64/pkcs11 /usr/lib/softhsm /usr/lib/x86_64-linux-gnu/softhsm /usr/lib /usr/lib64/softhsm)
-for i in ${softhsm_searchpath[@]} ""; do
-    SOFTHSM_LIB="${i}/${softhsm_libname}"
-    echo "checking ${SOFTHSM_LIB} ..."
-    if [ -f "${SOFTHSM_LIB}" ]; then
-	echo "found!"
-	export SOFTHSM_LIB
-	break;
-    fi
-done
+if [ -z "${SOFTHSM_LIB}" ]; then
+    # Try to find the libsofthsm[2] module in some common locations.
+    softhsm_searchpath=(/usr/lib64/pkcs11 /usr/lib/softhsm /usr/lib/x86_64-linux-gnu/softhsm /usr/lib /usr/lib64/softhsm)
+    for i in ${softhsm_searchpath[@]} ""; do
+	SOFTHSM_LIB="${i}/${softhsm_libname}"
+	echo "checking ${SOFTHSM_LIB} ..."
+	if [ -f "${SOFTHSM_LIB}" ]; then
+	    echo "found!"
+	    export SOFTHSM_LIB
+	    break;
+	fi
+    done
+else
+    echo "using ${SOFTHSM_LIB} (set by user)"
+fi
 
 if [ ! -f "${SOFTHSM_LIB}" ]; then
     echo "${softhsm_libname} not found!" >&2
