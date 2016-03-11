@@ -200,7 +200,7 @@ sleep_pidfile="$(mktemp mod_gnutls_test-XXXXXX.pid)"
 if (sed "s/__HOSTNAME__/${TEST_HOST}/" <${t}/input && \
 	   run_with_pidfile "${sleep_pidfile}" sleep "${TEST_QUERY_DELAY}" &) | \
        gnutls-cli -p "${TEST_PORT}" $(cat ${t}/gnutls-cli.args) "${TEST_HOST}" \
-		  >"$output";
+       | tee "$output" && test "${PIPESTATUS[1]}" -eq 0;
 then
     if [ -e ${t}/fail* ]; then
         printf "%s should have failed but succeeded\n" "$(basename "$t")" >&2
