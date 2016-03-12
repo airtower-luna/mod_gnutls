@@ -80,6 +80,9 @@ AS_IF([test "${FLOCK}" != "no"],
 AM_CONDITIONAL([DISABLE_FLOCK],
 	       [test "$enable_flock" = "no" || test "$flock_works" = "no"])
 
+# TODO: check for openssl ocsp
+AM_CONDITIONAL([ENABLE_OCSP_TEST], [true])
+
 dnl Enable test namespaces? Default is "yes".
 AC_ARG_ENABLE(test-namespaces,
 	AS_HELP_STRING([--disable-test-namespaces], [Disable use of network \

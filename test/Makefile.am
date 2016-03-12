@@ -32,6 +32,13 @@ dist_check_SCRIPTS += test-16_view-status.bash \
 
 TESTS = $(dist_check_SCRIPTS)
 
+# build OCSP database tool
+if ENABLE_OCSP_TEST
+check_PROGRAMS = gen_ocsp_index
+gen_ocsp_index_SOURCES = gen_ocsp_index.c cert_helper.c
+noinst_HEADERS = cert_helper.h
+endif
+
 # Identities in the miniature CA, server, and client environment for
 # the test suite
 shared_identities = server authority client imposter rogueca
