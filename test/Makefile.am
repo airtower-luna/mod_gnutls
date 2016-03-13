@@ -44,6 +44,9 @@ endif
 shared_identities = server authority client imposter rogueca
 pgp_identities = $(shared_identities)
 x509_only_identities = rogueclient
+if ENABLE_OCSP_TEST
+x509_only_identities += ocsp-responder
+endif
 x509_identities = $(shared_identities) $(x509_only_identities)
 identities = $(shared_identities) $(x509_only_identities)
 # Append strings after ":=" to each identity to generate a list of
@@ -77,8 +80,8 @@ check_DATA = $(tokens) server/crl.pem
 MOSTLYCLEANFILES = cache/* logs/* outputs/* server/crl.pem
 
 cert_templates = authority.template.in client.template.in \
-	imposter.template.in rogueca.template rogueclient.template.in \
-	server.template.in
+	imposter.template.in ocsp-responder.template rogueca.template \
+	rogueclient.template.in server.template.in
 generated_templates = authority.template client.template \
 	imposter.template rogueclient.template server.template
 
