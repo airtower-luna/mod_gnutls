@@ -122,6 +122,16 @@ $(msva_home)/trustdb.gpg: authority/minimal.pgp client/cert.pgp
 	printf "keyserver does-not-exist.example\n" > $(msva_home)/gpg.conf
 endif
 
+# rules to build OCSP database
+if ENABLE_OCSP_TEST
+check_DATA += authority/ocsp_index.txt
+MOSTLYCLEANFILES += authority/ocsp_index.txt authority/ocsp_index.txt.attr
+authority/ocsp_index.txt: $(x509_tokens) gen_ocsp_index authority/ocsp_index.txt.attr
+	./gen_ocsp_index server/x509.pem client/x509.pem > $@
+
+authority/ocsp_index.txt.attr: authority/secret.key
+	echo "unique_subject = no" > $@
+endif
 
 # SoftHSM tokens. Note that the SoftHSM 2 token is a directory and
 # hence has to be treated slightly differently.
