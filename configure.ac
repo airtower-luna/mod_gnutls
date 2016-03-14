@@ -80,8 +80,9 @@ AS_IF([test "${FLOCK}" != "no"],
 AM_CONDITIONAL([DISABLE_FLOCK],
 	       [test "$enable_flock" = "no" || test "$flock_works" = "no"])
 
-# TODO: check for openssl ocsp
-AM_CONDITIONAL([ENABLE_OCSP_TEST], [true])
+# openssl is needed as the responder for OCSP tests
+AC_PATH_PROG([OPENSSL], [openssl], [no])
+AM_CONDITIONAL([ENABLE_OCSP_TEST], [test "${OPENSSL}" != "no"])
 
 dnl Enable test namespaces? Default is "yes".
 AC_ARG_ENABLE(test-namespaces,
@@ -207,20 +208,23 @@ AC_ARG_VAR([SOFTHSM_LIB], [Absolute path of the SoftHSM PKCS @%:@11 module to \
 			  library paths.])
 
 dnl Build list of "Listen" statements for Apache
-LISTEN_LIST="# Listen addresses for the test servers"
+LISTEN_LIST="@%:@ Listen addresses for the test servers"
 for i in ${TEST_IP}; do
 	LISTEN_LIST="${LISTEN_LIST}
 Listen ${i}:\${TEST_PORT}"
 done
-dnl HTTP ports, only active if TEST_HTTP_PORT is defined
+# Available extra ports, tests can "Define" variables of the listed
+# names in their apache.conf to enable them.
+for j in TEST_HTTP_PORT OCSP_PORT; do
 LISTEN_LIST="${LISTEN_LIST}
-<IfDefine TEST_HTTP_PORT>"
+<IfDefine ${j}>"
 for i in ${TEST_IP}; do
 	LISTEN_LIST="${LISTEN_LIST}
-	Listen ${i}:\${TEST_HTTP_PORT}"
+	Listen ${i}:\${${j}}"
 done
 LISTEN_LIST="${LISTEN_LIST}
 </IfDefine>"
+done
 AC_SUBST(LISTEN_LIST)
 AM_SUBST_NOTMAKE(LISTEN_LIST)
 

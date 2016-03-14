@@ -187,6 +187,10 @@ lock_wait = 30
 TEST_PORT ?= 9932
 # port for MSVA in test cases that use it
 MSVA_PORT ?= 9933
+# port for OCSP server (Apache vhost if enabled)
+if ENABLE_OCSP_TEST
+OCSP_PORT ?= 9936
+endif
 # maximum time to wait for MSVA startup (milliseconds)
 TEST_MSVA_MAX_WAIT ?= 10000
 # wait loop time for MSVA startup (milliseconds)
@@ -210,6 +214,11 @@ if HAVE_SOFTHSM
 AM_TESTS_ENVIRONMENT += export SOFTHSM="@SOFTHSM@"; \
 	export SOFTHSM_MAJOR_VERSION="@SOFTHSM_MAJOR_VERSION@"; \
 	export SOFTHSM_LIB="@SOFTHSM_LIB@"
+endif
+
+if ENABLE_OCSP_TEST
+AM_TESTS_ENVIRONMENT += export OPENSSL="@OPENSSL@"; \
+	export OCSP_PORT="$(OCSP_PORT)";
 endif
 
 if ENABLE_NETNS
