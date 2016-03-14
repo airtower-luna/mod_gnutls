@@ -8,6 +8,10 @@
 
 %.template: $(srcdir)/%.template.in
 	sed s/__HOSTNAME__/$(TEST_HOST)/ < $< > $@
+	if test -n "$(OCSP_PORT)"; then \
+		sed -i -e 's/^### ocsp/ocsp/' \
+			-e s/__OCSP_PORT__/$(OCSP_PORT)/ $@; \
+	fi
 
 %.uid: $(srcdir)/%.uid.in
 	sed s/__HOSTNAME__/$(TEST_HOST)/ < $< > $@
