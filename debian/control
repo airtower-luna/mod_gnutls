@@ -18,7 +18,7 @@ Build-Depends: apache2-bin <!nocheck>,
                pandoc | markdown,
                pkg-config,
                procps <!nocheck>,
-               softhsm <!nocheck>,
+               softhsm2 | softhsm <!nocheck>,
                curl | wget <!nocheck>
 Standards-Version: 3.9.6
 Homepage: https://mod.gnutls.org/
