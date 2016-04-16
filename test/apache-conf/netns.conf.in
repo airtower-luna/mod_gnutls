@@ -1,0 +1,4 @@
+# This file contains options that are different depending on whether
+# tests use namespaces or not.
+Mutex	@MUTEX_TYPE@	default
+PidFile	apache2@PID_AFFIX@.pid

@@ -5,6 +5,8 @@
 # Thomas Klute <thomas2.klute@uni-dortmund.de>
 
 set -e
+. ${srcdir}/common.bash
+netns_reexec ${@}
 
 testid="${1##t-}"
 
@@ -16,8 +18,8 @@ else
 fi
 
 BADVARS=0
-for v in APACHE2 TEST_HOST TEST_IP TEST_PORT TEST_QUERY_DELAY TEST_MSVA_WAIT \
-		 MSVA_PORT TEST_LOCK; do
+for v in APACHE2 TEST_HOST TEST_PORT TEST_QUERY_DELAY TEST_MSVA_WAIT \
+		 MSVA_PORT; do
     if [ ! -v "$v" ]; then
         printf "You need to set the %s environment variable\n" "$v" >&2
         BADVARS=1
@@ -149,8 +151,18 @@ if [ -n "${USE_MSVA}" ]; then
     fi
 fi
 
+TEST_PID="apache2.pid"
 # configure locking for the Apache process
-flock_cmd="flock -w ${TEST_LOCK_WAIT} $(realpath ${TEST_LOCK})"
+if [ -n "${USE_TEST_NAMESPACE}" ]; then
+    echo "Using namespaces to isolate tests, no need for locking."
+    flock_cmd=""
+elif [ -n "${TEST_LOCK}" ]; then
+    flock_cmd="${FLOCK} -w ${TEST_LOCK_WAIT} $(realpath ${TEST_LOCK})"
+else
+    echo "Locking disabled, using wait based on Apache PID file."
+    wait_pid_gone "${TEST_PID}"
+    flock_cmd=""
+fi
 
 t="$(realpath ${testid})"
 export srcdir="$(realpath ${srcdir})"
@@ -188,7 +200,7 @@ sleep_pidfile="$(mktemp mod_gnutls_test-XXXXXX.pid)"
 if (sed "s/__HOSTNAME__/${TEST_HOST}/" <${t}/input && \
 	   run_with_pidfile "${sleep_pidfile}" sleep "${TEST_QUERY_DELAY}" &) | \
        gnutls-cli -p "${TEST_PORT}" $(cat ${t}/gnutls-cli.args) "${TEST_HOST}" \
-		  >"$output";
+       | tee "$output" && test "${PIPESTATUS[1]}" -eq 0;
 then
     if [ -e ${t}/fail* ]; then
         printf "%s should have failed but succeeded\n" "$(basename "$t")" >&2
@@ -205,7 +217,7 @@ kill_by_pidfile "${sleep_pidfile}"
 unset sleep_pidfile
 
 if [ -e ${t}/output ] ; then
-    diff_output_filter_headers "${t}/output" "$output" "-q"
+    diff_output_filter_headers "${t}/output" "$output" >&2
 fi
 if [ -n "${USE_MSVA}" ]; then
     trap stop_msva EXIT

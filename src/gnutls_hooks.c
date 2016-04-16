@@ -3,7 +3,7 @@
  *  Copyright 2008, 2014 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
  *  Copyright 2013-2014 Daniel Kahn Gillmor
- *  Copyright 2015 Thomas Klute
+ *  Copyright 2015-2016 Thomas Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -1654,44 +1654,72 @@ end:
 }
 #endif /* ENABLE_MSVA */
 
-static int mgs_status_hook(request_rec *r, int flags __attribute__((unused)))
-{
-    mgs_srvconf_rec *sc;
 
+
+/*
+ * This hook writes the mod_gnutls status message for a mod_status
+ * report. According to the comments in mod_status.h, the "flags"
+ * parameter is a bitwise OR of the AP_STATUS_ flags.
+ *
+ * Note that this implementation gives flags explicitly requesting a
+ * simple response priority, e.g. if AP_STATUS_SHORT is set, flags
+ * requesting an HTML report will be ignored. As of Apache 2.4.10, the
+ * following flags were defined in mod_status.h:
+ *
+ * AP_STATUS_SHORT (short, non-HTML report requested)
+ * AP_STATUS_NOTABLE (HTML report without tables)
+ * AP_STATUS_EXTENDED (detailed report)
+ */
+static int mgs_status_hook(request_rec *r, int flags)
+{
     if (r == NULL)
         return OK;
 
-    sc = (mgs_srvconf_rec *) ap_get_module_config(r->server->module_config, &gnutls_module);
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(r->server->module_config, &gnutls_module);
 
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
 
-    ap_rputs("<hr>\n", r);
-    ap_rputs("<h2>GnuTLS Information:</h2>\n<dl>\n", r);
+    if (flags & AP_STATUS_SHORT)
+    {
+        ap_rprintf(r, "Using GnuTLS version: %s\n", gnutls_check_version(NULL));
+        ap_rputs("Built against GnuTLS version: " GNUTLS_VERSION "\n", r);
+    }
+    else
+    {
+        ap_rputs("<hr>\n", r);
+        ap_rputs("<h2>GnuTLS Information:</h2>\n<dl>\n", r);
 
-    ap_rprintf(r, "<dt>GnuTLS version:</dt><dd>%s</dd>\n", gnutls_check_version(NULL));
-    ap_rputs("<dt>Built against:</dt><dd>" GNUTLS_VERSION "</dd>\n", r);
-    ap_rprintf(r, "<dt>using TLS:</dt><dd>%s</dd>\n", (sc->enabled == GNUTLS_ENABLED_FALSE ? "no" : "yes"));
-    if (sc->enabled != GNUTLS_ENABLED_FALSE) {
-        mgs_handle_t* ctxt;
-        ctxt = ap_get_module_config(r->connection->conn_config, &gnutls_module);
-        if (ctxt && ctxt->session != NULL) {
-#if GNUTLS_VERSION_MAJOR < 3
-            ap_rprintf(r, "<dt>This TLS Session:</dt><dd>%s</dd>\n",
-                gnutls_cipher_suite_get_name(gnutls_kx_get(ctxt->session),
-                gnutls_cipher_get(ctxt->session),
-                gnutls_mac_get(ctxt->session)));
-#else
-            char* z = NULL;
-            z = gnutls_session_get_desc(ctxt->session);
-            if (z) {
-                ap_rprintf(r, "<dt>This TLS Session:</dt><dd>%s</dd>\n", z);
-                gnutls_free(z);
+        ap_rprintf(r, "<dt>Using GnuTLS version:</dt><dd>%s</dd>\n",
+                   gnutls_check_version(NULL));
+        ap_rputs("<dt>Built against GnuTLS version:</dt><dd>"
+                 GNUTLS_VERSION "</dd>\n", r);
+        ap_rprintf(r, "<dt>Using TLS:</dt><dd>%s</dd>\n",
+                   (sc->enabled == GNUTLS_ENABLED_FALSE ? "no" : "yes"));
+    }
+
+    if (sc->enabled != GNUTLS_ENABLED_FALSE)
+    {
+        mgs_handle_t* ctxt =
+            ap_get_module_config(r->connection->conn_config, &gnutls_module);
+        if (ctxt && ctxt->session != NULL)
+        {
+            char* s_info = gnutls_session_get_desc(ctxt->session);
+            if (s_info)
+            {
+                if (flags & AP_STATUS_SHORT)
+                    ap_rprintf(r, "Current TLS session: %s\n", s_info);
+                else
+                    ap_rprintf(r, "<dt>Current TLS session:</dt><dd>%s</dd>\n",
+                               s_info);
+                gnutls_free(s_info);
             }
-#endif
         }
     }
 
-    ap_rputs("</dl>\n", r);
+    if (!(flags & AP_STATUS_SHORT))
+        ap_rputs("</dl>\n", r);
+
     return OK;
 }
 

@@ -68,19 +68,36 @@ static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
     /* mod_proxy calls these functions */
     APR_REGISTER_OPTIONAL_FN(ssl_proxy_enable);
     APR_REGISTER_OPTIONAL_FN(ssl_engine_disable);
+
+    /* mod_rewrite calls this function to detect HTTPS */
+    APR_REGISTER_OPTIONAL_FN(ssl_is_https);
 }
 
+
+
+/*
+ * mod_rewrite calls this function to fill %{HTTPS}. A non-zero return
+ * value means that HTTPS is in use.
+ */
 int ssl_is_https(conn_rec *c)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(c->base_server->module_config, &gnutls_module);
-    if(sc->enabled == 0 || sc->non_ssl_request == 1) {
+    mgs_handle_t *ctxt = (mgs_handle_t *)
+        ap_get_module_config(c->conn_config, &gnutls_module);
+
+    if(sc->enabled == GNUTLS_ENABLED_FALSE
+       || ctxt == NULL
+       || ctxt->enabled == GNUTLS_ENABLED_FALSE)
+    {
         /* SSL/TLS Disabled or Plain HTTP Connection Detected */
         return 0;
     }
     /* Connection is Using SSL/TLS */
     return 1;
 }
+
+
 
 int ssl_engine_disable(conn_rec *c)
 {

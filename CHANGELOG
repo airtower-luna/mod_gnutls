@@ -2,6 +2,33 @@
 - Handle Unclean Shutdowns
 - make session cache use generic apache caches
 
+** Version 0.7.4 (2016-04-13)
+- Support SoftHSM 2 for PKCS #11 testing
+- Increase verbosity of test logs
+
+** Version 0.7.3 (2016-01-12)
+- Update test suite for compatibility with GnuTLS 3.4, which has
+  stricter key usage checks and priorities than 3.3.
+- Write non-HTML output to mod_status reports if AP_STATUS_SHORT is
+  set (mod_status sets it for requests with the "auto" parameter, e.g.
+  https://localhost/server-status?auto).
+- Register "ssl_is_https" function so the special mod_rewrite variable
+  %{HTTPS} works correctly with mod_gnutls. The new test case for this
+  requires Wget or curl. Fixes Debian bug #514005.
+- Test suite servers listen on IPv4 *and* IPv6 loopback addresses by
+  default (other addresses configurable), which should fix failures
+  due to localhost randomly resolving to either on some distributions.
+- Isolate tests using network namespaces, if possible. This avoids
+  port conflicts with other test cases (so they can run in parallel)
+  and host services.
+- Support for local Apache drop-in config files in the test suite
+  (e.g. to load additional modules needed on Fedora).
+- Try to use markdown to build HTML documentation if pandoc is not
+  available.
+- Disable use of flock if it is unavailable or does not support
+  timeouts (the latter caused the build to fail on Debian Hurd).
+- New test: Disable TLS 1.0 (regression test for Debian bug #754960).
+
 ** Version 0.7.2 (2015-11-21)
 - Bugfix: Non-blocking reads in the input filter could lead to a busy
   wait in the gnutls_io_input_read function, causing high load on
