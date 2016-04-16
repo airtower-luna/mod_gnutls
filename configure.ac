@@ -1,5 +1,5 @@
 dnl 
-AC_INIT(mod_gnutls, 0.7.2)
+AC_INIT(mod_gnutls, 0.7.4)
 OOO_CONFIG_NICE(config.nice)
 MOD_GNUTLS_VERSION=AC_PACKAGE_VERSION
 AC_PREREQ(2.53)
@@ -59,6 +59,61 @@ fi
 AC_MSG_CHECKING([whether to enable SRP functionality])
 AC_MSG_RESULT($use_srp)
 
+dnl Optionally disable flock
+AC_ARG_ENABLE(flock,
+	AS_HELP_STRING([--disable-flock], [Disable use of flock during tests \
+	(some exotic architectures don't support it)]),
+	[use_flock=$enableval], [use_flock=yes])
+# Check if flock is available and supports --timeout
+AC_PATH_PROG([FLOCK], [flock], [no])
+AS_IF([test "${FLOCK}" != "no"],
+      [
+	AC_MSG_CHECKING([whether ${FLOCK} supports --timeout])
+	lockfile="$(mktemp)"
+	AS_IF([${FLOCK} --timeout 1 ${lockfile} true >&AS_MESSAGE_LOG_FD 2>&1],
+	      [flock_works="yes"], [flock_works="no"])
+	rm "${lockfile}"
+	AC_MSG_RESULT([$flock_works])
+      ],
+      [flock_works="no"])
+# disable flock if requested by user or it doesn't support timeout
+AM_CONDITIONAL([DISABLE_FLOCK],
+	       [test "$enable_flock" = "no" || test "$flock_works" = "no"])
+
+dnl Enable test namespaces? Default is "yes".
+AC_ARG_ENABLE(test-namespaces,
+	AS_HELP_STRING([--disable-test-namespaces], [Disable use of network \
+	namespaces to run tests in parallel (some architectures might not \
+	support it)]),
+	[use_netns=$enableval], [use_netns=yes])
+
+# Check if "unshare" is available and has permission to create network
+# and user namespaces
+AC_PATH_PROG([UNSHARE], [unshare], [no])
+AS_IF([test "${UNSHARE}" != "no"],
+      [
+	AC_MSG_CHECKING([for permission to create network and user namespaces])
+	AS_IF([${UNSHARE} --net -r /bin/sh -c \
+		"ip link set up lo && ip addr show" >&AS_MESSAGE_LOG_FD 2>&1],
+	      [unshare_works="yes"], [unshare_works="no"])
+	AC_MSG_RESULT([$unshare_works])
+      ],
+      [unshare_works="no"])
+# decide whether to enable network namespaces
+AS_IF([test "$enable_test_namespaces" != "no" \
+	    && test "$unshare_works" = "yes"],
+      [use_netns="yes"], [use_netns="no"])
+AM_CONDITIONAL([ENABLE_NETNS], [test "$use_netns" != "no"])
+# Adjust Apache configuration for tests accordingly: Use pthread mutex
+# and test specific PID files if using namespaces, defaults otherwise.
+AS_IF([test "$use_netns" = "yes"],
+      [MUTEX_TYPE="pthread"; PID_AFFIX="-\${TEST_NAME}"],
+      [MUTEX_TYPE="default"; PID_AFFIX=""])
+AC_SUBST(MUTEX_TYPE)
+AC_SUBST(PID_AFFIX)
+AM_SUBST_NOTMAKE(MUTEX_TYPE)
+AM_SUBST_NOTMAKE(PID_AFFIX)
+
 AC_ARG_ENABLE(msva,
        AS_HELP_STRING([--enable-msva],
                [enable Monkeysphere client certificate verification]),
@@ -92,10 +147,17 @@ if test "$PANDOC" != "no"; then
 	else
 		build_doc="html only"
 	fi
+else
+	AC_PATH_PROG([MARKDOWN], [markdown], [no])
+	if test "$MARKDOWN" != "no"; then
+		build_doc="html stub"
+	fi
 fi
 AM_CONDITIONAL([USE_PANDOC], [test "$PANDOC" != "no"])
 AM_CONDITIONAL([USE_PDFLATEX], [test "$PANDOC" != "no" && \
 			       test "$PDFLATEX" != "no"])
+AM_CONDITIONAL([USE_MARKDOWN], [test -n "$MARKDOWN" && \
+			       test "$MARKDOWN" != "no"])
 
 # Check for Apache binary
 AC_PATH_PROGS([APACHE2], [apache2 httpd], [no], [$PATH:/usr/sbin])
@@ -104,24 +166,66 @@ if test "${APACHE2}" = "no"; then
 		     PATH. Test suite will fail.])
 fi
 
+AC_PATH_PROGS([HTTP_CLI], [curl wget], [no])
+
 MODULE_CFLAGS="${LIBGNUTLS_CFLAGS} ${SRP_CFLAGS} ${MSVA_CFLAGS} ${APR_MEMCACHE_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES} ${STRICT_CFLAGS}"
 MODULE_LIBS="${APR_MEMCACHE_LIBS} ${LIBGNUTLS_LIBS}"
+
+AC_PATH_PROGS([SOFTHSM], [softhsm2-util softhsm], [no])
+if test "${SOFTHSM}" != "no"; then
+	softhsm_version=$(${SOFTHSM} --version)
+	AS_VERSION_COMPARE([$(${SOFTHSM} --version)], [2.0.0],
+			   [AC_SUBST(SOFTHSM_MAJOR_VERSION, [1])],
+			   [AC_SUBST(SOFTHSM_MAJOR_VERSION, [2])],
+			   [AC_SUBST(SOFTHSM_MAJOR_VERSION, [2])])
+fi
+AM_CONDITIONAL([HAVE_SOFTHSM], [test "${SOFTHSM}" != "no"])
+AM_CONDITIONAL([HAVE_SOFTHSM1], [test "${SOFTHSM_MAJOR_VERSION}" = "1"])
+AM_CONDITIONAL([HAVE_SOFTHSM2], [test "${SOFTHSM_MAJOR_VERSION}" = "2"])
 
 AC_SUBST(MODULE_CFLAGS)
 AC_SUBST(MODULE_LIBS)
 
 # assign default values to TEST_HOST and TEST_IP if necessary
 : ${TEST_HOST:="localhost"}
-: ${TEST_IP:="[::1]"}
+: ${TEST_IP:="[[::1]] 127.0.0.1"}
 AC_ARG_VAR([TEST_HOST], [Host name to use for server instances started by \
-			"make check", must resolve to TEST_IP. The default \
-			is "localhost".])
-AC_ARG_VAR([TEST_IP], [IP address to use for server instances started by \
-		      "make check". The default is the IPv6 loopback address \
-		      [::1].])
+			"make check", must resolve to addresses in TEST_IP. \
+			The default is "localhost".])
+AC_ARG_VAR([TEST_IP], [List of IP addresses to use for server instances \
+		      started by "make check". The default is \
+		      "[::1] 127.0.0.1". Note that IPv6 addresses must be \
+		      enclosed in square brackets.])
+AM_SUBST_NOTMAKE(TEST_IP)
+
+dnl Allow user to set SoftHSM PKCS #11 module
+AC_ARG_VAR([SOFTHSM_LIB], [Absolute path of the SoftHSM PKCS @%:@11 module to \
+			  use. By default the test suite will search common \
+			  library paths.])
+
+dnl Build list of "Listen" statements for Apache
+LISTEN_LIST="# Listen addresses for the test servers"
+for i in ${TEST_IP}; do
+	LISTEN_LIST="${LISTEN_LIST}
+Listen ${i}:\${TEST_PORT}"
+done
+dnl HTTP ports, only active if TEST_HTTP_PORT is defined
+LISTEN_LIST="${LISTEN_LIST}
+<IfDefine TEST_HTTP_PORT>"
+for i in ${TEST_IP}; do
+	LISTEN_LIST="${LISTEN_LIST}
+	Listen ${i}:\${TEST_HTTP_PORT}"
+done
+LISTEN_LIST="${LISTEN_LIST}
+</IfDefine>"
+AC_SUBST(LISTEN_LIST)
+AM_SUBST_NOTMAKE(LISTEN_LIST)
 
 AC_CONFIG_FILES([Makefile src/Makefile test/Makefile test/tests/Makefile \
-			  doc/Makefile include/mod_gnutls.h])
+			doc/Makefile include/mod_gnutls.h \
+			test/proxy_backend.conf \
+			test/apache-conf/listen.conf \
+			test/apache-conf/netns.conf])
 AC_OUTPUT
 
 echo "---"

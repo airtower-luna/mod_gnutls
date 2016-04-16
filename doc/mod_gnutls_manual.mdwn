@@ -30,9 +30,10 @@ The interesting options you can pass to configure are:
 `--help`
 :   Provides a list of all available configure options.
 
-It is recommended to run `make check` before installation. If
-`localhost` does not resolve to the IPv6 loopback address `[::1]` on
-your system, you may have to set the `TEST_HOST` or `TEST_IP`
+It is recommended to run `make check` before installation. If your
+system doesn't have a loopback device with IPv6 and IPv4 support or
+`localhost` does not resolve to at least one of `[::1]` and
+`127.0.0.1`, you may have to set the `TEST_HOST` or `TEST_IP`
 environment variables when running `./configure` to make the test
 suite work correctly.
 
