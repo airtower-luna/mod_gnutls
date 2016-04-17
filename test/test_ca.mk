@@ -18,7 +18,7 @@ pgpcrc: pgpcrc.c
 %/secret.key:
 	mkdir -p $(dir $@)
 	chmod 0700 $(dir $@)
-	certtool --generate-privkey > $@
+	certtool --outfile $@ --generate-privkey
 
 %/secret.pgp.raw: %.uid %/secret.key
 	PEM2OPENPGP_EXPIRATION=86400 PEM2OPENPGP_USAGE_FLAGS=authenticate,certify,sign pem2openpgp "$$(cat $<)" < $(dir $@)secret.key > $@
@@ -44,24 +44,24 @@ pgpcrc: pgpcrc.c
 %/cert.pgp: %/minimal.pgp authority/gpg.conf
 	GNUPGHOME=authority $(GPG_FLOCK) gpg --import $<
 	GNUPGHOME=authority $(GPG_FLOCK) gpg --batch --sign-key --no-tty --yes "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)"
-	GNUPGHOME=authority gpg --armor --export "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" > $@
+	GNUPGHOME=authority gpg --output $@ --armor --export "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)"
 
 # special cases for the authorities' root certs:
 authority/x509.pem: authority.template authority/secret.key
-	certtool --generate-self-signed --load-privkey authority/secret.key --template authority.template > $@
+	certtool --outfile $@ --generate-self-signed --load-privkey authority/secret.key --template authority.template
 rogueca/x509.pem: $(srcdir)/rogueca.template rogueca/secret.key
-	certtool --generate-self-signed --load-privkey rogueca/secret.key --template $(srcdir)/rogueca.template > $@
+	certtool --outfile $@ --generate-self-signed --load-privkey rogueca/secret.key --template $(srcdir)/rogueca.template
 
 %/cert-request: %.template %/secret.key
-	certtool --generate-request --load-privkey $(dir $@)secret.key --template $< > $@
+	certtool --outfile $@ --generate-request --load-privkey $(dir $@)secret.key --template $<
 
 # normal case: certificates signed by test CA
 %/x509.pem: %.template %/cert-request authority/secret.key authority/x509.pem
-	certtool --generate-certificate --load-ca-certificate authority/x509.pem --load-ca-privkey authority/secret.key --load-request $(dir $@)cert-request --template $< > $@
+	certtool --outfile $@ --generate-certificate --load-ca-certificate authority/x509.pem --load-ca-privkey authority/secret.key --load-request $(dir $@)cert-request --template $< 
 
 # error case: certificates signed by rogue CA
 rogue%/x509.pem: rogue%.template rogue%/cert-request rogueca/x509.pem
-	certtool --generate-certificate --load-ca-certificate rogueca/x509.pem --load-ca-privkey rogueca/secret.key --load-request $(dir $@)cert-request --template $< > $@
+	certtool --outfile $@ --generate-certificate --load-ca-certificate rogueca/x509.pem --load-ca-privkey rogueca/secret.key --load-request $(dir $@)cert-request --template $<
 
 %/softhsm.conf: %/secret.key
 	echo "0:$(dir $@)softhsm.db" > $@
@@ -87,8 +87,8 @@ rogue%/x509.pem: rogue%.template rogue%/cert-request rogueca/x509.pem
 # fail.
 %/crl.pem: %/x509.pem ${srcdir}/%-crl.template
 	certtool --generate-crl \
+		--outfile $@ \
 		--load-ca-privkey authority/secret.key \
 		--load-ca-certificate authority/x509.pem \
 		--load-certificate $< \
-		--template "${srcdir}/$(*)-crl.template" \
-		> $@
+		--template "${srcdir}/$(*)-crl.template"
