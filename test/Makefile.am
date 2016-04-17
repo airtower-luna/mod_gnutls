@@ -41,7 +41,7 @@ x509_identities = $(shared_identities) $(x509_only_identities)
 identities = $(shared_identities) $(x509_only_identities)
 # Append strings after ":=" to each identity to generate a list of
 # necessary files
-pgp_tokens = $(pgp_identities:=/secring.gpg) $(pgp_identities:=/cert.pgp) \
+pgp_tokens = $(pgp_identities:=/cert.pgp) \
 	$(pgp_identities:=/secret.pgp)
 x509_keys = $(x509_identities:=/secret.key)
 x509_certs = $(x509_identities:=/x509.pem)
@@ -92,7 +92,7 @@ MOSTLYCLEANFILES += */x509.pem $(generated_templates) *.uid
 # the X.509 private keys and certificates with an expiration time of
 # one day, so regenerating them is both fast and frequently
 # necessary.
-MOSTLYCLEANFILES += */*.pgp */*.gpg */*.gpg~ */gpg.conf authority/lock
+MOSTLYCLEANFILES += */*.pgp */*.gpg */*.gpg~ */gpg.conf authority/lock */*.kbx */*.kbx~ */S.gpg-agent */private-keys-v1.d/*
 # GnuPG random pool, no need to regenerate on every build
 CLEANFILES += authority/random_seed
 
@@ -148,6 +148,7 @@ clean-local:
 if USE_MSVA
 	-rmdir $(msva_home) || true
 endif
+	rm -f pgpcrc
 
 # Apache configuration and data files
 apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/secret.txt data/test.txt mime.types proxy_mods.conf

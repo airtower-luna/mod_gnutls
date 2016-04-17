@@ -3,6 +3,9 @@
 # Daniel Kahn Gillmor <dkg@fifthhorseman.net>
 # Thomas Klute <thomas2.klute@uni-dortmund.de>
 
+pgpcrc: pgpcrc.c
+	gcc -o $@ $<
+
 # General rules to set up a miniature CA & server & client environment
 # for the test suite
 
@@ -17,19 +20,24 @@
 	chmod 0700 $(dir $@)
 	certtool --generate-privkey > $@
 
-%/secring.gpg: %.uid %/secret.key
-	rm -f $(dir $@)pubring.gpg $(dir $@)secring.gpg $(dir $@)trustdb.gpg
-	PEM2OPENPGP_EXPIRATION=86400 PEM2OPENPGP_USAGE_FLAGS=authenticate,certify,sign pem2openpgp "$$(cat $<)" < $(dir $@)secret.key | GNUPGHOME=$(dir $@) gpg --import
-	printf "%s:6:\n" "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" | GNUPGHOME=$(dir $@) gpg --import-ownertrust
+%/secret.pgp.raw: %.uid %/secret.key
+	PEM2OPENPGP_EXPIRATION=86400 PEM2OPENPGP_USAGE_FLAGS=authenticate,certify,sign pem2openpgp "$$(cat $<)" < $(dir $@)secret.key > $@
 
-%/gpg.conf: %/secring.gpg
+%/secret.pgp: %/secret.pgp.raw pgpcrc
+	(printf -- '-----BEGIN PGP PRIVATE KEY BLOCK-----\nVersion: test\n\n' && \
+	base64 < $< && \
+	printf -- '=' && \
+	./pgpcrc < $< | base64 && \
+	printf -- '-----END PGP PRIVATE KEY BLOCK-----\n' ) > $@
+
+%/gpg.conf: %/secret.pgp
+	rm -f $(dir $@)pubring.gpg $(dir $@)secring.gpg $(dir $@)trustdb.gpg $(dir $@)pubring.kbx $(dir $@)private-keys-v1.d/*.key
+	GNUPGHOME=$(dir $@) gpg --import $<
+	printf "%s:6:\n" "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" | GNUPGHOME=$(dir $@) gpg --import-ownertrust
 	printf "default-key %s\n" "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" > $@
 
-%/secret.pgp: %/secring.gpg
-	GNUPGHOME=$(dir $@) gpg --armor --batch --no-tty --yes --export-secret-key "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" > $@
-
-%/minimal.pgp: %/secring.gpg
-	GNUPGHOME=$(dir $@) gpg --armor --export "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" > $@
+%/minimal.pgp: %/gpg.conf
+	GNUPGHOME=$(dir $@) gpg --output $@ --armor --export "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)"
 
 # Import and signing modify the shared keyring, which leads to race
 # conditions with parallel make. Locking avoids this problem.
