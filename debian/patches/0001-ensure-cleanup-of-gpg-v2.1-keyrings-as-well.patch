@@ -1,0 +1,144 @@
+From: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
+Date: Sun, 17 Apr 2016 16:22:45 -0400
+Subject: ensure cleanup of gpg v2.1 keyrings as well
+
+depending on the version of gpg, the choices of secret keyrings, and
+the behavior when exporting secret key material is different.
+
+for example, see https://bugs.gnupg.org/gnupg/issue2324, and the fact
+that secret keys are stored in different locations.
+
+This change allows the test suite to work with all known major
+versions of GnuPG.
+---
+ test/Makefile.am |  5 +++--
+ test/pgpcrc.c    | 40 ++++++++++++++++++++++++++++++++++++++++
+ test/test_ca.mk  | 28 ++++++++++++++++++----------
+ 3 files changed, 61 insertions(+), 12 deletions(-)
+ create mode 100644 test/pgpcrc.c
+
+diff --git a/test/Makefile.am b/test/Makefile.am
+index a93d153..c17ab0f 100644
+--- a/test/Makefile.am
++++ b/test/Makefile.am
+@@ -41,7 +41,7 @@ x509_identities = $(shared_identities) $(x509_only_identities)
+ identities = $(shared_identities) $(x509_only_identities)
+ # Append strings after ":=" to each identity to generate a list of
+ # necessary files
+-pgp_tokens = $(pgp_identities:=/secring.gpg) $(pgp_identities:=/cert.pgp) \
++pgp_tokens = $(pgp_identities:=/cert.pgp) \
+ 	$(pgp_identities:=/secret.pgp)
+ x509_keys = $(x509_identities:=/secret.key)
+ x509_certs = $(x509_identities:=/x509.pem)
+@@ -92,7 +92,7 @@ MOSTLYCLEANFILES += */x509.pem $(generated_templates) *.uid
+ # the X.509 private keys and certificates with an expiration time of
+ # one day, so regenerating them is both fast and frequently
+ # necessary.
+-MOSTLYCLEANFILES += */*.pgp */*.gpg */*.gpg~ */gpg.conf authority/lock
++MOSTLYCLEANFILES += */*.pgp */*.gpg */*.gpg~ */gpg.conf authority/lock */*.kbx */*.kbx~ */S.gpg-agent */private-keys-v1.d/*
+ # GnuPG random pool, no need to regenerate on every build
+ CLEANFILES += authority/random_seed
+ 
+@@ -148,6 +148,7 @@ clean-local:
+ if USE_MSVA
+ 	-rmdir $(msva_home) || true
+ endif
++	rm -f pgpcrc
+ 
+ # Apache configuration and data files
+ apache_data = base_apache.conf cgi_module.conf data/* mime.types proxy_mods.conf
+diff --git a/test/pgpcrc.c b/test/pgpcrc.c
+new file mode 100644
+index 0000000..a5bd437
+--- /dev/null
++++ b/test/pgpcrc.c
+@@ -0,0 +1,40 @@
++#include <unistd.h>
++#include <arpa/inet.h>
++
++/* from RFC 4880 section 6.1 */
++#define CRC24_INIT 0xB704CEL
++#define CRC24_POLY 0x1864CFBL
++
++typedef long crc24;
++crc24 crc_octets(unsigned char *octets, size_t len)
++{
++    crc24 crc = CRC24_INIT;
++    int i;
++    while (len--) {
++        crc ^= (*octets++) << 16;
++        for (i = 0; i < 8; i++) {
++            crc <<= 1;
++            if (crc & 0x1000000)
++                crc ^= CRC24_POLY;
++        }
++    }
++    return crc & 0xFFFFFFL;
++}
++
++
++int main()
++{
++    crc24 output;
++    int i = 0;
++    unsigned char o;
++    unsigned char indata[100000];
++    ssize_t rr = read(0, indata, sizeof(indata));
++    if (rr <= 0)
++        return 1;
++    output = crc_octets(indata, rr);
++    for (i = 2; i >= 0; i--) {
++        o = ((output >> (8 * i)) & 0xff);
++        write(1, &o, sizeof(o));
++    }
++    return 0;
++}
+diff --git a/test/test_ca.mk b/test/test_ca.mk
+index d4c0a72..b896110 100644
+--- a/test/test_ca.mk
++++ b/test/test_ca.mk
+@@ -3,6 +3,9 @@
+ # Daniel Kahn Gillmor <dkg@fifthhorseman.net>
+ # Thomas Klute <thomas2.klute@uni-dortmund.de>
+ 
++pgpcrc: pgpcrc.c
++	gcc -o $@ $<
++
+ # General rules to set up a miniature CA & server & client environment
+ # for the test suite
+ 
+@@ -17,19 +20,24 @@
+ 	chmod 0700 $(dir $@)
+ 	certtool --generate-privkey > $@
+ 
+-%/secring.gpg: %.uid %/secret.key
+-	rm -f $(dir $@)pubring.gpg $(dir $@)secring.gpg $(dir $@)trustdb.gpg
+-	PEM2OPENPGP_EXPIRATION=86400 PEM2OPENPGP_USAGE_FLAGS=authenticate,certify,sign pem2openpgp "$$(cat $<)" < $(dir $@)secret.key | GNUPGHOME=$(dir $@) gpg --import
+-	printf "%s:6:\n" "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" | GNUPGHOME=$(dir $@) gpg --import-ownertrust
++%/secret.pgp.raw: %.uid %/secret.key
++	PEM2OPENPGP_EXPIRATION=86400 PEM2OPENPGP_USAGE_FLAGS=authenticate,certify,sign pem2openpgp "$$(cat $<)" < $(dir $@)secret.key > $@
+ 
+-%/gpg.conf: %/secring.gpg
+-	printf "default-key %s\n" "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" > $@
++%/secret.pgp: %/secret.pgp.raw pgpcrc
++	(printf -- '-----BEGIN PGP PRIVATE KEY BLOCK-----\nVersion: test\n\n' && \
++	base64 < $< && \
++	printf -- '=' && \
++	./pgpcrc < $< | base64 && \
++	printf -- '-----END PGP PRIVATE KEY BLOCK-----\n' ) > $@
+ 
+-%/secret.pgp: %/secring.gpg
+-	GNUPGHOME=$(dir $@) gpg --armor --batch --no-tty --yes --export-secret-key "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" > $@
++%/gpg.conf: %/secret.pgp
++	rm -f $(dir $@)pubring.gpg $(dir $@)secring.gpg $(dir $@)trustdb.gpg $(dir $@)pubring.kbx $(dir $@)private-keys-v1.d/*.key
++	GNUPGHOME=$(dir $@) gpg --import $<
++	printf "%s:6:\n" "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" | GNUPGHOME=$(dir $@) gpg --import-ownertrust
++	printf "default-key %s\n" "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" > $@
+ 
+-%/minimal.pgp: %/secring.gpg
+-	GNUPGHOME=$(dir $@) gpg --armor --export "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" > $@
++%/minimal.pgp: %/gpg.conf
++	GNUPGHOME=$(dir $@) gpg --output $@ --armor --export "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)"
+ 
+ # Import and signing modify the shared keyring, which leads to race
+ # conditions with parallel make. Locking avoids this problem.

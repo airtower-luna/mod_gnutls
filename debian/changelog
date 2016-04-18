@@ -11,6 +11,7 @@ mod-gnutls (0.7.4-1) unstable; urgency=medium
   [ Daniel Kahn Gillmor ]
   * allow testing against softhsm2 (while keeping build-dep on softhsm for
     easy backports) (Closes: #820248)
+  * adjust test suite to work with gpg "modern" as well as "classic"
 
  -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Sat, 16 Apr 2016 11:31:58 -0400
 
