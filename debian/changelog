@@ -1,6 +1,7 @@
 mod-gnutls (0.7.4-2) unstable; urgency=medium
 
   * clean up build-deps for kfreebsd and hurd
+  * bump standards-version to 3.9.8.
 
  -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Mon, 18 Apr 2016 14:41:05 -0400
 
