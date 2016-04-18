@@ -20,7 +20,7 @@ Build-Depends: apache2-bin <!nocheck>,
                procps <!nocheck>,
                softhsm2 | softhsm <!nocheck>,
                curl | wget <!nocheck>
-Standards-Version: 3.9.6
+Standards-Version: 3.9.7
 Homepage: https://mod.gnutls.org/
 Vcs-Git: https://mod.gnutls.org/git/mod_gnutls
 Vcs-Browser: https://mod.gnutls.org/browser/mod_gnutls
