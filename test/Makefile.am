@@ -28,7 +28,8 @@ dist_check_SCRIPTS += test-16_view-status.bash \
 	test-23_TLS_reverse_proxy_mismatched_priorities.bash \
 	test-24_pkcs11_cert.bash \
 	test-25_Disable_TLS_1.0.bash \
-	test-26_redirect_HTTP_to_HTTPS.bash
+	test-26_redirect_HTTP_to_HTTPS.bash \
+	test-27_OCSP_server.bash
 
 TESTS = $(dist_check_SCRIPTS)
 
@@ -170,7 +171,7 @@ if USE_MSVA
 endif
 
 # Apache configuration and data files
-apache_data = base_apache.conf cgi_module.conf data/* mime.types proxy_mods.conf
+apache_data = base_apache.conf cgi_module.conf data/* mime.types ocsp_server.conf proxy_mods.conf
 
 EXTRA_DIST = $(apache_data) $(cert_templates) *.uid.in common.bash \
 	proxy_backend.bash runtests server-crl.template	softhsm.bash

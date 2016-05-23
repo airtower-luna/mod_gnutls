@@ -1,5 +1,3 @@
 cn="Testing Authority OCSP Responder"
-# Workaround: certtool ignores "ocsp_signing_key" if "ca" is not set
-ca
 signing_key
 ocsp_signing_key
