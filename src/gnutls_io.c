@@ -868,7 +868,16 @@ ssize_t mgs_transport_write(gnutls_transport_ptr_t ptr,
     ctxt->output_length += len;
     APR_BRIGADE_INSERT_TAIL(ctxt->output_bb, bucket);
 
-    if (write_flush(ctxt) < 0) {
+    if (write_flush(ctxt) < 0)
+    {
+        /* We encountered an error. APR_EINTR or APR_EAGAIN can be
+         * handled, treat everything else as a generic I/O error. */
+        int err = EIO;
+        if (APR_STATUS_IS_EAGAIN(ctxt->output_rc)
+            || APR_STATUS_IS_EINTR(ctxt->output_rc))
+            err = EAI_APR_TO_RAW(ctxt->output_rc);
+
+        gnutls_transport_set_errno(ctxt->session, err);
         return -1;
     }
     return len;
