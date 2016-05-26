@@ -802,9 +802,8 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
             }
             else
             {
-                if (ctxt->session)
-                    gnutls_transport_set_errno(ctxt->session,
-                                               EAI_APR_TO_RAW(ctxt->input_rc));
+                gnutls_transport_set_errno(ctxt->session,
+                                           EAI_APR_TO_RAW(ctxt->input_rc));
                 return -1;
             }
         }
@@ -829,9 +828,8 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
     {
         if (len == 0)
         {
-            if (ctxt->session)
-                gnutls_transport_set_errno(ctxt->session,
-                                           EAI_APR_TO_RAW(ctxt->input_rc));
+            gnutls_transport_set_errno(ctxt->session,
+                                       EAI_APR_TO_RAW(ctxt->input_rc));
             return -1;
         }
 
