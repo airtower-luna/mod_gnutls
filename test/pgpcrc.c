@@ -1,5 +1,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <stdio.h>
+#include <errno.h>
 
 /* from RFC 4880 section 6.1 */
 #define CRC24_INIT 0xB704CEL
@@ -29,12 +31,17 @@ int main()
     unsigned char o;
     unsigned char indata[100000];
     ssize_t rr = read(0, indata, sizeof(indata));
-    if (rr <= 0)
+    if (rr <= 0) {
+        perror("pgpcrc read");
         return 1;
+    }
     output = crc_octets(indata, rr);
     for (i = 2; i >= 0; i--) {
         o = ((output >> (8 * i)) & 0xff);
-        write(1, &o, sizeof(o));
+        if (write(1, &o, sizeof(o)) < 0) {
+            perror("pgpcrc write");
+            return 2;
+        }
     }
     return 0;
 }
