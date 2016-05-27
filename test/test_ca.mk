@@ -3,9 +3,6 @@
 # Daniel Kahn Gillmor <dkg@fifthhorseman.net>
 # Thomas Klute <thomas2.klute@uni-dortmund.de>
 
-pgpcrc: pgpcrc.c
-	gcc -o $@ $<
-
 # General rules to set up a miniature CA & server & client environment
 # for the test suite
 
@@ -57,7 +54,7 @@ rogueca/x509.pem: $(srcdir)/rogueca.template rogueca/secret.key
 
 # normal case: certificates signed by test CA
 %/x509.pem: %.template %/cert-request authority/secret.key authority/x509.pem
-	certtool --outfile $@ --generate-certificate --load-ca-certificate authority/x509.pem --load-ca-privkey authority/secret.key --load-request $(dir $@)cert-request --template $< 
+	certtool --outfile $@ --generate-certificate --load-ca-certificate authority/x509.pem --load-ca-privkey authority/secret.key --load-request $(dir $@)cert-request --template $<
 
 # error case: certificates signed by rogue CA
 rogue%/x509.pem: rogue%.template rogue%/cert-request rogueca/x509.pem

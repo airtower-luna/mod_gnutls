@@ -20,3 +20,5 @@ msva.gnupghome
 *.log
 *.trs
 *.lock
+pgpcrc
+.deps
