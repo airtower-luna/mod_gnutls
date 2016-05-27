@@ -34,11 +34,13 @@
 	printf "default-key %s\n" "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" > $@
 
 %/minimal.pgp: %/gpg.conf
+	if test -r $@; then rm $@; fi
 	GNUPGHOME=$(dir $@) gpg --output $@ --armor --export "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)"
 
 # Import and signing modify the shared keyring, which leads to race
 # conditions with parallel make. Locking avoids this problem.
 %/cert.pgp: %/minimal.pgp authority/gpg.conf
+	if test -r $@; then rm $@; fi
 	GNUPGHOME=authority $(GPG_FLOCK) gpg --import $<
 	GNUPGHOME=authority $(GPG_FLOCK) gpg --batch --sign-key --no-tty --yes "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)"
 	GNUPGHOME=authority gpg --output $@ --armor --export "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)"
