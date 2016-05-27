@@ -13,6 +13,8 @@ AC_CANONICAL_TARGET
 AM_INIT_AUTOMAKE([-Wno-portability])
 AM_CONFIG_HEADER(include/mod_gnutls_config.h:config.in)
 
+LT_INIT([disable-static])
+
 AC_SUBST(MOD_GNUTLS_VERSION)
 
 AC_PROG_CC
