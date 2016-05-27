@@ -150,10 +150,11 @@ if USE_MSVA
 endif
 
 # Apache configuration and data files
-apache_data = base_apache.conf cgi_module.conf data/* mime.types proxy_mods.conf
+apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/secret.txt data/test.txt mime.types proxy_mods.conf
 
-EXTRA_DIST = $(apache_data) $(cert_templates) *.uid.in common.bash \
-	proxy_backend.bash runtests server-crl.template	softhsm.bash
+EXTRA_DIST = $(apache_data) $(cert_templates) $(shared_identities:=.uid.in) \
+	common.bash proxy_backend.bash runtests server-crl.template \
+	softhsm.bash
 
 # Lockfile for the main Apache process
 test_lockfile = ./test.lock

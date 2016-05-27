@@ -35,6 +35,15 @@ PKG_CHECK_MODULES([LIBGNUTLS], [gnutls >= 3.1.4])
 
 LIBGNUTLS_VERSION=`pkg-config --modversion gnutls`
 
+AC_ARG_ENABLE(vpath-install,
+       AS_HELP_STRING([--enable-vpath-install],
+               [Modify the Apache module directory provided by apxs to \
+	       follow --prefix, if necessary. Most users will not want this, \
+	       but it is required for VPATH builds including "make \
+	       distcheck".]),
+       vpath_install=$enableval, vpath_install=no)
+AM_CONDITIONAL([ENABLE_VPATH_INSTALL], [test "$vpath_install" = "yes"])
+
 AC_ARG_ENABLE(srp,
        AS_HELP_STRING([--disable-srp],
                [unconditionally disable the SRP functionality]),
