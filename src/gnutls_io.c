@@ -764,6 +764,16 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
 
 /**
  * Pull function for GnuTLS
+ *
+ * Generic errnos used for gnutls_transport_set_errno:
+ * EIO: Unknown I/O error
+ * ECONNABORTED: Input BB does not exist (NULL)
+ *
+ * The reason we are not using APR_TO_OS_ERROR to map apr_status_t to
+ * errnos is this warning in the APR documentation: "If the statcode
+ * was not created by apr_get_os_error or APR_FROM_OS_ERROR, the
+ * results are undefined." We cannot know if this applies to any error
+ * we might encounter.
  */
 ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
                            void *buffer, size_t len)
@@ -781,6 +791,7 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
     }
     if (!ctxt->input_bb) {
         ctxt->input_rc = APR_EOF;
+        gnutls_transport_set_errno(ctxt->session, ECONNABORTED);
         return -1;
     }
 
@@ -812,6 +823,7 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
             /* Unexpected errors discard the brigade */
             apr_brigade_cleanup(ctxt->input_bb);
             ctxt->input_bb = NULL;
+            gnutls_transport_set_errno(ctxt->session, EIO);
             return -1;
         }
     }
@@ -849,9 +861,20 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
         return (ssize_t) len;
     }
 
+    gnutls_transport_set_errno(ctxt->session, EIO);
     return -1;
 }
 
+/**
+ * Push function for GnuTLS
+ *
+ * In case of unexpected errors gnutls_transport_set_errno is called
+ * with EIO.  The reason we are not using APR_TO_OS_ERROR to map
+ * apr_status_t to errnos is this warning in the APR documentation:
+ * "If the statcode was not created by apr_get_os_error or
+ * APR_FROM_OS_ERROR, the results are undefined." We cannot know if
+ * this applies to any error we might encounter.
+ */
 ssize_t mgs_transport_write(gnutls_transport_ptr_t ptr,
         const void *buffer, size_t len) {
     mgs_handle_t *ctxt = ptr;
