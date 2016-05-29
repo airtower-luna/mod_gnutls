@@ -33,9 +33,12 @@ dist_check_SCRIPTS += test-16_view-status.bash \
 
 TESTS = $(dist_check_SCRIPTS)
 
+check_PROGRAMS = pgpcrc
+pgpcrc_SOURCES = pgpcrc.c
+
 # build OCSP database tool
 if ENABLE_OCSP_TEST
-check_PROGRAMS = gen_ocsp_index
+check_PROGRAMS += gen_ocsp_index
 gen_ocsp_index_SOURCES = gen_ocsp_index.c cert_helper.c
 noinst_HEADERS = cert_helper.h
 endif
@@ -52,7 +55,7 @@ x509_identities = $(shared_identities) $(x509_only_identities)
 identities = $(shared_identities) $(x509_only_identities)
 # Append strings after ":=" to each identity to generate a list of
 # necessary files
-pgp_tokens = $(pgp_identities:=/secring.gpg) $(pgp_identities:=/cert.pgp) \
+pgp_tokens = $(pgp_identities:=/cert.pgp) \
 	$(pgp_identities:=/secret.pgp)
 x509_keys = $(x509_identities:=/secret.key)
 x509_certs = $(x509_identities:=/x509.pem)
@@ -103,7 +106,8 @@ MOSTLYCLEANFILES += */x509.pem $(generated_templates) *.uid
 # the X.509 private keys and certificates with an expiration time of
 # one day, so regenerating them is both fast and frequently
 # necessary.
-MOSTLYCLEANFILES += */*.pgp */*.gpg */*.gpg~ */gpg.conf authority/lock
+MOSTLYCLEANFILES += */*.pgp */*.pgp.raw */*.gpg */*.gpg~ */gpg.conf \
+	authority/lock */*.kbx */*.kbx~ */S.gpg-agent */private-keys-v1.d/*
 # GnuPG random pool, no need to regenerate on every build
 CLEANFILES += authority/random_seed
 
@@ -162,6 +166,10 @@ make-test-dirs:
 .PHONY: make-test-dirs clean-softhsm2-db
 
 mostlyclean-local: clean-softhsm2-db
+	-rmdir $(pgp_identities:=/private-keys-v1.d) || true
+if USE_MSVA
+	-rmdir $(msva_home)/private-keys-v1.d || true
+endif
 
 clean-local:
 	-rmdir $(identities) || true
@@ -171,10 +179,13 @@ if USE_MSVA
 endif
 
 # Apache configuration and data files
-apache_data = base_apache.conf cgi_module.conf data/* mime.types ocsp_server.conf proxy_mods.conf
+apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/ocsp.cgi \
+	data/secret.txt data/test.txt mime.types ocsp_server.conf \
+	proxy_mods.conf
 
-EXTRA_DIST = $(apache_data) $(cert_templates) *.uid.in common.bash \
-	proxy_backend.bash runtests server-crl.template	softhsm.bash
+EXTRA_DIST = $(apache_data) $(cert_templates) $(shared_identities:=.uid.in) \
+	common.bash proxy_backend.bash runtests server-crl.template \
+	softhsm.bash
 
 # Lockfile for the main Apache process
 test_lockfile = ./test.lock

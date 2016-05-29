@@ -22,4 +22,5 @@ msva.gnupghome
 *.trs
 *.lock
 gen_ocsp_index
+pgpcrc
 .deps
