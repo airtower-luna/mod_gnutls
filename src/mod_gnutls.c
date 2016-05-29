@@ -19,6 +19,7 @@
  */
 
 #include "mod_gnutls.h"
+#include "gnutls_ocsp.h"
 
 #ifdef APLOG_USE_MODULE
 APLOG_USE_MODULE(gnutls);
@@ -274,6 +275,10 @@ static const command_rec mgs_config_cmds[] = {
     RSRC_CONF,
     "The priorities to enable for proxy connections (ciphers, key exchange, "
     "MACs, compression)."),
+    AP_INIT_TAKE1("GnuTLSOCSPResponseFile", mgs_store_ocsp_response_path,
+    NULL,
+    RSRC_CONF,
+    "EXPERIMENTAL: OCSP response for stapling (must be updated externally)"),
     { NULL },
 };
 

@@ -20,6 +20,7 @@
  */
 
 #include "mod_gnutls.h"
+#include "gnutls_ocsp.h"
 #include "http_vhost.h"
 #include "ap_mpm.h"
 #include "mod_status.h"
@@ -155,6 +156,13 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session) {
     gnutls_credentials_set(session, GNUTLS_CRD_CERTIFICATE, ctxt->sc->certs);
     /* Set Anon credentials */
     gnutls_credentials_set(session, GNUTLS_CRD_ANON, ctxt->sc->anon_creds);
+
+    if (ctxt->sc->ocsp_response_file != NULL)
+    {
+        gnutls_certificate_set_ocsp_status_request_function(ctxt->sc->certs,
+                                                            mgs_get_ocsp_response,
+                                                            ctxt);
+    }
 
 #ifdef ENABLE_SRP
 	/* Set SRP credentials */
