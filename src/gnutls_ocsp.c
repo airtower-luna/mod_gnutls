@@ -15,13 +15,50 @@
  */
 
 #include "gnutls_ocsp.h"
-
 #include "mod_gnutls.h"
-#include "apr_lib.h"
+
+#include <apr_lib.h>
+#include <apr_time.h>
+#include <gnutls/ocsp.h>
+#include <time.h>
 
 #ifdef APLOG_USE_MODULE
 APLOG_USE_MODULE(gnutls);
 #endif
+
+
+
+#define _log_one_ocsp_fail(s, c)                                      \
+    ap_log_cerror(APLOG_MARK, APLOG_INFO, APR_EGENERAL, (c),           \
+                  "Reason for failed OCSP response verification: %s", (s))
+/*
+ * Log all matching reasons for verification failure
+ */
+static void _log_verify_fail_reason(const unsigned int verify, conn_rec *c)
+{
+    if (verify & GNUTLS_OCSP_VERIFY_SIGNER_NOT_FOUND)
+        _log_one_ocsp_fail("Signer cert not found", c);
+
+    if (verify & GNUTLS_OCSP_VERIFY_SIGNER_KEYUSAGE_ERROR)
+        _log_one_ocsp_fail("Signer cert keyusage error", c);
+
+    if (verify & GNUTLS_OCSP_VERIFY_UNTRUSTED_SIGNER)
+        _log_one_ocsp_fail("Signer cert is not trusted", c);
+
+    if (verify & GNUTLS_OCSP_VERIFY_INSECURE_ALGORITHM)
+        _log_one_ocsp_fail("Insecure algorithm", c);
+
+    if (verify & GNUTLS_OCSP_VERIFY_SIGNATURE_FAILURE)
+        _log_one_ocsp_fail("Signature failure", c);
+
+    if (verify & GNUTLS_OCSP_VERIFY_CERT_NOT_ACTIVATED)
+        _log_one_ocsp_fail("Signer cert not yet activated", c);
+
+    if (verify & GNUTLS_OCSP_VERIFY_CERT_EXPIRED)
+        _log_one_ocsp_fail("Signer cert expired", c);
+}
+
+
 
 const char *mgs_store_ocsp_response_path(cmd_parms *parms,
                                          void *dummy __attribute__((unused)),
@@ -33,6 +70,171 @@ const char *mgs_store_ocsp_response_path(cmd_parms *parms,
     sc->ocsp_response_file = ap_server_root_relative(parms->pool, arg);
     return NULL;
 }
+
+
+
+/**
+ * Check if the provided OCSP response is usable for stapling in this
+ * connection context. Returns GNUTLS_E_SUCCESS if yes.
+ */
+int check_ocsp_response(mgs_handle_t *ctxt, const gnutls_datum_t *ocsp_response)
+{
+    if (ctxt->sc->certs_x509_chain_num < 2)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
+                      "No CA certificates in store, cannot verify response.");
+        return GNUTLS_E_NO_CERTIFICATE_FOUND;
+    }
+    gnutls_x509_trust_list_t issuer;
+    int ret = gnutls_x509_trust_list_init(&issuer, 1);
+    if (ret != GNUTLS_E_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
+                      "Could not create issuer trust list: %s (%d)",
+                      gnutls_strerror(ret), ret);
+        goto trust_cleanup;
+    }
+    /* Only the direct issuer may sign the OCSP response or an OCSP
+     * signer. Assuming the certificate file is properly ordered, it
+     * should be the one directly after the server's. */
+    ret = gnutls_x509_trust_list_add_cas(issuer,
+                                         &(ctxt->sc->certs_x509_crt_chain[1]),
+                                         1, 0);
+    if (ret != 1)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
+                      "Could not populate issuer trust list.");
+        ret = GNUTLS_E_CERTIFICATE_ERROR;
+        goto trust_cleanup;
+    }
+
+    gnutls_ocsp_resp_t resp;
+    ret = gnutls_ocsp_resp_init(&resp);
+    if (ret != GNUTLS_E_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
+                      "Could not initialize OCSP response structure: %s (%d)",
+                      gnutls_strerror(ret), ret);
+        goto resp_cleanup;
+    }
+    ret = gnutls_ocsp_resp_import(resp, ocsp_response);
+    if (ret != GNUTLS_E_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
+                      "Importing OCSP response failed: %s (%d)",
+                      gnutls_strerror(ret), ret);
+        goto resp_cleanup;
+    }
+
+    ret = gnutls_ocsp_resp_check_crt(resp, 0,
+                                     ctxt->sc->certs_x509_crt_chain[0]);
+    if (ret != GNUTLS_E_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
+                      "OCSP response is not for server certificate: %s (%d)",
+                      gnutls_strerror(ret), ret);
+        goto resp_cleanup;
+    }
+
+    unsigned int verify;
+    ret = gnutls_ocsp_resp_verify(resp, issuer, &verify, 0);
+    if (ret != GNUTLS_E_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
+                      "OCSP response verification failed: %s (%d)",
+                      gnutls_strerror(ret), ret);
+        goto resp_cleanup;
+    }
+    else
+    {
+        /* verification worked, check the result */
+        if (verify != 0)
+        {
+            _log_verify_fail_reason(verify, ctxt->c);
+            ret = GNUTLS_E_OCSP_RESPONSE_ERROR;
+            goto resp_cleanup;
+        }
+        else
+            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                          "OCSP response is valid.");
+    }
+
+    /* OK, response is for our certificate and valid, let's get the
+     * actual response data. */
+    unsigned int cert_status;
+    time_t this_update;
+    time_t next_update;
+    ret = gnutls_ocsp_resp_get_single(resp, 0, NULL, NULL, NULL, NULL,
+                                      &cert_status, &this_update,
+                                      &next_update, NULL, NULL);
+    if (ret != GNUTLS_E_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
+                      "Could not get OCSP response data: %s (%d)",
+                      gnutls_strerror(ret), ret);
+        goto resp_cleanup;
+    }
+
+    apr_time_t now = apr_time_now();
+    apr_time_t valid_at;
+    apr_time_ansi_put(&valid_at, this_update);
+    /* Buffer for human-readable times produced by apr_rfc822_date,
+     * see apr_time.h */
+    char date_str[APR_RFC822_DATE_LEN];
+    apr_rfc822_date(date_str, valid_at);
+
+    if (now < valid_at)
+    {
+        /* We don't know if our clock or that of the OCSP responder is
+         * out of sync, so warn but continue. */
+        ap_log_cerror(APLOG_MARK, APLOG_WARNING, APR_EGENERAL, ctxt->c,
+                      "OSCP response claims to be from future (%s), check "
+                      "time synchronization!", date_str);
+    }
+
+    if (next_update == (time_t) -1)
+        ap_log_cerror(APLOG_MARK, APLOG_INFO, APR_SUCCESS, ctxt->c,
+                      "OSCP response does not contain nextUpdate info.");
+    else
+    {
+        apr_time_t valid_to;
+        apr_time_ansi_put(&valid_to, next_update);
+        if (now > valid_to)
+        {
+            apr_rfc822_date(date_str, valid_to);
+            ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
+                          "OCSP response has expired at %s!", date_str);
+            ret = GNUTLS_E_OCSP_RESPONSE_ERROR;
+            goto resp_cleanup;
+        }
+    }
+
+    /* What's the actual status? Will be one of
+     * gnutls_ocsp_cert_status_t as defined in gnutls/ocsp.h. */
+    if (cert_status == GNUTLS_OCSP_CERT_GOOD)
+    {
+        /* Yay, everything's good! */
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                      "CA flagged certificate as valid at %s.", date_str);
+    }
+    else
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
+                      "CA flagged certificate as %s at %s.",
+                      cert_status == GNUTLS_OCSP_CERT_REVOKED ?
+                      "revoked" : "unknown", date_str);
+        ret = GNUTLS_E_OCSP_RESPONSE_ERROR;
+    }
+
+ resp_cleanup:
+    gnutls_ocsp_resp_deinit(resp);
+ trust_cleanup:
+    /* deinit trust list, but not the certificates */
+    gnutls_x509_trust_list_deinit(issuer, 0);
+    return ret;
+}
+
+
 
 int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
                           void *ptr,
@@ -49,11 +251,16 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
         ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
                       "Loading OCSP response failed: %s (%d)",
                       gnutls_strerror(ret), ret);
-        gnutls_free(ocsp_response->data);
-        ocsp_response->size = 0;
-        ocsp_response->data = NULL;
-        return GNUTLS_E_NO_CERTIFICATE_STATUS;
+        goto resp_cleanup;
     }
 
-    return GNUTLS_E_SUCCESS;
+    /* succeed if response is present and valid, fail otherwise. */
+    if (check_ocsp_response(ctxt, ocsp_response) == GNUTLS_E_SUCCESS)
+        return GNUTLS_E_SUCCESS;
+
+ resp_cleanup:
+    gnutls_free(ocsp_response->data);
+    ocsp_response->size = 0;
+    ocsp_response->data = NULL;
+    return GNUTLS_E_NO_CERTIFICATE_STATUS;
 }
