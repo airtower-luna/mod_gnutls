@@ -9,7 +9,7 @@ export CHECK_OCSP_SERVER="true"
 export OCSP_RESPONSE_FILE="$(mktemp mod_gnutls_test-XXXXXX.der)"
 
 ${srcdir}/runtests t-27
+ret=${?}
 
-ocsptool -e --load-signer authority/x509.pem --load-response ${OCSP_RESPONSE_FILE} || ret=1
 rm "${OCSP_RESPONSE_FILE}"
 exit ${ret}
