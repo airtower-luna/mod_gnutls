@@ -1,5 +1,5 @@
 dnl 
-AC_INIT(mod_gnutls, 0.7.4)
+AC_INIT(mod_gnutls, 0.7.5)
 OOO_CONFIG_NICE(config.nice)
 MOD_GNUTLS_VERSION=AC_PACKAGE_VERSION
 AC_PREREQ(2.53)
@@ -12,6 +12,8 @@ AC_CANONICAL_TARGET
 # mod_gnutls test suite requires GNU make
 AM_INIT_AUTOMAKE([-Wno-portability])
 AM_CONFIG_HEADER(include/mod_gnutls_config.h:config.in)
+
+LT_INIT([disable-static])
 
 AC_SUBST(MOD_GNUTLS_VERSION)
 
@@ -32,6 +34,15 @@ CHECK_APACHE(,$AP_VERSION,
 PKG_CHECK_MODULES([LIBGNUTLS], [gnutls >= 3.1.4])
 
 LIBGNUTLS_VERSION=`pkg-config --modversion gnutls`
+
+AC_ARG_ENABLE(vpath-install,
+       AS_HELP_STRING([--enable-vpath-install],
+               [Modify the Apache module directory provided by apxs to \
+	       follow --prefix, if necessary. Most users will not want this, \
+	       but it is required for VPATH builds including "make \
+	       distcheck".]),
+       vpath_install=$enableval, vpath_install=no)
+AM_CONDITIONAL([ENABLE_VPATH_INSTALL], [test "$vpath_install" = "yes"])
 
 AC_ARG_ENABLE(srp,
        AS_HELP_STRING([--disable-srp],

@@ -764,6 +764,16 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
 
 /**
  * Pull function for GnuTLS
+ *
+ * Generic errnos used for gnutls_transport_set_errno:
+ * EIO: Unknown I/O error
+ * ECONNABORTED: Input BB does not exist (NULL)
+ *
+ * The reason we are not using APR_TO_OS_ERROR to map apr_status_t to
+ * errnos is this warning in the APR documentation: "If the statcode
+ * was not created by apr_get_os_error or APR_FROM_OS_ERROR, the
+ * results are undefined." We cannot know if this applies to any error
+ * we might encounter.
  */
 ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
                            void *buffer, size_t len)
@@ -776,19 +786,23 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
     ctxt->input_rc = APR_SUCCESS;
 
     /* If Len = 0, we don't do anything. */
-    if (!len || buffer == NULL) {
+    if (!len || buffer == NULL)
+    {
         return 0;
     }
-    if (!ctxt->input_bb) {
+    /* Input bucket brigade is missing, EOF */
+    if (!ctxt->input_bb)
+    {
         ctxt->input_rc = APR_EOF;
+        gnutls_transport_set_errno(ctxt->session, ECONNABORTED);
         return -1;
     }
 
-    if (APR_BRIGADE_EMPTY(ctxt->input_bb)) {
-
+    if (APR_BRIGADE_EMPTY(ctxt->input_bb))
+    {
         rc = ap_get_brigade(ctxt->input_filter->next,
-                ctxt->input_bb, AP_MODE_READBYTES,
-                ctxt->input_block, in);
+                            ctxt->input_bb, AP_MODE_READBYTES,
+                            ctxt->input_block, in);
 
         /* Not a problem, there was simply no data ready yet.
          */
@@ -802,25 +816,26 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
             }
             else
             {
-                if (ctxt->session)
-                    gnutls_transport_set_errno(ctxt->session,
-                                               EAI_APR_TO_RAW(ctxt->input_rc));
+                gnutls_transport_set_errno(ctxt->session,
+                                           EAI_APR_TO_RAW(ctxt->input_rc));
                 return -1;
             }
         }
 
-        if (rc != APR_SUCCESS) {
+        if (rc != APR_SUCCESS)
+        {
             /* Unexpected errors discard the brigade */
             apr_brigade_cleanup(ctxt->input_bb);
             ctxt->input_bb = NULL;
+            gnutls_transport_set_errno(ctxt->session, EIO);
             return -1;
         }
     }
 
-    ctxt->input_rc =
-            brigade_consume(ctxt->input_bb, block, buffer, &len);
+    ctxt->input_rc = brigade_consume(ctxt->input_bb, block, buffer, &len);
 
-    if (ctxt->input_rc == APR_SUCCESS) {
+    if (ctxt->input_rc == APR_SUCCESS)
+    {
         return (ssize_t) len;
     }
 
@@ -829,9 +844,8 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
     {
         if (len == 0)
         {
-            if (ctxt->session)
-                gnutls_transport_set_errno(ctxt->session,
-                                           EAI_APR_TO_RAW(ctxt->input_rc));
+            gnutls_transport_set_errno(ctxt->session,
+                                       EAI_APR_TO_RAW(ctxt->input_rc));
             return -1;
         }
 
@@ -839,23 +853,33 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
     }
 
     /* Unexpected errors and APR_EOF clean out the brigade.
-     * Subsequent calls will return APR_EOF.
-     */
+     * Subsequent calls will return APR_EOF. */
     apr_brigade_cleanup(ctxt->input_bb);
     ctxt->input_bb = NULL;
 
-    if (APR_STATUS_IS_EOF(ctxt->input_rc) && len) {
-        /* Provide the results of this read pass,
-         * without resetting the BIO retry_read flag
-         */
+    if (APR_STATUS_IS_EOF(ctxt->input_rc) && len)
+    {
+        /* Some data has been received before EOF, return it. */
         return (ssize_t) len;
     }
 
+    gnutls_transport_set_errno(ctxt->session, EIO);
     return -1;
 }
 
+/**
+ * Push function for GnuTLS
+ *
+ * In case of unexpected errors gnutls_transport_set_errno is called
+ * with EIO.  The reason we are not using APR_TO_OS_ERROR to map
+ * apr_status_t to errnos is this warning in the APR documentation:
+ * "If the statcode was not created by apr_get_os_error or
+ * APR_FROM_OS_ERROR, the results are undefined." We cannot know if
+ * this applies to any error we might encounter.
+ */
 ssize_t mgs_transport_write(gnutls_transport_ptr_t ptr,
-        const void *buffer, size_t len) {
+                            const void *buffer, size_t len)
+{
     mgs_handle_t *ctxt = ptr;
 
     /* pass along the encrypted data
@@ -868,7 +892,16 @@ ssize_t mgs_transport_write(gnutls_transport_ptr_t ptr,
     ctxt->output_length += len;
     APR_BRIGADE_INSERT_TAIL(ctxt->output_bb, bucket);
 
-    if (write_flush(ctxt) < 0) {
+    if (write_flush(ctxt) < 0)
+    {
+        /* We encountered an error. APR_EINTR or APR_EAGAIN can be
+         * handled, treat everything else as a generic I/O error. */
+        int err = EIO;
+        if (APR_STATUS_IS_EAGAIN(ctxt->output_rc)
+            || APR_STATUS_IS_EINTR(ctxt->output_rc))
+            err = EAI_APR_TO_RAW(ctxt->output_rc);
+
+        gnutls_transport_set_errno(ctxt->session, err);
         return -1;
     }
     return len;

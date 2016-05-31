@@ -2,6 +2,16 @@
 - Handle Unclean Shutdowns
 - make session cache use generic apache caches
 
+** Version 0.7.5 (2016-05-28)
+- Sunil Mohan Adapa reported retry loops during session shutdown in
+  cleanup_gnutls_session() due to gnutls_bye() incorrectly returning
+  GNUTLS_E_INTERRUPTED or GNUTLS_E_AGAIN. Setting the GnuTLS session
+  errno in mgs_transport_write() fixes the problem.
+- Import Daniel Kahn Gillmor's patches for GnuPG v2 support from the
+  Debian package.
+- Build system improvements that allow VPATH builds and get "make
+  distcheck" to work
+
 ** Version 0.7.4 (2016-04-13)
 - Support SoftHSM 2 for PKCS #11 testing
 - Increase verbosity of test logs

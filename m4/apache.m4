@@ -38,6 +38,7 @@ AC_ARG_ENABLE(
         AP_INCLUDEDIR="`$APXS_BIN -q INCLUDEDIR 2>/dev/null`"
 
         AP_PREFIX="`$APXS_BIN -q prefix 2>/dev/null`"
+        AP_EXEC_PREFIX="`$APXS_BIN -q exec_prefix 2>/dev/null`"
 
         AP_BINDIR="`$APXS_BIN -q bindir 2>/dev/null`"
         AP_SBINDIR="`$APXS_BIN -q sbindir 2>/dev/null`"
@@ -125,6 +126,7 @@ AC_ARG_ENABLE(
         AC_CHECK_DECL([DEFAULT_EXP_LIBEXECDIR],,[AC_DEFINE_UNQUOTED([DEFAULT_EXP_LIBEXECDIR],["$AP_LIBEXECDIR"],[Default Module LibExec directory])])
         AC_SUBST(AP_DEFS)
         AC_SUBST(AP_PREFIX)
+        AC_SUBST(AP_EXEC_PREFIX)
         AC_SUBST(AP_CFLAGS)
         AC_SUBST(AP_CPPFLAGS)
         AC_SUBST(AP_INCLUDES)
