@@ -14,9 +14,5 @@ override_dh_auto_test:
 
 override_dh_auto_install:
 
-override_dh_install:
-	mv src/.libs/libmod_gnutls.so src/.libs/mod_gnutls.so
-	dh_install
-
 override_dh_installchangelogs:
 	dh_installchangelogs CHANGELOG
