@@ -1,3 +1,10 @@
+mod-gnutls (0.7.5-1) unstable; urgency=medium
+
+  * new upstream release (Closes: #825654) 
+  * drop patches already applied upstream.
+
+ -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Tue, 31 May 2016 14:10:44 -0400
+
 mod-gnutls (0.7.4-2) unstable; urgency=medium
 
   * clean up build-deps for kfreebsd and hurd
