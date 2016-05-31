@@ -85,27 +85,20 @@ int check_ocsp_response(mgs_handle_t *ctxt, const gnutls_datum_t *ocsp_response)
                       "No CA certificates in store, cannot verify response.");
         return GNUTLS_E_NO_CERTIFICATE_FOUND;
     }
+
+    /* Only the direct issuer may sign the OCSP response or an OCSP
+     * signer. Assuming the certificate file is properly ordered, it
+     * should be the one directly after the server's. */
     gnutls_x509_trust_list_t issuer;
-    int ret = gnutls_x509_trust_list_init(&issuer, 1);
+    int ret = mgs_create_ocsp_trust_list(&issuer,
+                                         &(ctxt->sc->certs_x509_crt_chain[1]),
+                                         1);
     if (ret != GNUTLS_E_SUCCESS)
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
                       "Could not create issuer trust list: %s (%d)",
                       gnutls_strerror(ret), ret);
-        goto trust_cleanup;
-    }
-    /* Only the direct issuer may sign the OCSP response or an OCSP
-     * signer. Assuming the certificate file is properly ordered, it
-     * should be the one directly after the server's. */
-    ret = gnutls_x509_trust_list_add_cas(issuer,
-                                         &(ctxt->sc->certs_x509_crt_chain[1]),
-                                         1, 0);
-    if (ret != 1)
-    {
-        ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
-                      "Could not populate issuer trust list.");
-        ret = GNUTLS_E_CERTIFICATE_ERROR;
-        goto trust_cleanup;
+        return ret;
     }
 
     gnutls_ocsp_resp_t resp;
@@ -204,6 +197,7 @@ int check_ocsp_response(mgs_handle_t *ctxt, const gnutls_datum_t *ocsp_response)
             apr_rfc822_date(date_str, valid_to);
             ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
                           "OCSP response has expired at %s!", date_str);
+            /* Do not send a stale response */
             ret = GNUTLS_E_OCSP_RESPONSE_ERROR;
             goto resp_cleanup;
         }
@@ -228,7 +222,6 @@ int check_ocsp_response(mgs_handle_t *ctxt, const gnutls_datum_t *ocsp_response)
 
  resp_cleanup:
     gnutls_ocsp_resp_deinit(resp);
- trust_cleanup:
     /* deinit trust list, but not the certificates */
     gnutls_x509_trust_list_deinit(issuer, 0);
     return ret;
@@ -263,4 +256,26 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
     ocsp_response->size = 0;
     ocsp_response->data = NULL;
     return GNUTLS_E_NO_CERTIFICATE_STATUS;
+}
+
+
+
+int mgs_create_ocsp_trust_list(gnutls_x509_trust_list_t *tl,
+                               const gnutls_x509_crt_t *chain,
+                               const int num)
+{
+    int added = 0;
+    int ret = gnutls_x509_trust_list_init(tl, num);
+
+    if (ret == GNUTLS_E_SUCCESS)
+        added = gnutls_x509_trust_list_add_cas(*tl, chain, num, 0);
+
+    if (added != num)
+        ret = GNUTLS_E_CERTIFICATE_ERROR;
+
+    /* Clean up trust list in case of error */
+    if (ret != GNUTLS_E_SUCCESS)
+        gnutls_x509_trust_list_deinit(*tl, 0);
+
+    return ret;
 }

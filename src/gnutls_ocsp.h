@@ -18,12 +18,35 @@
 #define __MOD_GNUTLS_OCSP_H__
 
 #include "gnutls/gnutls.h"
+#include "gnutls/x509.h"
 #include "httpd.h"
 #include "http_config.h"
 
 const char *mgs_store_ocsp_response_path(cmd_parms * parms,
                                          void *dummy __attribute__((unused)),
                                          const char *arg);
+
+/*
+ * Create a trust list from a certificate chain (one or more
+ * certificates).
+ *
+ * tl: This trust list will be initialized and filled with the
+ * specified certificate(s)
+ *
+ * chain: certificate chain, must contain at least num certifictes
+ *
+ * num: number of certificates to load from chain
+ *
+ * Chain is supposed to be static (the trust chain of the server
+ * certificate), so when gnutls_x509_trust_list_deinit() is called on
+ * tl later, the "all" parameter should be zero.
+ *
+ * Returns GNUTLS_E_SUCCESS or a GnuTLS error code. In case of error
+ * tl will be uninitialized.
+ */
+int mgs_create_ocsp_trust_list(gnutls_x509_trust_list_t *tl,
+                               const gnutls_x509_crt_t *chain,
+                               const int num);
 
 int mgs_get_ocsp_response(gnutls_session_t session, void *ptr,
                           gnutls_datum_t *ocsp_response);
