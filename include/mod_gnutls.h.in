@@ -473,9 +473,10 @@ const char *mgs_store_cred_path(cmd_parms * parms,
 int mgs_hook_pre_config(apr_pool_t * pconf,
                         apr_pool_t * plog, apr_pool_t * ptemp);
 
-int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
-                         apr_pool_t * ptemp,
-                         server_rec * base_server);
+int mgs_hook_post_config(apr_pool_t *pconf,
+                         apr_pool_t *plog,
+                         apr_pool_t *ptemp,
+                         server_rec *base_server);
 
 void mgs_hook_child_init(apr_pool_t *p, server_rec *s);
 

@@ -302,8 +302,17 @@ static int read_pgpcrt_cn(server_rec * s, apr_pool_t * p,
     return rv;
 }
 
-int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused)), apr_pool_t * ptemp __attribute__((unused)), server_rec * base_server) {
-
+/*
+ * Must return OK or DECLINED on success, something else on
+ * error. These codes are defined in Apache httpd.h along with the
+ * HTTP status codes, so I'm going to use HTTP error codes both for
+ * fun (and to avoid conflicts).
+ */
+int mgs_hook_post_config(apr_pool_t *pconf,
+                         apr_pool_t *plog __attribute__((unused)),
+                         apr_pool_t *ptemp __attribute__((unused)),
+                         server_rec *base_server)
+{
     int rv;
     server_rec *s;
     gnutls_dh_params_t dh_params = NULL;
@@ -323,12 +332,12 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
     sc_base = (mgs_srvconf_rec *) ap_get_module_config(s->module_config, &gnutls_module);
 
 
-    rv = mgs_cache_post_config(p, s, sc_base);
+    rv = mgs_cache_post_config(pconf, s, sc_base);
     if (rv != 0) {
         ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, s,
                 "GnuTLS: Post Config for GnuTLSCache Failed."
                 " Shutting Down.");
-        exit(-1);
+        return HTTP_INSUFFICIENT_STORAGE;
     }
 
     /* If GnuTLSP11Module is set, load the listed PKCS #11
@@ -365,12 +374,12 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
         sc->cache_config = sc_base->cache_config;
         sc->cache_timeout = sc_base->cache_timeout;
 
-        rv = mgs_load_files(p, s);
+        rv = mgs_load_files(pconf, s);
         if (rv != 0) {
             ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
                 "GnuTLS: Loading required files failed."
                 " Shutting Down.");
-            exit(-1);
+            return HTTP_NOT_FOUND;
         }
 
         /* defaults for unset values: */
@@ -390,7 +399,7 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
             ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
                     "GnuTLS: Host '%s:%d' is missing the GnuTLSPriorities directive!",
                     s->server_hostname, s->port);
-            exit(-1);
+            return HTTP_NOT_ACCEPTABLE;
         }
 
         /* Check if DH params have been set per host */
@@ -422,7 +431,7 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
 			ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
 						"GnuTLS: Host '%s:%d' is missing a Certificate File!",
 						s->server_hostname, s->port);
-            exit(-1);
+            return HTTP_UNAUTHORIZED;
         }
         if (sc->enabled == GNUTLS_ENABLED_TRUE &&
             ((sc->certs_x509_chain_num > 0 && sc->privkey_x509 == NULL) ||
@@ -430,16 +439,16 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
 			ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
 						"GnuTLS: Host '%s:%d' is missing a Private Key File!",
 						s->server_hostname, s->port);
-            exit(-1);
+            return HTTP_UNAUTHORIZED;
         }
 
         if (sc->enabled == GNUTLS_ENABLED_TRUE) {
             rv = -1;
             if (sc->certs_x509_chain_num > 0) {
-                rv = read_crt_cn(s, p, sc->certs_x509_crt_chain[0], &sc->cert_cn);
+                rv = read_crt_cn(s, pconf, sc->certs_x509_crt_chain[0], &sc->cert_cn);
             }
             if (rv < 0 && sc->cert_pgp != NULL) {
-                rv = read_pgpcrt_cn(s, p, sc->cert_crt_pgp[0], &sc->cert_cn);
+                rv = read_pgpcrt_cn(s, pconf, sc->cert_crt_pgp[0], &sc->cert_cn);
 			}
 
             if (rv < 0) {
@@ -459,21 +468,21 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
                          "%s: loading proxy credentials for host "
                          "'%s:%d' failed, exiting!",
                          __func__, s->server_hostname, s->port);
-            exit(-1);
+            return HTTP_PROXY_AUTHENTICATION_REQUIRED;
         }
     }
 
 
-    ap_add_version_component(p, "mod_gnutls/" MOD_GNUTLS_VERSION);
+    ap_add_version_component(pconf, "mod_gnutls/" MOD_GNUTLS_VERSION);
 
     {
         const char* libvers = gnutls_check_version(NULL);
         char* gnutls_version = NULL;
-        if(libvers && (gnutls_version = apr_psprintf(p, "GnuTLS/%s", libvers))) {
-            ap_add_version_component(p, gnutls_version);
+        if(libvers && (gnutls_version = apr_psprintf(pconf, "GnuTLS/%s", libvers))) {
+            ap_add_version_component(pconf, gnutls_version);
         } else {
             // In case we could not create the above string go for the static version instead
-            ap_add_version_component(p, "GnuTLS/" GNUTLS_VERSION "-static");
+            ap_add_version_component(pconf, "GnuTLS/" GNUTLS_VERSION "-static");
         }
     }
 
