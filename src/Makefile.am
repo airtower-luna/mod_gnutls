@@ -1,27 +1,12 @@
-CLEANFILES = .libs/libmod_gnutls *~
+# installation directory for Apache modules
+if ENABLE_VPATH_INSTALL
+apmodpkglibdir = $(subst ${AP_EXEC_PREFIX},${prefix},${AP_LIBEXECDIR})
+else
+apmodpkglibdir = ${AP_LIBEXECDIR}
+endif
 
-libmod_gnutls_la_SOURCES = mod_gnutls.c gnutls_io.c gnutls_cache.c gnutls_config.c gnutls_hooks.c
-libmod_gnutls_la_CFLAGS = -Wall ${MODULE_CFLAGS}
-libmod_gnutls_la_LDFLAGS = -rpath ${AP_LIBEXECDIR} -module -avoid-version ${MODULE_LIBS}
+mod_gnutls_la_SOURCES = mod_gnutls.c gnutls_io.c gnutls_cache.c gnutls_config.c gnutls_hooks.c
+mod_gnutls_la_CFLAGS = -Wall ${MODULE_CFLAGS}
+mod_gnutls_la_LDFLAGS = -module -avoid-version ${MODULE_LIBS}
 
-lib_LTLIBRARIES = libmod_gnutls.la
-
-make_so: $(lib_LTLIBRARIES)
-	@if test ! -L mod_gnutls.so ; then ln -s .libs/libmod_gnutls.so mod_gnutls.so ; fi
-
-clean:
-	rm -f mod_gnutls.so
-	rm -f *.o *.lo *.la
-	rm -fr .libs
-
-install: make_so
-	@${APXS_BIN} -i -n gnutls mod_gnutls.so
-	@echo ""
-	@echo ""
-	@echo "***********************************************"
-	@echo ""
-	@echo "  Please read the manual in the doc/ directory for"
-	@echo "  details on the configuration of this module"
-	@echo ""
-	@echo "***********************************************"
-	@echo ""
+apmodpkglib_LTLIBRARIES = mod_gnutls.la
