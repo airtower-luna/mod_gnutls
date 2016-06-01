@@ -4,7 +4,7 @@ Priority: extra
 Maintainer: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
 Build-Depends: apache2-bin <!nocheck>,
                apache2-dev,
-               curl | wget <!nocheck>,
+               curl <!nocheck> | wget <!nocheck>,
                debhelper (>= 9.20141010),
                dh-apache2,
                dh-autoreconf,
@@ -19,7 +19,7 @@ Build-Depends: apache2-bin <!nocheck>,
                pandoc [!m68k !powerpc !sh4 !x32] | markdown [m68k powerpc sh4 x32],
                pkg-config,
                procps <!nocheck>,
-               softhsm2 | softhsm <!nocheck>
+               softhsm2 <!nocheck> | softhsm <!nocheck>
 Standards-Version: 3.9.8
 Homepage: https://mod.gnutls.org/
 Vcs-Git: https://mod.gnutls.org/git/mod_gnutls
