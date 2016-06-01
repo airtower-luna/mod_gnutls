@@ -291,8 +291,9 @@ int mgs_ocsp_post_config_server(apr_pool_t *pconf, server_rec *server)
     {
         ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
                      "OCSP stapling is enabled but no CA certificate "
-                     "available, make sure it is included in "
-                     "GnuTLSCertificateFile!");
+                     "available for %s:%d, make sure it is included in "
+                     "GnuTLSCertificateFile!",
+                     server->server_hostname, server->addrs->host_port);
         return HTTP_NOT_FOUND;
     }
     sc->ocsp_trust = apr_palloc(pconf,
