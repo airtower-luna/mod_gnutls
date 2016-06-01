@@ -228,14 +228,15 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
         ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
                       "Loading OCSP response failed: %s (%d)",
                       gnutls_strerror(ret), ret);
-        goto resp_cleanup;
+    }
+    else
+    {
+        /* Succeed if response is present and valid. */
+        if (check_ocsp_response(ctxt, ocsp_response) == GNUTLS_E_SUCCESS)
+            return GNUTLS_E_SUCCESS;
     }
 
-    /* succeed if response is present and valid, fail otherwise. */
-    if (check_ocsp_response(ctxt, ocsp_response) == GNUTLS_E_SUCCESS)
-        return GNUTLS_E_SUCCESS;
-
- resp_cleanup:
+    /* failure, clean up response data */
     gnutls_free(ocsp_response->data);
     ocsp_response->size = 0;
     ocsp_response->data = NULL;
