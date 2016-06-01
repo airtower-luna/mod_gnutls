@@ -219,6 +219,10 @@ typedef struct {
     /* EXPERIMENTAL: OCSP response file for stapling, will go away
      * once sending OCSP requests is implemented */
     char *ocsp_response_file;
+    /* Trust list to verify OCSP responses for stapling. Should
+     * usually only contain the CA that signed the server
+     * certificate. */
+    gnutls_x509_trust_list_t *ocsp_trust;
 } mgs_srvconf_rec;
 
 /* Character Buffer */

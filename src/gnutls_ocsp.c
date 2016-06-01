@@ -79,30 +79,16 @@ const char *mgs_store_ocsp_response_path(cmd_parms *parms,
  */
 int check_ocsp_response(mgs_handle_t *ctxt, const gnutls_datum_t *ocsp_response)
 {
-    if (ctxt->sc->certs_x509_chain_num < 2)
+    if (ctxt->sc->ocsp_trust == NULL)
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
-                      "No CA certificates in store, cannot verify response.");
+                      "No OCSP trust list available for server \"%s\"!",
+                      ctxt->c->base_server->server_hostname);
         return GNUTLS_E_NO_CERTIFICATE_FOUND;
     }
 
-    /* Only the direct issuer may sign the OCSP response or an OCSP
-     * signer. Assuming the certificate file is properly ordered, it
-     * should be the one directly after the server's. */
-    gnutls_x509_trust_list_t issuer;
-    int ret = mgs_create_ocsp_trust_list(&issuer,
-                                         &(ctxt->sc->certs_x509_crt_chain[1]),
-                                         1);
-    if (ret != GNUTLS_E_SUCCESS)
-    {
-        ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
-                      "Could not create issuer trust list: %s (%d)",
-                      gnutls_strerror(ret), ret);
-        return ret;
-    }
-
     gnutls_ocsp_resp_t resp;
-    ret = gnutls_ocsp_resp_init(&resp);
+    int ret = gnutls_ocsp_resp_init(&resp);
     if (ret != GNUTLS_E_SUCCESS)
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
@@ -130,7 +116,7 @@ int check_ocsp_response(mgs_handle_t *ctxt, const gnutls_datum_t *ocsp_response)
     }
 
     unsigned int verify;
-    ret = gnutls_ocsp_resp_verify(resp, issuer, &verify, 0);
+    ret = gnutls_ocsp_resp_verify(resp, *(ctxt->sc->ocsp_trust), &verify, 0);
     if (ret != GNUTLS_E_SUCCESS)
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
@@ -222,8 +208,6 @@ int check_ocsp_response(mgs_handle_t *ctxt, const gnutls_datum_t *ocsp_response)
 
  resp_cleanup:
     gnutls_ocsp_resp_deinit(resp);
-    /* deinit trust list, but not the certificates */
-    gnutls_x509_trust_list_deinit(issuer, 0);
     return ret;
 }
 
@@ -278,4 +262,56 @@ int mgs_create_ocsp_trust_list(gnutls_x509_trust_list_t *tl,
         gnutls_x509_trust_list_deinit(*tl, 0);
 
     return ret;
+}
+
+
+
+apr_status_t mgs_cleanup_trust_list(void *data)
+{
+    gnutls_x509_trust_list_t *tl = (gnutls_x509_trust_list_t *) data;
+    gnutls_x509_trust_list_deinit(*tl, 0);
+    return APR_SUCCESS;
+}
+
+
+
+/*
+ * Like in the general post_config hook the HTTP status codes for
+ * errors are just for fun. What matters is "neither OK nor DECLINED"
+ * to denote an error.
+ */
+int mgs_ocsp_post_config_server(apr_pool_t *pconf, server_rec *server)
+{
+    mgs_srvconf_rec *sc =
+        (mgs_srvconf_rec *) ap_get_module_config(server->module_config,
+                                                 &gnutls_module);
+
+    if (sc->certs_x509_chain_num < 2)
+    {
+        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
+                     "OCSP stapling is enabled but no CA certificate "
+                     "available, make sure it is included in "
+                     "GnuTLSCertificateFile!");
+        return HTTP_NOT_FOUND;
+    }
+    sc->ocsp_trust = apr_palloc(pconf,
+                                sizeof(gnutls_x509_trust_list_t));
+     /* Only the direct issuer may sign the OCSP response or an OCSP
+      * signer. */
+    int ret = mgs_create_ocsp_trust_list(sc->ocsp_trust,
+                                         &(sc->certs_x509_crt_chain[1]),
+                                         1);
+    if (ret != GNUTLS_E_SUCCESS)
+    {
+        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
+                     "Could not create OCSP trust list: %s (%d)",
+                     gnutls_strerror(ret), ret);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+    /* deinit trust list when the config pool is destroyed */
+    apr_pool_cleanup_register(pconf, sc->ocsp_trust,
+                              mgs_cleanup_trust_list,
+                              apr_pool_cleanup_null);
+
+    return OK;
 }

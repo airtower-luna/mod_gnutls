@@ -382,6 +382,14 @@ int mgs_hook_post_config(apr_pool_t *pconf,
             return HTTP_NOT_FOUND;
         }
 
+        /* init OCSP trust list if OCSP is enabled */
+        if (sc->ocsp_response_file != NULL)
+        {
+            rv = mgs_ocsp_post_config_server(pconf, s);
+            if (rv != OK && rv != DECLINED)
+                return rv;
+        }
+
         /* defaults for unset values: */
         if (sc->enabled == GNUTLS_ENABLED_UNSET)
             sc->enabled = GNUTLS_ENABLED_FALSE;
