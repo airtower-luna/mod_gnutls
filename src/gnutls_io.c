@@ -58,10 +58,9 @@ static apr_status_t gnutls_io_filter_error(ap_filter_t * f,
     switch (status) {
     case HTTP_BAD_REQUEST:
         /* log the situation */
-        ap_log_error(APLOG_MARK, APLOG_INFO, 0,
-                     f->c->base_server,
-                     "GnuTLS handshake failed: HTTP spoken on HTTPS port; "
-                     "trying to send HTML error page");
+        ap_log_cerror(APLOG_MARK, APLOG_INFO, 0, f->c,
+                      "GnuTLS handshake failed: HTTP spoken on HTTPS port; "
+                      "trying to send HTML error page");
         mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
             ap_get_module_config(f->c->base_server->module_config,
                                  &gnutls_module);
@@ -416,18 +415,15 @@ tryagain:
         if (ret == GNUTLS_E_WARNING_ALERT_RECEIVED
                 || ret == GNUTLS_E_FATAL_ALERT_RECEIVED) {
             errcode = gnutls_alert_get(ctxt->session);
-            ap_log_error(APLOG_MARK, APLOG_INFO, 0,
-                    ctxt->c->base_server,
-                    "GnuTLS: Handshake Alert (%d) '%s'.",
-                    errcode,
-                    gnutls_alert_get_name(errcode));
+            ap_log_cerror(APLOG_MARK, APLOG_INFO, 0, ctxt->c,
+                          "GnuTLS: Handshake Alert (%d) '%s'.",
+                          errcode, gnutls_alert_get_name(errcode));
         }
 
         if (!gnutls_error_is_fatal(ret)) {
-            ap_log_error(APLOG_MARK, APLOG_INFO, 0,
-                    ctxt->c->base_server,
-                    "GnuTLS: Non-Fatal Handshake Error: (%d) '%s'",
-                    ret, gnutls_strerror(ret));
+            ap_log_cerror(APLOG_MARK, APLOG_INFO, 0, ctxt->c,
+                          "GnuTLS: Non-Fatal Handshake Error: (%d) '%s'",
+                          ret, gnutls_strerror(ret));
             goto tryagain;
         }
         ap_log_cerror(APLOG_MARK, APLOG_INFO, 0, ctxt->c,
@@ -469,9 +465,8 @@ int mgs_rehandshake(mgs_handle_t * ctxt) {
 
     if (rv != 0) {
         /* the client did not want to rehandshake. goodbye */
-        ap_log_error(APLOG_MARK, APLOG_WARNING, 0,
-                ctxt->c->base_server,
-                "GnuTLS: Client Refused Rehandshake request.");
+        ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, ctxt->c,
+                      "GnuTLS: Client Refused Rehandshake request.");
         return -1;
     }
 
@@ -721,14 +716,10 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
 
                 if (ret < 0) {
                     /* error sending output */
-                    ap_log_error(APLOG_MARK,
-                            APLOG_INFO,
-                            ctxt->output_rc,
-                            ctxt->c->base_server,
-                            "GnuTLS: Error writing data."
-                            " (%d) '%s'",
-                            (int) ret,
-                            gnutls_strerror(ret));
+                    ap_log_cerror(APLOG_MARK, APLOG_INFO, ctxt->output_rc,
+                                  ctxt->c,
+                                  "GnuTLS: Error writing data. (%d) '%s'",
+                                  ret, gnutls_strerror(ret));
                     if (ctxt->output_rc == APR_SUCCESS) {
                         ctxt->output_rc =
                                 APR_EGENERAL;

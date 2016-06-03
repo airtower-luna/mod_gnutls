@@ -618,7 +618,8 @@ int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc) 
 	return rv;
 }
 
-static int vhost_cb(void *baton, conn_rec * conn __attribute__((unused)), server_rec * s) {
+static int vhost_cb(void *baton, conn_rec *conn, server_rec * s)
+{
     mgs_srvconf_rec *tsc;
     vhost_cb_rec *x = baton;
     int ret;
@@ -636,13 +637,14 @@ static int vhost_cb(void *baton, conn_rec * conn __attribute__((unused)), server
          * in the certificate. */
         ret = gnutls_x509_crt_check_hostname(tsc->certs_x509_crt_chain[0], s->server_hostname);
         if (0 == ret)
-            ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
-                         "GnuTLS: the certificate doesn't match requested hostname "
-                         "'%s'", s->server_hostname);
+            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, conn,
+                          "GnuTLS: the certificate doesn't match requested "
+                          "hostname '%s'", s->server_hostname);
     } else {
-        ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
-                     "GnuTLS: SNI request for '%s' but no X.509 certs available at all",
-                     s->server_hostname);
+        ap_log_cerror(APLOG_MARK, APLOG_INFO, 0, conn,
+                      "GnuTLS: SNI request for '%s' but no X.509 certs "
+                      "available at all",
+                      s->server_hostname);
     }
 	return check_server_aliases(x, s, tsc);
 }
@@ -670,10 +672,9 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
     }
 
     if (sni_type != GNUTLS_NAME_DNS) {
-        ap_log_error(APLOG_MARK, APLOG_CRIT, 0,
-                ctxt->c->base_server,
-                "GnuTLS: Unknown type '%d' for SNI: "
-                "'%s'", sni_type, sni_name);
+        ap_log_cerror(APLOG_MARK, APLOG_CRIT, 0, ctxt->c,
+                      "GnuTLS: Unknown type '%d' for SNI: '%s'",
+                      sni_type, sni_name);
         return NULL;
     }
 
