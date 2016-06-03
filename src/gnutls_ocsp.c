@@ -222,6 +222,8 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
                   "Loading OCSP response from %s",
                   ctxt->sc->ocsp_response_file);
 
+    /* TODO: response should come from cache, which must be filled
+     * from sc->ocsp_uri */
     int ret = gnutls_load_file(ctxt->sc->ocsp_response_file, ocsp_response);
     if (ret != GNUTLS_E_SUCCESS)
     {
@@ -276,16 +278,58 @@ apr_status_t mgs_cleanup_trust_list(void *data)
 
 
 
+apr_uri_t * mgs_cert_get_ocsp_uri(apr_pool_t *p, gnutls_x509_crt_t cert)
+{
+    apr_pool_t *tmp;
+    apr_status_t rv = apr_pool_create(&tmp, p);
+    if (rv != APR_SUCCESS)
+        return NULL;
+
+    apr_uri_t *ocsp_uri = NULL;
+
+    int ret = GNUTLS_E_SUCCESS;
+    /* search authority info access for OCSP URI */
+    for (int seq = 0; ret != GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE; seq++)
+    {
+        gnutls_datum_t ocsp_access_data;
+        ret = gnutls_x509_crt_get_authority_info_access(cert, seq,
+                                                        GNUTLS_IA_OCSP_URI,
+                                                        &ocsp_access_data,
+                                                        NULL);
+        if (ret == GNUTLS_E_SUCCESS)
+        {
+            /* create NULL terminated string */
+            char *ocsp_str =
+                apr_pstrndup(tmp, (const char*) ocsp_access_data.data,
+                             ocsp_access_data.size);
+            gnutls_free(ocsp_access_data.data);
+
+            ocsp_uri = apr_palloc(p, sizeof(apr_uri_t));
+            rv = apr_uri_parse(p, ocsp_str, ocsp_uri);
+            if (rv == APR_SUCCESS)
+                break;
+            else
+                ocsp_uri = NULL;
+        }
+    }
+
+    apr_pool_destroy(tmp);
+    return ocsp_uri;
+}
+
+
+
 /*
  * Like in the general post_config hook the HTTP status codes for
  * errors are just for fun. What matters is "neither OK nor DECLINED"
  * to denote an error.
  */
-int mgs_ocsp_post_config_server(apr_pool_t *pconf, server_rec *server)
+int mgs_ocsp_post_config_server(apr_pool_t *pconf,
+                                apr_pool_t *ptemp __attribute__((unused)),
+                                server_rec *server)
 {
-    mgs_srvconf_rec *sc =
-        (mgs_srvconf_rec *) ap_get_module_config(server->module_config,
-                                                 &gnutls_module);
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(server->module_config, &gnutls_module);
 
     if (sc->certs_x509_chain_num < 2)
     {
@@ -296,6 +340,9 @@ int mgs_ocsp_post_config_server(apr_pool_t *pconf, server_rec *server)
                      server->server_hostname, server->addrs->host_port);
         return HTTP_NOT_FOUND;
     }
+
+    sc->ocsp_uri = mgs_cert_get_ocsp_uri(pconf, sc->certs_x509_crt_chain[0]);
+
     sc->ocsp_trust = apr_palloc(pconf,
                                 sizeof(gnutls_x509_trust_list_t));
      /* Only the direct issuer may sign the OCSP response or an OCSP

@@ -62,7 +62,8 @@ apr_status_t mgs_cleanup_trust_list(void *data);
  * @return OK or DECLINED on success, any other value on error (like
  * the post_config hook itself)
  */
-int mgs_ocsp_post_config_server(apr_pool_t *pconf, server_rec *server);
+int mgs_ocsp_post_config_server(apr_pool_t *pconf, apr_pool_t *ptemp,
+                                server_rec *server);
 
 int mgs_get_ocsp_response(gnutls_session_t session, void *ptr,
                           gnutls_datum_t *ocsp_response);

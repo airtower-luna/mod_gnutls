@@ -385,7 +385,7 @@ int mgs_hook_post_config(apr_pool_t *pconf,
         /* init OCSP trust list if OCSP is enabled */
         if (sc->ocsp_response_file != NULL)
         {
-            rv = mgs_ocsp_post_config_server(pconf, s);
+            rv = mgs_ocsp_post_config_server(pconf, ptemp, s);
             if (rv != OK && rv != DECLINED)
                 return rv;
         }
