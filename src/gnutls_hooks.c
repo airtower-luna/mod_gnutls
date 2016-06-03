@@ -20,6 +20,7 @@
  */
 
 #include "mod_gnutls.h"
+#include "gnutls_cache.h"
 #include "gnutls_ocsp.h"
 #include "http_vhost.h"
 #include "ap_mpm.h"

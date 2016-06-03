@@ -18,6 +18,7 @@
  *
  */
 
+#include "gnutls_cache.h"
 #include "mod_gnutls.h"
 
 #if HAVE_APR_MEMCACHE
