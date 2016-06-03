@@ -33,10 +33,6 @@
 APLOG_USE_MODULE(gnutls);
 #endif
 
-#if !USING_2_1_RECENT
-extern server_rec *ap_server_conf;
-#endif
-
 #if MOD_GNUTLS_DEBUG
 static apr_file_t *debug_log_fp;
 #endif
@@ -565,8 +561,6 @@ apr_port_t mgs_hook_default_port(const request_rec * r) {
 
 #define MAX_HOST_LEN 255
 
-#if USING_2_1_RECENT
-
 typedef struct {
     mgs_handle_t *ctxt;
     mgs_srvconf_rec *sc;
@@ -652,7 +646,6 @@ static int vhost_cb(void *baton, conn_rec * conn __attribute__((unused)), server
     }
 	return check_server_aliases(x, s, tsc);
 }
-#endif
 
 mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
 {
@@ -661,12 +654,7 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
     size_t data_len = MAX_HOST_LEN;
     char sni_name[MAX_HOST_LEN];
     mgs_handle_t *ctxt;
-#if USING_2_1_RECENT
     vhost_cb_rec cbx;
-#else
-    server_rec *s;
-    mgs_srvconf_rec *tsc;
-#endif
 
     if (session == NULL)
         return NULL;
@@ -693,7 +681,6 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
      * Code in the Core already sets up the c->base_server as the base
      * for this IP/Port combo.  Trust that the core did the 'right' thing.
      */
-#if USING_2_1_RECENT
     cbx.ctxt = ctxt;
     cbx.sc = NULL;
     cbx.sni_name = sni_name;
@@ -702,19 +689,6 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
     if (rv == 1) {
         return cbx.sc;
     }
-#else
-    for (s = ap_server_conf; s; s = s->next) {
-
-        tsc = (mgs_srvconf_rec *) ap_get_module_config(s->module_config,
-                                                       &gnutls_module);
-
-        if (tsc->enabled != GNUTLS_ENABLED_TRUE) { continue; }
-
-        if(check_server_aliases(x, s, tsc)) {
-            return tsc;
-        }
-    }
-#endif
     return NULL;
 }
 

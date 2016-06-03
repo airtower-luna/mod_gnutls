@@ -32,11 +32,7 @@ static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
     ap_hook_post_config(mgs_hook_post_config, aszPre, NULL,
                         APR_HOOK_REALLY_LAST);
     /* HTTP Scheme Hook */
-#if USING_2_1_RECENT
     ap_hook_http_scheme(mgs_hook_http_scheme, NULL, NULL, APR_HOOK_MIDDLE);
-#else
-    ap_hook_http_method(mgs_hook_http_scheme, NULL, NULL, APR_HOOK_MIDDLE);
-#endif
     /* Default Port Hook */
     ap_hook_default_port(mgs_hook_default_port, NULL, NULL, APR_HOOK_MIDDLE);
     /* Pre-Connect Hook */
