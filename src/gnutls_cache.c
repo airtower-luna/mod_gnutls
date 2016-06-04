@@ -308,37 +308,38 @@ static const char *db_type(mgs_srvconf_rec * sc) {
 
 #define SSL_DBM_FILE_MODE ( APR_UREAD | APR_UWRITE | APR_GREAD | APR_WREAD )
 
-static void dbm_cache_expire(mgs_handle_t * ctxt) {
+static void dbm_cache_expire(server_rec *s)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(s->module_config, &gnutls_module);
+
     apr_status_t rv;
     apr_dbm_t *dbm;
     apr_datum_t dbmkey;
     apr_datum_t dbmval;
-    apr_time_t now;
     apr_time_t dtime;
     apr_pool_t *spool;
     int total, deleted;
 
-    now = apr_time_now();
+    apr_time_t now = apr_time_now();
 
-    if (now - ctxt->sc->last_cache_check <
-            (ctxt->sc->cache_timeout) / 2)
+    if (now - sc->last_cache_check < (sc->cache_timeout) / 2)
         return;
 
-    ctxt->sc->last_cache_check = now;
+    sc->last_cache_check = now;
 
-    apr_pool_create(&spool, ctxt->c->pool);
+    apr_pool_create(&spool, NULL);
 
     total = 0;
     deleted = 0;
 
-    rv = apr_dbm_open_ex(&dbm, db_type(ctxt->sc),
-            ctxt->sc->cache_config, APR_DBM_RWCREATE,
+    rv = apr_dbm_open_ex(&dbm, db_type(sc),
+            sc->cache_config, APR_DBM_RWCREATE,
             SSL_DBM_FILE_MODE, spool);
     if (rv != APR_SUCCESS) {
-        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
-                ctxt->c->base_server,
+        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv, s,
                 "[gnutls_cache] error opening cache searcher '%s'",
-                ctxt->sc->cache_config);
+                sc->cache_config);
         apr_pool_destroy(spool);
         return;
     }
@@ -364,10 +365,9 @@ static void dbm_cache_expire(mgs_handle_t * ctxt) {
     }
     apr_dbm_close(dbm);
 
-    ap_log_error(APLOG_MARK, APLOG_DEBUG, rv,
-            ctxt->c->base_server,
+    ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, s,
             "[gnutls_cache] Cleaned up cache '%s'. Deleted %d and left %d",
-            ctxt->sc->cache_config, deleted, total - deleted);
+            sc->cache_config, deleted, total - deleted);
 
     apr_pool_destroy(spool);
 
@@ -441,7 +441,7 @@ static int dbm_cache_store(void *baton, gnutls_datum_t key,
 
     /* we expire dbm only on every store
      */
-    dbm_cache_expire(ctxt);
+    dbm_cache_expire(ctxt->c->base_server);
 
     apr_pool_create(&spool, ctxt->c->pool);
 
