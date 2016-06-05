@@ -16,6 +16,7 @@
 
 #include "gnutls_ocsp.h"
 #include "mod_gnutls.h"
+#include "gnutls_cache.h"
 
 #include <apr_lib.h>
 #include <apr_time.h>
@@ -213,23 +214,120 @@ int check_ocsp_response(mgs_handle_t *ctxt, const gnutls_datum_t *ocsp_response)
 
 
 
+/*
+ * Returns the certificate fingerprint, memory is allocated from p.
+ */
+static gnutls_datum_t mgs_get_cert_fingerprint(apr_pool_t *p,
+                                               gnutls_x509_crt_t cert)
+{
+    gnutls_datum_t fingerprint = {NULL, 0};
+    size_t fplen;
+    gnutls_x509_crt_get_fingerprint(cert, GNUTLS_DIG_SHA1, NULL, &fplen);
+    unsigned char * fp = apr_palloc(p, fplen);
+    gnutls_x509_crt_get_fingerprint(cert, GNUTLS_DIG_SHA1, fp, &fplen);
+    // TODO: Prevent overflow
+    fingerprint.size = fplen;
+    fingerprint.data = fp;
+    return fingerprint;
+}
+
+
+
+/* TODO: response should be fetched from sc->ocsp_uri */
+apr_status_t mgs_cache_ocsp_response(server_rec *s)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(s->module_config, &gnutls_module);
+
+    if (sc->cache_type != mgs_cache_dbm && sc->cache_type != mgs_cache_gdbm)
+    {
+        /* experimental OCSP cache requires DBM cache */
+        return APR_ENOTIMPL;
+    }
+
+    apr_pool_t *tmp;
+    apr_status_t rv = apr_pool_create(&tmp, NULL);
+
+    /* the fingerprint will be used as cache key */
+    gnutls_datum_t fingerprint =
+        mgs_get_cert_fingerprint(tmp, sc->certs_x509_crt_chain[0]);
+    if (fingerprint.data == NULL)
+        return APR_EINVAL;
+
+    ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
+                 "Loading OCSP response from %s",
+                 sc->ocsp_response_file);
+    apr_file_t *file;
+    apr_finfo_t finfo;
+    apr_size_t br = 0;
+    rv = apr_file_open(&file, sc->ocsp_response_file,
+                       APR_READ | APR_BINARY, APR_OS_DEFAULT, tmp);
+    if (rv != APR_SUCCESS)
+    {
+        apr_pool_destroy(tmp);
+        return rv;
+    }
+    rv = apr_file_info_get(&finfo, APR_FINFO_SIZE, file);
+    if (rv != APR_SUCCESS)
+    {
+        apr_pool_destroy(tmp);
+        return rv;
+    }
+
+    gnutls_datum_t resp;
+    resp.data = apr_palloc(tmp, finfo.size);
+    rv = apr_file_read_full(file, resp.data, finfo.size, &br);
+    if (rv != APR_SUCCESS)
+    {
+        apr_pool_destroy(tmp);
+        return rv;
+    }
+    apr_file_close(file);
+    // TODO: Prevent overflow
+    resp.size = br;
+
+
+    /* TODO: make cache lifetime configurable */
+    int r = dbm_cache_store(s, fingerprint,
+                            resp, apr_time_now() + apr_time_from_sec(120));
+    /* destroy pool, and original copy of the OCSP response with it */
+    apr_pool_destroy(tmp);
+    if (r != 0)
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
+                      "Storing OCSP response in cache failed.");
+        return APR_EGENERAL;
+    }
+    return APR_SUCCESS;
+}
+
+
+
 int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
                           void *ptr,
                           gnutls_datum_t *ocsp_response)
 {
     mgs_handle_t *ctxt = (mgs_handle_t *) ptr;
-    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
-                  "Loading OCSP response from %s",
-                  ctxt->sc->ocsp_response_file);
 
-    /* TODO: response should come from cache, which must be filled
-     * from sc->ocsp_uri */
-    int ret = gnutls_load_file(ctxt->sc->ocsp_response_file, ocsp_response);
-    if (ret != GNUTLS_E_SUCCESS)
+    apr_status_t rv = mgs_cache_ocsp_response(ctxt->c->base_server);
+    if (rv != APR_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, ctxt->c,
+                      "Updating OCSP response cache failed");
+        return GNUTLS_E_NO_CERTIFICATE_STATUS;
+    }
+
+    gnutls_datum_t fingerprint =
+        mgs_get_cert_fingerprint(ctxt->c->pool,
+                                 ctxt->sc->certs_x509_crt_chain[0]);
+    if (fingerprint.data == NULL)
+        return GNUTLS_E_NO_CERTIFICATE_STATUS;
+
+    *ocsp_response = dbm_cache_fetch(ctxt, fingerprint);
+    if (ocsp_response->size == 0)
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
-                      "Loading OCSP response failed: %s (%d)",
-                      gnutls_strerror(ret), ret);
+                      "Fetching OCSP response from cache failed.");
     }
     else
     {

@@ -394,7 +394,7 @@ static void dbm_cache_expire(server_rec *s)
     return;
 }
 
-static gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
+gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
 {
     gnutls_datum_t data = {NULL, 0};
     apr_dbm_t *dbm;
@@ -458,8 +458,8 @@ static gnutls_datum_t dbm_cache_fetch_session(void *baton, gnutls_datum_t key)
     return dbm_cache_fetch(ctxt, dbmkey);
 }
 
-static int dbm_cache_store(server_rec *s, gnutls_datum_t key,
-                           gnutls_datum_t data, apr_time_t expiry)
+int dbm_cache_store(server_rec *s, gnutls_datum_t key,
+                    gnutls_datum_t data, apr_time_t expiry)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);

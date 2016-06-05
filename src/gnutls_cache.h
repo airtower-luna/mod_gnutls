@@ -60,4 +60,14 @@ char *mgs_session_id2sz(unsigned char *id, int idlen, char *str, int strsize);
  */
 char *mgs_time2sz(time_t t, char *str, int strsize);
 
+/*
+ * EXPERIMENTAL: Make DBM cache available for OCSP caching. To be
+ * replaced with properly configurable caching that can also use
+ * memcached later.
+ */
+#include <apr_dbm.h>
+int dbm_cache_store(server_rec *s, gnutls_datum_t key,
+                    gnutls_datum_t data, apr_time_t expiry);
+gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key);
+
 #endif /** __MOD_GNUTLS_CACHE_H__ */
