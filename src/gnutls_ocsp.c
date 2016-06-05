@@ -79,8 +79,13 @@ const char *mgs_store_ocsp_response_path(cmd_parms *parms,
  * connections to this server. Returns GNUTLS_E_SUCCESS if yes.
  *
  * Supports only one certificate status per response.
+ *
+ * If expiry is not NULL, it will be set to the nextUpdate time
+ * contained in the response, or zero the response does not contain a
+ * nextUpdate field.
  */
-int check_ocsp_response(server_rec *s, const gnutls_datum_t *ocsp_response)
+int check_ocsp_response(server_rec *s, const gnutls_datum_t *ocsp_response,
+                        apr_time_t* expiry)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
@@ -177,12 +182,18 @@ int check_ocsp_response(server_rec *s, const gnutls_datum_t *ocsp_response)
     }
 
     if (next_update == (time_t) -1)
+    {
         ap_log_error(APLOG_MARK, APLOG_INFO, APR_SUCCESS, s,
                      "OSCP response does not contain nextUpdate info.");
+        if (expiry != NULL)
+            *expiry = 0;
+    }
     else
     {
         apr_time_t valid_to;
         apr_time_ansi_put(&valid_to, next_update);
+        if (expiry != NULL)
+            *expiry = valid_to;
         if (now > valid_to)
         {
             apr_rfc822_date(date_str, valid_to);
@@ -255,6 +266,13 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
 
     apr_pool_t *tmp;
     apr_status_t rv = apr_pool_create(&tmp, NULL);
+    if (rv != APR_SUCCESS)
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
+                     "could not create temporary pool for %s",
+                     __func__);
+        return rv;
+    }
 
     /* the fingerprint will be used as cache key */
     gnutls_datum_t fingerprint =
@@ -298,7 +316,8 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
         return APR_EINVAL;
     }
 
-    if (check_ocsp_response(s, &resp) != GNUTLS_E_SUCCESS)
+    apr_time_t expiry;
+    if (check_ocsp_response(s, &resp, &expiry) != GNUTLS_E_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_EGENERAL, s,
                      "OCSP response validation failed, cannot "
@@ -306,11 +325,16 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
         apr_pool_destroy(tmp);
         return APR_EGENERAL;
     }
+    /* if expiry is zero, the response does not contain a nextUpdate
+     * field */
+    /* TODO: If a refresh time is configured, use it as timeout. With
+     * the current code the response will expire at next cache
+     * expiration check. */
+    if (expiry == 0)
+        expiry = apr_time_now();
 
-    /* TODO: make cache lifetime configurable, make sure expiration
-     * happens without storing new data */
-    int r = dbm_cache_store(s, fingerprint,
-                            resp, apr_time_now() + apr_time_from_sec(120));
+    /* TODO: configurable refresh independent of expiration */
+    int r = dbm_cache_store(s, fingerprint, resp, expiry);
     /* destroy pool, and original copy of the OCSP response with it */
     apr_pool_destroy(tmp);
     if (r != 0)
@@ -345,7 +369,7 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
     else
     {
         /* Succeed if response is present and valid. */
-        if (check_ocsp_response(ctxt->c->base_server, ocsp_response)
+        if (check_ocsp_response(ctxt->c->base_server, ocsp_response, NULL)
             == GNUTLS_E_SUCCESS)
             return GNUTLS_E_SUCCESS;
     }
@@ -374,7 +398,7 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
     else
     {
         /* Succeed if response is present and valid. */
-        if (check_ocsp_response(ctxt->c->base_server, ocsp_response)
+        if (check_ocsp_response(ctxt->c->base_server, ocsp_response, NULL)
             == GNUTLS_E_SUCCESS)
             return GNUTLS_E_SUCCESS;
     }
