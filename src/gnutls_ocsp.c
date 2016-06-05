@@ -75,6 +75,72 @@ const char *mgs_store_ocsp_response_path(cmd_parms *parms,
 
 
 /**
+ * Check if the time specified in the nextUpdate field (if any) of the
+ * given OCSP response has passed. Returns GNUTLS_E_SUCCESS if it has
+ * not (so the response is still valid), or there is no such field.
+ *
+ * Note that this function does not do a signature check, it is meant
+ * to operate on cached responses that have been verified before.
+ */
+static int check_ocsp_response_expiry(mgs_handle_t *ctxt,
+                                      const gnutls_datum_t *ocsp_response)
+{
+    gnutls_ocsp_resp_t resp;
+    int ret = gnutls_ocsp_resp_init(&resp);
+    if (ret != GNUTLS_E_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
+                      "Could not initialize OCSP response structure: "
+                      "%s (%d)", gnutls_strerror(ret), ret);
+        goto resp_cleanup;
+    }
+    ret = gnutls_ocsp_resp_import(resp, ocsp_response);
+    if (ret != GNUTLS_E_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
+                      "Importing OCSP response failed: %s (%d)",
+                      gnutls_strerror(ret), ret);
+        goto resp_cleanup;
+    }
+    time_t next_update;
+    ret = gnutls_ocsp_resp_get_single(resp, 0, NULL, NULL, NULL, NULL, NULL,
+                                      NULL, &next_update, NULL, NULL);
+    if (ret != GNUTLS_E_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
+                      "Could not get OCSP response data: %s (%d)",
+                      gnutls_strerror(ret), ret);
+        goto resp_cleanup;
+    }
+
+    if (next_update == (time_t) -1)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                      "OSCP response does not contain nextUpdate info.");
+    }
+    else
+    {
+        apr_time_t now = apr_time_now();
+        apr_time_t valid_to;
+        apr_time_ansi_put(&valid_to, next_update);
+        if (now > valid_to)
+        {
+            char date_str[APR_RFC822_DATE_LEN];
+            apr_rfc822_date(date_str, valid_to);
+            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                          "OCSP response has expired at %s.", date_str);
+            ret = GNUTLS_E_OCSP_RESPONSE_ERROR;
+            goto resp_cleanup;
+        }
+    }
+ resp_cleanup:
+    gnutls_ocsp_resp_deinit(resp);
+    return ret;
+}
+
+
+
+/**
  * Check if the provided OCSP response is usable for stapling in
  * connections to this server. Returns GNUTLS_E_SUCCESS if yes.
  *
@@ -368,8 +434,7 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
     }
     else
     {
-        /* Succeed if response is present and valid. */
-        if (check_ocsp_response(ctxt->c->base_server, ocsp_response, NULL)
+        if (check_ocsp_response_expiry(ctxt, ocsp_response)
             == GNUTLS_E_SUCCESS)
             return GNUTLS_E_SUCCESS;
     }
@@ -398,7 +463,7 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
     else
     {
         /* Succeed if response is present and valid. */
-        if (check_ocsp_response(ctxt->c->base_server, ocsp_response, NULL)
+        if (check_ocsp_response_expiry(ctxt, ocsp_response)
             == GNUTLS_E_SUCCESS)
             return GNUTLS_E_SUCCESS;
     }
