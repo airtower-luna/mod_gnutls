@@ -426,18 +426,14 @@ static gnutls_datum_t dbm_cache_fetch(void *baton, gnutls_datum_t key) {
     return data;
 }
 
-static int dbm_cache_store(void *baton, gnutls_datum_t key,
-        gnutls_datum_t data) {
+static int dbm_cache_store(void *baton, apr_datum_t key,
+                           gnutls_datum_t data, apr_time_t expiry)
+{
     apr_dbm_t *dbm;
-    apr_datum_t dbmkey;
     apr_datum_t dbmval;
     mgs_handle_t *ctxt = baton;
     apr_status_t rv;
-    apr_time_t expiry;
     apr_pool_t *spool;
-
-    if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
-        return -1;
 
     /* we expire dbm only on every store
      */
@@ -449,8 +445,7 @@ static int dbm_cache_store(void *baton, gnutls_datum_t key,
     dbmval.dsize = data.size + sizeof (apr_time_t);
     dbmval.dptr = (char *) apr_palloc(spool, dbmval.dsize);
 
-    expiry = apr_time_now() + ctxt->sc->cache_timeout;
-
+    /* prepend expiration time */
     memcpy((char *) dbmval.dptr, &expiry, sizeof (apr_time_t));
     memcpy((char *) dbmval.dptr + sizeof (apr_time_t),
             data.data, data.size);
@@ -467,7 +462,7 @@ static int dbm_cache_store(void *baton, gnutls_datum_t key,
         return -1;
     }
 
-    rv = apr_dbm_store(dbm, dbmkey, dbmval);
+    rv = apr_dbm_store(dbm, key, dbmval);
 
     if (rv != APR_SUCCESS) {
         ap_log_error(APLOG_MARK, APLOG_DEBUG, rv,
@@ -484,6 +479,20 @@ static int dbm_cache_store(void *baton, gnutls_datum_t key,
     apr_pool_destroy(spool);
 
     return 0;
+}
+
+static int dbm_cache_store_session(void *baton, gnutls_datum_t key,
+                                   gnutls_datum_t data)
+{
+    mgs_handle_t *ctxt = baton;
+    apr_datum_t dbmkey;
+
+    if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
+        return -1;
+
+    apr_time_t expiry = apr_time_now() + ctxt->sc->cache_timeout;
+
+    return dbm_cache_store(baton, dbmkey, data, expiry);
 }
 
 static int dbm_cache_delete(void *baton, gnutls_datum_t key) {
@@ -613,7 +622,7 @@ int mgs_cache_session_init(mgs_handle_t * ctxt) {
         gnutls_db_set_remove_function(ctxt->session,
                 dbm_cache_delete);
         gnutls_db_set_store_function(ctxt->session,
-                dbm_cache_store);
+                dbm_cache_store_session);
         gnutls_db_set_ptr(ctxt->session, ctxt);
     }
 #if HAVE_APR_MEMCACHE
