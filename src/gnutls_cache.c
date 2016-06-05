@@ -426,20 +426,21 @@ static gnutls_datum_t dbm_cache_fetch(void *baton, gnutls_datum_t key) {
     return data;
 }
 
-static int dbm_cache_store(void *baton, apr_datum_t key,
+static int dbm_cache_store(server_rec *s, apr_datum_t key,
                            gnutls_datum_t data, apr_time_t expiry)
 {
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(s->module_config, &gnutls_module);
+
     apr_dbm_t *dbm;
     apr_datum_t dbmval;
-    mgs_handle_t *ctxt = baton;
     apr_status_t rv;
     apr_pool_t *spool;
 
-    /* we expire dbm only on every store
-     */
-    dbm_cache_expire(ctxt->c->base_server);
+    /* we expire dbm only on every store */
+    dbm_cache_expire(s);
 
-    apr_pool_create(&spool, ctxt->c->pool);
+    apr_pool_create(&spool, NULL);
 
     /* create DBM value */
     dbmval.dsize = data.size + sizeof (apr_time_t);
@@ -450,29 +451,32 @@ static int dbm_cache_store(void *baton, apr_datum_t key,
     memcpy((char *) dbmval.dptr + sizeof (apr_time_t),
             data.data, data.size);
 
-    rv = apr_dbm_open_ex(&dbm, db_type(ctxt->sc),
-            ctxt->sc->cache_config, APR_DBM_RWCREATE,
-            SSL_DBM_FILE_MODE, ctxt->c->pool);
-    if (rv != APR_SUCCESS) {
-        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
-                ctxt->c->base_server,
-                "[gnutls_cache] error opening cache '%s'",
-                ctxt->sc->cache_config);
+    rv = apr_dbm_open_ex(&dbm, db_type(sc),
+                         sc->cache_config, APR_DBM_RWCREATE,
+                         SSL_DBM_FILE_MODE, spool);
+    if (rv != APR_SUCCESS)
+    {
+        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv, s,
+                     "error opening cache '%s'",
+                     sc->cache_config);
         apr_pool_destroy(spool);
         return -1;
     }
 
     rv = apr_dbm_store(dbm, key, dbmval);
-
-    if (rv != APR_SUCCESS) {
-        ap_log_error(APLOG_MARK, APLOG_DEBUG, rv,
-                ctxt->c->base_server,
-                "[gnutls_cache] error storing in cache '%s'",
-                ctxt->sc->cache_config);
+    if (rv != APR_SUCCESS)
+    {
+        ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, s,
+                     "error storing in cache '%s'",
+                     sc->cache_config);
         apr_dbm_close(dbm);
         apr_pool_destroy(spool);
         return -1;
     }
+
+    ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, s,
+                 "stored %ld bytes of data (%ld byte key) in cache '%s'",
+                 dbmval.dsize, key.dsize, sc->cache_config);
 
     apr_dbm_close(dbm);
 
@@ -492,7 +496,7 @@ static int dbm_cache_store_session(void *baton, gnutls_datum_t key,
 
     apr_time_t expiry = apr_time_now() + ctxt->sc->cache_timeout;
 
-    return dbm_cache_store(baton, dbmkey, data, expiry);
+    return dbm_cache_store(ctxt->c->base_server, dbmkey, data, expiry);
 }
 
 static int dbm_cache_delete(void *baton, gnutls_datum_t key) {
