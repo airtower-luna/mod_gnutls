@@ -68,8 +68,9 @@ char *mgs_session_id2sz(unsigned char *id, int idlen,
  * server:port.SessionID
  * to disallow resuming sessions on different servers
  */
-static int mgs_session_id2dbm(conn_rec * c, unsigned char *id, int idlen,
-        apr_datum_t * dbmkey) {
+static int mgs_session_id2dbm(conn_rec *c, unsigned char *id, int idlen,
+                              gnutls_datum_t *dbmkey)
+{
     char buf[STR_SESSION_LEN];
     char *sz;
 
@@ -77,12 +78,12 @@ static int mgs_session_id2dbm(conn_rec * c, unsigned char *id, int idlen,
     if (sz == NULL)
         return -1;
 
-    dbmkey->dptr =
-            apr_psprintf(c->pool, "%s:%d.%s",
-            c->base_server->server_hostname,
-            c->base_server->port, sz);
-    dbmkey->dsize = strlen(dbmkey->dptr);
-
+    char *newkey = apr_psprintf(c->pool, "%s:%d.%s",
+                                c->base_server->server_hostname,
+                                c->base_server->port, sz);
+    dbmkey->size = strlen(newkey);
+    /* signedness does not matter for arbitrary bits */
+    dbmkey->data = (unsigned char*) newkey;
     return 0;
 }
 
@@ -393,10 +394,11 @@ static void dbm_cache_expire(server_rec *s)
     return;
 }
 
-static gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, apr_datum_t key)
+static gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
 {
     gnutls_datum_t data = {NULL, 0};
     apr_dbm_t *dbm;
+    apr_datum_t dbmkey = {(char*) key.data, key.size};
     apr_datum_t dbmval;
     apr_status_t rv;
 
@@ -410,7 +412,7 @@ static gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, apr_datum_t key)
         return data;
     }
 
-    rv = apr_dbm_fetch(dbm, key, &dbmval);
+    rv = apr_dbm_fetch(dbm, dbmkey, &dbmval);
 
     if (rv != APR_SUCCESS) {
         apr_dbm_close(dbm);
@@ -444,11 +446,10 @@ static gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, apr_datum_t key)
     return data;
 }
 
-static gnutls_datum_t dbm_cache_fetch_session(void *baton,
-                                              gnutls_datum_t key)
+static gnutls_datum_t dbm_cache_fetch_session(void *baton, gnutls_datum_t key)
 {
     gnutls_datum_t data = {NULL, 0};
-    apr_datum_t dbmkey;
+    gnutls_datum_t dbmkey;
     mgs_handle_t *ctxt = baton;
 
     if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
@@ -457,13 +458,14 @@ static gnutls_datum_t dbm_cache_fetch_session(void *baton,
     return dbm_cache_fetch(ctxt, dbmkey);
 }
 
-static int dbm_cache_store(server_rec *s, apr_datum_t key,
+static int dbm_cache_store(server_rec *s, gnutls_datum_t key,
                            gnutls_datum_t data, apr_time_t expiry)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
 
     apr_dbm_t *dbm;
+    apr_datum_t dbmkey = {(char*) key.data, key.size};
     apr_datum_t dbmval;
     apr_status_t rv;
     apr_pool_t *spool;
@@ -494,7 +496,7 @@ static int dbm_cache_store(server_rec *s, apr_datum_t key,
         return -1;
     }
 
-    rv = apr_dbm_store(dbm, key, dbmval);
+    rv = apr_dbm_store(dbm, dbmkey, dbmval);
     if (rv != APR_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, s,
@@ -507,7 +509,7 @@ static int dbm_cache_store(server_rec *s, apr_datum_t key,
 
     ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, s,
                  "stored %ld bytes of data (%ld byte key) in cache '%s'",
-                 dbmval.dsize, key.dsize, sc->cache_config);
+                 dbmval.dsize, dbmkey.dsize, sc->cache_config);
 
     apr_dbm_close(dbm);
 
@@ -520,7 +522,7 @@ static int dbm_cache_store_session(void *baton, gnutls_datum_t key,
                                    gnutls_datum_t data)
 {
     mgs_handle_t *ctxt = baton;
-    apr_datum_t dbmkey;
+    gnutls_datum_t dbmkey;
 
     if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
         return -1;
@@ -532,12 +534,13 @@ static int dbm_cache_store_session(void *baton, gnutls_datum_t key,
 
 static int dbm_cache_delete(void *baton, gnutls_datum_t key) {
     apr_dbm_t *dbm;
-    apr_datum_t dbmkey;
+    gnutls_datum_t tmpkey;
     mgs_handle_t *ctxt = baton;
     apr_status_t rv;
 
-    if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
+    if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &tmpkey) < 0)
         return -1;
+    apr_datum_t dbmkey = {(char*) tmpkey.data, tmpkey.size};
 
     rv = apr_dbm_open_ex(&dbm, db_type(ctxt->sc),
             ctxt->sc->cache_config, APR_DBM_RWCREATE,
