@@ -374,29 +374,24 @@ static void dbm_cache_expire(server_rec *s)
     return;
 }
 
-static gnutls_datum_t dbm_cache_fetch(void *baton, gnutls_datum_t key) {
+static gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, apr_datum_t key)
+{
     gnutls_datum_t data = {NULL, 0};
     apr_dbm_t *dbm;
-    apr_datum_t dbmkey;
     apr_datum_t dbmval;
-    mgs_handle_t *ctxt = baton;
     apr_status_t rv;
-
-    if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
-        return data;
 
     rv = apr_dbm_open_ex(&dbm, db_type(ctxt->sc),
             ctxt->sc->cache_config, APR_DBM_READONLY,
             SSL_DBM_FILE_MODE, ctxt->c->pool);
     if (rv != APR_SUCCESS) {
-        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
-                ctxt->c->base_server,
-                "[gnutls_cache] error opening cache '%s'",
-                ctxt->sc->cache_config);
+        ap_log_cerror(APLOG_MARK, APLOG_NOTICE, rv, ctxt->c,
+                      "error opening cache '%s'",
+                      ctxt->sc->cache_config);
         return data;
     }
 
-    rv = apr_dbm_fetch(dbm, dbmkey, &dbmval);
+    rv = apr_dbm_fetch(dbm, key, &dbmval);
 
     if (rv != APR_SUCCESS) {
         apr_dbm_close(dbm);
@@ -418,12 +413,29 @@ static gnutls_datum_t dbm_cache_fetch(void *baton, gnutls_datum_t key) {
         return data;
     }
 
+    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, rv, ctxt->c,
+                  "fetched %ld bytes from cache",
+                  dbmval.dsize);
+
     memcpy(data.data, dbmval.dptr + sizeof (apr_time_t), data.size);
 
     apr_dbm_freedatum(dbm, dbmval);
     apr_dbm_close(dbm);
 
     return data;
+}
+
+static gnutls_datum_t dbm_cache_fetch_session(void *baton,
+                                              gnutls_datum_t key)
+{
+    gnutls_datum_t data = {NULL, 0};
+    apr_datum_t dbmkey;
+    mgs_handle_t *ctxt = baton;
+
+    if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
+        return data;
+
+    return dbm_cache_fetch(ctxt, dbmkey);
 }
 
 static int dbm_cache_store(server_rec *s, apr_datum_t key,
@@ -622,7 +634,7 @@ int mgs_cache_session_init(mgs_handle_t * ctxt) {
     if (ctxt->sc->cache_type == mgs_cache_dbm
             || ctxt->sc->cache_type == mgs_cache_gdbm) {
         gnutls_db_set_retrieve_function(ctxt->session,
-                dbm_cache_fetch);
+                dbm_cache_fetch_session);
         gnutls_db_set_remove_function(ctxt->session,
                 dbm_cache_delete);
         gnutls_db_set_store_function(ctxt->session,
