@@ -294,7 +294,8 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
         return APR_EINVAL;
     }
 
-    /* TODO: make cache lifetime configurable */
+    /* TODO: make cache lifetime configurable, make sure expiration
+     * happens without storing new data */
     int r = dbm_cache_store(s, fingerprint,
                             resp, apr_time_now() + apr_time_from_sec(120));
     /* destroy pool, and original copy of the OCSP response with it */
@@ -316,14 +317,6 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
 {
     mgs_handle_t *ctxt = (mgs_handle_t *) ptr;
 
-    apr_status_t rv = mgs_cache_ocsp_response(ctxt->c->base_server);
-    if (rv != APR_SUCCESS)
-    {
-        ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, ctxt->c,
-                      "Updating OCSP response cache failed");
-        return GNUTLS_E_NO_CERTIFICATE_STATUS;
-    }
-
     gnutls_datum_t fingerprint =
         mgs_get_cert_fingerprint(ctxt->c->pool,
                                  ctxt->sc->certs_x509_crt_chain[0]);
@@ -342,8 +335,36 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
         if (check_ocsp_response(ctxt, ocsp_response) == GNUTLS_E_SUCCESS)
             return GNUTLS_E_SUCCESS;
     }
+    /* get rid of invalid response (if any) */
+    gnutls_free(ocsp_response->data);
+
+    /* If the cache had no response or an invalid one, try to update. */
+    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                  "No valid OCSP response in cache, trying to update.");
+    apr_status_t rv = mgs_cache_ocsp_response(ctxt->c->base_server);
+    if (rv != APR_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, ctxt->c,
+                      "Updating OCSP response cache failed");
+        goto fail_cleanup;
+    }
+
+    /* retry reading from cache */
+    *ocsp_response = dbm_cache_fetch(ctxt, fingerprint);
+    if (ocsp_response->size == 0)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
+                      "Fetching OCSP response from cache failed on retry.");
+    }
+    else
+    {
+        /* Succeed if response is present and valid. */
+        if (check_ocsp_response(ctxt, ocsp_response) == GNUTLS_E_SUCCESS)
+            return GNUTLS_E_SUCCESS;
+    }
 
     /* failure, clean up response data */
+ fail_cleanup:
     gnutls_free(ocsp_response->data);
     ocsp_response->size = 0;
     ocsp_response->data = NULL;
