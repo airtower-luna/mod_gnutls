@@ -308,6 +308,25 @@ static const char *db_type(mgs_srvconf_rec * sc) {
 
 #define SSL_DBM_FILE_MODE ( APR_UREAD | APR_UWRITE | APR_GREAD | APR_WREAD )
 
+/***
+ * The signatures of the dbm_cache_...() functions may be a bit
+ * confusing: "store" and "expire" take a server_rec, "fetch" an
+ * mgs_handle_t, and "delete" the void* required for a
+ * gnutls_db_remove_func. The first three have matching ..._session
+ * functions to fit their respective GnuTLS session cache signatures.
+ *
+ * This is because "store", "expire", and "fetch" are also needed for
+ * the OCSP cache. Their ..._session variants have been created to
+ * take care of the session cache specific parts, mainly calculating
+ * the DB key from the session ID. They have to match the appropriate
+ * GnuTLS DB function signatures.
+ *
+ * To update cached OCSP responses independent of client connections,
+ * "store" and "expire" have to work without a connection context. On
+ * the other hand "fetch" does not need to do that, because cached
+ * OCSP responses will be retrieved for use in client connections.
+ ***/
+
 static void dbm_cache_expire(server_rec *s)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
