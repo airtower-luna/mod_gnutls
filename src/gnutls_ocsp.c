@@ -225,9 +225,13 @@ static gnutls_datum_t mgs_get_cert_fingerprint(apr_pool_t *p,
     gnutls_x509_crt_get_fingerprint(cert, GNUTLS_DIG_SHA1, NULL, &fplen);
     unsigned char * fp = apr_palloc(p, fplen);
     gnutls_x509_crt_get_fingerprint(cert, GNUTLS_DIG_SHA1, fp, &fplen);
-    // TODO: Prevent overflow
-    fingerprint.size = fplen;
-    fingerprint.data = fp;
+    /* Safe integer type conversion: The types of fingerprint.size
+     * (unsigned int) and fplen (size_t) may have different
+     * lengths. */
+    if (__builtin_add_overflow(fplen, 0, &fingerprint.size))
+        fingerprint.size = 0;
+    else
+        fingerprint.data = fp;
     return fingerprint;
 }
 
@@ -283,9 +287,12 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
         return rv;
     }
     apr_file_close(file);
-    // TODO: Prevent overflow
-    resp.size = br;
-
+    /* safe integer type conversion */
+    if (__builtin_add_overflow(br, 0, &resp.size))
+    {
+        apr_pool_destroy(tmp);
+        return APR_EINVAL;
+    }
 
     /* TODO: make cache lifetime configurable */
     int r = dbm_cache_store(s, fingerprint,
