@@ -317,7 +317,7 @@ static const char *db_type(mgs_srvconf_rec * sc) {
  * The signatures of the dbm_cache_...() functions may be a bit
  * confusing: "store" and "expire" take a server_rec, "fetch" an
  * mgs_handle_t, and "delete" the void* required for a
- * gnutls_db_remove_func. The first three have matching ..._session
+ * gnutls_db_remove_func. The first two have matching ..._session
  * functions to fit their respective GnuTLS session cache signatures.
  *
  * This is because "store", "expire", and "fetch" are also needed for
@@ -411,6 +411,9 @@ gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
     apr_datum_t dbmval;
     apr_status_t rv;
 
+    /* check if it is time for cache expiration */
+    dbm_cache_expire(ctxt->c->base_server);
+
     apr_global_mutex_lock(ctxt->sc->cache_mutex);
 
     rv = apr_dbm_open_ex(&dbm, db_type(ctxt->sc),
@@ -426,28 +429,17 @@ gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
 
     rv = apr_dbm_fetch(dbm, dbmkey, &dbmval);
 
-    if (rv != APR_SUCCESS) {
-        apr_dbm_close(dbm);
-        apr_global_mutex_unlock(ctxt->sc->cache_mutex);
-        return data;
-    }
+    if (rv != APR_SUCCESS)
+        goto close_db;
 
-    if (dbmval.dptr == NULL || dbmval.dsize <= sizeof (apr_time_t)) {
-        apr_dbm_freedatum(dbm, dbmval);
-        apr_dbm_close(dbm);
-        apr_global_mutex_unlock(ctxt->sc->cache_mutex);
-        return data;
-    }
+    if (dbmval.dptr == NULL || dbmval.dsize <= sizeof (apr_time_t))
+        goto cleanup;
 
     data.size = dbmval.dsize - sizeof (apr_time_t);
 
     data.data = gnutls_malloc(data.size);
-    if (data.data == NULL) {
-        apr_dbm_freedatum(dbm, dbmval);
-        apr_dbm_close(dbm);
-        apr_global_mutex_unlock(ctxt->sc->cache_mutex);
-        return data;
-    }
+    if (data.data == NULL)
+        goto cleanup;
 
     ap_log_cerror(APLOG_MARK, APLOG_DEBUG, rv, ctxt->c,
                   "fetched %ld bytes from cache",
@@ -455,7 +447,9 @@ gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
 
     memcpy(data.data, dbmval.dptr + sizeof (apr_time_t), data.size);
 
+ cleanup:
     apr_dbm_freedatum(dbm, dbmval);
+ close_db:
     apr_dbm_close(dbm);
     apr_global_mutex_unlock(ctxt->sc->cache_mutex);
 
@@ -486,7 +480,7 @@ int dbm_cache_store(server_rec *s, gnutls_datum_t key,
     apr_status_t rv;
     apr_pool_t *spool;
 
-    /* we expire dbm only on every store */
+    /* check if it is time for cache expiration */
     dbm_cache_expire(s);
 
     apr_pool_create(&spool, NULL);
@@ -553,7 +547,8 @@ static int dbm_cache_store_session(void *baton, gnutls_datum_t key,
     return dbm_cache_store(ctxt->c->base_server, dbmkey, data, expiry);
 }
 
-static int dbm_cache_delete(void *baton, gnutls_datum_t key) {
+static int dbm_cache_delete(void *baton, gnutls_datum_t key)
+{
     apr_dbm_t *dbm;
     gnutls_datum_t tmpkey;
     mgs_handle_t *ctxt = baton;
