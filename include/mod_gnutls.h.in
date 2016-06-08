@@ -132,6 +132,9 @@ typedef struct {
 	/* Chose Cache Type */
     mgs_cache_e cache_type;
     const char* cache_config;
+    /* Mutex for cache access (used only if the cache type is not
+     * thread-safe) */
+    apr_global_mutex_t *cache_mutex;
 
 	/* GnuTLS uses Session Tickets */
     int tickets;

@@ -28,6 +28,7 @@
 #include "apr_dbm.h"
 
 #include "ap_mpm.h"
+#include <util_mutex.h>
 
 #include <unistd.h>
 #include <sys/types.h>
@@ -35,6 +36,9 @@
 #if !defined(OS2) && !defined(WIN32) && !defined(BEOS) && !defined(NETWARE)
 #include "unixd.h"
 #endif
+
+/* default cache timeout */
+#define MGS_DEFAULT_CACHE_TIMEOUT 300
 
 /* it seems the default has some strange errors. Use SDBM
  */
@@ -353,13 +357,16 @@ static void dbm_cache_expire(server_rec *s)
     total = 0;
     deleted = 0;
 
+    apr_global_mutex_lock(sc->cache_mutex);
+
     rv = apr_dbm_open_ex(&dbm, db_type(sc),
             sc->cache_config, APR_DBM_RWCREATE,
             SSL_DBM_FILE_MODE, spool);
     if (rv != APR_SUCCESS) {
         ap_log_error(APLOG_MARK, APLOG_NOTICE, rv, s,
-                "[gnutls_cache] error opening cache searcher '%s'",
+                "[gnutls_cache] error opening cache '%s'",
                 sc->cache_config);
+        apr_global_mutex_unlock(sc->cache_mutex);
         apr_pool_destroy(spool);
         return;
     }
@@ -385,6 +392,8 @@ static void dbm_cache_expire(server_rec *s)
     }
     apr_dbm_close(dbm);
 
+    rv = apr_global_mutex_unlock(sc->cache_mutex);
+
     ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, s,
             "[gnutls_cache] Cleaned up cache '%s'. Deleted %d and left %d",
             sc->cache_config, deleted, total - deleted);
@@ -402,6 +411,8 @@ gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
     apr_datum_t dbmval;
     apr_status_t rv;
 
+    apr_global_mutex_lock(ctxt->sc->cache_mutex);
+
     rv = apr_dbm_open_ex(&dbm, db_type(ctxt->sc),
             ctxt->sc->cache_config, APR_DBM_READONLY,
             SSL_DBM_FILE_MODE, ctxt->c->pool);
@@ -409,6 +420,7 @@ gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
         ap_log_cerror(APLOG_MARK, APLOG_NOTICE, rv, ctxt->c,
                       "error opening cache '%s'",
                       ctxt->sc->cache_config);
+        apr_global_mutex_unlock(ctxt->sc->cache_mutex);
         return data;
     }
 
@@ -416,12 +428,14 @@ gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
 
     if (rv != APR_SUCCESS) {
         apr_dbm_close(dbm);
+        apr_global_mutex_unlock(ctxt->sc->cache_mutex);
         return data;
     }
 
     if (dbmval.dptr == NULL || dbmval.dsize <= sizeof (apr_time_t)) {
         apr_dbm_freedatum(dbm, dbmval);
         apr_dbm_close(dbm);
+        apr_global_mutex_unlock(ctxt->sc->cache_mutex);
         return data;
     }
 
@@ -431,6 +445,7 @@ gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
     if (data.data == NULL) {
         apr_dbm_freedatum(dbm, dbmval);
         apr_dbm_close(dbm);
+        apr_global_mutex_unlock(ctxt->sc->cache_mutex);
         return data;
     }
 
@@ -442,6 +457,7 @@ gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
 
     apr_dbm_freedatum(dbm, dbmval);
     apr_dbm_close(dbm);
+    apr_global_mutex_unlock(ctxt->sc->cache_mutex);
 
     return data;
 }
@@ -484,6 +500,8 @@ int dbm_cache_store(server_rec *s, gnutls_datum_t key,
     memcpy((char *) dbmval.dptr + sizeof (apr_time_t),
             data.data, data.size);
 
+    apr_global_mutex_lock(sc->cache_mutex);
+
     rv = apr_dbm_open_ex(&dbm, db_type(sc),
                          sc->cache_config, APR_DBM_RWCREATE,
                          SSL_DBM_FILE_MODE, spool);
@@ -492,6 +510,7 @@ int dbm_cache_store(server_rec *s, gnutls_datum_t key,
         ap_log_error(APLOG_MARK, APLOG_NOTICE, rv, s,
                      "error opening cache '%s'",
                      sc->cache_config);
+        apr_global_mutex_unlock(sc->cache_mutex);
         apr_pool_destroy(spool);
         return -1;
     }
@@ -503,15 +522,17 @@ int dbm_cache_store(server_rec *s, gnutls_datum_t key,
                      "error storing in cache '%s'",
                      sc->cache_config);
         apr_dbm_close(dbm);
+        apr_global_mutex_unlock(sc->cache_mutex);
         apr_pool_destroy(spool);
         return -1;
     }
 
+    apr_dbm_close(dbm);
+    apr_global_mutex_unlock(sc->cache_mutex);
+
     ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, s,
                  "stored %ld bytes of data (%ld byte key) in cache '%s'",
                  dbmval.dsize, dbmkey.dsize, sc->cache_config);
-
-    apr_dbm_close(dbm);
 
     apr_pool_destroy(spool);
 
@@ -542,6 +563,8 @@ static int dbm_cache_delete(void *baton, gnutls_datum_t key) {
         return -1;
     apr_datum_t dbmkey = {(char*) tmpkey.data, tmpkey.size};
 
+    apr_global_mutex_lock(ctxt->sc->cache_mutex);
+
     rv = apr_dbm_open_ex(&dbm, db_type(ctxt->sc),
             ctxt->sc->cache_config, APR_DBM_RWCREATE,
             SSL_DBM_FILE_MODE, ctxt->c->pool);
@@ -550,6 +573,7 @@ static int dbm_cache_delete(void *baton, gnutls_datum_t key) {
                 ctxt->c->base_server,
                 "[gnutls_cache] error opening cache '%s'",
                 ctxt->sc->cache_config);
+        apr_global_mutex_unlock(ctxt->sc->cache_mutex);
         return -1;
     }
 
@@ -561,10 +585,12 @@ static int dbm_cache_delete(void *baton, gnutls_datum_t key) {
                 "[gnutls_cache] error deleting from cache '%s'",
                 ctxt->sc->cache_config);
         apr_dbm_close(dbm);
+        apr_global_mutex_unlock(ctxt->sc->cache_mutex);
         return -1;
     }
 
     apr_dbm_close(dbm);
+    apr_global_mutex_unlock(ctxt->sc->cache_mutex);
 
     return 0;
 }
@@ -619,13 +645,24 @@ int mgs_cache_post_config(apr_pool_t * p, server_rec * s,
         sc->cache_type = mgs_cache_none;
     /* if GnuTLSCacheTimeout was never explicitly set: */
     if (sc->cache_timeout == -1)
-        sc->cache_timeout = apr_time_from_sec(300);
+        sc->cache_timeout = apr_time_from_sec(MGS_DEFAULT_CACHE_TIMEOUT);
+
+    /* initialize mutex only once */
+    if (sc->cache_mutex == NULL)
+    {
+        apr_status_t rv = ap_global_mutex_create(&sc->cache_mutex, NULL,
+                                                 MGS_CACHE_MUTEX_NAME,
+                                                 NULL, s, p, 0);
+        if (rv != APR_SUCCESS)
+            return rv;
+    }
 
     if (sc->cache_type == mgs_cache_dbm
             || sc->cache_type == mgs_cache_gdbm) {
         return dbm_cache_post_config(p, s, sc);
     }
-    return 0;
+
+    return APR_SUCCESS;
 }
 
 #if HAVE_APR_MEMCACHE

@@ -23,6 +23,8 @@
 #include "mod_gnutls.h"
 #include <httpd.h>
 
+#define MGS_CACHE_MUTEX_NAME "gnutls-cache"
+
 /**
  * Init the Cache after Configuration is done
  */

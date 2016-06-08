@@ -25,6 +25,7 @@
 #include "http_vhost.h"
 #include "ap_mpm.h"
 #include "mod_status.h"
+#include <util_mutex.h>
 
 #ifdef ENABLE_MSVA
 #include <msv/msv.h>
@@ -123,7 +124,9 @@ int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog, apr_pool_t * ptem
 
     AP_OPTIONAL_HOOK(status_hook, mgs_status_hook, NULL, NULL, APR_HOOK_MIDDLE);
 
-	/* Register a pool clean-up function */
+    ap_mutex_register(pconf, MGS_CACHE_MUTEX_NAME, NULL, APR_LOCK_DEFAULT, 0);
+
+    /* Register a pool clean-up function */
     apr_pool_cleanup_register(pconf, NULL, mgs_cleanup_pre_config, apr_pool_cleanup_null);
 
     return OK;
@@ -330,10 +333,10 @@ int mgs_hook_post_config(apr_pool_t *pconf,
 
 
     rv = mgs_cache_post_config(pconf, s, sc_base);
-    if (rv != 0) {
+    if (rv != APR_SUCCESS)
+    {
         ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, s,
-                "GnuTLS: Post Config for GnuTLSCache Failed."
-                " Shutting Down.");
+                     "Post config for cache failed.");
         return HTTP_INSUFFICIENT_STORAGE;
     }
 
@@ -370,6 +373,7 @@ int mgs_hook_post_config(apr_pool_t *pconf,
         sc->cache_type = sc_base->cache_type;
         sc->cache_config = sc_base->cache_config;
         sc->cache_timeout = sc_base->cache_timeout;
+        sc->cache_mutex = sc_base->cache_mutex;
 
         rv = mgs_load_files(pconf, s);
         if (rv != 0) {
@@ -494,14 +498,15 @@ int mgs_hook_post_config(apr_pool_t *pconf,
     return OK;
 }
 
-void mgs_hook_child_init(apr_pool_t * p, server_rec *s) {
+void mgs_hook_child_init(apr_pool_t *p, server_rec *s)
+{
     apr_status_t rv = APR_SUCCESS;
-    mgs_srvconf_rec *sc =
-        (mgs_srvconf_rec *) ap_get_module_config(s->module_config, &gnutls_module);
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(s->module_config, &gnutls_module);
 
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
-    /* if we use PKCS #11 reinitialize it */
 
+    /* if we use PKCS #11 reinitialize it */
     if (mgs_pkcs11_reinit(s) < 0) {
             ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
                     "GnuTLS: Failed to reinitialize PKCS #11");
@@ -515,6 +520,17 @@ void mgs_hook_child_init(apr_pool_t * p, server_rec *s) {
                     "GnuTLS: Failed to run Cache Init");
         }
     }
+
+    /* reinit cache mutex */
+    if (sc->cache_mutex != NULL)
+    {
+        const char *lockfile = apr_global_mutex_lockfile(sc->cache_mutex);
+        rv = apr_global_mutex_child_init(&sc->cache_mutex, lockfile, p);
+        if (rv != APR_SUCCESS)
+            ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
+                         "Failed to reinit mutex '%s'", MGS_CACHE_MUTEX_NAME);
+    }
+
     /* Block SIGPIPE Signals */
     rv = apr_signal_block(SIGPIPE);
     if(rv != APR_SUCCESS) {

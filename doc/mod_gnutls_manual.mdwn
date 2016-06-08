@@ -75,7 +75,9 @@ Default: `GnuTLSCache none`\
 Context: server config
 
 This directive configures the SSL Session Cache for `mod_gnutls`.
-This could be shared between machines of different architectures.
+This could be shared between machines of different architectures. If a
+DBM cache is used, access is serialized using the `gnutls-cache`
+mutex.
 
 `dbm` (Requires Berkeley DBM)
 :   Uses the default Berkeley DB backend of APR DBM to cache SSL
