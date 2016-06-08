@@ -391,13 +391,10 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
         apr_pool_destroy(tmp);
         return APR_EGENERAL;
     }
-    /* if expiry is zero, the response does not contain a nextUpdate
-     * field */
-    /* TODO: If a refresh time is configured, use it as timeout. With
-     * the current code the response will expire at next cache
-     * expiration check. */
+    /* If expiry is zero, the response does not contain a nextUpdate
+     * field. Use the default cache timeout. */
     if (expiry == 0)
-        expiry = apr_time_now();
+        expiry = apr_time_now() + sc->cache_timeout;
 
     /* TODO: configurable refresh independent of expiration */
     int r = dbm_cache_store(s, fingerprint, resp, expiry);
