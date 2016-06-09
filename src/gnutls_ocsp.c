@@ -395,8 +395,10 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
      * field. Use the default cache timeout. */
     if (expiry == 0)
         expiry = apr_time_now() + sc->cache_timeout;
+    /* Apply grace time otherwise. */
+    else
+        expiry -= sc->ocsp_grace_time;
 
-    /* TODO: configurable refresh independent of expiration */
     int r = dbm_cache_store(s, fingerprint, resp, expiry);
     /* destroy pool, and original copy of the OCSP response with it */
     apr_pool_destroy(tmp);

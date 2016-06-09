@@ -225,7 +225,7 @@ static const command_rec mgs_config_cmds[] = {
     RSRC_CONF,
     "TLS Server SRP Parameters file"),
 #endif
-    AP_INIT_TAKE1("GnuTLSCacheTimeout", mgs_set_cache_timeout,
+    AP_INIT_TAKE1("GnuTLSCacheTimeout", mgs_set_timeout,
     NULL,
     RSRC_CONF,
     "Cache Timeout"),
@@ -275,6 +275,11 @@ static const command_rec mgs_config_cmds[] = {
     NULL,
     RSRC_CONF,
     "EXPERIMENTAL: OCSP response for stapling (must be updated externally)"),
+    AP_INIT_TAKE1("GnuTLSOCSPGraceTime", mgs_set_timeout,
+    NULL,
+    RSRC_CONF,
+    "EXPERIMENTAL: Replace cached OCSP responses this many seconds before "
+    "they expire"),
     { NULL },
 };
 
