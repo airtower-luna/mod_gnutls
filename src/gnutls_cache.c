@@ -409,6 +409,7 @@ gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
     apr_dbm_t *dbm;
     apr_datum_t dbmkey = {(char*) key.data, key.size};
     apr_datum_t dbmval;
+    apr_time_t expiry = 0;
     apr_status_t rv;
 
     /* check if it is time for cache expiration */
@@ -436,6 +437,8 @@ gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
         goto cleanup;
 
     data.size = dbmval.dsize - sizeof (apr_time_t);
+    /* get data expiration tag */
+    expiry = *((apr_time_t *) dbmval.dptr);
 
     data.data = gnutls_malloc(data.size);
     if (data.data == NULL)
@@ -452,6 +455,16 @@ gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
  close_db:
     apr_dbm_close(dbm);
     apr_global_mutex_unlock(ctxt->sc->cache_mutex);
+
+    /* cache entry might have expired since last cache cleanup */
+    if (expiry != 0 && expiry < apr_time_now())
+    {
+        gnutls_free(data.data);
+        data.data = NULL;
+        data.size = 0;
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                      "dropped expired cache data");
+    }
 
     return data;
 }

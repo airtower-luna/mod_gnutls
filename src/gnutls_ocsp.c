@@ -426,7 +426,7 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
     *ocsp_response = dbm_cache_fetch(ctxt, fingerprint);
     if (ocsp_response->size == 0)
     {
-        ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_EGENERAL, ctxt->c,
                       "Fetching OCSP response from cache failed.");
     }
     else
