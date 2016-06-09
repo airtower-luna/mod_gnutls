@@ -59,5 +59,8 @@ char *mgs_time2sz(time_t t, char *str, int strsize);
 int dbm_cache_store(server_rec *s, gnutls_datum_t key,
                     gnutls_datum_t data, apr_time_t expiry);
 gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key);
+int mc_cache_store_generic(server_rec *s, gnutls_datum_t key,
+                           gnutls_datum_t data, apr_time_t expiry);
+gnutls_datum_t mc_cache_fetch_generic(mgs_handle_t *ctxt, gnutls_datum_t key);
 
 #endif /** __MOD_GNUTLS_CACHE_H__ */

@@ -18,6 +18,30 @@
  *
  */
 
+/***
+ * The signatures of the (dbm|mc)_cache_...() functions may be a bit
+ * confusing: "store" and "expire" take a server_rec, "fetch" an
+ * mgs_handle_t, and "delete" the void* required for a
+ * gnutls_db_remove_func. The first two have matching ..._session
+ * functions to fit their respective GnuTLS session cache signatures.
+ *
+ * This is because "store", "expire" (dbm only), and "fetch" are also
+ * needed for the OCSP cache. Their ..._session variants have been
+ * created to take care of the session cache specific parts, mainly
+ * calculating the DB key from the session ID. They have to match the
+ * appropriate GnuTLS DB function signatures.
+ *
+ * Additionally, there are the mc_cache_(store|fetch)_generic()
+ * functions. They exist because memcached requires string keys while
+ * DBM accepts binary keys, and provide wrappers to turn binary keys
+ * into hex strings with a "mod_gnutls:" prefix.
+ *
+ * To update cached OCSP responses independent of client connections,
+ * "store" and "expire" have to work without a connection context. On
+ * the other hand "fetch" does not need to do that, because cached
+ * OCSP responses will be retrieved for use in client connections.
+ ***/
+
 #include "gnutls_cache.h"
 #include "mod_gnutls.h"
 
@@ -198,58 +222,76 @@ static int mc_cache_child_init(apr_pool_t * p, server_rec * s,
     return rv;
 }
 
-static int mc_cache_store(void *baton, gnutls_datum_t key,
-        gnutls_datum_t data) {
-    apr_status_t rv = APR_SUCCESS;
-    mgs_handle_t *ctxt = baton;
-    char *strkey = NULL;
-    apr_uint32_t timeout;
+static int mc_cache_store(server_rec *s, const char *key,
+                          gnutls_datum_t data, apr_uint32_t timeout)
+{
+    apr_status_t rv = apr_memcache_set(mc, key, (char *) data.data,
+                                       data.size, timeout, 0);
 
-    strkey = mgs_session_id2mc(ctxt->c, key.data, key.size);
-    if (!strkey)
-        return -1;
-
-    timeout = apr_time_sec(ctxt->sc->cache_timeout);
-
-    rv = apr_memcache_set(mc, strkey, (char *) data.data, data.size, timeout,
-            0);
-
-    if (rv != APR_SUCCESS) {
-        ap_log_error(APLOG_MARK, APLOG_CRIT, rv,
-                ctxt->c->base_server,
-                "[gnutls_cache] error setting key '%s' "
-                "with %d bytes of data", strkey, data.size);
+    if (rv != APR_SUCCESS)
+    {
+        ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
+                     "[gnutls_cache] error setting key '%s' "
+                     "with %d bytes of data", key, data.size);
         return -1;
     }
 
     return 0;
 }
 
-static gnutls_datum_t mc_cache_fetch(void *baton, gnutls_datum_t key) {
-    apr_status_t rv = APR_SUCCESS;
+int mc_cache_store_generic(server_rec *s, gnutls_datum_t key,
+                           gnutls_datum_t data, apr_time_t expiry)
+{
+    apr_uint32_t timeout = apr_time_sec(expiry - apr_time_now());
+
+    apr_pool_t *p;
+    apr_pool_create(&p, NULL);
+
+    const char *hex = apr_pescape_hex(p, key.data, key.size, 1);
+    if (hex == NULL)
+    {
+        apr_pool_destroy(p);
+        return -1;
+    }
+
+    const char *strkey = apr_psprintf(p, MC_TAG "%s", hex);
+
+    int ret = mc_cache_store(s, strkey, data, timeout);
+
+    apr_pool_destroy(p);
+    return ret;
+}
+
+static int mc_cache_store_session(void *baton, gnutls_datum_t key,
+                                  gnutls_datum_t data)
+{
     mgs_handle_t *ctxt = baton;
-    char *strkey = NULL;
+
+    const char *strkey = mgs_session_id2mc(ctxt->c, key.data, key.size);
+    if (!strkey)
+        return -1;
+
+    apr_uint32_t timeout = apr_time_sec(ctxt->sc->cache_timeout);
+
+    return mc_cache_store(ctxt->c->base_server, strkey, data, timeout);
+}
+
+static gnutls_datum_t mc_cache_fetch(conn_rec *c, const char *key)
+{
+    apr_status_t rv = APR_SUCCESS;
     char *value;
     apr_size_t value_len;
     gnutls_datum_t data = {NULL, 0};
 
-    strkey = mgs_session_id2mc(ctxt->c, key.data, key.size);
-    if (!strkey) {
-        return data;
-    }
+    rv = apr_memcache_getp(mc, c->pool, key, &value, &value_len, NULL);
 
-    rv = apr_memcache_getp(mc, ctxt->c->pool, strkey,
-            &value, &value_len, NULL);
-
-    if (rv != APR_SUCCESS) {
+    if (rv != APR_SUCCESS)
+    {
 #if MOD_GNUTLS_DEBUG
-        ap_log_error(APLOG_MARK, APLOG_DEBUG, rv,
-                ctxt->c->base_server,
-                "[gnutls_cache] error fetching key '%s' ",
-                strkey);
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, rv, c,
+                      "[gnutls_cache] error fetching key '%s' ",
+                      key);
 #endif
-        data.size = 0;
-        data.data = NULL;
         return data;
     }
 
@@ -262,6 +304,29 @@ static gnutls_datum_t mc_cache_fetch(void *baton, gnutls_datum_t key) {
     memcpy(data.data, value, value_len);
 
     return data;
+}
+
+gnutls_datum_t mc_cache_fetch_generic(mgs_handle_t *ctxt, gnutls_datum_t key)
+{
+    gnutls_datum_t data = {NULL, 0};
+    const char *hex = apr_pescape_hex(ctxt->c->pool, key.data, key.size, 1);
+    if (hex == NULL)
+        return data;
+
+    const char *strkey = apr_psprintf(ctxt->c->pool, MC_TAG "%s", hex);
+    return mc_cache_fetch(ctxt->c, strkey);
+}
+
+static gnutls_datum_t mc_cache_fetch_session(void *baton, gnutls_datum_t key)
+{
+    mgs_handle_t *ctxt = baton;
+    gnutls_datum_t data = {NULL, 0};
+
+    const char *strkey = mgs_session_id2mc(ctxt->c, key.data, key.size);
+    if (!strkey)
+        return data;
+
+    return mc_cache_fetch(ctxt->c, strkey);
 }
 
 static int mc_cache_delete(void *baton, gnutls_datum_t key) {
@@ -296,25 +361,6 @@ static const char *db_type(mgs_srvconf_rec * sc) {
 }
 
 #define SSL_DBM_FILE_MODE ( APR_UREAD | APR_UWRITE | APR_GREAD | APR_WREAD )
-
-/***
- * The signatures of the dbm_cache_...() functions may be a bit
- * confusing: "store" and "expire" take a server_rec, "fetch" an
- * mgs_handle_t, and "delete" the void* required for a
- * gnutls_db_remove_func. The first two have matching ..._session
- * functions to fit their respective GnuTLS session cache signatures.
- *
- * This is because "store", "expire", and "fetch" are also needed for
- * the OCSP cache. Their ..._session variants have been created to
- * take care of the session cache specific parts, mainly calculating
- * the DB key from the session ID. They have to match the appropriate
- * GnuTLS DB function signatures.
- *
- * To update cached OCSP responses independent of client connections,
- * "store" and "expire" have to work without a connection context. On
- * the other hand "fetch" does not need to do that, because cached
- * OCSP responses will be retrieved for use in client connections.
- ***/
 
 static void dbm_cache_expire(server_rec *s)
 {
@@ -695,11 +741,11 @@ int mgs_cache_session_init(mgs_handle_t * ctxt) {
 #if HAVE_APR_MEMCACHE
     else if (ctxt->sc->cache_type == mgs_cache_memcache) {
         gnutls_db_set_retrieve_function(ctxt->session,
-                mc_cache_fetch);
+                mc_cache_fetch_session);
         gnutls_db_set_remove_function(ctxt->session,
                 mc_cache_delete);
         gnutls_db_set_store_function(ctxt->session,
-                mc_cache_store);
+                mc_cache_store_session);
         gnutls_db_set_ptr(ctxt->session, ctxt);
     }
 #endif
