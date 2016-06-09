@@ -26,6 +26,7 @@
 #include "ap_mpm.h"
 #include "mod_status.h"
 #include <util_mutex.h>
+#include <apr_escape.h>
 
 #ifdef ENABLE_MSVA
 #include <msv/msv.h>
@@ -892,7 +893,6 @@ int mgs_hook_pre_connection(conn_rec * c, void *csd __attribute__((unused)))
 
 int mgs_hook_fixups(request_rec * r) {
     unsigned char sbuf[GNUTLS_MAX_SESSION_ID];
-    char buf[AP_IOBUFSIZE];
     const char *tmp;
     size_t len;
     mgs_handle_t *ctxt;
@@ -962,8 +962,8 @@ int mgs_hook_fixups(request_rec * r) {
 
     len = sizeof (sbuf);
     gnutls_session_get_id(ctxt->session, sbuf, &len);
-    tmp = mgs_session_id2sz(sbuf, len, buf, sizeof (buf));
-    apr_table_setn(env, "SSL_SESSION_ID", apr_pstrdup(r->pool, tmp));
+    apr_table_setn(env, "SSL_SESSION_ID",
+                   apr_pescape_hex(r->pool, sbuf, len, 0));
 
     if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_X509) {
 	mgs_add_common_cert_vars(r, ctxt->sc->certs_x509_crt_chain[0], 0, ctxt->sc->export_certificates_size);
@@ -1098,8 +1098,8 @@ static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, in
 
     len = sizeof (sbuf);
     gnutls_x509_crt_get_serial(cert, sbuf, &len);
-    tmp = mgs_session_id2sz(sbuf, len, buf, sizeof (buf));
-    apr_table_setn(env, MGS_SIDE("_M_SERIAL"), apr_pstrdup(r->pool, tmp));
+    apr_table_setn(env, MGS_SIDE("_M_SERIAL"),
+                   apr_pescape_hex(r->pool, sbuf, len, 0));
 
     ret = gnutls_x509_crt_get_version(cert);
     if (ret > 0)
@@ -1215,8 +1215,8 @@ static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t ce
 
     len = sizeof (sbuf);
     gnutls_openpgp_crt_get_fingerprint(cert, sbuf, &len);
-    tmp = mgs_session_id2sz(sbuf, len, buf, sizeof (buf));
-    apr_table_setn(env, MGS_SIDE("_FINGERPRINT"), apr_pstrdup(r->pool, tmp));
+    apr_table_setn(env, MGS_SIDE("_FINGERPRINT"),
+                   apr_pescape_hex(r->pool, sbuf, len, 0));
 
     ret = gnutls_openpgp_crt_get_version(cert);
     if (ret > 0)

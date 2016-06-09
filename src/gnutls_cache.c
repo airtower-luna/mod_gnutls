@@ -26,6 +26,7 @@
 #endif
 
 #include "apr_dbm.h"
+#include <apr_escape.h>
 
 #include "ap_mpm.h"
 #include <util_mutex.h>
@@ -43,8 +44,8 @@
 /* it seems the default has some strange errors. Use SDBM
  */
 #define MC_TAG "mod_gnutls:"
-#define MC_TAG_LEN sizeof(MC_TAG)
-#define STR_SESSION_LEN (GNUTLS_SESSION_ID_STRING_LEN + MC_TAG_LEN)
+/* two characters per byte, plus one more for '\0' */
+#define GNUTLS_SESSION_ID_STRING_LEN ((GNUTLS_MAX_SESSION_ID_SIZE * 2) + 1)
 
 #if MODULE_MAGIC_NUMBER_MAJOR < 20081201
 #define ap_unixd_config unixd_config
@@ -54,20 +55,6 @@
 APLOG_USE_MODULE(gnutls);
 #endif
 
-char *mgs_session_id2sz(unsigned char *id, int idlen,
-        char *str, int strsize) {
-    char *cp;
-    int n;
-
-    cp = str;
-    for (n = 0; n < idlen && n < GNUTLS_MAX_SESSION_ID; n++) {
-        apr_snprintf(cp, strsize - (cp - str), "%02X", id[n]);
-        cp += 2;
-    }
-    *cp = '\0';
-    return str;
-}
-
 /* Name the Session ID as:
  * server:port.SessionID
  * to disallow resuming sessions on different servers
@@ -75,11 +62,9 @@ char *mgs_session_id2sz(unsigned char *id, int idlen,
 static int mgs_session_id2dbm(conn_rec *c, unsigned char *id, int idlen,
                               gnutls_datum_t *dbmkey)
 {
-    char buf[STR_SESSION_LEN];
-    char *sz;
-
-    sz = mgs_session_id2sz(id, idlen, buf, sizeof (buf));
-    if (sz == NULL)
+    char sz[GNUTLS_SESSION_ID_STRING_LEN];
+    apr_status_t rv = apr_escape_hex(sz, id, idlen, 0, NULL);
+    if (rv != APR_SUCCESS)
         return -1;
 
     char *newkey = apr_psprintf(c->pool, "%s:%d.%s",
@@ -112,12 +97,11 @@ char *mgs_time2sz(time_t in_time, char *str, int strsize) {
  * server:port.SessionID
  * to disallow resuming sessions on different servers
  */
-static char *mgs_session_id2mc(conn_rec * c, unsigned char *id, int idlen) {
-    char buf[STR_SESSION_LEN];
-    char *sz;
-
-    sz = mgs_session_id2sz(id, idlen, buf, sizeof (buf));
-    if (sz == NULL)
+static char *mgs_session_id2mc(conn_rec * c, unsigned char *id, int idlen)
+{
+    char sz[GNUTLS_SESSION_ID_STRING_LEN];
+    apr_status_t rv = apr_escape_hex(sz, id, idlen, 0, NULL);
+    if (rv != APR_SUCCESS)
         return NULL;
 
     return apr_psprintf(c->pool, MC_TAG "%s:%d.%s",
