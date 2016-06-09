@@ -324,9 +324,9 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
 
-    if (sc->cache_type != mgs_cache_dbm && sc->cache_type != mgs_cache_gdbm)
+    if (sc->cache == NULL)
     {
-        /* experimental OCSP cache requires DBM cache */
+        /* OCSP caching requires a cache. */
         return APR_ENOTIMPL;
     }
 
@@ -399,7 +399,7 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
     else
         expiry -= sc->ocsp_grace_time;
 
-    int r = dbm_cache_store(s, fingerprint, resp, expiry);
+    int r = sc->cache->store(s, fingerprint, resp, expiry);
     /* destroy pool, and original copy of the OCSP response with it */
     apr_pool_destroy(tmp);
     if (r != 0)
@@ -418,6 +418,11 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
                           gnutls_datum_t *ocsp_response)
 {
     mgs_handle_t *ctxt = (mgs_handle_t *) ptr;
+    if (ctxt->sc->cache == NULL)
+    {
+        /* OCSP caching requires a cache. */
+        return GNUTLS_E_NO_CERTIFICATE_STATUS;
+    }
 
     gnutls_datum_t fingerprint =
         mgs_get_cert_fingerprint(ctxt->c->pool,
@@ -425,7 +430,7 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
     if (fingerprint.data == NULL)
         return GNUTLS_E_NO_CERTIFICATE_STATUS;
 
-    *ocsp_response = dbm_cache_fetch(ctxt, fingerprint);
+    *ocsp_response = ctxt->sc->cache->fetch(ctxt, fingerprint);
     if (ocsp_response->size == 0)
     {
         ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_EGENERAL, ctxt->c,
@@ -453,7 +458,7 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
     }
 
     /* retry reading from cache */
-    *ocsp_response = dbm_cache_fetch(ctxt, fingerprint);
+    *ocsp_response = ctxt->sc->cache->fetch(ctxt, fingerprint);
     if (ocsp_response->size == 0)
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,

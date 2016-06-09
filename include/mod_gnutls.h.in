@@ -71,6 +71,9 @@ typedef enum {
     mgs_cache_unset
 } mgs_cache_e;
 
+/* Internal cache data, defined in gnutls_cache.h */
+typedef struct mgs_cache* mgs_cache_t;
+
 typedef enum {
     mgs_cvm_unset,
     mgs_cvm_cartel,
@@ -135,6 +138,8 @@ typedef struct {
     /* Mutex for cache access (used only if the cache type is not
      * thread-safe) */
     apr_global_mutex_t *cache_mutex;
+    /* Internal cache data */
+    mgs_cache_t cache;
 
 	/* GnuTLS uses Session Tickets */
     int tickets;

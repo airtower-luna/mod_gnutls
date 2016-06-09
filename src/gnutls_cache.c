@@ -239,8 +239,8 @@ static int mc_cache_store(server_rec *s, const char *key,
     return 0;
 }
 
-int mc_cache_store_generic(server_rec *s, gnutls_datum_t key,
-                           gnutls_datum_t data, apr_time_t expiry)
+static int mc_cache_store_generic(server_rec *s, gnutls_datum_t key,
+                                  gnutls_datum_t data, apr_time_t expiry)
 {
     apr_uint32_t timeout = apr_time_sec(expiry - apr_time_now());
 
@@ -306,7 +306,8 @@ static gnutls_datum_t mc_cache_fetch(conn_rec *c, const char *key)
     return data;
 }
 
-gnutls_datum_t mc_cache_fetch_generic(mgs_handle_t *ctxt, gnutls_datum_t key)
+static gnutls_datum_t mc_cache_fetch_generic(mgs_handle_t *ctxt,
+                                             gnutls_datum_t key)
 {
     gnutls_datum_t data = {NULL, 0};
     const char *hex = apr_pescape_hex(ctxt->c->pool, key.data, key.size, 1);
@@ -433,7 +434,7 @@ static void dbm_cache_expire(server_rec *s)
     return;
 }
 
-gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
+static gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
 {
     gnutls_datum_t data = {NULL, 0};
     apr_dbm_t *dbm;
@@ -511,8 +512,8 @@ static gnutls_datum_t dbm_cache_fetch_session(void *baton, gnutls_datum_t key)
     return dbm_cache_fetch(ctxt, dbmkey);
 }
 
-int dbm_cache_store(server_rec *s, gnutls_datum_t key,
-                    gnutls_datum_t data, apr_time_t expiry)
+static int dbm_cache_store(server_rec *s, gnutls_datum_t key,
+                           gnutls_datum_t data, apr_time_t expiry)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
@@ -695,10 +696,20 @@ int mgs_cache_post_config(apr_pool_t * p, server_rec * s,
             return rv;
     }
 
-    if (sc->cache_type == mgs_cache_dbm
-            || sc->cache_type == mgs_cache_gdbm) {
+    sc->cache = apr_palloc(p, sizeof(struct mgs_cache));
+    if (sc->cache_type == mgs_cache_dbm || sc->cache_type == mgs_cache_gdbm)
+    {
+        sc->cache->store = dbm_cache_store;
+        sc->cache->fetch = dbm_cache_fetch;
         return dbm_cache_post_config(p, s, sc);
     }
+#if HAVE_APR_MEMCACHE
+    else if (sc->cache_type == mgs_cache_memcache)
+    {
+        sc->cache->store = mc_cache_store_generic;
+        sc->cache->fetch = mc_cache_fetch_generic;
+    }
+#endif
 
     return APR_SUCCESS;
 }

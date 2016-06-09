@@ -51,16 +51,15 @@ int mgs_cache_session_init(mgs_handle_t *ctxt);
 char *mgs_time2sz(time_t t, char *str, int strsize);
 
 /*
- * EXPERIMENTAL: Make DBM cache available for OCSP caching. To be
- * replaced with properly configurable caching that can also use
- * memcached later.
+ * Generic object cache functions, used for OCSP caching
  */
-#include <apr_dbm.h>
-int dbm_cache_store(server_rec *s, gnutls_datum_t key,
-                    gnutls_datum_t data, apr_time_t expiry);
-gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key);
-int mc_cache_store_generic(server_rec *s, gnutls_datum_t key,
-                           gnutls_datum_t data, apr_time_t expiry);
-gnutls_datum_t mc_cache_fetch_generic(mgs_handle_t *ctxt, gnutls_datum_t key);
+typedef int (*cache_store_func)(server_rec *s, gnutls_datum_t key,
+                                gnutls_datum_t data, apr_time_t expiry);
+typedef gnutls_datum_t (*cache_fetch_func)(mgs_handle_t *ctxt,
+                                           gnutls_datum_t key);
+struct mgs_cache {
+    cache_store_func store;
+    cache_fetch_func fetch;
+};
 
 #endif /** __MOD_GNUTLS_CACHE_H__ */

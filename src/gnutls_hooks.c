@@ -375,6 +375,7 @@ int mgs_hook_post_config(apr_pool_t *pconf,
         sc->cache_config = sc_base->cache_config;
         sc->cache_timeout = sc_base->cache_timeout;
         sc->cache_mutex = sc_base->cache_mutex;
+        sc->cache = sc_base->cache;
 
         rv = mgs_load_files(pconf, s);
         if (rv != 0) {
