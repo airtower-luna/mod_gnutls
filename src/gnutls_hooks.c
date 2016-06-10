@@ -126,6 +126,7 @@ int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog, apr_pool_t * ptem
     AP_OPTIONAL_HOOK(status_hook, mgs_status_hook, NULL, NULL, APR_HOOK_MIDDLE);
 
     ap_mutex_register(pconf, MGS_CACHE_MUTEX_NAME, NULL, APR_LOCK_DEFAULT, 0);
+    ap_mutex_register(pconf, MGS_OCSP_MUTEX_NAME, NULL, APR_LOCK_DEFAULT, 0);
 
     /* Register a pool clean-up function */
     apr_pool_cleanup_register(pconf, NULL, mgs_cleanup_pre_config, apr_pool_cleanup_null);
@@ -341,6 +342,20 @@ int mgs_hook_post_config(apr_pool_t *pconf,
         return HTTP_INSUFFICIENT_STORAGE;
     }
 
+    if (sc_base->ocsp_mutex == NULL)
+    {
+        rv = ap_global_mutex_create(&sc_base->ocsp_mutex, NULL,
+                                    MGS_OCSP_MUTEX_NAME, NULL,
+                                    base_server, pconf, 0);
+        if (rv != APR_SUCCESS)
+        {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, base_server,
+                         "Failed to create mutex '" MGS_OCSP_MUTEX_NAME
+                         "'.");
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
+    }
+
     /* If GnuTLSP11Module is set, load the listed PKCS #11
      * modules. Otherwise system defaults will be used. */
     if (sc_base->p11_modules != NULL)
@@ -369,7 +384,8 @@ int mgs_hook_post_config(apr_pool_t *pconf,
         }
     }
 
-    for (s = base_server; s; s = s->next) {
+    for (s = base_server; s; s = s->next)
+    {
         sc = (mgs_srvconf_rec *) ap_get_module_config(s->module_config, &gnutls_module);
         sc->cache_type = sc_base->cache_type;
         sc->cache_config = sc_base->cache_config;
@@ -384,7 +400,8 @@ int mgs_hook_post_config(apr_pool_t *pconf,
             return HTTP_NOT_FOUND;
         }
 
-        /* init OCSP trust list if OCSP is enabled */
+        sc->ocsp_mutex = sc_base->ocsp_mutex;
+        /* init OCSP trust list if OCSP is enabled for this host */
         if (sc->ocsp_response_file != NULL)
         {
             rv = mgs_ocsp_post_config_server(pconf, ptemp, s);
@@ -521,6 +538,13 @@ void mgs_hook_child_init(apr_pool_t *p, server_rec *s)
                     "GnuTLS: Failed to run Cache Init");
         }
     }
+
+    /* reinit OCSP mutex */
+    const char *lockfile = apr_global_mutex_lockfile(sc->ocsp_mutex);
+    rv = apr_global_mutex_child_init(&sc->ocsp_mutex, lockfile, p);
+    if (rv != APR_SUCCESS)
+        ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
+                     "Failed to reinit mutex '" MGS_OCSP_MUTEX_NAME "'.");
 
     /* Block SIGPIPE Signals */
     rv = apr_signal_block(SIGPIPE);

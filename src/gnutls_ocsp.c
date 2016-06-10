@@ -449,13 +449,41 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
     /* If the cache had no response or an invalid one, try to update. */
     ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
                   "No valid OCSP response in cache, trying to update.");
-    apr_status_t rv = mgs_cache_ocsp_response(ctxt->c->base_server);
+
+    apr_status_t rv = apr_global_mutex_trylock(ctxt->sc->ocsp_mutex);
+    if (APR_STATUS_IS_EBUSY(rv))
+    {
+        /* Another thread is currently holding the mutex, wait. */
+        apr_global_mutex_lock(ctxt->sc->ocsp_mutex);
+        /* Check if this other thread updated the response we need. It
+         * would be better to have a vhost specific mutex, but at the
+         * moment there's no good way to integrate that with the
+         * Apache Mutex directive. */
+        *ocsp_response = ctxt->sc->cache->fetch(ctxt, fingerprint);
+        if (ocsp_response->size > 0
+            && check_ocsp_response_expiry(ctxt, ocsp_response)
+            == GNUTLS_E_SUCCESS)
+        {
+            /* Got a valid response now, unlock mutex and return. */
+            apr_global_mutex_unlock(ctxt->sc->ocsp_mutex);
+            return GNUTLS_E_SUCCESS;
+        }
+        else
+        {
+            gnutls_free(ocsp_response->data);
+            ocsp_response->data = NULL;
+        }
+    }
+
+    rv = mgs_cache_ocsp_response(ctxt->c->base_server);
     if (rv != APR_SUCCESS)
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, ctxt->c,
                       "Updating OCSP response cache failed");
+        apr_global_mutex_unlock(ctxt->sc->ocsp_mutex);
         goto fail_cleanup;
     }
+    apr_global_mutex_unlock(ctxt->sc->ocsp_mutex);
 
     /* retry reading from cache */
     *ocsp_response = ctxt->sc->cache->fetch(ctxt, fingerprint);

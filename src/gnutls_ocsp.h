@@ -22,6 +22,8 @@
 #include "httpd.h"
 #include "http_config.h"
 
+#define MGS_OCSP_MUTEX_NAME "gnutls-ocsp"
+
 const char *mgs_store_ocsp_response_path(cmd_parms * parms,
                                          void *dummy __attribute__((unused)),
                                          const char *arg);
