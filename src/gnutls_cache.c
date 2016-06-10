@@ -388,7 +388,7 @@ static void dbm_cache_expire(server_rec *s)
     total = 0;
     deleted = 0;
 
-    apr_global_mutex_lock(sc->cache_mutex);
+    apr_global_mutex_lock(sc->cache->mutex);
 
     rv = apr_dbm_open_ex(&dbm, db_type(sc),
             sc->cache_config, APR_DBM_RWCREATE,
@@ -397,7 +397,7 @@ static void dbm_cache_expire(server_rec *s)
         ap_log_error(APLOG_MARK, APLOG_NOTICE, rv, s,
                 "[gnutls_cache] error opening cache '%s'",
                 sc->cache_config);
-        apr_global_mutex_unlock(sc->cache_mutex);
+        apr_global_mutex_unlock(sc->cache->mutex);
         apr_pool_destroy(spool);
         return;
     }
@@ -423,7 +423,7 @@ static void dbm_cache_expire(server_rec *s)
     }
     apr_dbm_close(dbm);
 
-    rv = apr_global_mutex_unlock(sc->cache_mutex);
+    rv = apr_global_mutex_unlock(sc->cache->mutex);
 
     ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, s,
             "[gnutls_cache] Cleaned up cache '%s'. Deleted %d and left %d",
@@ -446,7 +446,7 @@ static gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
     /* check if it is time for cache expiration */
     dbm_cache_expire(ctxt->c->base_server);
 
-    apr_global_mutex_lock(ctxt->sc->cache_mutex);
+    apr_global_mutex_lock(ctxt->sc->cache->mutex);
 
     rv = apr_dbm_open_ex(&dbm, db_type(ctxt->sc),
             ctxt->sc->cache_config, APR_DBM_READONLY,
@@ -455,7 +455,7 @@ static gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
         ap_log_cerror(APLOG_MARK, APLOG_NOTICE, rv, ctxt->c,
                       "error opening cache '%s'",
                       ctxt->sc->cache_config);
-        apr_global_mutex_unlock(ctxt->sc->cache_mutex);
+        apr_global_mutex_unlock(ctxt->sc->cache->mutex);
         return data;
     }
 
@@ -485,7 +485,7 @@ static gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
     apr_dbm_freedatum(dbm, dbmval);
  close_db:
     apr_dbm_close(dbm);
-    apr_global_mutex_unlock(ctxt->sc->cache_mutex);
+    apr_global_mutex_unlock(ctxt->sc->cache->mutex);
 
     /* cache entry might have expired since last cache cleanup */
     if (expiry != 0 && expiry < apr_time_now())
@@ -538,7 +538,7 @@ static int dbm_cache_store(server_rec *s, gnutls_datum_t key,
     memcpy((char *) dbmval.dptr + sizeof (apr_time_t),
             data.data, data.size);
 
-    apr_global_mutex_lock(sc->cache_mutex);
+    apr_global_mutex_lock(sc->cache->mutex);
 
     rv = apr_dbm_open_ex(&dbm, db_type(sc),
                          sc->cache_config, APR_DBM_RWCREATE,
@@ -548,7 +548,7 @@ static int dbm_cache_store(server_rec *s, gnutls_datum_t key,
         ap_log_error(APLOG_MARK, APLOG_NOTICE, rv, s,
                      "error opening cache '%s'",
                      sc->cache_config);
-        apr_global_mutex_unlock(sc->cache_mutex);
+        apr_global_mutex_unlock(sc->cache->mutex);
         apr_pool_destroy(spool);
         return -1;
     }
@@ -560,13 +560,13 @@ static int dbm_cache_store(server_rec *s, gnutls_datum_t key,
                      "error storing in cache '%s'",
                      sc->cache_config);
         apr_dbm_close(dbm);
-        apr_global_mutex_unlock(sc->cache_mutex);
+        apr_global_mutex_unlock(sc->cache->mutex);
         apr_pool_destroy(spool);
         return -1;
     }
 
     apr_dbm_close(dbm);
-    apr_global_mutex_unlock(sc->cache_mutex);
+    apr_global_mutex_unlock(sc->cache->mutex);
 
     ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, s,
                  "stored %ld bytes of data (%ld byte key) in cache '%s'",
@@ -602,7 +602,7 @@ static int dbm_cache_delete(void *baton, gnutls_datum_t key)
         return -1;
     apr_datum_t dbmkey = {(char*) tmpkey.data, tmpkey.size};
 
-    apr_global_mutex_lock(ctxt->sc->cache_mutex);
+    apr_global_mutex_lock(ctxt->sc->cache->mutex);
 
     rv = apr_dbm_open_ex(&dbm, db_type(ctxt->sc),
             ctxt->sc->cache_config, APR_DBM_RWCREATE,
@@ -612,7 +612,7 @@ static int dbm_cache_delete(void *baton, gnutls_datum_t key)
                 ctxt->c->base_server,
                 "[gnutls_cache] error opening cache '%s'",
                 ctxt->sc->cache_config);
-        apr_global_mutex_unlock(ctxt->sc->cache_mutex);
+        apr_global_mutex_unlock(ctxt->sc->cache->mutex);
         return -1;
     }
 
@@ -624,12 +624,12 @@ static int dbm_cache_delete(void *baton, gnutls_datum_t key)
                 "[gnutls_cache] error deleting from cache '%s'",
                 ctxt->sc->cache_config);
         apr_dbm_close(dbm);
-        apr_global_mutex_unlock(ctxt->sc->cache_mutex);
+        apr_global_mutex_unlock(ctxt->sc->cache->mutex);
         return -1;
     }
 
     apr_dbm_close(dbm);
-    apr_global_mutex_unlock(ctxt->sc->cache_mutex);
+    apr_global_mutex_unlock(ctxt->sc->cache->mutex);
 
     return 0;
 }
@@ -687,16 +687,16 @@ int mgs_cache_post_config(apr_pool_t * p, server_rec * s,
         sc->cache_timeout = apr_time_from_sec(MGS_DEFAULT_CACHE_TIMEOUT);
 
     /* initialize mutex only once */
-    if (sc->cache_mutex == NULL)
+    if (sc->cache == NULL)
     {
-        apr_status_t rv = ap_global_mutex_create(&sc->cache_mutex, NULL,
+        sc->cache = apr_palloc(p, sizeof(struct mgs_cache));
+        apr_status_t rv = ap_global_mutex_create(&sc->cache->mutex, NULL,
                                                  MGS_CACHE_MUTEX_NAME,
                                                  NULL, s, p, 0);
         if (rv != APR_SUCCESS)
             return rv;
     }
 
-    sc->cache = apr_palloc(p, sizeof(struct mgs_cache));
     if (sc->cache_type == mgs_cache_dbm || sc->cache_type == mgs_cache_gdbm)
     {
         sc->cache->store = dbm_cache_store;
@@ -714,16 +714,18 @@ int mgs_cache_post_config(apr_pool_t * p, server_rec * s,
     return APR_SUCCESS;
 }
 
-#if HAVE_APR_MEMCACHE
 int mgs_cache_child_init(apr_pool_t * p,
                          server_rec * s,
                          mgs_srvconf_rec * sc)
-#else
-int mgs_cache_child_init(apr_pool_t * p __attribute__((unused)),
-                         server_rec * s __attribute__((unused)),
-                         mgs_srvconf_rec * sc)
-#endif
 {
+    /* reinit cache mutex */
+    const char *lockfile = apr_global_mutex_lockfile(sc->cache->mutex);
+    apr_status_t rv = apr_global_mutex_child_init(&sc->cache->mutex,
+                                                  lockfile, p);
+    if (rv != APR_SUCCESS)
+        ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
+                     "Failed to reinit mutex '%s'", MGS_CACHE_MUTEX_NAME);
+
     if (sc->cache_type == mgs_cache_dbm
             || sc->cache_type == mgs_cache_gdbm) {
         return 0;

@@ -374,7 +374,6 @@ int mgs_hook_post_config(apr_pool_t *pconf,
         sc->cache_type = sc_base->cache_type;
         sc->cache_config = sc_base->cache_config;
         sc->cache_timeout = sc_base->cache_timeout;
-        sc->cache_mutex = sc_base->cache_mutex;
         sc->cache = sc_base->cache;
 
         rv = mgs_load_files(pconf, s);
@@ -521,16 +520,6 @@ void mgs_hook_child_init(apr_pool_t *p, server_rec *s)
             ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
                     "GnuTLS: Failed to run Cache Init");
         }
-    }
-
-    /* reinit cache mutex */
-    if (sc->cache_mutex != NULL)
-    {
-        const char *lockfile = apr_global_mutex_lockfile(sc->cache_mutex);
-        rv = apr_global_mutex_child_init(&sc->cache_mutex, lockfile, p);
-        if (rv != APR_SUCCESS)
-            ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
-                         "Failed to reinit mutex '%s'", MGS_CACHE_MUTEX_NAME);
     }
 
     /* Block SIGPIPE Signals */

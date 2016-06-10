@@ -60,6 +60,9 @@ typedef gnutls_datum_t (*cache_fetch_func)(mgs_handle_t *ctxt,
 struct mgs_cache {
     cache_store_func store;
     cache_fetch_func fetch;
+    /* Mutex for cache access (used only if the cache type is not
+     * thread-safe) */
+    apr_global_mutex_t *mutex;
 };
 
 #endif /** __MOD_GNUTLS_CACHE_H__ */
