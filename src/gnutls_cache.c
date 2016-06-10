@@ -473,7 +473,10 @@ static gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
 
     data.data = gnutls_malloc(data.size);
     if (data.data == NULL)
+    {
+        data.size = 0;
         goto cleanup;
+    }
 
     ap_log_cerror(APLOG_MARK, APLOG_DEBUG, rv, ctxt->c,
                   "fetched %ld bytes from cache",
