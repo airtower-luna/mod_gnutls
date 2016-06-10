@@ -280,7 +280,13 @@ static const command_rec mgs_config_cmds[] = {
     RSRC_CONF,
     "EXPERIMENTAL: Replace cached OCSP responses this many seconds before "
     "they expire"),
+#ifdef __clang__
+    /* Workaround for this clang bug:
+     * https://llvm.org/bugs/show_bug.cgi?id=21689 */
+    {},
+#else
     { NULL },
+#endif
 };
 
 module AP_MODULE_DECLARE_DATA gnutls_module = {
