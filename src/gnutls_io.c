@@ -560,9 +560,17 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
             /* you're asking us to speculatively read a negative number of bytes! */
             return APR_ENOTIMPL;
         }
-        /* Err. This is bad. readbytes *can* be a 64bit int! len.. is NOT */
-        if ((apr_size_t) readbytes < len) {
-            len = (apr_size_t) readbytes;
+        /* 'readbytes' and 'len' are of different integer types, which
+         * might have different lengths. Read sizes should be too
+         * small for 32 or 64 bit to matter, but we have to make
+         * sure. */
+        if ((apr_size_t) readbytes < len
+            && __builtin_add_overflow(readbytes, 0, &len))
+        {
+            ap_log_cerror(APLOG_MARK, APLOG_CRIT, APR_EINVAL, ctxt->c,
+                          "%s: prevented buffer length overflow",
+                          __func__);
+            return APR_EINVAL;
         }
         status =
                 gnutls_io_input_read(ctxt, ctxt->input_buffer, &len);
