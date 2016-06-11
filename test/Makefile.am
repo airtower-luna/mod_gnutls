@@ -40,6 +40,7 @@ pgpcrc_SOURCES = pgpcrc.c
 if ENABLE_OCSP_TEST
 check_PROGRAMS += gen_ocsp_index
 gen_ocsp_index_SOURCES = gen_ocsp_index.c cert_helper.c
+gen_ocsp_index_LDFLAGS = $(LIBGNUTLS_LIBS)
 noinst_HEADERS = cert_helper.h
 endif
 
