@@ -35,6 +35,9 @@ struct mgs_ocsp_data {
      * usually only contain the CA that signed the server
      * certificate. */
     gnutls_x509_trust_list_t *trust;
+    /* Server certificate fingerprint, used as cache key for the OCSP
+     * response */
+    gnutls_datum_t fingerprint;
 };
 
 const char *mgs_store_ocsp_response_path(cmd_parms * parms,

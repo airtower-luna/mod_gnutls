@@ -274,12 +274,6 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
         return rv;
     }
 
-    /* the fingerprint will be used as cache key */
-    gnutls_datum_t fingerprint =
-        mgs_get_cert_fingerprint(tmp, sc->certs_x509_crt_chain[0]);
-    if (fingerprint.data == NULL)
-        return APR_EINVAL;
-
     ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
                  "Loading OCSP response from %s",
                  sc->ocsp_response_file);
@@ -333,7 +327,7 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
     else
         expiry -= sc->ocsp_grace_time;
 
-    int r = sc->cache->store(s, fingerprint, resp, expiry);
+    int r = sc->cache->store(s, sc->ocsp->fingerprint, resp, expiry);
     /* destroy pool, and original copy of the OCSP response with it */
     apr_pool_destroy(tmp);
     if (r != 0)
@@ -358,13 +352,8 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
         return GNUTLS_E_NO_CERTIFICATE_STATUS;
     }
 
-    gnutls_datum_t fingerprint =
-        mgs_get_cert_fingerprint(ctxt->c->pool,
-                                 ctxt->sc->certs_x509_crt_chain[0]);
-    if (fingerprint.data == NULL)
-        return GNUTLS_E_NO_CERTIFICATE_STATUS;
-
-    *ocsp_response = ctxt->sc->cache->fetch(ctxt, fingerprint);
+    *ocsp_response = ctxt->sc->cache->fetch(ctxt,
+                                            ctxt->sc->ocsp->fingerprint);
     if (ocsp_response->size == 0)
     {
         ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_EGENERAL, ctxt->c,
@@ -391,7 +380,8 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
          * would be better to have a vhost specific mutex, but at the
          * moment there's no good way to integrate that with the
          * Apache Mutex directive. */
-        *ocsp_response = ctxt->sc->cache->fetch(ctxt, fingerprint);
+        *ocsp_response = ctxt->sc->cache->fetch(ctxt,
+                                                ctxt->sc->ocsp->fingerprint);
         if (ocsp_response->size > 0)
         {
             /* Got a valid response now, unlock mutex and return. */
@@ -416,7 +406,8 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
     apr_global_mutex_unlock(ctxt->sc->ocsp_mutex);
 
     /* retry reading from cache */
-    *ocsp_response = ctxt->sc->cache->fetch(ctxt, fingerprint);
+    *ocsp_response = ctxt->sc->cache->fetch(ctxt,
+                                            ctxt->sc->ocsp->fingerprint);
     if (ocsp_response->size == 0)
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
@@ -532,6 +523,11 @@ int mgs_ocsp_post_config_server(apr_pool_t *pconf,
     }
 
     sc->ocsp = apr_palloc(pconf, sizeof(struct mgs_ocsp_data));
+
+    sc->ocsp->fingerprint =
+        mgs_get_cert_fingerprint(pconf, sc->certs_x509_crt_chain[0]);
+    if (sc->ocsp->fingerprint.data == NULL)
+        return HTTP_INTERNAL_SERVER_ERROR;
 
     sc->ocsp->uri = mgs_cert_get_ocsp_uri(pconf,
                                           sc->certs_x509_crt_chain[0]);
