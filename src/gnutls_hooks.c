@@ -401,7 +401,7 @@ int mgs_hook_post_config(apr_pool_t *pconf,
         }
 
         sc->ocsp_mutex = sc_base->ocsp_mutex;
-        /* init OCSP trust list if OCSP is enabled for this host */
+        /* init OCSP configuration if OCSP is enabled for this host */
         if (sc->ocsp_response_file != NULL)
         {
             rv = mgs_ocsp_post_config_server(pconf, ptemp, s);

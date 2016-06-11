@@ -87,6 +87,10 @@ typedef struct {
 } mgs_dirconf_rec;
 
 
+/* Internal per-vhost config for OCSP, defined in gnutls_ocsp.h */
+typedef struct mgs_ocsp_data* mgs_ocsp_data_t;
+
+
 /* The maximum number of certificates to send in a chain */
 #define MAX_CHAIN_SIZE 8
 /* The maximum number of SANs to read from a x509 certificate */
@@ -209,15 +213,10 @@ typedef struct {
     /* EXPERIMENTAL: OCSP response file for stapling, will go away
      * once sending OCSP requests is implemented */
     char *ocsp_response_file;
-    /* OCSP URI extracted from the server certificate. NULL if
-     * unset. */
-    apr_uri_t *ocsp_uri;
+    /* Server specific OCSP data */
+    mgs_ocsp_data_t ocsp;
     /* Mutex to prevent parallel OCSP requests */
     apr_global_mutex_t *ocsp_mutex;
-    /* Trust list to verify OCSP responses for stapling. Should
-     * usually only contain the CA that signed the server
-     * certificate. */
-    gnutls_x509_trust_list_t *ocsp_trust;
     /* Cached OCSP responses expire this long before their validity
      * period expires. This way mod_gnutls does not staple barely
      * valid responses. */

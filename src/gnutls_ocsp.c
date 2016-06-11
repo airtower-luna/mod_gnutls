@@ -90,7 +90,7 @@ int check_ocsp_response(server_rec *s, const gnutls_datum_t *ocsp_response,
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
 
-    if (sc->ocsp_trust == NULL)
+    if (sc->ocsp->trust == NULL)
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
                      "No OCSP trust list available for server \"%s\"!",
@@ -126,7 +126,7 @@ int check_ocsp_response(server_rec *s, const gnutls_datum_t *ocsp_response,
     }
 
     unsigned int verify;
-    ret = gnutls_ocsp_resp_verify(resp, *(sc->ocsp_trust), &verify, 0);
+    ret = gnutls_ocsp_resp_verify(resp, *(sc->ocsp->trust), &verify, 0);
     if (ret != GNUTLS_E_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
@@ -252,7 +252,7 @@ static gnutls_datum_t mgs_get_cert_fingerprint(apr_pool_t *p,
 
 
 
-/* TODO: fetch response from sc->ocsp_uri */
+/* TODO: fetch response from sc->ocsp->uri */
 apr_status_t mgs_cache_ocsp_response(server_rec *s)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
@@ -531,13 +531,16 @@ int mgs_ocsp_post_config_server(apr_pool_t *pconf,
         return HTTP_NOT_FOUND;
     }
 
-    sc->ocsp_uri = mgs_cert_get_ocsp_uri(pconf, sc->certs_x509_crt_chain[0]);
+    sc->ocsp = apr_palloc(pconf, sizeof(struct mgs_ocsp_data));
 
-    sc->ocsp_trust = apr_palloc(pconf,
-                                sizeof(gnutls_x509_trust_list_t));
+    sc->ocsp->uri = mgs_cert_get_ocsp_uri(pconf,
+                                          sc->certs_x509_crt_chain[0]);
+
+    sc->ocsp->trust = apr_palloc(pconf,
+                                 sizeof(gnutls_x509_trust_list_t));
      /* Only the direct issuer may sign the OCSP response or an OCSP
       * signer. */
-    int ret = mgs_create_ocsp_trust_list(sc->ocsp_trust,
+    int ret = mgs_create_ocsp_trust_list(sc->ocsp->trust,
                                          &(sc->certs_x509_crt_chain[1]),
                                          1);
     if (ret != GNUTLS_E_SUCCESS)
@@ -548,7 +551,7 @@ int mgs_ocsp_post_config_server(apr_pool_t *pconf,
         return HTTP_INTERNAL_SERVER_ERROR;
     }
     /* deinit trust list when the config pool is destroyed */
-    apr_pool_cleanup_register(pconf, sc->ocsp_trust,
+    apr_pool_cleanup_register(pconf, sc->ocsp->trust,
                               mgs_cleanup_trust_list,
                               apr_pool_cleanup_null);
 

@@ -24,6 +24,19 @@
 
 #define MGS_OCSP_MUTEX_NAME "gnutls-ocsp"
 
+/**
+ * Vhost specific OCSP data structure
+ */
+struct mgs_ocsp_data {
+    /* OCSP URI extracted from the server certificate. NULL if
+     * unset. */
+    apr_uri_t *uri;
+    /* Trust list to verify OCSP responses for stapling. Should
+     * usually only contain the CA that signed the server
+     * certificate. */
+    gnutls_x509_trust_list_t *trust;
+};
+
 const char *mgs_store_ocsp_response_path(cmd_parms * parms,
                                          void *dummy __attribute__((unused)),
                                          const char *arg);
