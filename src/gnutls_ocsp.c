@@ -18,6 +18,7 @@
 #include "mod_gnutls.h"
 #include "gnutls_cache.h"
 
+#include <apr_escape.h>
 #include <apr_lib.h>
 #include <apr_time.h>
 #include <gnutls/ocsp.h>
@@ -72,6 +73,100 @@ const char *mgs_store_ocsp_response_path(cmd_parms *parms,
     return NULL;
 }
 
+
+
+/**
+ * Create an OCSP request for the certificate of the given server. The
+ * DER encoded request is stored in 'req' (must be released with
+ * gnutls_free() when no longer needed), its nonce in 'nonce' (same,
+ * if not NULL).
+ *
+ * Returns GNUTLS_E_SUCCESS, or a GnuTLS error code.
+ */
+int mgs_create_ocsp_request(server_rec *s, gnutls_datum_t *req,
+                            gnutls_datum_t *nonce)
+{
+    if (req == NULL || s == NULL)
+        return GNUTLS_E_RECEIVED_ILLEGAL_PARAMETER;
+
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(s->module_config, &gnutls_module);
+
+    gnutls_ocsp_req_t r;
+    int ret = gnutls_ocsp_req_init(&r);
+    if (ret != GNUTLS_E_SUCCESS)
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
+                     "Could not initialize OCSP request structure: %s (%d)",
+                     gnutls_strerror(ret), ret);
+        return ret;
+    }
+
+    /* GnuTLS doc says that the digest is "normally"
+     * GNUTLS_DIG_SHA1. */
+    ret = gnutls_ocsp_req_add_cert(r, GNUTLS_DIG_SHA256,
+                                   sc->certs_x509_crt_chain[1],
+                                   sc->certs_x509_crt_chain[0]);
+
+    if (ret != GNUTLS_E_SUCCESS)
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
+                     "Adding certificate to OCSP request for %s:%d "
+                     "failed: %s (%d)",
+                     s->server_hostname, s->addrs->host_port,
+                     gnutls_strerror(ret), ret);
+        gnutls_ocsp_req_deinit(r);
+        return ret;
+    }
+
+    ret = gnutls_ocsp_req_randomize_nonce(r);
+    if (ret != GNUTLS_E_SUCCESS)
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
+                     "OCSP nonce creation failed: %s (%d)",
+                     gnutls_strerror(ret), ret);
+        gnutls_ocsp_req_deinit(r);
+        return ret;
+    }
+
+    if (nonce != NULL)
+    {
+        ret = gnutls_ocsp_req_get_nonce(r, NULL, nonce);
+        if (ret != GNUTLS_E_SUCCESS)
+        {
+            ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
+                         "Could not get nonce: %s (%d)",
+                         gnutls_strerror(ret), ret);
+            gnutls_free(nonce->data);
+            nonce->data = NULL;
+            nonce->size = 0;
+            gnutls_ocsp_req_deinit(r);
+            return ret;
+        }
+    }
+
+    ret = gnutls_ocsp_req_export(r, req);
+    if (ret != GNUTLS_E_SUCCESS)
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
+                     "OCSP request export failed: %s (%d)",
+                     gnutls_strerror(ret), ret);
+        gnutls_free(req->data);
+        req->data = NULL;
+        req->size = 0;
+        if (nonce != NULL)
+        {
+            gnutls_free(nonce->data);
+            nonce->data = NULL;
+            nonce->size = 0;
+        }
+        gnutls_ocsp_req_deinit(r);
+        return ret;
+    }
+
+    gnutls_ocsp_req_deinit(r);
+    return ret;
+}
 
 
 /**
@@ -252,7 +347,6 @@ static gnutls_datum_t mgs_get_cert_fingerprint(apr_pool_t *p,
 
 
 
-/* TODO: fetch response from sc->ocsp->uri */
 apr_status_t mgs_cache_ocsp_response(server_rec *s)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
@@ -272,6 +366,19 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
                      "could not create temporary pool for %s",
                      __func__);
         return rv;
+    }
+
+    /* TODO: actually send this request to sc->ocsp->uri and parse the
+     * received response (including nonce) */
+    gnutls_datum_t req;
+    int ret = mgs_create_ocsp_request(s, &req, NULL);
+    if (ret == GNUTLS_E_SUCCESS)
+    {
+        ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
+                     "created OCSP request for %s:%d: %s",
+                     s->server_hostname, s->addrs->host_port,
+                     apr_pescape_hex(tmp, req.data, req.size, 0));
+        gnutls_free(req.data);
     }
 
     ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
@@ -371,6 +478,11 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
     ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
                   "No valid OCSP response in cache, trying to update.");
 
+    /* TODO: Once sending OCSP requests is implemented we need a rate
+     * limit for retries on error. If the responder is overloaded or
+     * buggy we don't want to add too much more load, and if a MITM is
+     * messing with requests a repetition loop might end up being a
+     * self-inflicted denial of service. */
     apr_status_t rv = apr_global_mutex_trylock(ctxt->sc->ocsp_mutex);
     if (APR_STATUS_IS_EBUSY(rv))
     {
