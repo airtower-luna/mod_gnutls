@@ -84,8 +84,6 @@ typedef enum {
 /* Directory Configuration Record */
 typedef struct {
     int client_verify_mode;
-    const char* lua_bytecode;
-    apr_size_t lua_bytecode_len;
 } mgs_dirconf_rec;
 
 
