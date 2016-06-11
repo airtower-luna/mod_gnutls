@@ -43,10 +43,12 @@ int mgs_cache_session_init(mgs_handle_t *ctxt);
 
 
 /**
- * Convert a time_t into a Null Terminated String
+ * Convert a time_t into a null terminated string in a format
+ * compatible with OpenSSL's ASN1_TIME_print()
+ *
  * @param t time_t time
- * @param str Location to store the Hex Encoded String
- * @param strsize The Maximum Length that can be stored in str
+ * @param str Location to store the time string
+ * @param strsize The maximum length that can be stored in str
  */
 char *mgs_time2sz(time_t t, char *str, int strsize);
 

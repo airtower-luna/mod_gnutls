@@ -100,9 +100,14 @@ static int mgs_session_id2dbm(conn_rec *c, unsigned char *id, int idlen,
     return 0;
 }
 
-#define CTIME "%b %d %k:%M:%S %Y %Z"
+/* The OPENSSL_TIME_FORMAT macro and mgs_time2sz() serve to print time
+ * in a format compatible with OpenSSL's ASN1_TIME_print()
+ * function. */
 
-char *mgs_time2sz(time_t in_time, char *str, int strsize) {
+#define OPENSSL_TIME_FORMAT "%b %d %k:%M:%S %Y %Z"
+
+char *mgs_time2sz(time_t in_time, char *str, int strsize)
+{
     apr_time_exp_t vtm;
     apr_size_t ret_size;
     apr_time_t t;
@@ -110,7 +115,7 @@ char *mgs_time2sz(time_t in_time, char *str, int strsize) {
 
     apr_time_ansi_put(&t, in_time);
     apr_time_exp_gmt(&vtm, t);
-    apr_strftime(str, &ret_size, strsize - 1, CTIME, &vtm);
+    apr_strftime(str, &ret_size, strsize - 1, OPENSSL_TIME_FORMAT, &vtm);
 
     return str;
 }
