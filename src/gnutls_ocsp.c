@@ -185,9 +185,14 @@ static int mgs_create_ocsp_request(server_rec *s, gnutls_datum_t *req,
  * If expiry is not NULL, it will be set to the nextUpdate time
  * contained in the response, or zero if the response does not contain
  * a nextUpdate field.
+ *
+ * If nonce is not NULL, the response must contain a matching nonce.
  */
 int check_ocsp_response(server_rec *s, const gnutls_datum_t *ocsp_response,
-                        apr_time_t* expiry)
+                        apr_time_t* expiry, const gnutls_datum_t *nonce)
+    __attribute__((nonnull(1, 2)));
+int check_ocsp_response(server_rec *s, const gnutls_datum_t *ocsp_response,
+                        apr_time_t* expiry, const gnutls_datum_t *nonce)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
@@ -247,7 +252,32 @@ int check_ocsp_response(server_rec *s, const gnutls_datum_t *ocsp_response,
         }
         else
             ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
-                         "OCSP response is valid.");
+                         "OCSP response signature is valid.");
+    }
+
+    if (nonce != NULL)
+    {
+        gnutls_datum_t resp_nonce;
+        ret = gnutls_ocsp_resp_get_nonce(resp, 0, &resp_nonce);
+        if (ret != GNUTLS_E_SUCCESS)
+        {
+            ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
+                         "Could not get OCSP response nonce: %s (%d)",
+                         gnutls_strerror(ret), ret);
+            goto resp_cleanup;
+        }
+        if (resp_nonce.size != nonce->size
+            || memcmp(resp_nonce.data, nonce->data, nonce->size))
+        {
+            ret = GNUTLS_E_OCSP_RESPONSE_ERROR;
+            ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
+                         "OCSP response invalid: nonce mismatch");
+            gnutls_free(resp_nonce.data);
+            goto resp_cleanup;
+        }
+        ap_log_error(APLOG_MARK, APLOG_TRACE2, APR_SUCCESS, s,
+                     "OCSP response: nonce match");
+        gnutls_free(resp_nonce.data);
     }
 
     /* OK, response is for our certificate and valid, let's get the
@@ -533,7 +563,8 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
     }
 
     gnutls_datum_t req;
-    int ret = mgs_create_ocsp_request(s, &req, NULL);
+    gnutls_datum_t nonce;
+    int ret = mgs_create_ocsp_request(s, &req, &nonce);
     if (ret == GNUTLS_E_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_TRACE2, APR_SUCCESS, s,
@@ -544,6 +575,7 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
     else
     {
         gnutls_free(req.data);
+        gnutls_free(nonce.data);
         apr_pool_destroy(tmp);
         return APR_EGENERAL;
     }
@@ -554,23 +586,27 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
     if (rv != APR_SUCCESS)
     {
         /* do_ocsp_request() does its own error logging. */
+        gnutls_free(nonce.data);
         apr_pool_destroy(tmp);
         return rv;
     }
-    /* TODO: check nonce */
 
-    /* TODO: separate option to enable/disable OCSP stapling, restore
-     * reading response from file for debugging/expert use. */
+    /* TODO: separate option to enable/disable OCSP stapling, same for
+     * nonce, restore reading response from file for debugging/expert
+     * use. */
 
     apr_time_t expiry;
-    if (check_ocsp_response(s, &resp, &expiry) != GNUTLS_E_SUCCESS)
+    if (check_ocsp_response(s, &resp, &expiry, &nonce) != GNUTLS_E_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_EGENERAL, s,
                      "OCSP response validation failed, cannot "
                      "update cache.");
         apr_pool_destroy(tmp);
+        gnutls_free(nonce.data);
         return APR_EGENERAL;
     }
+    gnutls_free(nonce.data);
+
     /* If expiry is zero, the response does not contain a nextUpdate
      * field. Use the default cache timeout. */
     if (expiry == 0)
