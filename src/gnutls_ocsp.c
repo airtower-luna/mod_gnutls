@@ -338,7 +338,7 @@ static gnutls_datum_t mgs_get_cert_fingerprint(apr_pool_t *p,
                                                gnutls_x509_crt_t cert)
 {
     gnutls_datum_t fingerprint = {NULL, 0};
-    size_t fplen;
+    size_t fplen = 0;
     gnutls_x509_crt_get_fingerprint(cert, GNUTLS_DIG_SHA1, NULL, &fplen);
     unsigned char * fp = apr_palloc(p, fplen);
     gnutls_x509_crt_get_fingerprint(cert, GNUTLS_DIG_SHA1, fp, &fplen);
@@ -536,15 +536,21 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
     int ret = mgs_create_ocsp_request(s, &req, NULL);
     if (ret == GNUTLS_E_SUCCESS)
     {
-        ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
+        ap_log_error(APLOG_MARK, APLOG_TRACE2, APR_SUCCESS, s,
                      "created OCSP request for %s:%d: %s",
                      s->server_hostname, s->addrs->host_port,
                      apr_pescape_hex(tmp, req.data, req.size, 0));
+    }
+    else
+    {
         gnutls_free(req.data);
+        apr_pool_destroy(tmp);
+        return APR_EGENERAL;
     }
 
     gnutls_datum_t resp;
     rv = do_ocsp_request(tmp, s, &req, &resp);
+    gnutls_free(req.data);
     if (rv != APR_SUCCESS)
     {
         /* do_ocsp_request() does its own error logging. */
