@@ -17,6 +17,7 @@
 #include "gnutls_ocsp.h"
 #include "mod_gnutls.h"
 #include "gnutls_cache.h"
+#include "gnutls_util.h"
 
 #include <apr_escape.h>
 #include <apr_lib.h>
@@ -27,6 +28,11 @@
 #ifdef APLOG_USE_MODULE
 APLOG_USE_MODULE(gnutls);
 #endif
+
+/* maximum supported OCSP response size, 8K should be plenty */
+#define OCSP_RESP_SIZE_MAX (8 * 1024)
+#define OCSP_REQ_TYPE "application/ocsp-request"
+#define OCSP_RESP_TYPE "application/ocsp-response"
 
 
 
@@ -83,12 +89,12 @@ const char *mgs_store_ocsp_response_path(cmd_parms *parms,
  *
  * Returns GNUTLS_E_SUCCESS, or a GnuTLS error code.
  */
-int mgs_create_ocsp_request(server_rec *s, gnutls_datum_t *req,
+static int mgs_create_ocsp_request(server_rec *s, gnutls_datum_t *req,
+                            gnutls_datum_t *nonce)
+    __attribute__((nonnull(1, 2)));
+static int mgs_create_ocsp_request(server_rec *s, gnutls_datum_t *req,
                             gnutls_datum_t *nonce)
 {
-    if (req == NULL || s == NULL)
-        return GNUTLS_E_RECEIVED_ILLEGAL_PARAMETER;
-
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
 
@@ -167,6 +173,7 @@ int mgs_create_ocsp_request(server_rec *s, gnutls_datum_t *req,
     gnutls_ocsp_req_deinit(r);
     return ret;
 }
+
 
 
 /**
@@ -347,6 +354,163 @@ static gnutls_datum_t mgs_get_cert_fingerprint(apr_pool_t *p,
 
 
 
+static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
+                                    gnutls_datum_t *request,
+                                    gnutls_datum_t *response)
+    __attribute__((nonnull));
+static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
+                                    gnutls_datum_t *request,
+                                    gnutls_datum_t *response)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(s->module_config, &gnutls_module);
+
+    if (apr_strnatcmp(sc->ocsp->uri->scheme, "http"))
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
+                     "Scheme \"%s\" is not supported for OCSP requests!",
+                     sc->ocsp->uri->scheme);
+        return APR_EINVAL;
+    }
+
+    const char* header = http_post_header(p, sc->ocsp->uri,
+                                          OCSP_REQ_TYPE, OCSP_RESP_TYPE,
+                                          request->size);
+    ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
+                 "OCSP POST header: %s", header);
+
+    /* Find correct port */
+    apr_port_t port = sc->ocsp->uri->port ?
+        sc->ocsp->uri->port : apr_uri_port_of_scheme(sc->ocsp->uri->scheme);
+
+    apr_sockaddr_t *sa;
+    apr_status_t rv = apr_sockaddr_info_get(&sa, sc->ocsp->uri->hostname,
+                                            APR_UNSPEC, port, 0, p);
+    if (rv != APR_SUCCESS)
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
+                     "Address resolution for OCSP responder %s failed.",
+                     sc->ocsp->uri->hostinfo);
+    }
+
+    /* There may be multiple answers, try them in order until one
+     * works. */
+    apr_socket_t *sock;
+    /* TODO: configurable timeout */
+    apr_interval_time_t timeout = apr_time_from_sec(2);
+    while (sa)
+    {
+        rv = apr_socket_create(&sock, sa->family, SOCK_STREAM,
+                               APR_PROTO_TCP, p);
+        if (rv == APR_SUCCESS)
+        {
+            apr_socket_timeout_set(sock, timeout);
+            rv = apr_socket_connect(sock, sa);
+            if (rv == APR_SUCCESS)
+                /* Connected! */
+                break;
+            apr_socket_close(sock);
+        }
+        sa = sa->next;
+    }
+    /* If the socket is connected, 'sa' points at the matching
+     * address. */
+    if (sa == NULL)
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
+                     "Connecting to OCSP responder %s failed.",
+                     sc->ocsp->uri->hostinfo);
+        return rv;
+    }
+
+    /* Header is generated locally, so strlen() is safe. */
+    rv = sock_send_buf(sock, header, strlen(header));
+    if (rv == APR_SUCCESS)
+        rv = sock_send_buf(sock, (char*) request->data, request->size);
+    /* catches errors from both header and request */
+    if (rv != APR_SUCCESS)
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
+                     "Sending OCSP request failed.");
+        goto exit;
+    }
+
+    /* Prepare bucket brigades to read the response header. BBs make
+     * it easy to split the header into lines. */
+    apr_bucket_alloc_t *ba = apr_bucket_alloc_create(p);
+    apr_bucket_brigade *bb = apr_brigade_create(p, ba);
+    /* will carry split response headers */
+    apr_bucket_brigade *rh = apr_brigade_create(p, ba);
+
+    APR_BRIGADE_INSERT_TAIL(bb, apr_bucket_socket_create(sock, ba));
+    /* The first line in the response header must be the status, check
+     * for OK status code. Line looks similar to "HTTP/1.0 200 OK". */
+    const char *h = read_line(p, bb, rh);
+    const char *code = 0;
+    if (h == NULL
+        || strncmp(h, "HTTP/", 5)
+        || (code = ap_strchr(h, ' ')) == NULL
+        || apr_atoi64(code + 1) != HTTP_OK)
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
+                     "Invalid HTTP response status from %s: %s",
+                     sc->ocsp->uri->hostinfo, h);
+        rv = APR_ECONNRESET;
+        goto exit;
+    }
+    /* Read remaining header lines */
+    for (h = read_line(p, bb, rh); h != NULL && apr_strnatcmp(h, "") != 0;
+         h = read_line(p, bb, rh))
+    {
+        ap_log_error(APLOG_MARK, APLOG_TRACE2, APR_SUCCESS, s,
+                     "Received header: %s", h);
+    }
+    /* The last header line should be empty (""), NULL indicates an
+     * error. */
+    if (h == NULL)
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
+                     "Error while reading HTTP response header from %s",
+                     sc->ocsp->uri->hostinfo);
+        rv = APR_ECONNRESET;
+        goto exit;
+    }
+
+    /* Headers have been consumed, the rest of the available data
+     * should be the actual response. */
+    apr_size_t len = OCSP_RESP_SIZE_MAX;
+    char buf[OCSP_RESP_SIZE_MAX];
+    /* apr_brigade_pflatten() can allocate directly from the pool, but
+     * the documentation does not describe a way to limit the size of
+     * the buffer, which is necessary here to prevent DoS by endless
+     * response. Use apr_brigade_flatten() to read to a stack pool,
+     * then create a copy to return. */
+    rv = apr_brigade_flatten(bb, buf, &len);
+    if (rv != APR_SUCCESS)
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
+                     "Failed to read OCSP response.");
+        goto exit;
+    }
+
+    /* With the length restriction this really should not happen. */
+    if (__builtin_add_overflow(len, 0, &response->size))
+    {
+        response->data = NULL;
+        rv = APR_ENOMEM;
+    }
+    else
+    {
+        response->data = apr_pmemdup(p, buf, len);
+    }
+
+ exit:
+    apr_socket_close(sock);
+    return rv;
+}
+
+
+
 apr_status_t mgs_cache_ocsp_response(server_rec *s)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
@@ -368,8 +532,6 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
         return rv;
     }
 
-    /* TODO: actually send this request to sc->ocsp->uri and parse the
-     * received response (including nonce) */
     gnutls_datum_t req;
     int ret = mgs_create_ocsp_request(s, &req, NULL);
     if (ret == GNUTLS_E_SUCCESS)
@@ -381,41 +543,18 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
         gnutls_free(req.data);
     }
 
-    ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
-                 "Loading OCSP response from %s",
-                 sc->ocsp_response_file);
-    apr_file_t *file;
-    apr_finfo_t finfo;
-    apr_size_t br = 0;
-    rv = apr_file_open(&file, sc->ocsp_response_file,
-                       APR_READ | APR_BINARY, APR_OS_DEFAULT, tmp);
-    if (rv != APR_SUCCESS)
-    {
-        apr_pool_destroy(tmp);
-        return rv;
-    }
-    rv = apr_file_info_get(&finfo, APR_FINFO_SIZE, file);
-    if (rv != APR_SUCCESS)
-    {
-        apr_pool_destroy(tmp);
-        return rv;
-    }
-
     gnutls_datum_t resp;
-    resp.data = apr_palloc(tmp, finfo.size);
-    rv = apr_file_read_full(file, resp.data, finfo.size, &br);
+    rv = do_ocsp_request(tmp, s, &req, &resp);
     if (rv != APR_SUCCESS)
     {
+        /* do_ocsp_request() does its own error logging. */
         apr_pool_destroy(tmp);
         return rv;
     }
-    apr_file_close(file);
-    /* safe integer type conversion */
-    if (__builtin_add_overflow(br, 0, &resp.size))
-    {
-        apr_pool_destroy(tmp);
-        return APR_EINVAL;
-    }
+    /* TODO: check nonce */
+
+    /* TODO: separate option to enable/disable OCSP stapling, restore
+     * reading response from file for debugging/expert use. */
 
     apr_time_t expiry;
     if (check_ocsp_response(s, &resp, &expiry) != GNUTLS_E_SUCCESS)
