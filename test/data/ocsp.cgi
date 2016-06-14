@@ -37,6 +37,9 @@
 if [ -z "${OPENSSL}" ]; then
     OPENSSL=$(which openssl)
 fi
+if [ -z "${OCSP_VALID_MIN}" ]; then
+    OCSP_VALID_MIN="3"
+fi
 
 case "${REQUEST_METHOD}" in
     ("GET")
@@ -54,7 +57,7 @@ case "${REQUEST_METHOD}" in
 	    echo -e "Content-Type: application/ocsp-response\n"
 	    ${OPENSSL} ocsp -index "${OCSP_INDEX}" -CA "${CA_CERT}" \
 		    -rsigner "${OCSP_CERT}" -rkey "${OCSP_KEY}" \
-		    -nmin 3 -reqin - -respout -
+		    -nmin "${OCSP_VALID_MIN}" -reqin - -respout -
 	else
 	    echo "Status: 415 Unsupported Media Type"
 	    echo -e "Content-Type: text/plain\n"
