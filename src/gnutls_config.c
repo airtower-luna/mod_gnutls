@@ -156,8 +156,8 @@ int mgs_load_files(apr_pool_t * p, server_rec * s)
     gnutls_datum_t data;
     int ret;
     mgs_srvconf_rec *sc =
-	(mgs_srvconf_rec *) ap_get_module_config(s->module_config,
-						 &gnutls_module);
+        (mgs_srvconf_rec *) ap_get_module_config(s->module_config,
+                                                 &gnutls_module);
 
     apr_pool_create(&spool, p);
 
@@ -210,20 +210,20 @@ int mgs_load_files(apr_pool_t * p, server_rec * s)
         }
     }
 
-    if (sc->srp_tpasswd_conf_file != NULL && sc->srp_tpasswd_file != NULL) {
-	ret = gnutls_srp_set_server_credentials_file
-	    (sc->srp_creds, sc->srp_tpasswd_file,
-	     sc->srp_tpasswd_conf_file);
+    if (sc->srp_tpasswd_conf_file != NULL && sc->srp_tpasswd_file != NULL)
+    {
+        ret = gnutls_srp_set_server_credentials_file
+            (sc->srp_creds, sc->srp_tpasswd_file,
+             sc->srp_tpasswd_conf_file);
 
-	if (ret < 0 && sc->enabled == GNUTLS_ENABLED_TRUE) {
-	    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0,
-			 s,
-			 "GnuTLS: Host '%s:%d' is missing a "
-			 "SRP password or conf File!",
-			 s->server_hostname, s->port);
-	    ret = -1;
-	    goto cleanup;
-	}
+        if (ret < 0 && sc->enabled == GNUTLS_ENABLED_TRUE) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Host '%s:%d' is missing a "
+                         "SRP password or conf File!",
+                         s->server_hostname, s->port);
+            ret = -1;
+            goto cleanup;
+        }
     }
 #endif
 
@@ -238,41 +238,42 @@ int mgs_load_files(apr_pool_t * p, server_rec * s)
             goto cleanup;
         }
 
-    /* Load DH parameters */
-    if (sc->dh_file) {
-	if (load_datum_from_file(spool, sc->dh_file, &data) != 0) {
-	    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			 "GnuTLS: Error Reading " "DH params '%s'", sc->dh_file);
-	    ret = -1;
-	    goto cleanup;
-	}
+        /* Load DH parameters */
+        if (sc->dh_file)
+        {
+            if (load_datum_from_file(spool, sc->dh_file, &data) != 0) {
+                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                             "GnuTLS: Error Reading " "DH params '%s'", sc->dh_file);
+                ret = -1;
+                goto cleanup;
+            }
 
-	ret =
-	    gnutls_dh_params_import_pkcs3(sc->dh_params, &data,
-					  GNUTLS_X509_FMT_PEM);
-	if (ret < 0) {
-	    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			 "GnuTLS: Failed to Import "
-			 "DH params '%s': (%d) %s", sc->dh_file, ret,
-			 gnutls_strerror(ret));
-	    ret = -1;
-	    goto cleanup;
-	}
-    } else {
-        gnutls_datum_t pdata = {
-            (void *) static_dh_params,
-            sizeof(static_dh_params)
-        };
+            ret =
+                gnutls_dh_params_import_pkcs3(sc->dh_params, &data,
+                                              GNUTLS_X509_FMT_PEM);
+            if (ret < 0) {
+                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                             "GnuTLS: Failed to Import "
+                             "DH params '%s': (%d) %s", sc->dh_file, ret,
+                             gnutls_strerror(ret));
+                ret = -1;
+                goto cleanup;
+            }
+        } else {
+            gnutls_datum_t pdata = {
+                (void *) static_dh_params,
+                sizeof(static_dh_params)
+            };
 
-        ret = gnutls_dh_params_import_pkcs3(sc->dh_params, &pdata, GNUTLS_X509_FMT_PEM);
-        if (ret < 0) {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                    "GnuTLS: Unable to generate or load DH Params: (%d) %s",
-                    ret, gnutls_strerror(ret));
-            ret = -1;
-            goto cleanup;
+            ret = gnutls_dh_params_import_pkcs3(sc->dh_params, &pdata, GNUTLS_X509_FMT_PEM);
+            if (ret < 0) {
+                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                             "GnuTLS: Unable to generate or load DH Params: (%d) %s",
+                             ret, gnutls_strerror(ret));
+                ret = -1;
+                goto cleanup;
+            }
         }
-    }
     }
 
     if (sc->x509_cert_file != NULL && sc->certs_x509_crt_chain[0] == NULL)
@@ -280,221 +281,228 @@ int mgs_load_files(apr_pool_t * p, server_rec * s)
         unsigned int chain_num = MAX_CHAIN_SIZE;
         unsigned format = GNUTLS_X509_FMT_PEM;
 
-	/* Load X.509 certificate */
-	if (strncmp(sc->x509_cert_file, "pkcs11:", 7) == 0) {
-	    gnutls_pkcs11_obj_t obj;
+        /* Load X.509 certificate */
+        if (strncmp(sc->x509_cert_file, "pkcs11:", 7) == 0) {
+            gnutls_pkcs11_obj_t obj;
 
-	    file = sc->x509_cert_file;
+            file = sc->x509_cert_file;
 
-	    ret = gnutls_pkcs11_obj_init(&obj);
-	    if (ret < 0) {
-		ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			     "GnuTLS: Error Initializing PKCS #11 object");
-		ret = -1;
-		goto cleanup;
-	    }
+            ret = gnutls_pkcs11_obj_init(&obj);
+            if (ret < 0) {
+                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                             "GnuTLS: Error Initializing PKCS #11 object");
+                ret = -1;
+                goto cleanup;
+            }
 
-	    gnutls_pkcs11_obj_set_pin_function(obj, pin_callback, sc);
+            gnutls_pkcs11_obj_set_pin_function(obj, pin_callback, sc);
 
-	    ret = gnutls_pkcs11_obj_import_url(obj, file, GNUTLS_PKCS11_OBJ_FLAG_LOGIN);
-	    if (ret < 0) {
-		ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			     "GnuTLS: Error Importing PKCS #11 object: '%s': %s",
-			     file, gnutls_strerror(ret));
-		ret = -1;
-		goto cleanup;
-	    }
+            ret = gnutls_pkcs11_obj_import_url(obj, file,
+                                               GNUTLS_PKCS11_OBJ_FLAG_LOGIN);
+            if (ret < 0) {
+                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                             "GnuTLS: Error Importing PKCS #11 object: "
+                             "'%s': %s",
+                             file, gnutls_strerror(ret));
+                ret = -1;
+                goto cleanup;
+            }
 
-	    format = GNUTLS_X509_FMT_DER;
-	    ret = gnutls_pkcs11_obj_export2(obj, &data);
-	    if (ret < 0) {
-		ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			     "GnuTLS: Error Exporting a PKCS #11 object: '%s': %s",
-			     file, gnutls_strerror(ret));
-		ret = -1;
-		goto cleanup;
-	    }
+            format = GNUTLS_X509_FMT_DER;
+            ret = gnutls_pkcs11_obj_export2(obj, &data);
+            if (ret < 0) {
+                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                             "GnuTLS: Error Exporting a PKCS #11 object: "
+                             "'%s': %s",
+                             file, gnutls_strerror(ret));
+                ret = -1;
+                goto cleanup;
+            }
 
-	    gnutls_pkcs11_obj_deinit(obj);
-	} else {
-	    file = ap_server_root_relative(spool, sc->x509_cert_file);
+            gnutls_pkcs11_obj_deinit(obj);
+        } else {
+            file = ap_server_root_relative(spool, sc->x509_cert_file);
 
-	    ret = gnutls_load_file(file, &data);
-	    if (ret < 0) {
-		ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			     "GnuTLS: Error Reading Certificate '%s': %s",
-			     file, gnutls_strerror(ret));
-		ret = -1;
-		goto cleanup;
-	    }
-	}
+            ret = gnutls_load_file(file, &data);
+            if (ret < 0) {
+                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                             "GnuTLS: Error Reading Certificate '%s': %s",
+                             file, gnutls_strerror(ret));
+                ret = -1;
+                goto cleanup;
+            }
+        }
 
-	ret = gnutls_x509_crt_list_import(sc->certs_x509_crt_chain,
-                                      &chain_num, &data, format,
-                                      GNUTLS_X509_CRT_LIST_FAIL_IF_UNSORTED);
-	gnutls_free(data.data);
-	sc->certs_x509_chain_num = chain_num;
+        ret = gnutls_x509_crt_list_import(sc->certs_x509_crt_chain,
+                                          &chain_num, &data, format,
+                                          GNUTLS_X509_CRT_LIST_FAIL_IF_UNSORTED);
+        gnutls_free(data.data);
+        sc->certs_x509_chain_num = chain_num;
 
-	if (ret < 0) {
-	    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			 "GnuTLS: Failed to Import Certificate Chain '%s': (%d) %s",
-			 file, ret, gnutls_strerror(ret));
-	    ret = -1;
-	    goto cleanup;
-	}
+        if (ret < 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Failed to Import Certificate Chain "
+                         "'%s': (%d) %s",
+                         file, ret, gnutls_strerror(ret));
+            ret = -1;
+            goto cleanup;
+        }
 
-    for (unsigned int i = 0; i < chain_num; i++)
-    {
-	    ret =
-		gnutls_pcert_import_x509(&sc->certs_x509_chain[i],
-					 sc->certs_x509_crt_chain[i], 0);
-	    if (ret < 0) {
-		ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			     "GnuTLS: Failed to Import pCertificate '%s': (%d) %s",
-			     file, ret, gnutls_strerror(ret));
-		ret = -1;
-		goto cleanup;
-	    }
-	}
-	sc->certs_x509_chain_num = chain_num;
+        for (unsigned int i = 0; i < chain_num; i++)
+        {
+            ret =
+                gnutls_pcert_import_x509(&sc->certs_x509_chain[i],
+                                         sc->certs_x509_crt_chain[i], 0);
+            if (ret < 0) {
+                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                             "GnuTLS: Failed to Import pCertificate "
+                             "'%s': (%d) %s",
+                             file, ret, gnutls_strerror(ret));
+                ret = -1;
+                goto cleanup;
+            }
+        }
+        sc->certs_x509_chain_num = chain_num;
     }
 
     if (sc->x509_key_file && sc->privkey_x509 == NULL)
     {
-	ret = gnutls_privkey_init(&sc->privkey_x509);
-	if (ret < 0) {
-	    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			 "GnuTLS: Failed to initialize: (%d) %s", ret,
-			 gnutls_strerror(ret));
-	    ret = -1;
-	    goto cleanup;
-	}
+        ret = gnutls_privkey_init(&sc->privkey_x509);
+        if (ret < 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Failed to initialize: (%d) %s", ret,
+                         gnutls_strerror(ret));
+            ret = -1;
+            goto cleanup;
+        }
 
-	if (gnutls_url_is_supported(sc->x509_key_file) != 0) {
-	    file = sc->x509_key_file;
+        if (gnutls_url_is_supported(sc->x509_key_file) != 0) {
+            file = sc->x509_key_file;
 
-	    gnutls_privkey_set_pin_function(sc->privkey_x509, pin_callback,
-					    sc);
+            gnutls_privkey_set_pin_function(sc->privkey_x509, pin_callback,
+                                            sc);
 
-	    ret = gnutls_privkey_import_url(sc->privkey_x509, file, 0);
+            ret = gnutls_privkey_import_url(sc->privkey_x509, file, 0);
 
-	    if (ret < 0) {
-		ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			     "GnuTLS: Failed to Import Private Key URL '%s': (%d) %s",
-			     file, ret, gnutls_strerror(ret));
-		ret = -1;
-		goto cleanup;
-	    }
-	} else {
-	    file = ap_server_root_relative(spool, sc->x509_key_file);
+            if (ret < 0) {
+                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                             "GnuTLS: Failed to Import Private Key URL "
+                             "'%s': (%d) %s",
+                             file, ret, gnutls_strerror(ret));
+                ret = -1;
+                goto cleanup;
+            }
+        } else {
+            file = ap_server_root_relative(spool, sc->x509_key_file);
 
-	    if (load_datum_from_file(spool, file, &data) != 0) {
-		ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			     "GnuTLS: Error Reading Private Key '%s'",
-			     file);
-		ret = -1;
-		goto cleanup;
-	    }
+            if (load_datum_from_file(spool, file, &data) != 0) {
+                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                             "GnuTLS: Error Reading Private Key '%s'",
+                             file);
+                ret = -1;
+                goto cleanup;
+            }
 
-	    ret =
-		gnutls_privkey_import_x509_raw(sc->privkey_x509, &data,
-					       GNUTLS_X509_FMT_PEM, sc->pin,
-					       0);
+            ret =
+                gnutls_privkey_import_x509_raw(sc->privkey_x509, &data,
+                                               GNUTLS_X509_FMT_PEM, sc->pin,
+                                               0);
 
-	    if (ret < 0) {
-		ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			     "GnuTLS: Failed to Import Private Key '%s': (%d) %s",
-			     file, ret, gnutls_strerror(ret));
-		ret = -1;
-		goto cleanup;
-	    }
-	}
+            if (ret < 0) {
+                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                             "GnuTLS: Failed to Import Private Key "
+                             "'%s': (%d) %s",
+                             file, ret, gnutls_strerror(ret));
+                ret = -1;
+                goto cleanup;
+            }
+        }
     }
 
     /* Load the X.509 CA file */
-    if (sc->x509_ca_file) {
-	if (load_datum_from_file(spool, sc->x509_ca_file, &data) != 0) {
-	    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			 "GnuTLS: Error Reading " "Client CA File '%s'",
-			 sc->x509_ca_file);
-	    ret = -1;
-	    goto cleanup;
-	}
+    if (sc->x509_ca_file)
+    {
+        if (load_datum_from_file(spool, sc->x509_ca_file, &data) != 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Error Reading " "Client CA File '%s'",
+                         sc->x509_ca_file);
+            ret = -1;
+            goto cleanup;
+        }
 
-	ret = gnutls_x509_crt_list_import2(&sc->ca_list, &sc->ca_list_size,
-					 &data, GNUTLS_X509_FMT_PEM, 0);
-	if (ret < 0) {
-	    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			 "GnuTLS: Failed to load "
-			 "Client CA File '%s': (%d) %s", sc->x509_ca_file,
-			 ret, gnutls_strerror(ret));
-	    ret = -1;
-	    goto cleanup;
-	}
+        ret = gnutls_x509_crt_list_import2(&sc->ca_list, &sc->ca_list_size,
+                                           &data, GNUTLS_X509_FMT_PEM, 0);
+        if (ret < 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Failed to load "
+                         "Client CA File '%s': (%d) %s", sc->x509_ca_file,
+                         ret, gnutls_strerror(ret));
+            ret = -1;
+            goto cleanup;
+        }
     }
 
-    if (sc->pgp_cert_file) {
-	if (load_datum_from_file(spool, sc->pgp_cert_file, &data) != 0) {
-	    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			 "GnuTLS: Error Reading " "Certificate '%s'",
-			 sc->pgp_cert_file);
-	    ret = -1;
-	    goto cleanup;
-	}
+    if (sc->pgp_cert_file)
+    {
+        if (load_datum_from_file(spool, sc->pgp_cert_file, &data) != 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Error Reading " "Certificate '%s'",
+                         sc->pgp_cert_file);
+            ret = -1;
+            goto cleanup;
+        }
 
-	ret = gnutls_openpgp_crt_init(&sc->cert_crt_pgp[0]);
-	if (ret < 0) {
-	    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			 "GnuTLS: Failed to Init "
-			 "PGP Certificate: (%d) %s", ret,
-			 gnutls_strerror(ret));
-	    ret = -1;
-	    goto cleanup;
-	}
+        ret = gnutls_openpgp_crt_init(&sc->cert_crt_pgp[0]);
+        if (ret < 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Failed to Init "
+                         "PGP Certificate: (%d) %s", ret,
+                         gnutls_strerror(ret));
+            ret = -1;
+            goto cleanup;
+        }
 
-	ret =
-	    gnutls_openpgp_crt_import(sc->cert_crt_pgp[0], &data,
-				      GNUTLS_OPENPGP_FMT_BASE64);
-	if (ret < 0) {
-	    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			 "GnuTLS: Failed to Import "
-			 "PGP Certificate: (%d) %s", ret,
-			 gnutls_strerror(ret));
-	    ret = -1;
-	    goto cleanup;
-	}
+        ret = gnutls_openpgp_crt_import(sc->cert_crt_pgp[0], &data,
+                                        GNUTLS_OPENPGP_FMT_BASE64);
+        if (ret < 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Failed to Import "
+                         "PGP Certificate: (%d) %s", ret,
+                         gnutls_strerror(ret));
+            ret = -1;
+            goto cleanup;
+        }
 
-	ret =
-	    gnutls_pcert_import_openpgp(sc->cert_pgp, sc->cert_crt_pgp[0],
-					0);
-	if (ret < 0) {
-	    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			 "GnuTLS: Failed to Import "
-			 "PGP pCertificate: (%d) %s", ret,
-			 gnutls_strerror(ret));
-	    ret = -1;
-	    goto cleanup;
-	}
+        ret = gnutls_pcert_import_openpgp(sc->cert_pgp,
+                                          sc->cert_crt_pgp[0], 0);
+        if (ret < 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Failed to Import "
+                         "PGP pCertificate: (%d) %s", ret,
+                         gnutls_strerror(ret));
+            ret = -1;
+            goto cleanup;
+        }
     }
 
     /* Load the PGP key file */
     if (sc->pgp_key_file) {
-	if (load_datum_from_file(spool, sc->pgp_key_file, &data) != 0) {
-	    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			 "GnuTLS: Error Reading " "Private Key '%s'",
-			 sc->pgp_key_file);
-	    ret = -1;
-	    goto cleanup;
-	}
+        if (load_datum_from_file(spool, sc->pgp_key_file, &data) != 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Error Reading " "Private Key '%s'",
+                         sc->pgp_key_file);
+            ret = -1;
+            goto cleanup;
+        }
 
-	ret = gnutls_privkey_init(&sc->privkey_pgp);
-	if (ret < 0) {
-	    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			 "GnuTLS: Failed to initialize"
-			 ": (%d) %s", ret, gnutls_strerror(ret));
-	    ret = -1;
-	    goto cleanup;
-	}
+        ret = gnutls_privkey_init(&sc->privkey_pgp);
+        if (ret < 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Failed to initialize"
+                         ": (%d) %s", ret, gnutls_strerror(ret));
+            ret = -1;
+            goto cleanup;
+        }
 
 #if GNUTLS_VERSION_NUMBER < 0x030312
         /* GnuTLS versions before 3.3.12 contain a bug in
@@ -506,25 +514,25 @@ int mgs_load_files(apr_pool_t * p, server_rec * s)
          * gnutls_openpgp_privkey_import and
          * gnutls_privkey_import_openpgp. */
         ret = gnutls_openpgp_privkey_init(&sc->privkey_pgp_internal);
-	if (ret != 0) {
-	    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			 "GnuTLS: Failed to initialize "
-			 "PGP Private Key '%s': (%d) %s",
-			 sc->pgp_key_file, ret, gnutls_strerror(ret));
-	    ret = -1;
-	    goto cleanup;
-	}
+        if (ret != 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Failed to initialize "
+                         "PGP Private Key '%s': (%d) %s",
+                         sc->pgp_key_file, ret, gnutls_strerror(ret));
+            ret = -1;
+            goto cleanup;
+        }
 
         ret = gnutls_openpgp_privkey_import(sc->privkey_pgp_internal, &data,
                                             GNUTLS_OPENPGP_FMT_BASE64, NULL, 0);
-	if (ret != 0) {
-	    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			 "GnuTLS: Failed to Import "
-			 "PGP Private Key '%s': (%d) %s",
-			 sc->pgp_key_file, ret, gnutls_strerror(ret));
-	    ret = -1;
-	    goto cleanup;
-	}
+        if (ret != 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Failed to Import "
+                         "PGP Private Key '%s': (%d) %s",
+                         sc->pgp_key_file, ret, gnutls_strerror(ret));
+            ret = -1;
+            goto cleanup;
+        }
 
         ret = gnutls_privkey_import_openpgp(sc->privkey_pgp,
                                             sc->privkey_pgp_internal, 0);
@@ -534,54 +542,55 @@ int mgs_load_files(apr_pool_t * p, server_rec * s)
                          "GnuTLS: Failed to assign PGP Private Key '%s' "
                          "to gnutls_privkey_t structure: (%d) %s",
                          sc->pgp_key_file, ret, gnutls_strerror(ret));
-	    ret = -1;
-	    goto cleanup;
-	}
+            ret = -1;
+            goto cleanup;
+        }
 #else
         ret = gnutls_privkey_import_openpgp_raw(sc->privkey_pgp, &data,
                                                 GNUTLS_OPENPGP_FMT_BASE64,
                                                 NULL, NULL);
-	if (ret != 0)
+        if (ret != 0)
         {
             ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
                          "GnuTLS: Failed to Import "
                          "PGP Private Key '%s': (%d) %s",
                          sc->pgp_key_file, ret, gnutls_strerror(ret));
-	    ret = -1;
-	    goto cleanup;
-	}
+            ret = -1;
+            goto cleanup;
+        }
 #endif
     }
 
     /* Load the keyring file */
-    if (sc->pgp_ring_file) {
-	if (load_datum_from_file(spool, sc->pgp_ring_file, &data) != 0) {
-	    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			 "GnuTLS: Error Reading " "Keyring File '%s'",
-			 sc->pgp_ring_file);
-	    ret = -1;
-	    goto cleanup;
-	}
+    if (sc->pgp_ring_file)
+    {
+        if (load_datum_from_file(spool, sc->pgp_ring_file, &data) != 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Error Reading " "Keyring File '%s'",
+                         sc->pgp_ring_file);
+            ret = -1;
+            goto cleanup;
+        }
 
-	ret = gnutls_openpgp_keyring_init(&sc->pgp_list);
-	if (ret < 0) {
-	    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			 "GnuTLS: Failed to initialize"
-			 "keyring: (%d) %s", ret, gnutls_strerror(ret));
-	    ret = -1;
-	    goto cleanup;
-	}
+        ret = gnutls_openpgp_keyring_init(&sc->pgp_list);
+        if (ret < 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Failed to initialize"
+                         "keyring: (%d) %s", ret, gnutls_strerror(ret));
+            ret = -1;
+            goto cleanup;
+        }
 
-	ret = gnutls_openpgp_keyring_import(sc->pgp_list, &data,
-					   GNUTLS_OPENPGP_FMT_BASE64);
-	if (ret < 0) {
-	    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			 "GnuTLS: Failed to load "
-			 "Keyring File '%s': (%d) %s", sc->pgp_ring_file,
-			 ret, gnutls_strerror(ret));
-	    ret = -1;
-	    goto cleanup;
-	}
+        ret = gnutls_openpgp_keyring_import(sc->pgp_list, &data,
+                                            GNUTLS_OPENPGP_FMT_BASE64);
+        if (ret < 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Failed to load "
+                         "Keyring File '%s': (%d) %s", sc->pgp_ring_file,
+                         ret, gnutls_strerror(ret));
+            ret = -1;
+            goto cleanup;
+        }
     }
 
     if (sc->priorities_str && sc->priorities == NULL)
@@ -589,23 +598,23 @@ int mgs_load_files(apr_pool_t * p, server_rec * s)
         const char *err;
         ret = gnutls_priority_init(&sc->priorities, sc->priorities_str, &err);
 
-	if (ret < 0) {
-	    if (ret == GNUTLS_E_INVALID_REQUEST) {
-		ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			     "GnuTLS: Syntax error parsing priorities string at: %s",
-			     err);
-	    } else {
-		ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			     "GnuTLS: error parsing priorities string");
+        if (ret < 0) {
+            if (ret == GNUTLS_E_INVALID_REQUEST) {
+                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                             "GnuTLS: Syntax error parsing priorities string at: %s",
+                             err);
+            } else {
+                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                             "GnuTLS: error parsing priorities string");
 
-	    }
-	    ret = -1;
-	    goto cleanup;
-	}
+            }
+            ret = -1;
+            goto cleanup;
+        }
     }
 
     ret = 0;
-  cleanup:
+ cleanup:
     apr_pool_destroy(spool);
 
     return ret;
