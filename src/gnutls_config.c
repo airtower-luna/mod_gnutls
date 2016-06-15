@@ -140,6 +140,16 @@ static apr_status_t mgs_pool_free_credentials(void *arg)
         sc->privkey_x509 = NULL;
     }
 
+    if (sc->ca_list)
+    {
+        for (unsigned int i = 0; i < sc->ca_list_size; i++)
+        {
+            gnutls_x509_crt_deinit(sc->ca_list[i]);
+        }
+        gnutls_free(sc->ca_list);
+        sc->ca_list = NULL;
+    }
+
     if (sc->priorities)
     {
         gnutls_priority_deinit(sc->priorities);
@@ -1054,6 +1064,8 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
     sc->tickets = GNUTLS_ENABLED_UNSET;
     sc->priorities = NULL;
     sc->dh_params = NULL;
+    sc->ca_list = NULL;
+    sc->ca_list_size = 0;
     sc->proxy_enabled = GNUTLS_ENABLED_UNSET;
     sc->export_certificates_size = -1;
     sc->client_verify_method = mgs_cvm_unset;
