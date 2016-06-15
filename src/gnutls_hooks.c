@@ -462,7 +462,8 @@ int mgs_hook_post_config(apr_pool_t *pconf,
         }
         if (sc->enabled == GNUTLS_ENABLED_TRUE &&
             ((sc->certs_x509_chain_num > 0 && sc->privkey_x509 == NULL) ||
-             (sc->cert_crt_pgp[0] != NULL && sc->privkey_pgp == NULL))) {
+             (sc->cert_crt_pgp != NULL && sc->privkey_pgp == NULL)))
+        {
 			ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
 						"GnuTLS: Host '%s:%d' is missing a Private Key File!",
 						s->server_hostname, s->port);

@@ -187,13 +187,6 @@ int mgs_load_files(apr_pool_t *pconf, apr_pool_t *ptemp, server_rec *s)
 
     apr_pool_create(&spool, ptemp);
 
-    sc->cert_pgp = apr_pcalloc(pconf, sizeof(sc->cert_pgp[0]));
-    sc->cert_crt_pgp = apr_pcalloc(pconf, sizeof(sc->cert_crt_pgp[0]));
-    sc->certs_x509_chain =
-        apr_pcalloc(pconf, MAX_CHAIN_SIZE * sizeof(sc->certs_x509_chain[0]));
-    sc->certs_x509_crt_chain =
-        apr_pcalloc(pconf, MAX_CHAIN_SIZE * sizeof(sc->certs_x509_crt_chain[0]));
-
     /* Cleanup function for the GnuTLS structures allocated below */
     apr_pool_cleanup_register(pconf, sc, mgs_pool_free_credentials,
                               apr_pool_cleanup_null);
@@ -302,8 +295,14 @@ int mgs_load_files(apr_pool_t *pconf, apr_pool_t *ptemp, server_rec *s)
         }
     }
 
-    if (sc->x509_cert_file != NULL && sc->certs_x509_crt_chain[0] == NULL)
+    if (sc->x509_cert_file != NULL && sc->certs_x509_crt_chain == NULL)
     {
+        sc->certs_x509_chain =
+            apr_pcalloc(pconf,
+                        MAX_CHAIN_SIZE * sizeof(sc->certs_x509_chain[0]));
+        sc->certs_x509_crt_chain =
+            apr_pcalloc(pconf,
+                        MAX_CHAIN_SIZE * sizeof(sc->certs_x509_crt_chain[0]));
         unsigned int chain_num = MAX_CHAIN_SIZE;
         unsigned format = GNUTLS_X509_FMT_PEM;
 
@@ -468,8 +467,11 @@ int mgs_load_files(apr_pool_t *pconf, apr_pool_t *ptemp, server_rec *s)
         }
     }
 
-    if (sc->pgp_cert_file)
+    if (sc->pgp_cert_file && sc->cert_pgp == NULL)
     {
+        sc->cert_pgp = apr_pcalloc(pconf, sizeof(sc->cert_pgp[0]));
+        sc->cert_crt_pgp = apr_pcalloc(pconf, sizeof(sc->cert_crt_pgp[0]));
+
         if (load_datum_from_file(spool, sc->pgp_cert_file, &data) != 0) {
             ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
                          "GnuTLS: Error Reading " "Certificate '%s'",
@@ -1069,10 +1071,14 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
     sc->srp_creds = NULL;
 #endif
     sc->certs = NULL;
+    sc->certs_x509_chain = NULL;
+    sc->certs_x509_crt_chain = NULL;
     sc->certs_x509_chain_num = 0;
     sc->p11_modules = NULL;
     sc->pin = NULL;
 
+    sc->cert_pgp = NULL;
+    sc->cert_crt_pgp = NULL;
     sc->privkey_pgp = NULL;
 #if GNUTLS_VERSION_NUMBER < 0x030312
     sc->privkey_pgp_internal = NULL;
