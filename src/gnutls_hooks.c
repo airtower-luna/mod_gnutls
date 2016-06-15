@@ -312,7 +312,7 @@ static int read_pgpcrt_cn(server_rec * s, apr_pool_t * p,
  */
 int mgs_hook_post_config(apr_pool_t *pconf,
                          apr_pool_t *plog __attribute__((unused)),
-                         apr_pool_t *ptemp __attribute__((unused)),
+                         apr_pool_t *ptemp,
                          server_rec *base_server)
 {
     int rv;
@@ -392,7 +392,7 @@ int mgs_hook_post_config(apr_pool_t *pconf,
         sc->cache_timeout = sc_base->cache_timeout;
         sc->cache = sc_base->cache;
 
-        rv = mgs_load_files(pconf, s);
+        rv = mgs_load_files(pconf, ptemp, s);
         if (rv != 0) {
             ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
                 "GnuTLS: Loading required files failed."

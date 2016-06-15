@@ -361,7 +361,8 @@ int mgs_pkcs11_reinit(server_rec * s);
 /* Configuration Functions */
 
 /* Loads all files set in the configuration */
-int mgs_load_files(apr_pool_t * p, server_rec * s);
+int mgs_load_files(apr_pool_t *pconf, apr_pool_t *ptemp, server_rec *s)
+    __attribute__((nonnull));
 
 const char *mgs_set_srp_tpasswd_conf_file(cmd_parms * parms, void *dummy,
                                         const char *arg);

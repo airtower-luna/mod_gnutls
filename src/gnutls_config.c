@@ -175,7 +175,7 @@ static apr_status_t mgs_pool_free_credentials(void *arg)
     return APR_SUCCESS;
 }
 
-int mgs_load_files(apr_pool_t * p, server_rec * s)
+int mgs_load_files(apr_pool_t *pconf, apr_pool_t *ptemp, server_rec *s)
 {
     apr_pool_t *spool;
     const char *file;
@@ -185,17 +185,17 @@ int mgs_load_files(apr_pool_t * p, server_rec * s)
         (mgs_srvconf_rec *) ap_get_module_config(s->module_config,
                                                  &gnutls_module);
 
-    apr_pool_create(&spool, p);
+    apr_pool_create(&spool, ptemp);
 
-    sc->cert_pgp = apr_pcalloc(p, sizeof(sc->cert_pgp[0]));
-    sc->cert_crt_pgp = apr_pcalloc(p, sizeof(sc->cert_crt_pgp[0]));
+    sc->cert_pgp = apr_pcalloc(pconf, sizeof(sc->cert_pgp[0]));
+    sc->cert_crt_pgp = apr_pcalloc(pconf, sizeof(sc->cert_crt_pgp[0]));
     sc->certs_x509_chain =
-        apr_pcalloc(p, MAX_CHAIN_SIZE * sizeof(sc->certs_x509_chain[0]));
+        apr_pcalloc(pconf, MAX_CHAIN_SIZE * sizeof(sc->certs_x509_chain[0]));
     sc->certs_x509_crt_chain =
-        apr_pcalloc(p, MAX_CHAIN_SIZE * sizeof(sc->certs_x509_crt_chain[0]));
+        apr_pcalloc(pconf, MAX_CHAIN_SIZE * sizeof(sc->certs_x509_crt_chain[0]));
 
     /* Cleanup function for the GnuTLS structures allocated below */
-    apr_pool_cleanup_register(p, sc, mgs_pool_free_credentials,
+    apr_pool_cleanup_register(pconf, sc, mgs_pool_free_credentials,
                               apr_pool_cleanup_null);
 
     if (sc->certs == NULL)
