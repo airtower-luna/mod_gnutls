@@ -150,6 +150,14 @@ static apr_status_t mgs_pool_free_credentials(void *arg)
         sc->ca_list = NULL;
     }
 
+    if (sc->cert_pgp)
+    {
+        gnutls_pcert_deinit(&sc->cert_pgp[0]);
+        sc->cert_pgp = NULL;
+        gnutls_openpgp_crt_deinit(sc->cert_crt_pgp[0]);
+        sc->cert_crt_pgp = NULL;
+    }
+
     if (sc->privkey_pgp)
     {
         gnutls_privkey_deinit(sc->privkey_pgp);
