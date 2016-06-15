@@ -94,6 +94,61 @@ const char static_dh_params[] = "-----BEGIN DH PARAMETERS-----\n"
         "Nd4jbVJfVHWbZeNy/NaO8g+nER+eSv9zAgEC\n"
         "-----END DH PARAMETERS-----\n";
 
+/*
+ * Clean up the various GnuTLS data structures allocated from
+ * mgs_load_files()
+ */
+static apr_status_t mgs_pool_free_credentials(void *arg)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *) arg;
+
+    if (sc->certs)
+    {
+        gnutls_certificate_free_credentials(sc->certs);
+        sc->certs = NULL;
+    }
+
+    if (sc->anon_creds)
+    {
+        gnutls_anon_free_server_credentials(sc->anon_creds);
+        sc->anon_creds = NULL;
+    }
+
+#ifdef ENABLE_SRP
+    if (sc->srp_creds)
+    {
+        gnutls_srp_free_server_credentials(sc->srp_creds);
+        sc->srp_creds = NULL;
+    }
+#endif
+
+    if (sc->dh_params)
+    {
+        gnutls_dh_params_deinit(sc->dh_params);
+        sc->dh_params = NULL;
+    }
+
+    for (unsigned int i = 0; i < sc->certs_x509_chain_num; i++)
+    {
+        gnutls_pcert_deinit(&sc->certs_x509_chain[i]);
+        gnutls_x509_crt_deinit(sc->certs_x509_crt_chain[i]);
+    }
+
+    if (sc->privkey_x509)
+    {
+        gnutls_privkey_deinit(sc->privkey_x509);
+        sc->privkey_x509 = NULL;
+    }
+
+    if (sc->priorities)
+    {
+        gnutls_priority_deinit(sc->priorities);
+        sc->priorities = NULL;
+    }
+
+    return APR_SUCCESS;
+}
+
 int mgs_load_files(apr_pool_t * p, server_rec * s)
 {
     apr_pool_t *spool;
@@ -109,38 +164,50 @@ int mgs_load_files(apr_pool_t * p, server_rec * s)
     sc->cert_pgp = apr_pcalloc(p, sizeof(sc->cert_pgp[0]));
     sc->cert_crt_pgp = apr_pcalloc(p, sizeof(sc->cert_crt_pgp[0]));
     sc->certs_x509_chain =
-	apr_pcalloc(p, MAX_CHAIN_SIZE * sizeof(sc->certs_x509_chain[0]));
+        apr_pcalloc(p, MAX_CHAIN_SIZE * sizeof(sc->certs_x509_chain[0]));
     sc->certs_x509_crt_chain =
-	apr_pcalloc(p,
-		    MAX_CHAIN_SIZE * sizeof(sc->certs_x509_crt_chain[0]));
+        apr_pcalloc(p, MAX_CHAIN_SIZE * sizeof(sc->certs_x509_crt_chain[0]));
 
-    ret = gnutls_certificate_allocate_credentials(&sc->certs);
-    if (ret < 0) {
-	ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-		     "GnuTLS: Failed to initialize" ": (%d) %s", ret,
-		     gnutls_strerror(ret));
-	ret = -1;
-	goto cleanup;
+    /* Cleanup function for the GnuTLS structures allocated below */
+    apr_pool_cleanup_register(p, sc, mgs_pool_free_credentials,
+                              apr_pool_cleanup_null);
+
+    if (sc->certs == NULL)
+    {
+        ret = gnutls_certificate_allocate_credentials(&sc->certs);
+        if (ret < 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Failed to initialize" ": (%d) %s", ret,
+                         gnutls_strerror(ret));
+            ret = -1;
+            goto cleanup;
+        }
     }
 
-    ret = gnutls_anon_allocate_server_credentials(&sc->anon_creds);
-    if (ret < 0) {
-	ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-		     "GnuTLS: Failed to initialize" ": (%d) %s", ret,
-		     gnutls_strerror(ret));
-	ret = -1;
-	goto cleanup;
+    if (sc->anon_creds == NULL)
+    {
+        ret = gnutls_anon_allocate_server_credentials(&sc->anon_creds);
+        if (ret < 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Failed to initialize" ": (%d) %s", ret,
+                         gnutls_strerror(ret));
+            ret = -1;
+            goto cleanup;
+        }
     }
 
     /* Load SRP parameters */
 #ifdef ENABLE_SRP
-    ret = gnutls_srp_allocate_server_credentials(&sc->srp_creds);
-    if (ret < 0) {
-	ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-		     "GnuTLS: Failed to initialize" ": (%d) %s", ret,
-		     gnutls_strerror(ret));
-	ret = -1;
-	goto cleanup;
+    if (sc->srp_creds == NULL)
+    {
+        ret = gnutls_srp_allocate_server_credentials(&sc->srp_creds);
+        if (ret < 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Failed to initialize" ": (%d) %s", ret,
+                         gnutls_strerror(ret));
+            ret = -1;
+            goto cleanup;
+        }
     }
 
     if (sc->srp_tpasswd_conf_file != NULL && sc->srp_tpasswd_file != NULL) {
@@ -160,14 +227,16 @@ int mgs_load_files(apr_pool_t * p, server_rec * s)
     }
 #endif
 
-    ret = gnutls_dh_params_init(&sc->dh_params);
-    if (ret < 0) {
-	    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-			 "GnuTLS: Failed to initialize"
-			 ": (%d) %s", ret, gnutls_strerror(ret));
-	    ret = -1;
-	    goto cleanup;
-    }
+    if (sc->dh_params == NULL)
+    {
+        ret = gnutls_dh_params_init(&sc->dh_params);
+        if (ret < 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Failed to initialize"
+                         ": (%d) %s", ret, gnutls_strerror(ret));
+            ret = -1;
+            goto cleanup;
+        }
 
     /* Load DH parameters */
     if (sc->dh_file) {
@@ -204,10 +273,12 @@ int mgs_load_files(apr_pool_t * p, server_rec * s)
             goto cleanup;
         }
     }
+    }
 
-    if (sc->x509_cert_file != NULL) {
-	unsigned int chain_num, i;
-	unsigned format = GNUTLS_X509_FMT_PEM;
+    if (sc->x509_cert_file != NULL && sc->certs_x509_crt_chain[0] == NULL)
+    {
+        unsigned int chain_num = MAX_CHAIN_SIZE;
+        unsigned format = GNUTLS_X509_FMT_PEM;
 
 	/* Load X.509 certificate */
 	if (strncmp(sc->x509_cert_file, "pkcs11:", 7) == 0) {
@@ -258,10 +329,9 @@ int mgs_load_files(apr_pool_t * p, server_rec * s)
 	    }
 	}
 
-	ret =
-	    gnutls_x509_crt_list_import2(&sc->certs_x509_crt_chain,
-					&chain_num, &data, format,
-					GNUTLS_X509_CRT_LIST_FAIL_IF_UNSORTED);
+	ret = gnutls_x509_crt_list_import(sc->certs_x509_crt_chain,
+                                      &chain_num, &data, format,
+                                      GNUTLS_X509_CRT_LIST_FAIL_IF_UNSORTED);
 	gnutls_free(data.data);
 	sc->certs_x509_chain_num = chain_num;
 
@@ -273,7 +343,8 @@ int mgs_load_files(apr_pool_t * p, server_rec * s)
 	    goto cleanup;
 	}
 
-	for (i = 0; i < chain_num; i++) {
+    for (unsigned int i = 0; i < chain_num; i++)
+    {
 	    ret =
 		gnutls_pcert_import_x509(&sc->certs_x509_chain[i],
 					 sc->certs_x509_crt_chain[i], 0);
@@ -288,7 +359,8 @@ int mgs_load_files(apr_pool_t * p, server_rec * s)
 	sc->certs_x509_chain_num = chain_num;
     }
 
-    if (sc->x509_key_file) {
+    if (sc->x509_key_file && sc->privkey_x509 == NULL)
+    {
 	ret = gnutls_privkey_init(&sc->privkey_x509);
 	if (ret < 0) {
 	    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
@@ -512,7 +584,8 @@ int mgs_load_files(apr_pool_t * p, server_rec * s)
 	}
     }
 
-    if (sc->priorities_str) {
+    if (sc->priorities_str && sc->priorities == NULL)
+    {
         const char *err;
         ret = gnutls_priority_init(&sc->priorities, sc->priorities_str, &err);
 
@@ -956,6 +1029,11 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
 
     sc->privkey_x509 = NULL;
     sc->privkey_pgp = NULL;
+    sc->anon_creds = NULL;
+#ifdef ENABLE_SRP
+    sc->srp_creds = NULL;
+#endif
+    sc->certs = NULL;
     sc->certs_x509_chain_num = 0;
     sc->p11_modules = NULL;
     sc->pin = NULL;
