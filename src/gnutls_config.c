@@ -150,6 +150,22 @@ static apr_status_t mgs_pool_free_credentials(void *arg)
         sc->ca_list = NULL;
     }
 
+    if (sc->privkey_pgp)
+    {
+        gnutls_privkey_deinit(sc->privkey_pgp);
+        sc->privkey_pgp = NULL;
+#if GNUTLS_VERSION_NUMBER < 0x030312
+        gnutls_openpgp_privkey_deinit(sc->privkey_pgp_internal);
+        sc->privkey_pgp_internal = NULL;
+#endif
+    }
+
+    if (sc->pgp_list)
+    {
+        gnutls_openpgp_keyring_deinit(sc->pgp_list);
+        sc->pgp_list = NULL;
+    }
+
     if (sc->priorities)
     {
         gnutls_priority_deinit(sc->priorities);
@@ -496,7 +512,8 @@ int mgs_load_files(apr_pool_t * p, server_rec * s)
     }
 
     /* Load the PGP key file */
-    if (sc->pgp_key_file) {
+    if (sc->pgp_key_file && sc->privkey_pgp == NULL)
+    {
         if (load_datum_from_file(spool, sc->pgp_key_file, &data) != 0) {
             ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
                          "GnuTLS: Error Reading " "Private Key '%s'",
@@ -572,7 +589,7 @@ int mgs_load_files(apr_pool_t * p, server_rec * s)
     }
 
     /* Load the keyring file */
-    if (sc->pgp_ring_file)
+    if (sc->pgp_ring_file && sc->pgp_list == NULL)
     {
         if (load_datum_from_file(spool, sc->pgp_ring_file, &data) != 0) {
             ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
@@ -1047,7 +1064,6 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
     sc->enabled = GNUTLS_ENABLED_UNSET;
 
     sc->privkey_x509 = NULL;
-    sc->privkey_pgp = NULL;
     sc->anon_creds = NULL;
 #ifdef ENABLE_SRP
     sc->srp_creds = NULL;
@@ -1056,6 +1072,13 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
     sc->certs_x509_chain_num = 0;
     sc->p11_modules = NULL;
     sc->pin = NULL;
+
+    sc->privkey_pgp = NULL;
+#if GNUTLS_VERSION_NUMBER < 0x030312
+    sc->privkey_pgp_internal = NULL;
+#endif
+    sc->pgp_list = NULL;
+
     sc->priorities_str = NULL;
     sc->cache_timeout = -1;	/* -1 means "unset" */
     sc->cache_type = mgs_cache_unset;
