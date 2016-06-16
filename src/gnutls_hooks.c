@@ -160,7 +160,7 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session) {
     /* Set Anon credentials */
     gnutls_credentials_set(session, GNUTLS_CRD_ANON, ctxt->sc->anon_creds);
 
-    if (ctxt->sc->ocsp_response_file != NULL)
+    if (ctxt->sc->ocsp_staple)
     {
         gnutls_certificate_set_ocsp_status_request_function(ctxt->sc->certs,
                                                             mgs_get_ocsp_response,
@@ -401,9 +401,12 @@ int mgs_hook_post_config(apr_pool_t *pconf,
             return HTTP_NOT_FOUND;
         }
 
+        if (sc->ocsp_staple == GNUTLS_ENABLED_UNSET)
+            sc->ocsp_staple = GNUTLS_ENABLED_FALSE;
+
         sc->ocsp_mutex = sc_base->ocsp_mutex;
         /* init OCSP configuration if OCSP is enabled for this host */
-        if (sc->ocsp_response_file != NULL)
+        if (sc->ocsp_staple)
         {
             rv = mgs_ocsp_post_config_server(pconf, ptemp, s);
             if (rv != OK && rv != DECLINED)

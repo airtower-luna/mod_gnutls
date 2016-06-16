@@ -68,6 +68,23 @@ static void _log_verify_fail_reason(const unsigned int verify, server_rec *s)
 
 
 
+const char *mgs_ocsp_stapling_enable(cmd_parms *parms,
+                                     void *dummy __attribute__((unused)),
+                                     const int arg)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(parms->server->module_config, &gnutls_module);
+
+    if (arg)
+        sc->ocsp_staple = GNUTLS_ENABLED_TRUE;
+    else
+        sc->ocsp_staple = GNUTLS_ENABLED_FALSE;
+
+    return NULL;
+}
+
+
+
 const char *mgs_store_ocsp_response_path(cmd_parms *parms,
                                          void *dummy __attribute__((unused)),
                                          const char *arg)
@@ -591,9 +608,8 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
         return rv;
     }
 
-    /* TODO: separate option to enable/disable OCSP stapling, same for
-     * nonce, restore reading response from file for debugging/expert
-     * use. */
+    /* TODO: separate option to enable/disable nonce, restore reading
+     * response from file for debugging/expert use. */
 
     apr_time_t expiry;
     if (check_ocsp_response(s, &resp, &expiry, &nonce) != GNUTLS_E_SUCCESS)
@@ -634,9 +650,9 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
                           gnutls_datum_t *ocsp_response)
 {
     mgs_handle_t *ctxt = (mgs_handle_t *) ptr;
-    if (ctxt->sc->cache == NULL)
+    if (!ctxt->sc->ocsp_staple || ctxt->sc->cache == NULL)
     {
-        /* OCSP caching requires a cache. */
+        /* OCSP must be enabled and caching requires a cache. */
         return GNUTLS_E_NO_CERTIFICATE_STATUS;
     }
 

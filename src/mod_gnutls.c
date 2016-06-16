@@ -271,6 +271,10 @@ static const command_rec mgs_config_cmds[] = {
     RSRC_CONF,
     "The priorities to enable for proxy connections (ciphers, key exchange, "
     "MACs, compression)."),
+    AP_INIT_FLAG("GnuTLSOCSPStapling", mgs_ocsp_stapling_enable,
+                 NULL,
+                 RSRC_CONF,
+                 "EXPERIMENTAL: Enable OCSP stapling"),
     AP_INIT_TAKE1("GnuTLSOCSPResponseFile", mgs_store_ocsp_response_path,
     NULL,
     RSRC_CONF,
