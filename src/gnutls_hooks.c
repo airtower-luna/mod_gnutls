@@ -53,7 +53,8 @@ static int mgs_status_hook(request_rec *r, int flags);
 #ifdef ENABLE_MSVA
 static const char* mgs_x509_construct_uid(request_rec * pool, gnutls_x509_crt_t cert);
 #endif
-static int load_proxy_x509_credentials(server_rec *s);
+static int load_proxy_x509_credentials(apr_pool_t *pconf, apr_pool_t *ptemp, server_rec *s)
+    __attribute__((nonnull));
 
 /* Pool Cleanup Function */
 apr_status_t mgs_cleanup_pre_config(void *data __attribute__((unused))) {
@@ -490,7 +491,7 @@ int mgs_hook_post_config(apr_pool_t *pconf,
 
         if (sc->enabled == GNUTLS_ENABLED_TRUE
             && sc->proxy_enabled == GNUTLS_ENABLED_TRUE
-            && load_proxy_x509_credentials(s) != APR_SUCCESS)
+            && load_proxy_x509_credentials(pconf, ptemp, s) != APR_SUCCESS)
         {
             ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
                          "%s: loading proxy credentials for host "
@@ -1818,7 +1819,9 @@ static int gtls_check_server_cert(gnutls_session_t session)
 
 
 
-static apr_status_t load_proxy_x509_credentials(server_rec *s)
+static apr_status_t load_proxy_x509_credentials(apr_pool_t *pconf __attribute__((unused)),
+                                                apr_pool_t *ptemp,
+                                                server_rec *s)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
@@ -1831,7 +1834,7 @@ static apr_status_t load_proxy_x509_credentials(server_rec *s)
 
     /* Function pool, gets destroyed before exit. */
     apr_pool_t *pool;
-    ret = apr_pool_create(&pool, s->process->pool);
+    ret = apr_pool_create(&pool, ptemp);
     if (ret != APR_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, ret, s,
