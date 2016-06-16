@@ -1822,7 +1822,37 @@ static int gtls_check_server_cert(gnutls_session_t session)
 
 
 
-static apr_status_t load_proxy_x509_credentials(apr_pool_t *pconf __attribute__((unused)),
+static apr_status_t cleanup_proxy_x509_credentials(void *arg)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *) arg;
+
+    if (sc->proxy_x509_creds)
+    {
+        /* This implicitly releases the associated trust list
+         * sc->proxy_x509_tl, too. */
+        gnutls_certificate_free_credentials(sc->proxy_x509_creds);
+        sc->proxy_x509_creds = NULL;
+        sc->proxy_x509_tl = NULL;
+    }
+
+    if (sc->anon_client_creds)
+    {
+        gnutls_anon_free_client_credentials(sc->anon_client_creds);
+        sc->anon_client_creds = NULL;
+    }
+
+    if (sc->proxy_priorities)
+    {
+        gnutls_priority_deinit(sc->proxy_priorities);
+        sc->proxy_priorities = NULL;
+    }
+
+    return APR_SUCCESS;
+}
+
+
+
+static apr_status_t load_proxy_x509_credentials(apr_pool_t *pconf,
                                                 apr_pool_t *ptemp,
                                                 server_rec *s)
 {
@@ -1832,8 +1862,12 @@ static apr_status_t load_proxy_x509_credentials(apr_pool_t *pconf __attribute__(
     if (sc == NULL)
         return APR_EGENERAL;
 
-    apr_status_t ret = APR_SUCCESS;
+    apr_status_t ret = APR_EINIT;
     int err = GNUTLS_E_SUCCESS;
+
+    /* Cleanup function for the GnuTLS structures allocated below */
+    apr_pool_cleanup_register(pconf, sc, cleanup_proxy_x509_credentials,
+                              apr_pool_cleanup_null);
 
     /* Function pool, gets destroyed before exit. */
     apr_pool_t *pool;

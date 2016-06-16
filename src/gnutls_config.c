@@ -1112,7 +1112,10 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
     sc->proxy_x509_ca_file = NULL;
     sc->proxy_x509_crl_file = NULL;
     sc->proxy_priorities_str = NULL;
+    sc->proxy_x509_creds = NULL;
+    sc->anon_client_creds = NULL;
     sc->proxy_priorities = NULL;
+    sc->proxy_x509_tl = NULL;
 
     sc->ocsp_response_file = NULL;
     sc->ocsp_mutex = NULL;
