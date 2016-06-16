@@ -6,10 +6,16 @@
 
 # trigger OCSP server test in the runtests script
 export CHECK_OCSP_SERVER="true"
-export OCSP_RESPONSE_FILE="$(mktemp mod_gnutls_test-XXXXXX.der)"
 
 ${srcdir}/runtests t-27
 ret=${?}
 
-rm "${OCSP_RESPONSE_FILE}"
+echo "Checking if client actually got a stapled response."
+if grep -P "^- Options: .*OCSP status request," outputs/27_*.output; then
+    echo "OK"
+else
+    echo "Error: \"OCSP status request\" option is missing!"
+    ret=1
+fi
+
 exit ${ret}
