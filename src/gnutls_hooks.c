@@ -1793,27 +1793,30 @@ static int gtls_check_server_cert(gnutls_session_t session)
         return err;
     }
 
-    gnutls_datum_t * out = gnutls_malloc(sizeof(gnutls_datum_t));
-    /* GNUTLS_CRT_X509: ATM, only X509 is supported for proxy certs
-     * 0: according to function API, the last argument should be 0 */
-    err = gnutls_certificate_verification_status_print(status, GNUTLS_CRT_X509,
-                                                       out, 0);
-    if (err != GNUTLS_E_SUCCESS)
+    if (status == 0)
         ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
-                      "%s: server verify print failed: %s (%d)",
-                      __func__, gnutls_strerror(err), err);
+                      "%s: server certificate is trusted.",
+                      __func__);
     else
     {
-        /* If the certificate is trusted, logging the result is just
-         * nice for debugging. But if the back end server provided an
-         * untrusted certificate, warn! */
-        int level = (status == 0 ? APLOG_DEBUG : APLOG_WARNING);
-        ap_log_cerror(APLOG_MARK, level, 0, ctxt->c,
-                      "%s: server certificate verify result: %s",
-                      __func__, out->data);
+        gnutls_datum_t out;
+        /* GNUTLS_CRT_X509: ATM, only X509 is supported for proxy
+         * certs 0: according to function API, the last argument
+         * should be 0 */
+        err = gnutls_certificate_verification_status_print(status,
+                                                           GNUTLS_CRT_X509,
+                                                           &out, 0);
+        if (err != GNUTLS_E_SUCCESS)
+            ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, ctxt->c,
+                          "%s: server verify print failed: %s (%d)",
+                          __func__, gnutls_strerror(err), err);
+        else
+            ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, ctxt->c,
+                          "%s: %s",
+                          __func__, out.data);
+        gnutls_free(out.data);
     }
 
-    gnutls_free(out);
     return status;
 }
 
