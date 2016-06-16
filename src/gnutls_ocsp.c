@@ -579,40 +579,59 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
         return rv;
     }
 
-    gnutls_datum_t req;
-    gnutls_datum_t nonce;
-    int ret = mgs_create_ocsp_request(s, &req, &nonce);
-    if (ret == GNUTLS_E_SUCCESS)
+    gnutls_datum_t resp;
+    gnutls_datum_t nonce = { NULL, 0 };
+
+    if (sc->ocsp_response_file != NULL)
     {
-        ap_log_error(APLOG_MARK, APLOG_TRACE2, APR_SUCCESS, s,
-                     "created OCSP request for %s:%d: %s",
-                     s->server_hostname, s->addrs->host_port,
-                     apr_pescape_hex(tmp, req.data, req.size, 0));
+        ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
+                     "Loading OCSP response from %s",
+                     sc->ocsp_response_file);
+        rv = datum_from_file(tmp, sc->ocsp_response_file, &resp);
+        if (rv != APR_SUCCESS)
+        {
+            ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
+                         "Loading OCSP response from %s failed!",
+                         sc->ocsp_response_file);
+            apr_pool_destroy(tmp);
+            return rv;
+        }
     }
     else
     {
+        gnutls_datum_t req;
+        int ret = mgs_create_ocsp_request(s, &req, &nonce);
+        if (ret == GNUTLS_E_SUCCESS)
+        {
+            ap_log_error(APLOG_MARK, APLOG_TRACE2, APR_SUCCESS, s,
+                         "created OCSP request for %s:%d: %s",
+                         s->server_hostname, s->addrs->host_port,
+                         apr_pescape_hex(tmp, req.data, req.size, 0));
+        }
+        else
+        {
+            gnutls_free(req.data);
+            gnutls_free(nonce.data);
+            apr_pool_destroy(tmp);
+            return APR_EGENERAL;
+        }
+
+        rv = do_ocsp_request(tmp, s, &req, &resp);
         gnutls_free(req.data);
-        gnutls_free(nonce.data);
-        apr_pool_destroy(tmp);
-        return APR_EGENERAL;
+        if (rv != APR_SUCCESS)
+        {
+            /* do_ocsp_request() does its own error logging. */
+            gnutls_free(nonce.data);
+            apr_pool_destroy(tmp);
+            return rv;
+        }
     }
 
-    gnutls_datum_t resp;
-    rv = do_ocsp_request(tmp, s, &req, &resp);
-    gnutls_free(req.data);
-    if (rv != APR_SUCCESS)
-    {
-        /* do_ocsp_request() does its own error logging. */
-        gnutls_free(nonce.data);
-        apr_pool_destroy(tmp);
-        return rv;
-    }
-
-    /* TODO: separate option to enable/disable nonce, restore reading
-     * response from file for debugging/expert use. */
+    /* TODO: separate option to enable/disable nonce */
 
     apr_time_t expiry;
-    if (check_ocsp_response(s, &resp, &expiry, &nonce) != GNUTLS_E_SUCCESS)
+    if (check_ocsp_response(s, &resp, &expiry, nonce.size ? &nonce : NULL)
+        != GNUTLS_E_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_EGENERAL, s,
                      "OCSP response validation failed, cannot "

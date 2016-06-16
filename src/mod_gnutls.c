@@ -272,18 +272,17 @@ static const command_rec mgs_config_cmds[] = {
     "The priorities to enable for proxy connections (ciphers, key exchange, "
     "MACs, compression)."),
     AP_INIT_FLAG("GnuTLSOCSPStapling", mgs_ocsp_stapling_enable,
-                 NULL,
-                 RSRC_CONF,
+                 NULL, RSRC_CONF,
                  "EXPERIMENTAL: Enable OCSP stapling"),
     AP_INIT_TAKE1("GnuTLSOCSPResponseFile", mgs_store_ocsp_response_path,
-    NULL,
-    RSRC_CONF,
-    "EXPERIMENTAL: OCSP response for stapling (must be updated externally)"),
+                  NULL, RSRC_CONF,
+                  "EXPERIMENTAL: Read OCSP response for stapling from this "
+                  "file instead of sending a request over HTTP (must be "
+                  "updated externally)"),
     AP_INIT_TAKE1("GnuTLSOCSPGraceTime", mgs_set_timeout,
-    NULL,
-    RSRC_CONF,
-    "EXPERIMENTAL: Replace cached OCSP responses this many seconds before "
-    "they expire"),
+                  NULL, RSRC_CONF,
+                  "EXPERIMENTAL: Replace cached OCSP responses this many "
+                  "seconds before they expire"),
 #ifdef __clang__
     /* Workaround for this clang bug:
      * https://llvm.org/bugs/show_bug.cgi?id=21689 */

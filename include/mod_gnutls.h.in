@@ -212,8 +212,8 @@ typedef struct {
 
     /* EXPERIMENTAL: Enable OCSP stapling */
     unsigned char ocsp_staple;
-    /* EXPERIMENTAL: OCSP response file for stapling, will go away
-     * once sending OCSP requests is implemented */
+    /* EXPERIMENTAL: Read OCSP response for stapling from this file
+     * instead of sending a request over HTTP */
     char *ocsp_response_file;
     /* Server specific OCSP data */
     mgs_ocsp_data_t ocsp;
