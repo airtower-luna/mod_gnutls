@@ -1180,12 +1180,6 @@ void *mgs_config_server_merge(apr_pool_t * p, void *BASE, void *ADD)
     gnutls_srvconf_assign(ocsp_response_file);
     gnutls_srvconf_merge(ocsp_grace_time, apr_time_from_sec(MGS_GRACE_TIME));
 
-    /* FIXME: the following items are pre-allocated, and should be
-     * properly disposed of before assigning in order to avoid leaks;
-     * so at the moment, we can't actually have them in the config.
-     * what happens during de-allocation? */
-    /* TODO: mgs_load_files takes care of most of these now, verify
-     * and clean up the following lines */
     gnutls_srvconf_assign(ca_list);
     gnutls_srvconf_assign(ca_list_size);
     gnutls_srvconf_assign(cert_pgp);
