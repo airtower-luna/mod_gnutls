@@ -57,8 +57,10 @@ static int load_proxy_x509_credentials(apr_pool_t *pconf, apr_pool_t *ptemp, ser
     __attribute__((nonnull));
 
 /* Pool Cleanup Function */
-apr_status_t mgs_cleanup_pre_config(void *data __attribute__((unused))) {
-	/* Free all session data */
+apr_status_t mgs_cleanup_pre_config(void *data __attribute__((unused)))
+{
+    /* Free session ticket master key */
+    gnutls_memset(session_ticket_key.data, 0, session_ticket_key.size);
     gnutls_free(session_ticket_key.data);
     session_ticket_key.data = NULL;
     session_ticket_key.size = 0;
