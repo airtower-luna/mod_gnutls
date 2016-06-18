@@ -874,6 +874,15 @@ int mgs_ocsp_post_config_server(apr_pool_t *pconf,
 
     sc->ocsp->uri = mgs_cert_get_ocsp_uri(pconf,
                                           sc->certs_x509_crt_chain[0]);
+    if (sc->ocsp->uri == NULL && sc->ocsp_response_file == NULL)
+    {
+        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
+                     "OCSP stapling is enabled for for %s:%d, but there is "
+                     "neither an OCSP URI in the certificate nor a "
+                     "GnuTLSOCSPResponseFile setting for this host!",
+                     server->server_hostname, server->addrs->host_port);
+        return HTTP_NOT_FOUND;
+    }
 
     sc->ocsp->trust = apr_palloc(pconf,
                                  sizeof(gnutls_x509_trust_list_t));
