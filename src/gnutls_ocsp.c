@@ -392,10 +392,18 @@ static gnutls_datum_t mgs_get_cert_fingerprint(apr_pool_t *p,
     /* Safe integer type conversion: The types of fingerprint.size
      * (unsigned int) and fplen (size_t) may have different
      * lengths. */
+#if defined(__GNUC__) && __GNUC__ < 5 && !defined(__clang__)
+    if (__builtin_expect(fplen <= UINT_MAX, 1))
+    {
+        fingerprint.size = (unsigned int) fplen;
+        fingerprint.data = fp;
+    }
+#else
     if (__builtin_add_overflow(fplen, 0, &fingerprint.size))
         fingerprint.size = 0;
     else
         fingerprint.data = fp;
+#endif
     return fingerprint;
 }
 
@@ -540,14 +548,21 @@ static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
         goto exit;
     }
 
-    /* With the length restriction this really should not happen. */
+    /* With the length restriction this really should not overflow. */
+#if defined(__GNUC__) && __GNUC__ < 5 && !defined(__clang__)
+    if (__builtin_expect(len > UINT_MAX, 0))
+#else
     if (__builtin_add_overflow(len, 0, &response->size))
+#endif
     {
         response->data = NULL;
         rv = APR_ENOMEM;
     }
     else
     {
+#if defined(__GNUC__) && __GNUC__ < 5 && !defined(__clang__)
+        response->size = (unsigned int) len;
+#endif
         response->data = apr_pmemdup(p, buf, len);
     }
 

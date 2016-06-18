@@ -111,9 +111,17 @@ apr_status_t datum_from_file(apr_pool_t *p, const char* filename,
 
     apr_file_close(file);
 
-    /* safe integer type conversion */
+    /* safe integer type conversion: unsigned int and apr_size_t might
+     * have different sizes */
+#if defined(__GNUC__) && __GNUC__ < 5 && !defined(__clang__)
+    if (__builtin_expect(br > UINT_MAX, 0))
+        return APR_EINVAL;
+    else
+        datum->size = (unsigned int) br;
+#else
     if (__builtin_add_overflow(br, 0, &datum->size))
         return APR_EINVAL;
+#endif
 
     return rv;
 }
