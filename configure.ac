@@ -25,13 +25,13 @@ AC_PROG_LIBTOOL
 
 AC_CONFIG_MACRO_DIR([m4])
 
-AP_VERSION=2.2.0
+AP_VERSION=2.4.0
 CHECK_APACHE(,$AP_VERSION,
     :,:,
     AC_MSG_ERROR([*** Apache version $AP_VERSION not found!])
 )
 
-PKG_CHECK_MODULES([LIBGNUTLS], [gnutls >= 3.1.4])
+PKG_CHECK_MODULES([LIBGNUTLS], [gnutls >= 3.3.0])
 
 LIBGNUTLS_VERSION=`pkg-config --modversion gnutls`
 
