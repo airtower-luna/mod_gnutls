@@ -24,6 +24,10 @@
 APLOG_USE_MODULE(gnutls);
 #endif
 
+#if defined(__GNUC__) && __GNUC__ < 5 && !defined(__clang__)
+#include <inttypes.h>
+#endif
+
 /**
  * Describe how the GnuTLS Filter system works here
  *  - Basicly the same as what mod_ssl does with OpenSSL.
@@ -564,6 +568,21 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
          * might have different lengths. Read sizes should be too
          * small for 32 or 64 bit to matter, but we have to make
          * sure. */
+#if defined(__GNUC__) && __GNUC__ < 5 && !defined(__clang__)
+        if ((apr_size_t) readbytes < len)
+        {
+            /* If readbytes is negative the function fails in the
+             * check above, but the compiler doesn't get that. */
+            if (__builtin_expect(imaxabs(readbytes) > SIZE_MAX, 0))
+            {
+                ap_log_cerror(APLOG_MARK, APLOG_CRIT, APR_EINVAL, ctxt->c,
+                              "%s: prevented buffer length overflow",
+                              __func__);
+                return APR_EINVAL;
+            }
+            len = (apr_size_t) readbytes;
+        }
+#else
         if ((apr_size_t) readbytes < len
             && __builtin_add_overflow(readbytes, 0, &len))
         {
@@ -572,6 +591,7 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
                           __func__);
             return APR_EINVAL;
         }
+#endif
         status =
                 gnutls_io_input_read(ctxt, ctxt->input_buffer, &len);
     } else if (ctxt->input_mode == AP_MODE_GETLINE) {

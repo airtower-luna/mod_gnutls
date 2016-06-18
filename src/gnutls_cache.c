@@ -69,7 +69,11 @@
  */
 #define MC_TAG "mod_gnutls:"
 /* two characters per byte, plus one more for '\0' */
+#if GNUTLS_VERSION_NUMBER >= 0x030400
 #define GNUTLS_SESSION_ID_STRING_LEN ((GNUTLS_MAX_SESSION_ID_SIZE * 2) + 1)
+#else
+#define GNUTLS_SESSION_ID_STRING_LEN ((GNUTLS_MAX_SESSION_ID * 2) + 1)
+#endif
 
 #if MODULE_MAGIC_NUMBER_MAJOR < 20081201
 #define ap_unixd_config unixd_config
