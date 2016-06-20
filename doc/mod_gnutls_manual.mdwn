@@ -324,66 +324,46 @@ file holds the SRP parameters and is associate with the password file
 `GnuTLSPriorities`
 ------------------
 
-Set the allowed ciphers, key exchange algorithms, MACs and compression
-methods
+Set the allowed protocol versions, ciphers, key exchange algorithms,
+MACs and compression methods
 
     GnuTLSPriorities NORMAL:+CIPHER_0:+CIPHER_1:...:+CIPHER_N
 
 Default: *none*\
 Context: server config, virtual host
 
-Takes a semi-colon separated list of ciphers, key exchange methods
-Message authentication codes and compression methods to enable.
-The allowed keywords are specified in the `gnutls_priority_init()`
-function of GnuTLS.
+Takes a colon separated list of protocol version, ciphers, key
+exchange methods message authentication codes, and compression methods
+to enable. The allowed keywords are specified in the
+`gnutls_priority_init()` function of GnuTLS.
 
-Full details can be found at [the GnuTLS documentation](http://gnutls.org/manual/html_node/Priority-Strings.html#Priority-Strings).
-In brief you can specify a set of ciphersuites from the choices:
-
-`NONE`
-:   The empty list.
-
-`EXPORT`
-:   A list with all the supported cipher combinations
-    including the `EXPORT` strength algorithms.
+Please refer to [the GnuTLS documentation](https://gnutls.org/manual/html_node/Priority-Strings.html#Priority-Strings)
+for details. A few commonly used sets are listed below, note that
+their exact meaning may change with GnuTLS versions.
 
 `PERFORMANCE`
-:   A list with all the secure cipher combinations sorted in terms of performance.
+:   A list with all the secure cipher combinations sorted in terms of
+    performance.
 
 `NORMAL`
 :   A list with all the secure cipher combinations sorted
     with respect to security margin (subjective term).
 
-`SECURE`
-:   A list with all the secure cipher combinations including
-    the 256-bit ciphers sorted with respect to security margin.
+`SECURE128`
+:   A list with all the secure cipher suites that offer a security level
+    of 128-bit or more.
 
-Additionally you can add or remove algorithms using the `+` and `!`
-prefixes respectively.
+`PFS`
+:   Only cipher suites offering perfect forward secrecy (ECDHE and DHE),
+    sorted by security margin.
 
-For example, in order to disable the `ARCFOUR` cipher from the `NORMAL` set
-you can use the string `NORMAL:!ARCFOUR-128`
-
-Other options such as the protocol version and the compression method
-can be specified using the `VERS-` and `COMP-` prefixes.
-
-So in order to remove or add a specific TLS version from the `NORMAL`
-set, use `NORMAL:!VERS-SSL3.0`.  And to enable zlib compression use
-`NORMAL:+COMP-DEFLATE`.
-
-
-However it is recommended not to add compression at this level.  With
-the `NONE` set, in order to be usable, you have to specify a complete
-set of combinations of protocol versions, cipher algorithms
-(`AES-128-CBC`), key exchange algorithms (`RSA`), message
-authentication codes (`SHA1`) and compression methods (`COMP-NULL`).
+You can add or remove algorithms using the `+` and `!` prefixes
+respectively. For example, in order to use the `NORMAL` set but
+disable TLS 1.0 and 1.1 you can use the string
+`NORMAL:!VERS-TLS1.0:!VERS-TLS1.1`.
 
 You can find a list of all supported Ciphers, Versions, MACs, etc.  by
 running `gnutls-cli --list`.
-
-The special keyword `%COMPAT` will disable some security features such
-as protection against statistical attacks to ciphertext data in order to
-achieve maximum compatibility (some broken mobile clients need this).
 
 `GnuTLSP11Module`
 ------------------
