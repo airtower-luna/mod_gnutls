@@ -546,6 +546,68 @@ algorithms, MACs and compression methods for proxy connections. It
 takes the same parameters as `GnuTLSPriorities`. Required if
 `GnuTLSProxyEngine` is `On`.
 
+`GnuTLSOCSPStapling`
+------------------
+
+EXPERIMENTAL: Enable OCSP stapling for this (virtual) host.
+
+    GnuTLSOCSPStapling [On|Off]
+
+Default: *off*\
+Context: server config, virtual host
+
+OCSP stapling, formally known as the TLS Certificate Status Request
+extension, allows the server to provide the client with an OCSP
+response for its certificate during the handshake. This way the client
+does not have to send an OCSP request to the CA to check the
+certificate status, which offers privacy and performance advantages.
+
+Using OCSP stapling has a few requirements:
+
+* Caching OCSP responses requires a cache, so `GnuTLSCache` must not
+  be `none`.
+* `GnuTLSCertificateFile` must contain the issuer CA certificate in
+  addition to the server certificate so responses can be verified.
+* The certificate must either contain an OCSP access URI using HTTP,
+  or `GnuTLSOCSPResponseFile` must be set.
+
+OCSP cache updates are serialized using the `gnutls-ocsp` mutex.
+
+`GnuTLSOCSPResponseFile`
+------------------
+
+EXPERIMENTAL: Read the OCSP response for stapling from this file
+instead of sending a request over HTTP
+
+    GnuTLSOCSPResponseFile /path/to/response.der
+
+Default: *empty*\
+Context: server config, virtual host
+
+The response file must be updated externally, for example using a cron
+job. This option is an alternative to the server fetching OCSP
+responses over HTTP. Reasons to use this option include:
+
+* Performing OCSP requests separate from the web server, to prevent slow
+  responses from stalling handshakes.
+* The issuer CA uses an access method other than HTTP.
+* Testing
+
+`GnuTLSOCSPGraceTime`
+------------------
+
+EXPERIMENTAL: Replace cached OCSP responses this many seconds before
+they expire.
+
+    GnuTLSOCSPGraceTime SECONDS
+
+Default: *60*\
+Context: server config, virtual host
+
+A cached OCSP response should be updated a little before it expires to
+account for potential clock skew between server, CA, and client, as
+well as transmission time in corner cases.
+
 * * * * *
 
 Configuration Examples
