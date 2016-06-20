@@ -52,8 +52,10 @@ and restart Apache:
 Configuration Directives
 ========================
 
-`GnuTLSEnable`
---------------
+General Options
+---------------
+
+### GnuTLSEnable
 
 Enable GnuTLS for this virtual host
 
@@ -64,8 +66,7 @@ Context: virtual host
 
 This directive enables SSL/TLS Encryption for a Virtual Host.
 
-`GnuTLSCache`
--------------
+### GnuTLSCache
 
 Configure TLS Session Cache
 
@@ -107,8 +108,7 @@ mutex.
     instead of reusing old ones.  This is the default, since it
     requires no configuration.
 
-`GnuTLSCacheTimeout`
---------------------
+### GnuTLSCacheTimeout
 
 Timeout for TLS Session Cache expiration
 
@@ -121,8 +121,7 @@ Sets the timeout for TLS Session Cache entries expiration.  This
 directive is valid even if Session Tickets are used, and indicates the
 expiration time of the ticket in seconds.
 
-`GnuTLSSessionTickets`
-----------------------
+### GnuTLSSessionTickets
 
 Enable Session Tickets for the server
 
@@ -146,80 +145,9 @@ the key. If session tickets are enabled it is highly recommened to
 restart the server regularly to protect past sessions in case an
 attacker gains access to server memory.
 
-`GnuTLSCertificateFile`
------------------------
+### GnuTLSClientVerify
 
-Set to the PEM Encoded Server Certificate
-
-    GnuTLSCertificateFile FILEPATH
-
-Default: *none*\
-Context: server config, virtual host
-
-Takes an absolute or relative path to a PEM-encoded X.509 certificate to
-use as this Server's End Entity (EE) certificate. If you need to supply
-certificates for intermediate Certificate Authorities (iCAs), they
-should be listed in sequence in the file, from EE to the iCA closest to
-the root CA. Optionally, you can also include the root CA's certificate
-as the last certificate in the list.
-
-Since version 0.7 this can be a PKCS #11 URL.
-
-`GnuTLSKeyFile`
----------------
-
-Set to the PEM Encoded Server Private Key
-
-    GnuTLSKeyFile FILEPATH
-
-Default: *none*\
-Context: server config, virtual host
-
-Takes an absolute or relative path to the Server Private Key. Set
-`GnuTLSPIN` if the key file is encrypted.
-
-Since version 0.7 this can be a PKCS #11 URL.
-
-**Security Warning:**\
-This private key must be protected. It is read while Apache is still
-running as root, and does not need to be readable by the nobody or
-apache user.
-
-`GnuTLSPGPCertificateFile`
---------------------------
-
-Set to a base64 Encoded Server OpenPGP Certificate
-
-    GnuTLSPGPCertificateFile FILEPATH
-
-Default: *none*\
-Context: server config, virtual host
-
-Takes an absolute or relative path to a base64 Encoded OpenPGP
-Certificate to use as this Server's Certificate.
-
-`GnuTLSPGPKeyFile`
-------------------
-
-Set to the Server OpenPGP Secret Key
-
-    GnuTLSPGPKeyFile FILEPATH
-
-Default: *none*\
-Context: server config, virtual host
-
-Takes an absolute or relative path to the Server Private Key. This key
-cannot currently be password protected.
-
-**Security Warning:**\
- This private key must be protected. It is read while Apache is still
-running as root, and does not need to be readable by the nobody or
-apache user.
-
-`GnuTLSClientVerify`
---------------------
-
-Enable Client Certificate Verification\
+Enable Client Certificate Verification
 
     GnuTLSClientVerify [ignore|request|require]
 
@@ -245,36 +173,7 @@ re-negotiation.
     client certificate will be denied.  The `SSL_CLIENT_VERIFY`
     environment variable will only be set to `SUCCESS`.
 
-`GnuTLSClientCAFile`
---------------------
-
-Set to the PEM Encoded Certificate Authority Certificate
-
-    GnuTLSClientCAFile FILEPATH
-
-Default: *none*
-Context: server config, virtual host
-
-Takes an absolute or relative path to a PEM Encoded Certificate to use
-as a Certificate Authority with Client Certificate Authentication.
-This file may contain a list of trusted authorities.
-
-`GnuTLSPGPKeyringFile`
-----------------------
-
-Set to a base64 Encoded key ring
-
-    GnuTLSPGPKeyringFile FILEPATH
-
-Default: *none*\
-Context: server config, virtual host
-
-Takes an absolute or relative path to a base64 Encoded Certificate
-list (key ring) to use as a means of verification of Client
-Certificates.  This file should contain a list of trusted signers.
-
-`GnuTLSDHFile`
---------------
+### GnuTLSDHFile
 
 Set to the PKCS \#3 encoded Diffie Hellman parameters
 
@@ -288,41 +187,7 @@ parameters.Those are used when the DHE key exchange method is enabled.
 You can generate this file using `certtool --generate-dh-params --bits
 2048`.  If not set `mod_gnutls` will use the included parameters.
 
-`GnuTLSSRPPasswdFile`
----------------------
-
-Set to the SRP password file for SRP ciphersuites
-
-    GnuTLSSRPPasswdFile FILEPATH
-
-Default: *none*\
-Context: server config, virtual host
-
-Takes an absolute or relative path to an SRP password file. This is
-the same format as used in libsrp.  You can generate such file using
-the command `srptool --passwd /etc/tpasswd --passwd-conf
-/etc/tpasswd.conf -u test` to set a password for user test.  This
-password file holds the username, a password verifier and the
-dependency to the SRP parameters.
-
-`GnuTLSSRPPasswdConfFile`
--------------------------
-
-Set to the SRP password.conf file for SRP ciphersuites
-
-    GnuTLSSRPPasswdConfFile FILEPATH 
-
-Default: *none*\
-Context: server config, virtual host
-
-Takes an absolute or relative path to an SRP password.conf file. This
-is the same format as used in `libsrp`.  You can generate such file
-using the command `srptool --create-conf /etc/tpasswd.conf`.  This
-file holds the SRP parameters and is associate with the password file
-(the verifiers depends on these parameters).
-
-`GnuTLSPriorities`
-------------------
+### GnuTLSPriorities
 
 Set the allowed protocol versions, ciphers, key exchange algorithms,
 MACs and compression methods
@@ -365,8 +230,7 @@ disable TLS 1.0 and 1.1 you can use the string
 You can find a list of all supported Ciphers, Versions, MACs, etc.  by
 running `gnutls-cli --list`.
 
-`GnuTLSP11Module`
-------------------
+### GnuTLSP11Module
 
 Load this PKCS #11 module.
 
@@ -378,8 +242,7 @@ Context: server config
 Load this PKCS #11 provider module, instead of the system
 defaults. May occur multiple times to load multiple modules.
 
-`GnuTLSPIN`
-------------------
+### GnuTLSPIN
 
 Set the PIN to be used to access encrypted key files or PKCS #11 objects.
 
@@ -392,10 +255,9 @@ Takes a string to be used as a PIN for the protected objects in
 a security module, or as a key to be used to decrypt PKCS #8, PKCS #12,
 or openssl encrypted keys.
 
-`GnuTLSSRKPIN`
-------------------
+### GnuTLSSRKPIN
 
-Set the SRK PIN to be used to unlaccess the TPM.
+Set the SRK PIN to be used to access the TPM.
 
     GnuTLSSRKPIN XXXXXX
 
@@ -405,8 +267,7 @@ Context: server config, virtual host
 Takes a string to be used as a PIN for the protected objects in
 the TPM module.
 
-`GnuTLSExportCertificates`
---------------------------
+### GnuTLSExportCertificates
 
 Export the PEM encoded certificates to CGIs
 
@@ -433,9 +294,143 @@ the fixed string `GNUTLS_CERTIFICATE_SIZE_LIMIT_EXCEEDED`.
 With GnuTLSExportCertificates enabled, `mod_gnutls` exports the same
 environment variables to the CGI process as `mod_ssl`.
 
+X.509 Certificate Authentication
+--------------------------------
 
-`GnuTLSProxyEngine`
---------------
+### GnuTLSCertificateFile
+
+Set to the PEM Encoded Server Certificate
+
+    GnuTLSCertificateFile FILEPATH
+
+Default: *none*\
+Context: server config, virtual host
+
+Takes an absolute or relative path to a PEM-encoded X.509 certificate to
+use as this Server's End Entity (EE) certificate. If you need to supply
+certificates for intermediate Certificate Authorities (iCAs), they
+should be listed in sequence in the file, from EE to the iCA closest to
+the root CA. Optionally, you can also include the root CA's certificate
+as the last certificate in the list.
+
+Since version 0.7 this can be a PKCS #11 URL.
+
+### GnuTLSKeyFile
+
+Set to the PEM Encoded Server Private Key
+
+    GnuTLSKeyFile FILEPATH
+
+Default: *none*\
+Context: server config, virtual host
+
+Takes an absolute or relative path to the Server Private Key. Set
+`GnuTLSPIN` if the key file is encrypted.
+
+Since version 0.7 this can be a PKCS #11 URL.
+
+**Security Warning:**\
+This private key must be protected. It is read while Apache is still
+running as root, and does not need to be readable by the nobody or
+apache user.
+
+### GnuTLSClientCAFile
+
+Set the PEM encoded Certificate Authority list to use for X.509 base
+client authentication
+
+    GnuTLSClientCAFile FILEPATH
+
+Default: *none*
+Context: server config, virtual host
+
+Takes an absolute or relative path to a PEM Encoded Certificate to use
+as a Certificate Authority with Client Certificate Authentication.
+This file may contain a list of trusted authorities.
+
+OpenPGP Certificate Authentication
+----------------------------------
+
+### GnuTLSPGPCertificateFile
+
+Set to a base64 Encoded Server OpenPGP Certificate
+
+    GnuTLSPGPCertificateFile FILEPATH
+
+Default: *none*\
+Context: server config, virtual host
+
+Takes an absolute or relative path to a base64 Encoded OpenPGP
+Certificate to use as this Server's Certificate.
+
+### GnuTLSPGPKeyFile
+
+Set to the Server OpenPGP Secret Key
+
+    GnuTLSPGPKeyFile FILEPATH
+
+Default: *none*\
+Context: server config, virtual host
+
+Takes an absolute or relative path to the Server Private Key. This key
+cannot currently be password protected.
+
+**Security Warning:**\
+ This private key must be protected. It is read while Apache is still
+running as root, and does not need to be readable by the nobody or
+apache user.
+
+### GnuTLSPGPKeyringFile
+
+Set to a base64 Encoded key ring
+
+    GnuTLSPGPKeyringFile FILEPATH
+
+Default: *none*\
+Context: server config, virtual host
+
+Takes an absolute or relative path to a base64 Encoded Certificate
+list (key ring) to use as a means of verification of Client
+Certificates.  This file should contain a list of trusted signers.
+
+SRP Authentication
+------------------
+
+### GnuTLSSRPPasswdFile
+
+Set to the SRP password file for SRP ciphersuites
+
+    GnuTLSSRPPasswdFile FILEPATH
+
+Default: *none*\
+Context: server config, virtual host
+
+Takes an absolute or relative path to an SRP password file. This is
+the same format as used in libsrp.  You can generate such file using
+the command `srptool --passwd /etc/tpasswd --passwd-conf
+/etc/tpasswd.conf -u test` to set a password for user test.  This
+password file holds the username, a password verifier and the
+dependency to the SRP parameters.
+
+### GnuTLSSRPPasswdConfFile
+
+Set to the SRP password.conf file for SRP ciphersuites
+
+    GnuTLSSRPPasswdConfFile FILEPATH
+
+Default: *none*\
+Context: server config, virtual host
+
+Takes an absolute or relative path to an SRP password.conf file. This
+is the same format as used in `libsrp`.  You can generate such file
+using the command `srptool --create-conf /etc/tpasswd.conf`.  This
+file holds the SRP parameters and is associate with the password file
+(the verifiers depends on these parameters).
+
+TLS Proxy Configuration
+-----------------------
+
+### GnuTLSProxyEngine
 
 Enable TLS proxy connections for this virtual host
 
@@ -447,8 +442,7 @@ Context: virtual host
 This directive enables support for TLS proxy connections for a virtual
 host.
 
-`GnuTLSProxyCAFile`
---------------------
+### GnuTLSProxyCAFile
 
 Set to the PEM encoded Certificate Authority Certificate
 
@@ -463,8 +457,7 @@ proxy back end servers. This file may contain a list of trusted
 authorities. If not set, verification of TLS back end servers will
 always fail due to lack of a trusted CA.
 
-`GnuTLSProxyCRLFile`
---------------------
+### GnuTLSProxyCRLFile
 
 Set to the PEM encoded Certificate Revocation List
 
@@ -477,8 +470,7 @@ Takes an absolute or relative path to a PEM encoded Certificate
 Revocation List to use when verifying certificates provided by proxy
 back end servers. The file may contain a list of CRLs.
 
-`GnuTLSProxyCertificateFile`
------------------------
+### GnuTLSProxyCertificateFile
 
 Set to the PEM encoded Client Certificate
 
@@ -499,8 +491,7 @@ If not set, TLS client authentication will be disabled for TLS proxy
 connections. If set, `GnuTLSProxyKeyFile` must be set as well to
 provide the matching private key.
 
-`GnuTLSProxyKeyFile`
----------------
+### GnuTLSProxyKeyFile
 
 Set to the PEM encoded Private Key
 
@@ -518,8 +509,7 @@ This private key must be protected. It is read while Apache is still
 running as root, and does not need to be readable by the nobody or
 apache user.
 
-`GnuTLSProxyPriorities`
-------------------
+### GnuTLSProxyPriorities
 
 Set the allowed ciphers, key exchange algorithms, MACs and compression
 methods for proxy connections
@@ -534,8 +524,10 @@ algorithms, MACs and compression methods for proxy connections. It
 takes the same parameters as `GnuTLSPriorities`. Required if
 `GnuTLSProxyEngine` is `On`.
 
-`GnuTLSOCSPStapling`
-------------------
+OCSP Stapling Configuration
+---------------------------
+
+### GnuTLSOCSPStapling
 
 EXPERIMENTAL: Enable OCSP stapling for this (virtual) host.
 
@@ -561,8 +553,7 @@ Using OCSP stapling has a few requirements:
 
 OCSP cache updates are serialized using the `gnutls-ocsp` mutex.
 
-`GnuTLSOCSPResponseFile`
-------------------
+### GnuTLSOCSPResponseFile
 
 EXPERIMENTAL: Read the OCSP response for stapling from this file
 instead of sending a request over HTTP
@@ -581,8 +572,7 @@ responses over HTTP. Reasons to use this option include:
 * The issuer CA uses an access method other than HTTP.
 * Testing
 
-`GnuTLSOCSPGraceTime`
-------------------
+### GnuTLSOCSPGraceTime
 
 EXPERIMENTAL: Replace cached OCSP responses this many seconds before
 they expire.
