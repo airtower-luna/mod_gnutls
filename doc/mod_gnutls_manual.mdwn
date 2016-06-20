@@ -624,153 +624,142 @@ Configuration Examples
 Simple Standard TLS Example
 ---------------------------
 
-The following is an example of standard TLS Hosting, using one IP
-Addresses for each virtual host
+The following is an example of simple TLS hosting, using one IP
+Addresses for each virtual host.
 
      # Load the module into Apache.
      LoadModule gnutls_module modules/mod_gnutls.so
      GnuTLSCache gdbm /var/cache/www-tls-cache
      GnuTLSCacheTimeout 500
-     # With normal TLS Websites, you need one IP Address per-site.
-     Listen 1.2.3.1:443
-     Listen 1.2.3.2:443
-     Listen 1.2.3.3:443
-     Listen 1.2.3.4:443
-     <VirtualHost 1.2.3.1:443>
-     GnuTLSEnable on
-     GnuTLSPriorities NONE:+AES-128-CBC:+3DES-CBC:+ARCFOUR-128:+RSA:+DHE-RSA:+DHE-DSS:+SHA1:+MD5:+COMP-NULL
-     DocumentRoot /www/site1.example.com/html
-     ServerName site1.example.com:443
-     GnuTLSCertificateFile conf/ssl/site1.crt
-     GnuTLSKeyFile conf/ss/site1.key
+
+     # Without SNI you need one IP Address per-site.
+     Listen 192.0.2.1:443
+     Listen 192.0.2.2:443
+     Listen 192.0.2.3:443
+     Listen 192.0.2.4:443
+
+     <VirtualHost 192.0.2.1:443>
+         GnuTLSEnable on
+         GnuTLSPriorities SECURE128
+         DocumentRoot /www/site1.example.com/html
+         ServerName site1.example.com:443
+         GnuTLSCertificateFile conf/tls/site1.crt
+         GnuTLSKeyFile conf/tls/site1.key
      </VirtualHost>
-     <VirtualHost 1.2.3.2:443>
-     # This virtual host enables SRP authentication
-     GnuTLSEnable on
-     GnuTLSPriorities NORMAL:+SRP
-     DocumentRoot /www/site2.example.com/html
-     ServerName site2.example.com:443
-     GnuTLSSRPPasswdFile conf/ssl/tpasswd.site2
-     GnuTLSSRPPasswdConfFile conf/ssl/tpasswd.site2.conf
+
+     <VirtualHost 192.0.2.2:443>
+         # This virtual host enables SRP authentication
+         GnuTLSEnable on
+         GnuTLSPriorities NORMAL:+SRP
+         DocumentRoot /www/site2.example.com/html
+         ServerName site2.example.com:443
+         GnuTLSSRPPasswdFile conf/tls/tpasswd.site2
+         GnuTLSSRPPasswdConfFile conf/tls/tpasswd.site2.conf
      </VirtualHost>
-     <VirtualHost 1.2.3.3:443>
-     # This server enables SRP, OpenPGP and X.509 authentication.
-     GnuTLSEnable on
-     GnuTLSPriorities NORMAL:+SRP:+SRP-RSA:+SRP-DSS
-     DocumentRoot /www/site3.example.com/html
-     ServerName site3.example.com:443
-     GnuTLSCertificateFile conf/ssl/site3.crt
-     GnuTLSKeyFile conf/ss/site3.key
-     GnuTLSClientVerify ignore
-     GnuTLSPGPCertificateFile conf/ss/site3.pub.asc
-     GnuTLSPGPKeyFile conf/ss/site3.sec.asc
-     GnuTLSSRPPasswdFile conf/ssl/tpasswd.site3
-     GnuTLSSRPPasswdConfFile conf/ssl/tpasswd.site3.conf
+
+     <VirtualHost 192.0.2.3:443>
+         # This server enables SRP, OpenPGP and X.509 authentication.
+         GnuTLSEnable on
+         GnuTLSPriorities NORMAL:+SRP:+SRP-RSA:+SRP-DSS:+CTYPE-OPENPGP
+         DocumentRoot /www/site3.example.com/html
+         ServerName site3.example.com:443
+         GnuTLSCertificateFile conf/tls/site3.crt
+         GnuTLSKeyFile conf/tls/site3.key
+         GnuTLSClientVerify ignore
+         GnuTLSPGPCertificateFile conf/tls/site3.pub.asc
+         GnuTLSPGPKeyFile conf/tls/site3.sec.asc
+         GnuTLSSRPPasswdFile conf/tls/tpasswd.site3
+         GnuTLSSRPPasswdConfFile conf/tls/tpasswd.site3.conf
      </VirtualHost>
-     <VirtualHost 1.2.3.4:443>
-     GnuTLSEnable on
-     # %COMPAT disables some security features to enable maximum compatibility with clients.
-     GnuTLSPriorities NONE:+AES-128-CBC:+ARCFOUR-128:+RSA:+SHA1:+MD5:+COMP-NULL:%COMPAT
-     DocumentRoot /www/site4.example.com/html
-     ServerName site4.example.com:443
-     GnuTLSCertificateFile conf/ssl/site4.crt
-     GnuTLSKeyFile conf/ss/site4.key
+
+     <VirtualHost 192.0.2.4:443>
+         GnuTLSEnable on
+         # %COMPAT disables some security features to enable maximum
+         # compatibility with clients. Don't use this if you need strong
+         # security.
+         GnuTLSPriorities NORMAL:%COMPAT
+         DocumentRoot /www/site4.example.com/html
+         ServerName site4.example.com:443
+         GnuTLSCertificateFile conf/tls/site4.crt
+         GnuTLSKeyFile conf/tls/site4.key
      </VirtualHost>
 
 Server Name Indication Example
 ------------------------------
 
-`mod_gnutls` can also use "Server Name Indication", as specified in
-RFC 3546.  This allows hosting many TLS Websites, with a Single IP
-Address.  Currently all the recent browsers support this
-standard. Here is an example, using SNI: ` `
-
-
-     # Load the module into Apache.
-     LoadModule gnutls_module modules/mod_gnutls.so
-     # With normal TLS Websites, you need one IP Address per-site.
-     Listen 1.2.3.1:443
-     # This could also be 'Listen *:443',
-     # just like '*:80' is common for non-https
-     # This tells apache, that for this IP/Port combination, we want to use
-     # Name Based Virtual Hosting. In the case of Server Name Indication,
-     # it lets mod_gnutls pick the correct Server Certificate.
-     NameVirtualHost 1.2.3.1:443
-     <VirtualHost 1.2.3.1:443>
-     GnuTLSEnable on
-     GnuTLSSessionTickets on
-     GnuTLSPriorities NORMAL
-     DocumentRoot /www/site1.example.com/html
-     ServerName site1.example.com:443
-     GnuTLSCertificateFile conf/ssl/site1.crt
-     GnuTLSKeyFile conf/ss/site1.key
-     </VirtualHost>
-     <VirtualHost 1.2.3.1:443>
-     GnuTLSEnable on
-     GnuTLSPriorities NORMAL
-     DocumentRoot /www/site2.example.com/html
-     ServerName site2.example.com:443
-     GnuTLSCertificateFile conf/ssl/site2.crt
-     GnuTLSKeyFile conf/ss/site2.key
-     </VirtualHost>
-     <VirtualHost 1.2.3.1:443>
-     GnuTLSEnable on
-     GnuTLSPriorities NORMAL
-     DocumentRoot /www/site3.example.com/html
-     ServerName site3.example.com:443
-     GnuTLSCertificateFile conf/ssl/site3.crt
-     GnuTLSKeyFile conf/ss/site3.key
-     </VirtualHost>
-     <VirtualHost 1.2.3.1:443>
-     GnuTLSEnable on
-     GnuTLSPriorities NORMAL
-     DocumentRoot /www/site4.example.com/html
-     ServerName site4.example.com:443
-     GnuTLSCertificateFile conf/ssl/site4.crt
-     GnuTLSKeyFile conf/ss/site4.key
-     </VirtualHost>
-
-
-* * * * *
-
-Performance Issues
-==================
-
-`mod_gnutls` by default uses conservative settings for the server.
-You can fine tune the configuration to reduce the load on a busy
-server.  The following examples do exactly this:
-
+`mod_gnutls` supports "Server Name Indication", as specified in
+RFC 3546. This allows hosting many TLS websites with a single IP
+address. All recent browsers support this standard. Here is an
+example using SNI:
 
      # Load the module into Apache.
      LoadModule gnutls_module modules/mod_gnutls.so
-     # Using 4 memcache servers to distribute the TLS Session Cache.
-     GnuTLSCache memcache "mc1.example.com mc2.example.com mc3.example.com mc4.example.com"
+
+     # SNI allows hosting multiple sites using one IP address. This
+     # could also be 'Listen *:443', just like '*:80' is common for
+     # non-HTTPS
+     Listen 198.51.100.1:443
+
+     <VirtualHost _default_:443>
+         GnuTLSEnable on
+         GnuTLSSessionTickets on
+         GnuTLSPriorities NORMAL
+         DocumentRoot /www/site1.example.com/html
+         ServerName site1.example.com:443
+         GnuTLSCertificateFile conf/tls/site1.crt
+         GnuTLSKeyFile conf/tls/site1.key
+     </VirtualHost>
+
+     <VirtualHost _default_:443>
+         GnuTLSEnable on
+         GnuTLSPriorities NORMAL
+         DocumentRoot /www/site2.example.com/html
+         ServerName site2.example.com:443
+         GnuTLSCertificateFile conf/tls/site2.crt
+         GnuTLSKeyFile conf/tls/site2.key
+     </VirtualHost>
+
+     <VirtualHost _default_:443>
+         GnuTLSEnable on
+         GnuTLSPriorities NORMAL
+         DocumentRoot /www/site3.example.com/html
+         ServerName site3.example.com:443
+         GnuTLSCertificateFile conf/tls/site3.crt
+         GnuTLSKeyFile conf/tls/site3.key
+     </VirtualHost>
+
+     <VirtualHost _default_:443>
+         GnuTLSEnable on
+         GnuTLSPriorities NORMAL
+         DocumentRoot /www/site4.example.com/html
+         ServerName site4.example.com:443
+         GnuTLSCertificateFile conf/tls/site4.crt
+         GnuTLSKeyFile conf/tls/site4.key
+     </VirtualHost>
+
+OCSP Stapling Example
+---------------------
+
+This example uses an X.509 server certificate. The server will fetch
+OCSP responses from the responder listed in the certificate and store
+them im a memcached cache shared with another server.
+
+     # Load the module into Apache.
+     LoadModule gnutls_module modules/mod_gnutls.so
+     GnuTLSCache memcache "192.0.2.1:11211 192.0.2.2:11211"
      GnuTLSCacheTimeout 600
-     Listen 1.2.3.1:443
-     NameVirtualHost 1.2.3.1:443
-     <VirtualHost 1.2.3.1:443>
-     GnuTLSEnable on
-     # Here we disable the Perfect forward secrecy ciphersuites (DHE)
-     # and disallow AES-256 since AES-128 is just fine.
-     GnuTLSPriorities NORMAL:!DHE-RSA:!DHE-DSS:!AES-256-CBC:%COMPAT
-     DocumentRoot /www/site1.example.com/html
-     ServerName site1.example.com:443
-     GnuTLSCertificateFile conf/ssl/site1.crt
-     GnuTLSKeyFile conf/ss/site1.key
-     </VirtualHost>
-     <VirtualHost 1.2.3.1:443>
-     GnuTLSEnable on
-     # Here we instead of disabling the DHE ciphersuites we use
-     # Diffie Hellman parameters of smaller size than the default (2048 bits).
-     # Using small numbers from 768 to 1024 bits should be ok once they are
-     # regenerated every few hours.
-     # Use "certtool --generate-dh-params --bits 1024" to get those
-     GnuTLSDHFile /etc/apache2/dh.params
-     GnuTLSPriorities NORMAL:!AES-256-CBC:%COMPAT
-     DocumentRoot /www/site2.example.com/html
-     ServerName site2.example.com:443
-     GnuTLSCertificateFile conf/ssl/site2.crt
-     GnuTLSKeyFile conf/ss/site2.key
+
+     Listen 192.0.2.1:443
+
+     <VirtualHost _default_:443>
+         GnuTLSEnable          On
+         GnuTLSPriorities      NORMAL
+         DocumentRoot          /www/site1.example.com/html
+         ServerName            site1.example.com:443
+         GnuTLSCertificateFile conf/tls/site1.crt
+         GnuTLSKeyFile         conf/tls/site1.key
+         GnuTLSPriorities      NORMAL
+         GnuTLSOCSPStapling    On
      </VirtualHost>
 
 * * * * *
