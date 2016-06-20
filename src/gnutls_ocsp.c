@@ -268,7 +268,7 @@ int check_ocsp_response(server_rec *s, const gnutls_datum_t *ocsp_response,
             goto resp_cleanup;
         }
         else
-            ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
+            ap_log_error(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, s,
                          "OCSP response signature is valid.");
     }
 
@@ -431,7 +431,7 @@ static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
     const char* header = http_post_header(p, sc->ocsp->uri,
                                           OCSP_REQ_TYPE, OCSP_RESP_TYPE,
                                           request->size);
-    ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
+    ap_log_error(APLOG_MARK, APLOG_TRACE2, APR_SUCCESS, s,
                  "OCSP POST header: %s", header);
 
     /* Find correct port */
@@ -694,7 +694,7 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
                                             ctxt->sc->ocsp->fingerprint);
     if (ocsp_response->size == 0)
     {
-        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_EGENERAL, ctxt->c,
+        ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_EGENERAL, ctxt->c,
                       "Fetching OCSP response from cache failed.");
     }
     else
