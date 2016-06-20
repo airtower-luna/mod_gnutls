@@ -67,40 +67,40 @@ This directive enables SSL/TLS Encryption for a Virtual Host.
 `GnuTLSCache`
 -------------
 
-Configure SSL Session Cache
+Configure TLS Session Cache
 
     GnuTLSCache [dbm|gdbm|memcache|none] [PATH|SERVERLIST|-]
 
 Default: `GnuTLSCache none`\
 Context: server config
 
-This directive configures the SSL Session Cache for `mod_gnutls`.
+This directive configures the TLS Session Cache for `mod_gnutls`.
 This could be shared between machines of different architectures. If a
 DBM cache is used, access is serialized using the `gnutls-cache`
 mutex.
 
 `dbm` (Requires Berkeley DBM)
-:   Uses the default Berkeley DB backend of APR DBM to cache SSL
+:   Uses the default Berkeley DB backend of APR DBM to cache TLS
     Sessions results.  The argument is a relative or absolute path to
     be used as the DBM Cache file. This is compatible with most
     operating systems, but needs the Apache Runtime to be compiled
     with Berkeley DBM support.
 
 `gdbm`
-:   Uses the GDBM backend of APR DBM to cache SSL Sessions results.
+:   Uses the GDBM backend of APR DBM to cache TLS Sessions results.
 
     The argument is a relative or absolute path to be used as the DBM Cache
     file.  This is the recommended option.
 
 `memcache`
-:   Uses a memcached server to cache the SSL Session.
+:   Uses a memcached server to cache the TLS Session.
 
     The argument is a space separated list of servers. If no port
     number is supplied, the default of 11211 is used.  This can be
     used to share a session cache between all servers in a cluster.
 
 `none`
-:   Turns off all caching of SSL Sessions.
+:   Turns off all caching of TLS Sessions.
 
     This can significantly reduce the performance of `mod_gnutls` since
     even followup connections by a client must renegotiate parameters
@@ -110,14 +110,14 @@ mutex.
 `GnuTLSCacheTimeout`
 --------------------
 
-Timeout for SSL Session Cache expiration
+Timeout for TLS Session Cache expiration
 
     GnuTLSCacheTimeout SECONDS
 
 Default: `GnuTLSCacheTimeout 300`\
 Context: server config
 
-Sets the timeout for SSL Session Cache entries expiration.  This
+Sets the timeout for TLS Session Cache entries expiration.  This
 directive is valid even if Session Tickets are used, and indicates the
 expiration time of the ticket in seconds.
 
@@ -226,12 +226,12 @@ Enable Client Certificate Verification\
 Default: `ignore`\
 Context: server config, virtual host, directory, .htaccess
 
-This directive controls the use of SSL Client Certificate
+This directive controls the use of TLS Client Certificate
 Authentication. If used in the .htaccess context, it can force TLS
 re-negotiation.
 
 `ignore`
-:   `mod_gnutls` will ignore the contents of any SSL Client Certificates
+:   `mod_gnutls` will ignore the contents of any TLS Client Certificates
     sent. It will not request that the client sends a certificate.
 
 `request`
@@ -621,17 +621,17 @@ well as transmission time in corner cases.
 Configuration Examples
 ======================
 
-Simple Standard SSL Example
+Simple Standard TLS Example
 ---------------------------
 
-The following is an example of standard SSL Hosting, using one IP
+The following is an example of standard TLS Hosting, using one IP
 Addresses for each virtual host
 
      # Load the module into Apache.
      LoadModule gnutls_module modules/mod_gnutls.so
      GnuTLSCache gdbm /var/cache/www-tls-cache
      GnuTLSCacheTimeout 500
-     # With normal SSL Websites, you need one IP Address per-site.
+     # With normal TLS Websites, you need one IP Address per-site.
      Listen 1.2.3.1:443
      Listen 1.2.3.2:443
      Listen 1.2.3.3:443
@@ -681,14 +681,14 @@ Server Name Indication Example
 ------------------------------
 
 `mod_gnutls` can also use "Server Name Indication", as specified in
-RFC 3546.  This allows hosting many SSL Websites, with a Single IP
+RFC 3546.  This allows hosting many TLS Websites, with a Single IP
 Address.  Currently all the recent browsers support this
 standard. Here is an example, using SNI: ` `
 
 
      # Load the module into Apache.
      LoadModule gnutls_module modules/mod_gnutls.so
-     # With normal SSL Websites, you need one IP Address per-site.
+     # With normal TLS Websites, you need one IP Address per-site.
      Listen 1.2.3.1:443
      # This could also be 'Listen *:443',
      # just like '*:80' is common for non-https
@@ -743,7 +743,7 @@ server.  The following examples do exactly this:
 
      # Load the module into Apache.
      LoadModule gnutls_module modules/mod_gnutls.so
-     # Using 4 memcache servers to distribute the SSL Session Cache.
+     # Using 4 memcache servers to distribute the TLS Session Cache.
      GnuTLSCache memcache "mc1.example.com mc2.example.com mc3.example.com mc4.example.com"
      GnuTLSCacheTimeout 600
      Listen 1.2.3.1:443
