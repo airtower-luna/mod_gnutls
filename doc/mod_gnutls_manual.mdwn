@@ -132,11 +132,19 @@ Default: `off`\
 Context: server config, virtual host
 
 To avoid storing data for TLS session resumption it is allowed to
-provide client with a ticket, to use on return.  Use for servers with
-limited storage, and don't combine with GnuTLSCache. For a pool of
-servers this option is not recommended since the tickets are unique
-for the issuing server only.
+provide client with a ticket, to use on return. Tickets are an
+alternative to using a session cache, mostly used for busy servers
+with limited storage. For a pool of servers this option is not
+recommended since the tickets are bound to the issuing server only.
 
+If this option is set in the global configuration, virtual hosts
+without a `GnuTLSSessionTickets` setting will use the global setting.
+
+*Warning:* Currently the master key that protects the tickets is
+generated only on server start, and there is no mechanism to roll over
+the key. If session tickets are enabled it is highly recommened to
+restart the server regularly to protect past sessions in case an
+attacker gains access to server memory.
 
 `GnuTLSCertificateFile`
 -----------------------
@@ -684,9 +692,6 @@ standard. Here is an example, using SNI: ` `
      Listen 1.2.3.1:443
      # This could also be 'Listen *:443',
      # just like '*:80' is common for non-https
-     # No caching. Enable session tickets. Timeout is still used for
-     # ticket expiration.
-     GnuTLSCacheTimeout 600
      # This tells apache, that for this IP/Port combination, we want to use
      # Name Based Virtual Hosting. In the case of Server Name Indication,
      # it lets mod_gnutls pick the correct Server Certificate.

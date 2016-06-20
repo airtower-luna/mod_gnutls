@@ -421,7 +421,7 @@ int mgs_hook_post_config(apr_pool_t *pconf,
         if (sc->enabled == GNUTLS_ENABLED_UNSET)
             sc->enabled = GNUTLS_ENABLED_FALSE;
         if (sc->tickets == GNUTLS_ENABLED_UNSET)
-            sc->tickets = GNUTLS_ENABLED_TRUE;
+            sc->tickets = GNUTLS_ENABLED_FALSE;
         if (sc->export_certificates_size < 0)
             sc->export_certificates_size = 0;
         if (sc->client_verify_mode == -1)
@@ -831,7 +831,8 @@ static void create_gnutls_handle(conn_rec * c)
                           "gnutls_init for server side failed: %s (%d)",
                           gnutls_strerror(err), err);
         /* Initialize Session Tickets */
-        if (session_ticket_key.data != NULL && ctxt->sc->tickets != 0)
+        if (session_ticket_key.data != NULL &&
+            ctxt->sc->tickets == GNUTLS_ENABLED_TRUE)
         {
             err = gnutls_session_ticket_enable_server(ctxt->session, &session_ticket_key);
             if (err != GNUTLS_E_SUCCESS)
