@@ -172,8 +172,8 @@ static int mc_cache_child_init(apr_pool_t * p, server_rec * s,
     rv = apr_memcache_create(p, nservers, 0, &mc);
     if (rv != APR_SUCCESS) {
         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
-                "[gnutls_cache] Failed to create Memcache Object of '%d' size.",
-                nservers);
+                     "Failed to create Memcache object of size '%d'.",
+                     nservers);
         return rv;
     }
 
@@ -190,15 +190,14 @@ static int mc_cache_child_init(apr_pool_t * p, server_rec * s,
                 split, p);
         if (rv != APR_SUCCESS) {
             ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
-                    "[gnutls_cache] Failed to Parse Server: '%s'",
-                    split);
+                         "Failed to parse server: '%s'", split);
             return rv;
         }
 
         if (host_str == NULL) {
             ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
-                    "[gnutls_cache] Failed to Parse Server, "
-                    "no hostname specified: '%s'", split);
+                         "Failed to parse server, "
+                         "no hostname specified: '%s'", split);
             return rv;
         }
 
@@ -213,16 +212,16 @@ static int mc_cache_child_init(apr_pool_t * p, server_rec * s,
                 1, thread_limit, 600, &st);
         if (rv != APR_SUCCESS) {
             ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
-                    "[gnutls_cache] Failed to Create Server: %s:%d",
-                    host_str, port);
+                         "Failed to create server: %s:%d",
+                         host_str, port);
             return rv;
         }
 
         rv = apr_memcache_add_server(mc, st);
         if (rv != APR_SUCCESS) {
             ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
-                    "[gnutls_cache] Failed to Add Server: %s:%d",
-                    host_str, port);
+                         "Failed to add server: %s:%d",
+                         host_str, port);
             return rv;
         }
 
@@ -240,8 +239,8 @@ static int mc_cache_store(server_rec *s, const char *key,
     if (rv != APR_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
-                     "[gnutls_cache] error setting key '%s' "
-                     "with %d bytes of data", key, data.size);
+                     "error storing key '%s' with %d bytes of data",
+                     key, data.size);
         return -1;
     }
 
@@ -298,7 +297,7 @@ static gnutls_datum_t mc_cache_fetch(conn_rec *c, const char *key)
     {
 #if MOD_GNUTLS_DEBUG
         ap_log_cerror(APLOG_MARK, APLOG_DEBUG, rv, c,
-                      "[gnutls_cache] error fetching key '%s' ",
+                      "error fetching key '%s'",
                       key);
 #endif
         return data;
@@ -352,9 +351,9 @@ static int mc_cache_delete(void *baton, gnutls_datum_t key) {
 
     if (rv != APR_SUCCESS) {
         ap_log_error(APLOG_MARK, APLOG_DEBUG, rv,
-                ctxt->c->base_server,
-                "[gnutls_cache] error deleting key '%s' ",
-                strkey);
+                     ctxt->c->base_server,
+                     "error deleting key '%s'",
+                     strkey);
         return -1;
     }
 
@@ -404,8 +403,8 @@ static void dbm_cache_expire(server_rec *s)
             SSL_DBM_FILE_MODE, spool);
     if (rv != APR_SUCCESS) {
         ap_log_error(APLOG_MARK, APLOG_NOTICE, rv, s,
-                "[gnutls_cache] error opening cache '%s'",
-                sc->cache_config);
+                     "error opening cache '%s'",
+                     sc->cache_config);
         apr_global_mutex_unlock(sc->cache->mutex);
         apr_pool_destroy(spool);
         return;
@@ -435,8 +434,8 @@ static void dbm_cache_expire(server_rec *s)
     rv = apr_global_mutex_unlock(sc->cache->mutex);
 
     ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, s,
-            "[gnutls_cache] Cleaned up cache '%s'. Deleted %d and left %d",
-            sc->cache_config, deleted, total - deleted);
+                 "Cleaned up cache '%s'. Deleted %d and left %d",
+                 sc->cache_config, deleted, total - deleted);
 
     apr_pool_destroy(spool);
 
@@ -487,7 +486,7 @@ static gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
         goto cleanup;
     }
 
-    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, rv, ctxt->c,
+    ap_log_cerror(APLOG_MARK, APLOG_TRACE1, rv, ctxt->c,
                   "fetched %ld bytes from cache",
                   dbmval.dsize);
 
@@ -505,7 +504,7 @@ static gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
         gnutls_free(data.data);
         data.data = NULL;
         data.size = 0;
-        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+        ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, ctxt->c,
                       "dropped expired cache data");
     }
 
@@ -580,7 +579,7 @@ static int dbm_cache_store(server_rec *s, gnutls_datum_t key,
     apr_dbm_close(dbm);
     apr_global_mutex_unlock(sc->cache->mutex);
 
-    ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, s,
+    ap_log_error(APLOG_MARK, APLOG_TRACE1, rv, s,
                  "stored %ld bytes of data (%ld byte key) in cache '%s'",
                  dbmval.dsize, dbmkey.dsize, sc->cache_config);
 
@@ -621,9 +620,9 @@ static int dbm_cache_delete(void *baton, gnutls_datum_t key)
             SSL_DBM_FILE_MODE, ctxt->c->pool);
     if (rv != APR_SUCCESS) {
         ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
-                ctxt->c->base_server,
-                "[gnutls_cache] error opening cache '%s'",
-                ctxt->sc->cache_config);
+                     ctxt->c->base_server,
+                     "error opening cache '%s'",
+                     ctxt->sc->cache_config);
         apr_global_mutex_unlock(ctxt->sc->cache->mutex);
         return -1;
     }
@@ -632,9 +631,9 @@ static int dbm_cache_delete(void *baton, gnutls_datum_t key)
 
     if (rv != APR_SUCCESS) {
         ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
-                ctxt->c->base_server,
-                "[gnutls_cache] error deleting from cache '%s'",
-                ctxt->sc->cache_config);
+                     ctxt->c->base_server,
+                     "error deleting from cache '%s'",
+                     ctxt->sc->cache_config);
         apr_dbm_close(dbm);
         apr_global_mutex_unlock(ctxt->sc->cache->mutex);
         return -1;
