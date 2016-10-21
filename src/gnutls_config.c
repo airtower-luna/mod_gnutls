@@ -851,10 +851,6 @@ const char *mgs_set_timeout(cmd_parms * parms,
                             void *dummy __attribute__((unused)),
                             const char *arg)
 {
-    const char *err;
-    if ((err = ap_check_cmd_context(parms, GLOBAL_ONLY)))
-        return err;
-
     apr_int64_t argint = apr_atoi64(arg);
     if (argint < 0)
         return apr_psprintf(parms->pool, "%s: Invalid argument",
@@ -864,7 +860,12 @@ const char *mgs_set_timeout(cmd_parms * parms,
         ap_get_module_config(parms->server->module_config, &gnutls_module);
 
     if (!apr_strnatcasecmp(parms->directive->directive, "GnuTLSCacheTimeout"))
+    {
+        const char *err;
+        if ((err = ap_check_cmd_context(parms, GLOBAL_ONLY)))
+            return err;
         sc->cache_timeout = apr_time_from_sec(argint);
+    }
     else if (!apr_strnatcasecmp(parms->directive->directive,
                                 "GnuTLSOCSPGraceTime"))
         sc->ocsp_grace_time = apr_time_from_sec(argint);
