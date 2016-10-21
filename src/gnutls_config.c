@@ -25,6 +25,8 @@
 #define INIT_CA_SIZE 128
 /* Default OCSP response grace time in seconds */
 #define MGS_GRACE_TIME 60
+/* Default OCSP failure timeout in seconds */
+#define MGS_FAILURE_TIMEOUT 300
 
 #ifdef APLOG_USE_MODULE
 APLOG_USE_MODULE(gnutls);
@@ -869,6 +871,9 @@ const char *mgs_set_timeout(cmd_parms * parms,
     else if (!apr_strnatcasecmp(parms->directive->directive,
                                 "GnuTLSOCSPGraceTime"))
         sc->ocsp_grace_time = apr_time_from_sec(argint);
+    else if (!apr_strnatcasecmp(parms->directive->directive,
+                                "GnuTLSOCSPFailureTimeout"))
+        sc->ocsp_failure_timeout = apr_time_from_sec(argint);
     else
         /* Can't happen unless there's a serious bug in mod_gnutls or Apache */
         return apr_psprintf(parms->pool,
@@ -1122,6 +1127,7 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
     sc->ocsp_response_file = NULL;
     sc->ocsp_mutex = NULL;
     sc->ocsp_grace_time = apr_time_from_sec(MGS_GRACE_TIME);
+    sc->ocsp_failure_timeout = apr_time_from_sec(MGS_FAILURE_TIMEOUT);
 
 /* this relies on GnuTLS never changing the gnutls_certificate_request_t enum to define -1 */
     sc->client_verify_mode = -1;
@@ -1182,6 +1188,8 @@ void *mgs_config_server_merge(apr_pool_t * p, void *BASE, void *ADD)
     gnutls_srvconf_merge(ocsp_staple, GNUTLS_ENABLED_UNSET);
     gnutls_srvconf_assign(ocsp_response_file);
     gnutls_srvconf_merge(ocsp_grace_time, apr_time_from_sec(MGS_GRACE_TIME));
+    gnutls_srvconf_merge(ocsp_failure_timeout,
+                         apr_time_from_sec(MGS_FAILURE_TIMEOUT));
 
     gnutls_srvconf_assign(ca_list);
     gnutls_srvconf_assign(ca_list_size);

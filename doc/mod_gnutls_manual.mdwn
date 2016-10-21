@@ -586,6 +586,21 @@ A cached OCSP response should be updated a little before it expires to
 account for potential clock skew between server, CA, and client, as
 well as transmission time in corner cases.
 
+### GnuTLSOCSPFailureTimeout
+
+EXPERIMENTAL: Wait this many seconds before retrying a failed OCSP request.
+
+    GnuTLSOCSPFailureTimeout SECONDS
+
+Default: *300*\
+Context: server config, virtual host
+
+Retries of failed OCSP requests must be rate limited to avoid
+overloading both the server using mod_gnutls and the CA's OCSP
+responder. A shorter value increases the load on both sides, a longer
+one means that stapling will remain disabled for longer after a failed
+request.
+
 * * * * *
 
 Configuration Examples

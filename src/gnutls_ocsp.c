@@ -39,6 +39,9 @@ APLOG_USE_MODULE(gnutls);
  * or received", not the whole connection. 10 seconds in mod_ssl. */
 #define OCSP_SOCKET_TIMEOUT 2
 
+/* Dummy data for failure cache entries (one byte). */
+#define OCSP_FAILURE_CACHE_DATA 0x0f
+
 
 #define _log_one_ocsp_fail(str, srv)                                    \
     ap_log_error(APLOG_MARK, APLOG_INFO, APR_EGENERAL, (srv),           \
@@ -683,6 +686,38 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
 
 
 
+/*
+ * Retries after failed OCSP requests must be rate limited. If the
+ * responder is overloaded or buggy we don't want to add too much more
+ * load, and if a MITM is messing with requests a repetition loop
+ * might end up being a self-inflicted denial of service.
+ */
+void mgs_cache_ocsp_failure(server_rec *s)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(s->module_config, &gnutls_module);
+
+    unsigned char c = OCSP_FAILURE_CACHE_DATA;
+    gnutls_datum_t dummy = {
+        .data = &c,
+        .size = sizeof(c)
+    };
+    apr_time_t expiry = apr_time_now() + sc->ocsp_failure_timeout;
+
+    char date_str[APR_RFC822_DATE_LEN];
+    apr_rfc822_date(date_str, expiry);
+    ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+                 "OCSP request for %s failed, next try after %s.",
+                 s->server_hostname, date_str);
+
+    int r = sc->cache->store(s, sc->ocsp->fingerprint, dummy, expiry);
+    if (r != 0)
+        ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
+                     "Caching OCSP failure failed.");
+}
+
+
+
 int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
                           void *ptr,
                           gnutls_datum_t *ocsp_response)
@@ -701,6 +736,14 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
         ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_EGENERAL, ctxt->c,
                       "Fetching OCSP response from cache failed.");
     }
+    else if ((ocsp_response->size == sizeof(unsigned char)) &&
+             (*((unsigned char *) ocsp_response->data) == OCSP_FAILURE_CACHE_DATA))
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_EGENERAL, ctxt->c,
+                      "Cached OCSP failure found for %s.",
+                      ctxt->c->base_server->server_hostname);
+        goto fail_cleanup;
+    }
     else
     {
         return GNUTLS_E_SUCCESS;
@@ -713,11 +756,6 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
     ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
                   "No valid OCSP response in cache, trying to update.");
 
-    /* TODO: Once sending OCSP requests is implemented we need a rate
-     * limit for retries on error. If the responder is overloaded or
-     * buggy we don't want to add too much more load, and if a MITM is
-     * messing with requests a repetition loop might end up being a
-     * self-inflicted denial of service. */
     apr_status_t rv = apr_global_mutex_trylock(ctxt->sc->ocsp_mutex);
     if (APR_STATUS_IS_EBUSY(rv))
     {
@@ -746,7 +784,9 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
     if (rv != APR_SUCCESS)
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, ctxt->c,
-                      "Updating OCSP response cache failed");
+                      "Caching a fresh OCSP response failed");
+        /* cache failure to rate limit retries */
+        mgs_cache_ocsp_failure(ctxt->c->base_server);
         apr_global_mutex_unlock(ctxt->sc->ocsp_mutex);
         goto fail_cleanup;
     }

@@ -283,6 +283,10 @@ static const command_rec mgs_config_cmds[] = {
                   NULL, RSRC_CONF,
                   "EXPERIMENTAL: Replace cached OCSP responses this many "
                   "seconds before they expire"),
+    AP_INIT_TAKE1("GnuTLSOCSPFailureTimeout", mgs_set_timeout,
+                  NULL, RSRC_CONF,
+                  "EXPERIMENTAL: Wait this many seconds before retrying a "
+                  "failed OCSP request"),
 #ifdef __clang__
     /* Workaround for this clang bug:
      * https://llvm.org/bugs/show_bug.cgi?id=21689 */
