@@ -222,9 +222,9 @@ typedef struct {
     /* Cached OCSP responses expire this long before their validity
      * period expires. This way mod_gnutls does not staple barely
      * valid responses. */
-    apr_time_t ocsp_grace_time;
+    apr_interval_time_t ocsp_grace_time;
     /* If an OCSP request fails wait this long before trying again. */
-    apr_time_t ocsp_failure_timeout;
+    apr_interval_time_t ocsp_failure_timeout;
     /* Socket timeout for OCSP requests */
     apr_interval_time_t ocsp_socket_timeout;
 } mgs_srvconf_rec;
