@@ -34,11 +34,6 @@ APLOG_USE_MODULE(gnutls);
 #define OCSP_REQ_TYPE "application/ocsp-request"
 #define OCSP_RESP_TYPE "application/ocsp-response"
 
-/* Default socket timeout for OCSP responder connections, in
- * seconds. Note that the timeout applies to "absolutely no data sent
- * or received", not the whole connection. 10 seconds in mod_ssl. */
-#define OCSP_SOCKET_TIMEOUT 2
-
 /* Dummy data for failure cache entries (one byte). */
 #define OCSP_FAILURE_CACHE_DATA 0x0f
 
@@ -458,15 +453,13 @@ static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
     /* There may be multiple answers, try them in order until one
      * works. */
     apr_socket_t *sock;
-    /* TODO: configurable timeout */
-    apr_interval_time_t timeout = apr_time_from_sec(OCSP_SOCKET_TIMEOUT);
     while (sa)
     {
         rv = apr_socket_create(&sock, sa->family, SOCK_STREAM,
                                APR_PROTO_TCP, p);
         if (rv == APR_SUCCESS)
         {
-            apr_socket_timeout_set(sock, timeout);
+            apr_socket_timeout_set(sock, sc->ocsp_socket_timeout);
             rv = apr_socket_connect(sock, sa);
             if (rv == APR_SUCCESS)
                 /* Connected! */

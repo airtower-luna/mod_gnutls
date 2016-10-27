@@ -287,6 +287,9 @@ static const command_rec mgs_config_cmds[] = {
                   NULL, RSRC_CONF,
                   "EXPERIMENTAL: Wait this many seconds before retrying a "
                   "failed OCSP request"),
+    AP_INIT_TAKE1("GnuTLSOCSPSocketTimeout", mgs_set_timeout,
+                  NULL, RSRC_CONF,
+                  "EXPERIMENTAL: Socket timeout for OCSP requests"),
 #ifdef __clang__
     /* Workaround for this clang bug:
      * https://llvm.org/bugs/show_bug.cgi?id=21689 */

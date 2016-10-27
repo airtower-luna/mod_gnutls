@@ -24,6 +24,15 @@
 
 #define MGS_OCSP_MUTEX_NAME "gnutls-ocsp"
 
+/* Default OCSP response grace time in seconds */
+#define MGS_GRACE_TIME 60
+/* Default OCSP failure timeout in seconds */
+#define MGS_OCSP_FAILURE_TIMEOUT 300
+/* Default socket timeout for OCSP responder connections, in
+ * seconds. Note that the timeout applies to "absolutely no data sent
+ * or received", not the whole connection. 10 seconds in mod_ssl. */
+#define MGS_OCSP_SOCKET_TIMEOUT 6
+
 /**
  * Vhost specific OCSP data structure
  */

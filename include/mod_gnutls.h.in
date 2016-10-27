@@ -225,6 +225,8 @@ typedef struct {
     apr_time_t ocsp_grace_time;
     /* If an OCSP request fails wait this long before trying again. */
     apr_time_t ocsp_failure_timeout;
+    /* Socket timeout for OCSP requests */
+    apr_interval_time_t ocsp_socket_timeout;
 } mgs_srvconf_rec;
 
 /* Character Buffer */

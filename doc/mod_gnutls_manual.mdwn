@@ -601,6 +601,26 @@ responder. A shorter value increases the load on both sides, a longer
 one means that stapling will remain disabled for longer after a failed
 request.
 
+### GnuTLSOCSPSocketTimeout
+
+EXPERIMENTAL: Timeout for TCP sockets used to send OCSP requests
+
+    GnuTLSOCSPFailureTimeout SECONDS
+
+Default: *6*\
+Context: server config, virtual host
+
+Stalled OCSP requests must time out after a while to prevent stalling
+the server too much. However, if the timeout is too short requests may
+fail with a slow OCSP responder or high latency network
+connection. This parameter allows you to adjust the timeout if
+necessary.
+
+Note that this is not an upper limit for the completion of an OCSP
+request but a socket timeout. The connection will time out if there is
+no activity (successful send or receive) at all for the configured
+time.
+
 * * * * *
 
 Configuration Examples
