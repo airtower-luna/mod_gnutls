@@ -82,19 +82,19 @@ mutex.
 
 `dbm` (Requires Berkeley DBM)
 :   Uses the default Berkeley DB backend of APR DBM to cache TLS
-    Sessions results.  The argument is a relative or absolute path to
+    Session data. The argument is a relative or absolute path to
     be used as the DBM Cache file. This is compatible with most
     operating systems, but needs the Apache Runtime to be compiled
     with Berkeley DBM support.
 
 `gdbm`
-:   Uses the GDBM backend of APR DBM to cache TLS Sessions results.
+:   Uses the GDBM backend of APR DBM to cache TLS Session data.
 
     The argument is a relative or absolute path to be used as the DBM Cache
     file.  This is the recommended option.
 
 `memcache`
-:   Uses a memcached server to cache the TLS Session.
+:   Uses memcached server(s) to cache TLS Session data.
 
     The argument is a space separated list of servers. If no port
     number is supplied, the default of 11211 is used.  This can be
@@ -117,9 +117,9 @@ Timeout for TLS Session Cache expiration
 Default: `GnuTLSCacheTimeout 300`\
 Context: server config
 
-Sets the timeout for TLS Session Cache entries expiration.  This
-directive is valid even if Session Tickets are used, and indicates the
-expiration time of the ticket in seconds.
+Sets the timeout for TLS Session Cache entries expiration. This value
+is also used for OCSP responses if they do not contain a `nextUpdate`
+time.
 
 ### GnuTLSSessionTickets
 
@@ -130,8 +130,8 @@ Enable Session Tickets for the server
 Default: `off`\
 Context: server config, virtual host
 
-To avoid storing data for TLS session resumption it is allowed to
-provide client with a ticket, to use on return. Tickets are an
+To avoid storing data for TLS session resumption the server can
+provide clients with tickets, to use on return. Tickets are an
 alternative to using a session cache, mostly used for busy servers
 with limited storage. For a pool of servers this option is not
 recommended since the tickets are bound to the issuing server only.
