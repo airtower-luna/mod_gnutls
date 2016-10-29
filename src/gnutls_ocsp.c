@@ -615,6 +615,9 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
     else
     {
         gnutls_datum_t req;
+        /* mod_ssl offers an option to enable/disable nonces for
+         * broken responders. If needed at some point, we could do the
+         * same by passing NULL instead of &nonce. */
         int ret = mgs_create_ocsp_request(s, &req, &nonce);
         if (ret == GNUTLS_E_SUCCESS)
         {
@@ -641,8 +644,6 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
             return rv;
         }
     }
-
-    /* TODO: separate option to enable/disable nonce */
 
     apr_time_t expiry;
     if (check_ocsp_response(s, &resp, &expiry, nonce.size ? &nonce : NULL)
