@@ -18,6 +18,7 @@
  *
  */
 
+#include "gnutls_config.h"
 #include "mod_gnutls.h"
 #include "gnutls_ocsp.h"
 #include "apr_lib.h"
@@ -851,6 +852,7 @@ const char *mgs_set_timeout(cmd_parms * parms,
                             const char *arg)
 {
     apr_int64_t argint = apr_atoi64(arg);
+    /* timeouts cannot be negative */
     if (argint < 0)
         return apr_psprintf(parms->pool, "%s: Invalid argument",
                             parms->directive->directive);
@@ -1100,7 +1102,7 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
     sc->pgp_list = NULL;
 
     sc->priorities_str = NULL;
-    sc->cache_timeout = -1;	/* -1 means "unset" */
+    sc->cache_timeout = MGS_TIMEOUT_UNSET;
     sc->cache_type = mgs_cache_unset;
     sc->cache_config = NULL;
     sc->cache = NULL;
@@ -1126,9 +1128,9 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
     sc->ocsp_staple = GNUTLS_ENABLED_UNSET;
     sc->ocsp_response_file = NULL;
     sc->ocsp_mutex = NULL;
-    sc->ocsp_grace_time = apr_time_from_sec(MGS_OCSP_GRACE_TIME);
-    sc->ocsp_failure_timeout = apr_time_from_sec(MGS_OCSP_FAILURE_TIMEOUT);
-    sc->ocsp_socket_timeout = apr_time_from_sec(MGS_OCSP_SOCKET_TIMEOUT);
+    sc->ocsp_grace_time = MGS_TIMEOUT_UNSET;
+    sc->ocsp_failure_timeout = MGS_TIMEOUT_UNSET;
+    sc->ocsp_socket_timeout = MGS_TIMEOUT_UNSET;
 
 /* this relies on GnuTLS never changing the gnutls_certificate_request_t enum to define -1 */
     sc->client_verify_mode = -1;
@@ -1188,12 +1190,9 @@ void *mgs_config_server_merge(apr_pool_t * p, void *BASE, void *ADD)
 
     gnutls_srvconf_merge(ocsp_staple, GNUTLS_ENABLED_UNSET);
     gnutls_srvconf_assign(ocsp_response_file);
-    gnutls_srvconf_merge(ocsp_grace_time,
-                         apr_time_from_sec(MGS_OCSP_GRACE_TIME));
-    gnutls_srvconf_merge(ocsp_failure_timeout,
-                         apr_time_from_sec(MGS_OCSP_FAILURE_TIMEOUT));
-    gnutls_srvconf_merge(ocsp_socket_timeout,
-                         apr_time_from_sec(MGS_OCSP_SOCKET_TIMEOUT));
+    gnutls_srvconf_merge(ocsp_grace_time, MGS_TIMEOUT_UNSET);
+    gnutls_srvconf_merge(ocsp_failure_timeout, MGS_TIMEOUT_UNSET);
+    gnutls_srvconf_merge(ocsp_socket_timeout, MGS_TIMEOUT_UNSET);
 
     gnutls_srvconf_assign(ca_list);
     gnutls_srvconf_assign(ca_list_size);

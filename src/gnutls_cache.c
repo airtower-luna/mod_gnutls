@@ -44,6 +44,7 @@
 
 #include "gnutls_cache.h"
 #include "mod_gnutls.h"
+#include "gnutls_config.h"
 
 #if HAVE_APR_MEMCACHE
 #include "apr_memcache.h"
@@ -694,7 +695,7 @@ int mgs_cache_post_config(apr_pool_t * p, server_rec * s,
     if (sc->cache_type == mgs_cache_unset)
         sc->cache_type = mgs_cache_none;
     /* if GnuTLSCacheTimeout was never explicitly set: */
-    if (sc->cache_timeout == -1)
+    if (sc->cache_timeout == MGS_TIMEOUT_UNSET)
         sc->cache_timeout = apr_time_from_sec(MGS_DEFAULT_CACHE_TIMEOUT);
 
     /* initialize mutex only once */

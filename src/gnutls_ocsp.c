@@ -17,6 +17,7 @@
 #include "gnutls_ocsp.h"
 #include "mod_gnutls.h"
 #include "gnutls_cache.h"
+#include "gnutls_config.h"
 #include "gnutls_util.h"
 
 #include <apr_escape.h>
@@ -902,6 +903,14 @@ int mgs_ocsp_post_config_server(apr_pool_t *pconf,
                      server->server_hostname, server->addrs->host_port);
         return HTTP_NOT_FOUND;
     }
+
+    /* set default values for unset timeouts */
+    if (sc->ocsp_grace_time == MGS_TIMEOUT_UNSET)
+        sc->ocsp_grace_time = apr_time_from_sec(MGS_OCSP_GRACE_TIME);
+    if (sc->ocsp_failure_timeout == MGS_TIMEOUT_UNSET)
+        sc->ocsp_failure_timeout = apr_time_from_sec(MGS_OCSP_FAILURE_TIMEOUT);
+    if (sc->ocsp_socket_timeout == MGS_TIMEOUT_UNSET)
+        sc->ocsp_socket_timeout = apr_time_from_sec(MGS_OCSP_SOCKET_TIMEOUT);
 
     sc->ocsp = apr_palloc(pconf, sizeof(struct mgs_ocsp_data));
 
