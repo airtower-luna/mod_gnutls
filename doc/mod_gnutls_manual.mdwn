@@ -529,7 +529,7 @@ OCSP Stapling Configuration
 
 ### GnuTLSOCSPStapling
 
-EXPERIMENTAL: Enable OCSP stapling for this (virtual) host.
+Enable OCSP stapling for this (virtual) host.
 
     GnuTLSOCSPStapling [On|Off]
 
@@ -555,8 +555,8 @@ OCSP cache updates are serialized using the `gnutls-ocsp` mutex.
 
 ### GnuTLSOCSPResponseFile
 
-EXPERIMENTAL: Read the OCSP response for stapling from this file
-instead of sending a request over HTTP
+Read the OCSP response for stapling from this file instead of sending
+a request over HTTP.
 
     GnuTLSOCSPResponseFile /path/to/response.der
 
@@ -574,8 +574,7 @@ responses over HTTP. Reasons to use this option include:
 
 ### GnuTLSOCSPGraceTime
 
-EXPERIMENTAL: Replace cached OCSP responses this many seconds before
-they expire.
+Replace cached OCSP responses this many seconds before they expire.
 
     GnuTLSOCSPGraceTime SECONDS
 
@@ -584,11 +583,13 @@ Context: server config, virtual host
 
 A cached OCSP response should be updated a little before it expires to
 account for potential clock skew between server, CA, and client, as
-well as transmission time in corner cases.
+well as transmission time in corner cases. Note that a response
+without a `nextUpdate` field will be subject to the default cache
+lifetime.
 
 ### GnuTLSOCSPFailureTimeout
 
-EXPERIMENTAL: Wait this many seconds before retrying a failed OCSP request.
+Wait this many seconds before retrying a failed OCSP request.
 
     GnuTLSOCSPFailureTimeout SECONDS
 
@@ -603,7 +604,7 @@ request.
 
 ### GnuTLSOCSPSocketTimeout
 
-EXPERIMENTAL: Timeout for TCP sockets used to send OCSP requests
+Timeout for TCP sockets used to send OCSP requests
 
     GnuTLSOCSPFailureTimeout SECONDS
 
