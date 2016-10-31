@@ -572,6 +572,16 @@ responses over HTTP. Reasons to use this option include:
 * The issuer CA uses an access method other than HTTP.
 * Testing
 
+You can use a GnuTLS `ocsptool` command like the following to create
+and update the response file:
+
+    ocsptool --ask --nonce --load-issuer ca_cert.pem \
+        --load-cert server_cert.pem --outfile ocsp_response.der
+
+Additional error checking is highly recommended. You may have to
+remove the `--nonce` option if the OCSP responder of your CA does not
+support nonces.
+
 ### GnuTLSOCSPGraceTime
 
 Replace cached OCSP responses this many seconds before they expire.
