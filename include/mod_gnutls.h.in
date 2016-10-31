@@ -210,10 +210,10 @@ typedef struct {
 	/* Last Cache timestamp */
     apr_time_t last_cache_check;
 
-    /* EXPERIMENTAL: Enable OCSP stapling */
+    /* Enable OCSP stapling */
     unsigned char ocsp_staple;
-    /* EXPERIMENTAL: Read OCSP response for stapling from this file
-     * instead of sending a request over HTTP */
+    /* Read OCSP response for stapling from this file instead of
+     * sending a request over HTTP */
     char *ocsp_response_file;
     /* Internal OCSP data for this server */
     mgs_ocsp_data_t ocsp;

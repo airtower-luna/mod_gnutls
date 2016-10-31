@@ -273,23 +273,23 @@ static const command_rec mgs_config_cmds[] = {
     "MACs, compression)."),
     AP_INIT_FLAG("GnuTLSOCSPStapling", mgs_ocsp_stapling_enable,
                  NULL, RSRC_CONF,
-                 "EXPERIMENTAL: Enable OCSP stapling"),
+                 "Enable OCSP stapling"),
     AP_INIT_TAKE1("GnuTLSOCSPResponseFile", mgs_store_ocsp_response_path,
                   NULL, RSRC_CONF,
-                  "EXPERIMENTAL: Read OCSP response for stapling from this "
-                  "file instead of sending a request over HTTP (must be "
-                  "updated externally)"),
+                  "Read OCSP response for stapling from this file instead "
+                  "of sending a request over HTTP (must be updated "
+                  "externally)"),
     AP_INIT_TAKE1("GnuTLSOCSPGraceTime", mgs_set_timeout,
                   NULL, RSRC_CONF,
-                  "EXPERIMENTAL: Replace cached OCSP responses this many "
-                  "seconds before they expire"),
+                  "Replace cached OCSP responses this many seconds before "
+                  "they expire"),
     AP_INIT_TAKE1("GnuTLSOCSPFailureTimeout", mgs_set_timeout,
                   NULL, RSRC_CONF,
-                  "EXPERIMENTAL: Wait this many seconds before retrying a "
-                  "failed OCSP request"),
+                  "Wait this many seconds before retrying a failed OCSP "
+                  "request"),
     AP_INIT_TAKE1("GnuTLSOCSPSocketTimeout", mgs_set_timeout,
                   NULL, RSRC_CONF,
-                  "EXPERIMENTAL: Socket timeout for OCSP requests"),
+                  "Socket timeout for OCSP requests"),
 #ifdef __clang__
     /* Workaround for this clang bug:
      * https://llvm.org/bugs/show_bug.cgi?id=21689 */
