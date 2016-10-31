@@ -274,6 +274,9 @@ static const command_rec mgs_config_cmds[] = {
     AP_INIT_FLAG("GnuTLSOCSPStapling", mgs_ocsp_stapling_enable,
                  NULL, RSRC_CONF,
                  "Enable OCSP stapling"),
+    AP_INIT_FLAG("GnuTLSOCSPCheckNonce", mgs_set_ocsp_check_nonce,
+                 NULL, RSRC_CONF,
+                 "Check nonce in OCSP responses?"),
     AP_INIT_TAKE1("GnuTLSOCSPResponseFile", mgs_store_ocsp_response_path,
                   NULL, RSRC_CONF,
                   "Read OCSP response for stapling from this file instead "

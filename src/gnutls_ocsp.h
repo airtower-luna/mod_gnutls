@@ -53,6 +53,10 @@ const char *mgs_ocsp_stapling_enable(cmd_parms *parms,
                                      void *dummy __attribute__((unused)),
                                      const int arg);
 
+const char *mgs_set_ocsp_check_nonce(cmd_parms *parms,
+                                     void *dummy __attribute__((unused)),
+                                     const int arg);
+
 const char *mgs_store_ocsp_response_path(cmd_parms * parms,
                                          void *dummy __attribute__((unused)),
                                          const char *arg);

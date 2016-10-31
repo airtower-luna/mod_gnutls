@@ -88,6 +88,23 @@ const char *mgs_ocsp_stapling_enable(cmd_parms *parms,
 
 
 
+const char *mgs_set_ocsp_check_nonce(cmd_parms *parms,
+                                     void *dummy __attribute__((unused)),
+                                     const int arg)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(parms->server->module_config, &gnutls_module);
+
+    if (arg)
+        sc->ocsp_check_nonce = GNUTLS_ENABLED_TRUE;
+    else
+        sc->ocsp_check_nonce = GNUTLS_ENABLED_FALSE;
+
+    return NULL;
+}
+
+
+
 const char *mgs_store_ocsp_response_path(cmd_parms *parms,
                                          void *dummy __attribute__((unused)),
                                          const char *arg)
@@ -275,7 +292,9 @@ int check_ocsp_response(server_rec *s, const gnutls_datum_t *ocsp_response,
                          "OCSP response signature is valid.");
     }
 
-    if (nonce != NULL)
+    /* Even some large CAs do not support nonces, probably because
+     * that way they can cache responses. :-/ */
+    if (nonce != NULL && sc->ocsp_check_nonce)
     {
         gnutls_datum_t resp_nonce;
         ret = gnutls_ocsp_resp_get_nonce(resp, 0, &resp_nonce);
@@ -616,9 +635,6 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
     else
     {
         gnutls_datum_t req;
-        /* mod_ssl offers an option to enable/disable nonces for
-         * broken responders. If needed at some point, we could do the
-         * same by passing NULL instead of &nonce. */
         int ret = mgs_create_ocsp_request(s, &req, &nonce);
         if (ret == GNUTLS_E_SUCCESS)
         {
@@ -904,7 +920,9 @@ int mgs_ocsp_post_config_server(apr_pool_t *pconf,
         return HTTP_NOT_FOUND;
     }
 
-    /* set default values for unset timeouts */
+    /* set default values for unset parameters */
+    if (sc->ocsp_check_nonce == GNUTLS_ENABLED_UNSET)
+        sc->ocsp_check_nonce = GNUTLS_ENABLED_TRUE;
     if (sc->ocsp_grace_time == MGS_TIMEOUT_UNSET)
         sc->ocsp_grace_time = apr_time_from_sec(MGS_OCSP_GRACE_TIME);
     if (sc->ocsp_failure_timeout == MGS_TIMEOUT_UNSET)

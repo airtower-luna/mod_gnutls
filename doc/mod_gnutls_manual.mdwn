@@ -553,6 +553,20 @@ Using OCSP stapling has a few requirements:
 
 OCSP cache updates are serialized using the `gnutls-ocsp` mutex.
 
+### GnuTLSOCSPCheckNonce
+
+Check the nonce in OCSP responses?
+
+    GnuTLSOCSPCheckNonce [On|Off]
+
+Default: *on*\
+Context: server config, virtual host
+
+Some CAs refuse to send nonces in their OCSP responses, probably
+because that way they can cache responses. If your CA is one of them
+you can use this flag to disable nonce verification. Note that
+`mod_gnutls` will _send_ a nonce either way.
+
 ### GnuTLSOCSPResponseFile
 
 Read the OCSP response for stapling from this file instead of sending

@@ -212,6 +212,8 @@ typedef struct {
 
     /* Enable OCSP stapling */
     unsigned char ocsp_staple;
+    /* Check nonce in OCSP responses? */
+    unsigned char ocsp_check_nonce;
     /* Read OCSP response for stapling from this file instead of
      * sending a request over HTTP */
     char *ocsp_response_file;
