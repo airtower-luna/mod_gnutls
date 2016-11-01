@@ -1,4 +1,4 @@
-** Version 0.8.0-alpha (2016-06-21)
+** Version 0.8.0-beta (2016-11-01)
 - New: Support for OCSP stapling
 - Bugfix: Access to DBM cache is locked using global mutex
   "gnutls-cache"
@@ -15,14 +15,6 @@
 - Test suite: Fixed locking for access to the PGP keyring of the test
   certificate authority
 - mod_gnutls can be built using Clang (unsupported)
-- Known Issues:
-  * OCSP cache refresh stalls other requests on the virtual host and
-    other vhosts that need a cache refresh at the same time. Requests
-    to vhosts with a fresh response in the cache or OCSP stapling
-    disabled are not affected.
-  * Rate limiting for OCSP requests is not yet implemented.
-  You can work around both issues using the GnuTLSOCSPResponseFile
-  option.
 
 ** Version 0.7.5 (2016-05-28)
 - Sunil Mohan Adapa reported retry loops during session shutdown in
