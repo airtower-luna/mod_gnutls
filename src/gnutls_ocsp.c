@@ -662,8 +662,8 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
         }
     }
 
-    apr_time_t expiry;
-    if (check_ocsp_response(s, &resp, &expiry, nonce.size ? &nonce : NULL)
+    apr_time_t next_update;
+    if (check_ocsp_response(s, &resp, &next_update, nonce.size ? &nonce : NULL)
         != GNUTLS_E_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_EGENERAL, s,
@@ -675,13 +675,20 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
     }
     gnutls_free(nonce.data);
 
-    /* If expiry is zero, the response does not contain a nextUpdate
-     * field. Use the default cache timeout. */
-    if (expiry == 0)
-        expiry = apr_time_now() + sc->cache_timeout;
-    /* Apply grace time otherwise. */
-    else
-        expiry -= sc->ocsp_grace_time;
+    apr_time_t expiry = apr_time_now() + sc->ocsp_cache_time;
+    /* Make sure that a response is not cached beyond its nextUpdate
+     * time. If the variable next_update is zero, the response does
+     * not contain a nextUpdate field. */
+    if (next_update != 0 && next_update < expiry)
+    {
+        char date_str[APR_RFC822_DATE_LEN];
+        apr_rfc822_date(date_str, next_update);
+        ap_log_error(APLOG_MARK, APLOG_WARNING, APR_EGENERAL, s,
+                     "OCSP response timeout restricted to nextUpdate time %s. "
+                     "Check if GnuTLSOCSPCacheTimeout is appropriate.",
+                     date_str);
+        expiry = next_update;
+    }
 
     int r = sc->cache->store(s, sc->ocsp->fingerprint, resp, expiry);
     /* destroy pool, and original copy of the OCSP response with it */
@@ -923,8 +930,8 @@ int mgs_ocsp_post_config_server(apr_pool_t *pconf,
     /* set default values for unset parameters */
     if (sc->ocsp_check_nonce == GNUTLS_ENABLED_UNSET)
         sc->ocsp_check_nonce = GNUTLS_ENABLED_TRUE;
-    if (sc->ocsp_grace_time == MGS_TIMEOUT_UNSET)
-        sc->ocsp_grace_time = apr_time_from_sec(MGS_OCSP_GRACE_TIME);
+    if (sc->ocsp_cache_time == MGS_TIMEOUT_UNSET)
+        sc->ocsp_cache_time = apr_time_from_sec(MGS_OCSP_CACHE_TIMEOUT);
     if (sc->ocsp_failure_timeout == MGS_TIMEOUT_UNSET)
         sc->ocsp_failure_timeout = apr_time_from_sec(MGS_OCSP_FAILURE_TIMEOUT);
     if (sc->ocsp_socket_timeout == MGS_TIMEOUT_UNSET)

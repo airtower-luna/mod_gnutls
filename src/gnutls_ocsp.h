@@ -24,8 +24,8 @@
 
 #define MGS_OCSP_MUTEX_NAME "gnutls-ocsp"
 
-/* Default OCSP response grace time in seconds */
-#define MGS_OCSP_GRACE_TIME 60
+/* Default OCSP response cache timeout in seconds */
+#define MGS_OCSP_CACHE_TIMEOUT 3600
 /* Default OCSP failure timeout in seconds */
 #define MGS_OCSP_FAILURE_TIMEOUT 300
 /* Default socket timeout for OCSP responder connections, in

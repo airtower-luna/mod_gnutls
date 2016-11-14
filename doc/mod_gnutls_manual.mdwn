@@ -596,20 +596,20 @@ Additional error checking is highly recommended. You may have to
 remove the `--nonce` option if the OCSP responder of your CA does not
 support nonces.
 
-### GnuTLSOCSPGraceTime
+### GnuTLSOCSPCacheTimeout
 
-Replace cached OCSP responses this many seconds before they expire.
+Cache timeout for OCSP responses
 
-    GnuTLSOCSPGraceTime SECONDS
+    GnuTLSOCSPCacheTimeout SECONDS
 
-Default: *60*\
+Default: *3600*\
 Context: server config, virtual host
 
-A cached OCSP response should be updated a little before it expires to
-account for potential clock skew between server, CA, and client, as
-well as transmission time in corner cases. Note that a response
-without a `nextUpdate` field will be subject to the default cache
-lifetime.
+Cached OCSP responses will be refreshed after the configured number of
+seconds. How long this timeout should reasonably be depends on your
+CA, namely how often its OCSP responder is updated and how long
+responses are valid. Note that a response will not be cached beyond
+its lifetime as denoted in the `nextUpdate` field of the response.
 
 ### GnuTLSOCSPFailureTimeout
 

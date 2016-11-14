@@ -282,10 +282,9 @@ static const command_rec mgs_config_cmds[] = {
                   "Read OCSP response for stapling from this file instead "
                   "of sending a request over HTTP (must be updated "
                   "externally)"),
-    AP_INIT_TAKE1("GnuTLSOCSPGraceTime", mgs_set_timeout,
+    AP_INIT_TAKE1("GnuTLSOCSPCacheTimeout", mgs_set_timeout,
                   NULL, RSRC_CONF,
-                  "Replace cached OCSP responses this many seconds before "
-                  "they expire"),
+                  "Cache timeout for OCSP responses"),
     AP_INIT_TAKE1("GnuTLSOCSPFailureTimeout", mgs_set_timeout,
                   NULL, RSRC_CONF,
                   "Wait this many seconds before retrying a failed OCSP "
