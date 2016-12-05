@@ -259,8 +259,18 @@ done
 AC_SUBST(LISTEN_LIST)
 AM_SUBST_NOTMAKE(LISTEN_LIST)
 
+DX_DOXYGEN_FEATURE(ON)
+DX_DOT_FEATURE(ON)
+DX_HTML_FEATURE(ON)
+DX_MAN_FEATURE(OFF)
+DX_RTF_FEATURE(OFF)
+DX_XML_FEATURE(OFF)
+DX_PDF_FEATURE(ON)
+DX_PS_FEATURE(OFF)
+DX_INIT_DOXYGEN([mod_gnutls], [doc/doxygen.conf], [doc/api])
+
 AC_CONFIG_FILES([Makefile src/Makefile test/Makefile test/tests/Makefile \
-			doc/Makefile include/mod_gnutls.h \
+			doc/Makefile doc/doxygen.conf include/mod_gnutls.h \
 			test/proxy_backend.conf \
 			test/apache-conf/listen.conf \
 			test/apache-conf/netns.conf])
