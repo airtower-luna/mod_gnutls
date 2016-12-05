@@ -1,4 +1,4 @@
-/**
+/*
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2008 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
@@ -15,32 +15,33 @@
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- *
  */
 
-/***
- * The signatures of the (dbm|mc)_cache_...() functions may be a bit
+/**
+ * @file gnutls_cache.c
+ *
+ * The signatures of the `(dbm|mc)_cache_...()` functions may be a bit
  * confusing: "store" and "expire" take a server_rec, "fetch" an
- * mgs_handle_t, and "delete" the void* required for a
- * gnutls_db_remove_func. The first two have matching ..._session
+ * mgs_handle_t, and "delete" the `void*` required for a
+ * `gnutls_db_remove_func`. The first two have matching `..._session`
  * functions to fit their respective GnuTLS session cache signatures.
  *
  * This is because "store", "expire" (dbm only), and "fetch" are also
- * needed for the OCSP cache. Their ..._session variants have been
+ * needed for the OCSP cache. Their `..._session` variants have been
  * created to take care of the session cache specific parts, mainly
  * calculating the DB key from the session ID. They have to match the
  * appropriate GnuTLS DB function signatures.
  *
- * Additionally, there are the mc_cache_(store|fetch)_generic()
+ * Additionally, there are the `mc_cache_(store|fetch)_generic()`
  * functions. They exist because memcached requires string keys while
  * DBM accepts binary keys, and provide wrappers to turn binary keys
- * into hex strings with a "mod_gnutls:" prefix.
+ * into hex strings with a `mod_gnutls:` prefix.
  *
  * To update cached OCSP responses independent of client connections,
  * "store" and "expire" have to work without a connection context. On
  * the other hand "fetch" does not need to do that, because cached
  * OCSP responses will be retrieved for use in client connections.
- ***/
+ */
 
 #include "gnutls_cache.h"
 #include "mod_gnutls.h"
@@ -63,13 +64,13 @@
 #include "unixd.h"
 #endif
 
-/* default cache timeout */
+/** Default session cache timeout */
 #define MGS_DEFAULT_CACHE_TIMEOUT 300
 
-/* it seems the default has some strange errors. Use SDBM
- */
+/** Prefix for keys used with a memcached cache */
 #define MC_TAG "mod_gnutls:"
-/* two characters per byte, plus one more for '\0' */
+/** Maximum length of the hex string representation of a GnuTLS
+ * session ID: two characters per byte, plus one more for `\0` */
 #if GNUTLS_VERSION_NUMBER >= 0x030400
 #define GNUTLS_SESSION_ID_STRING_LEN ((GNUTLS_MAX_SESSION_ID_SIZE * 2) + 1)
 #else
@@ -84,9 +85,12 @@
 APLOG_USE_MODULE(gnutls);
 #endif
 
-/* Name the Session ID as:
- * server:port.SessionID
- * to disallow resuming sessions on different servers
+/**
+ * Turn a GnuTLS session ID into the key format we use with DBM
+ * caches. Name the Session ID as `server:port.SessionID` to disallow
+ * resuming sessions on different servers.
+ *
+ * @return `0` on success, `-1` on failure
  */
 static int mgs_session_id2dbm(conn_rec *c, unsigned char *id, int idlen,
                               gnutls_datum_t *dbmkey)
@@ -105,10 +109,9 @@ static int mgs_session_id2dbm(conn_rec *c, unsigned char *id, int idlen,
     return 0;
 }
 
-/* The OPENSSL_TIME_FORMAT macro and mgs_time2sz() serve to print time
- * in a format compatible with OpenSSL's ASN1_TIME_print()
+/** The OPENSSL_TIME_FORMAT macro and mgs_time2sz() serve to print
+ * time in a format compatible with OpenSSL's `ASN1_TIME_print()`
  * function. */
-
 #define OPENSSL_TIME_FORMAT "%b %d %k:%M:%S %Y %Z"
 
 char *mgs_time2sz(time_t in_time, char *str, int strsize)
@@ -127,9 +130,12 @@ char *mgs_time2sz(time_t in_time, char *str, int strsize)
 
 #if HAVE_APR_MEMCACHE
 
-/* Name the Session ID as:
- * server:port.SessionID
- * to disallow resuming sessions on different servers
+/**
+ * Turn a GnuTLS session ID into the key format we use with memcached
+ * caches. Name the Session ID as `server:port.SessionID` to disallow
+ * resuming sessions on different servers.
+ *
+ * @return `0` on success, `-1` on failure
  */
 static char *mgs_session_id2mc(conn_rec * c, unsigned char *id, int idlen)
 {
