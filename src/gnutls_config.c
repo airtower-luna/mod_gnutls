@@ -1,4 +1,4 @@
-/**
+/*
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2008, 2014 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
@@ -15,7 +15,6 @@
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- *
  */
 
 #include "gnutls_config.h"

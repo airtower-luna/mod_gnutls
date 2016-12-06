@@ -1,4 +1,4 @@
-/**
+/*
  *  Copyright 2016 Thomas Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,11 +24,11 @@
 
 #define MGS_OCSP_MUTEX_NAME "gnutls-ocsp"
 
-/* Default OCSP response cache timeout in seconds */
+/** Default OCSP response cache timeout in seconds */
 #define MGS_OCSP_CACHE_TIMEOUT 3600
-/* Default OCSP failure timeout in seconds */
+/** Default OCSP failure timeout in seconds */
 #define MGS_OCSP_FAILURE_TIMEOUT 300
-/* Default socket timeout for OCSP responder connections, in
+/** Default socket timeout for OCSP responder connections, in
  * seconds. Note that the timeout applies to "absolutely no data sent
  * or received", not the whole connection. 10 seconds in mod_ssl. */
 #define MGS_OCSP_SOCKET_TIMEOUT 6
@@ -37,14 +37,14 @@
  * Vhost specific OCSP data structure
  */
 struct mgs_ocsp_data {
-    /* OCSP URI extracted from the server certificate. NULL if
+    /** OCSP URI extracted from the server certificate. NULL if
      * unset. */
     apr_uri_t *uri;
-    /* Trust list to verify OCSP responses for stapling. Should
+    /** Trust list to verify OCSP responses for stapling. Should
      * usually only contain the CA that signed the server
      * certificate. */
     gnutls_x509_trust_list_t *trust;
-    /* Server certificate fingerprint, used as cache key for the OCSP
+    /** Server certificate fingerprint, used as cache key for the OCSP
      * response */
     gnutls_datum_t fingerprint;
 };
@@ -61,22 +61,23 @@ const char *mgs_store_ocsp_response_path(cmd_parms * parms,
                                          void *dummy __attribute__((unused)),
                                          const char *arg);
 
-/*
+/**
  * Create a trust list from a certificate chain (one or more
  * certificates).
  *
- * tl: This trust list will be initialized and filled with the
+ * @param tl This trust list will be initialized and filled with the
  * specified certificate(s)
  *
- * chain: certificate chain, must contain at least num certifictes
+ * @param chain certificate chain, must contain at least `num`
+ * certifictes
  *
- * num: number of certificates to load from chain
+ * @param num number of certificates to load from chain
  *
  * Chain is supposed to be static (the trust chain of the server
- * certificate), so when gnutls_x509_trust_list_deinit() is called on
+ * certificate), so when `gnutls_x509_trust_list_deinit()` is called on
  * tl later, the "all" parameter should be zero.
  *
- * Returns GNUTLS_E_SUCCESS or a GnuTLS error code. In case of error
+ * @return `GNUTLS_E_SUCCESS` or a GnuTLS error code. In case of error
  * tl will be uninitialized.
  */
 int mgs_create_ocsp_trust_list(gnutls_x509_trust_list_t *tl,

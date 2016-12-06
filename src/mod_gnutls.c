@@ -1,4 +1,4 @@
-/**
+/*
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2008, 2014 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
@@ -15,7 +15,6 @@
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- *
  */
 
 #include "mod_gnutls.h"
@@ -72,9 +71,11 @@ static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
 
 
 
-/*
- * mod_rewrite calls this function to fill %{HTTPS}. A non-zero return
- * value means that HTTPS is in use.
+/**
+ * mod_rewrite calls this function to fill %{HTTPS}.
+ *
+ * @param c the connection to check
+ * @return non-zero value if HTTPS is in use, zero if not
  */
 int ssl_is_https(conn_rec *c)
 {

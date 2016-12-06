@@ -1,4 +1,4 @@
-/**
+/*
  *  Copyright 2016 Thomas Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -30,19 +30,19 @@
 APLOG_USE_MODULE(gnutls);
 #endif
 
-/* maximum supported OCSP response size, 8K should be plenty */
+/** maximum supported OCSP response size, 8K should be plenty */
 #define OCSP_RESP_SIZE_MAX (8 * 1024)
 #define OCSP_REQ_TYPE "application/ocsp-request"
 #define OCSP_RESP_TYPE "application/ocsp-response"
 
-/* Dummy data for failure cache entries (one byte). */
+/** Dummy data for failure cache entries (one byte). */
 #define OCSP_FAILURE_CACHE_DATA 0x0f
 
 
 #define _log_one_ocsp_fail(str, srv)                                    \
     ap_log_error(APLOG_MARK, APLOG_INFO, APR_EGENERAL, (srv),           \
                  "Reason for failed OCSP response verification: %s", (str))
-/*
+/**
  * Log all matching reasons for verification failure
  */
 static void _log_verify_fail_reason(const unsigned int verify, server_rec *s)

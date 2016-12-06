@@ -1,4 +1,4 @@
-/**
+/*
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2008, 2014 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
@@ -16,7 +16,6 @@
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- *
  */
 
 #include "mod_gnutls.h"
@@ -43,6 +42,10 @@ static apr_file_t *debug_log_fp;
 #define IS_PROXY_STR(c) \
     ((c->is_proxy == GNUTLS_ENABLED_TRUE) ? "proxy " : "")
 
+/** Key to encrypt session tickets. Must be kept secret. This key is
+ * generated in the `pre_config` hook and thus constant across
+ * forks. The problem with this approach is that it does not support
+ * regular key rotation. */
 static gnutls_datum_t session_ticket_key = {NULL, 0};
 
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt);
@@ -309,7 +312,9 @@ static int read_pgpcrt_cn(server_rec * s, apr_pool_t * p,
     return rv;
 }
 
-/*
+/**
+ * Post config hook.
+ *
  * Must return OK or DECLINED on success, something else on
  * error. These codes are defined in Apache httpd.h along with the
  * HTTP status codes, so I'm going to use HTTP error codes both for
@@ -613,10 +618,13 @@ typedef struct {
  *
  * @param x vhost callback record
  * @param s server record
+ * @param tsc mod_gnutls server data for `s`
+ *
  * @return true if a match, false otherwise
  *
  */
-int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc) {
+int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc)
+{
 	apr_array_header_t *names;
 	int rv = 0;
 	char ** name;

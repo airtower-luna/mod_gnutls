@@ -1,4 +1,4 @@
-/**
+/*
  *  Copyright 2016 Thomas Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,7 +24,7 @@
 #ifndef __MOD_GNUTLS_UTIL_H__
 #define __MOD_GNUTLS_UTIL_H__
 
-/* maximum allowed length of one header line */
+/** maximum allowed length of one header line */
 #define HTTP_HDR_LINE_MAX 1024
 
 /**

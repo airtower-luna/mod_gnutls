@@ -19,7 +19,7 @@
 /**
  * @file
  *
- * Generic object cache for mod_gnutls
+ * Generic object cache for mod_gnutls.
  */
 
 #ifndef __MOD_GNUTLS_CACHE_H__
@@ -36,18 +36,29 @@
  * Initialize the internal cache configuration structure. This
  * function is called after the configuration file(s) have been
  * parsed.
+ *
+ * @param p configuration memory pool
+ * @param s default server of the Apache configuration, head of the
+ * server list
+ * @param sc mod_gnutls data associated with `s`
  */
 int mgs_cache_post_config(apr_pool_t *p, server_rec *s, mgs_srvconf_rec *sc);
 
 /**
- * (Re-)Initialize the cache in a child process after forking
+ * (Re-)Initialize the cache in a child process after forking.
+ *
+ * @param p child memory pool provided by Apache
+ * @param s default server of the Apache configuration, head of the
+ * server list
+ * @param sc mod_gnutls data associated with `s`
  */
 int mgs_cache_child_init(apr_pool_t *p, server_rec *s, mgs_srvconf_rec *sc);
 
 /**
- * Setup caching for the given TLS session
+ * Set up caching for the given TLS session.
  *
  * @param ctxt mod_gnutls session context
+ *
  * @return 0
  */
 int mgs_cache_session_init(mgs_handle_t *ctxt);
@@ -56,31 +67,38 @@ int mgs_cache_session_init(mgs_handle_t *ctxt);
 
 /**
  * Convert a `time_t` into a null terminated string in a format
- * compatible with OpenSSL's `ASN1_TIME_print()`
+ * compatible with OpenSSL's `ASN1_TIME_print()`.
  *
  * @param t time_t time
  * @param str Location to store the time string
  * @param strsize The maximum length that can be stored in `str`
+ *
  * @return `str`
  */
 char *mgs_time2sz(time_t t, char *str, int strsize);
 
 /**
- * Generic store function for the mod_gnutls object cache
+ * Generic store function for the mod_gnutls object cache.
  *
  * @param s server associated with the cache entry
  * @param key key for the cache entry
  * @param data data to be cached
  * @param expiry expiration time
- * @return -1 on error, 0 on success
+ *
+ * @return `-1` on error, `0` on success
  */
 typedef int (*cache_store_func)(server_rec *s, gnutls_datum_t key,
                                 gnutls_datum_t data, apr_time_t expiry);
 /**
- * Generic fetch function for the mod_gnutls object cache
+ * Generic fetch function for the mod_gnutls object cache.
+ *
+ * *Warning*: The `data` element of the returned `gnutls_datum_t` is
+ * allocated using `gnutls_malloc()` for compatibility with the GnuTLS
+ * session caching API, and must be released using `gnutls_free()`.
  *
  * @param ctxt mod_gnutls session context for the request
  * @param key key for the cache entry to be fetched
+ *
  * @return the requested cache entry, or `{NULL, 0}`
  */
 typedef gnutls_datum_t (*cache_fetch_func)(mgs_handle_t *ctxt,
