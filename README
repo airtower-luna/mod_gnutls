@@ -43,6 +43,10 @@ It is recommended to run "make check" before "make install". You may
 need to pass TEST_HOST or TEST_IP to ./configure for the tests to work
 correctly, please see test/README for details.
 
+If Doxygen is available, you can build internal API documentation
+using "make doxygen-doc". The documentation will be placed in
+doc/api/.
+
 Configuration
 -------------
 
