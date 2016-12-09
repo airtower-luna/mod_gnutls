@@ -78,20 +78,22 @@ Context: server config
 This directive configures the TLS Session Cache for `mod_gnutls`.
 This could be shared between machines of different architectures. If a
 DBM cache is used, access is serialized using the `gnutls-cache`
-mutex.
+mutex. Which DBM types are available is part of the APR (Apache
+Portable Runtime) compile time configuration.
 
 `dbm` (Requires Berkeley DBM)
-:   Uses the default Berkeley DB backend of APR DBM to cache TLS
-    Session data. The argument is a relative or absolute path to
-    be used as the DBM Cache file. This is compatible with most
-    operating systems, but needs the Apache Runtime to be compiled
-    with Berkeley DBM support.
+:   Uses the Berkeley DB backend of APR DBM to cache TLS Session
+	data.
 
-`gdbm`
+	The argument is a relative or absolute path to be used as
+    the DBM Cache file. This is compatible with most operating
+    systems.
+
+`gdbm` (Requires GDBM)
 :   Uses the GDBM backend of APR DBM to cache TLS Session data.
 
-    The argument is a relative or absolute path to be used as the DBM Cache
-    file.  This is the recommended option.
+    The argument is a relative or absolute path to be used as the DBM
+    Cache file.
 
 `memcache`
 :   Uses memcached server(s) to cache TLS Session data.
