@@ -9,6 +9,9 @@ EXTRA_DIST = m4/outoforder.m4 m4/apache.m4 \
 
 AM_DISTCHECK_CONFIGURE_FLAGS = "--enable-vpath-install"
 DISTCLEANFILES = config.nice
+MOSTLYCLEANFILES = $(DX_CLEANFILES)
 
 SUBDIRS = src test doc
 ACLOCAL_AMFLAGS = -I m4
+
+@DX_RULES@

@@ -1,7 +1,7 @@
-/**
+/*
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2014 Nikos Mavrogiannopoulos
- *  Copyright 2015 Thomas Klute
+ *  Copyright 2015-2016 Thomas Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -14,7 +14,6 @@
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- *
  */
 
 /* Apache Runtime Headers */
@@ -32,9 +31,6 @@
 #include "apr_fnmatch.h"
 /* GnuTLS Library Headers */
 #include <gnutls/gnutls.h>
-#if GNUTLS_VERSION_MAJOR == 2
-#include <gnutls/extra.h>
-#endif
 #include <gnutls/abstract.h>
 #include <gnutls/openpgp.h>
 #include <gnutls/x509.h>
@@ -59,16 +55,6 @@ extern module AP_MODULE_DECLARE_DATA gnutls_module;
 /* Module Debug Mode */
 #define MOD_GNUTLS_DEBUG @OOO_MAINTAIN@
 
-/*
- * Recent Versions of 2.1 renamed several hooks.
- * This allows us to compile on 2.0.xx
- */
-#if AP_SERVER_MINORVERSION_NUMBER >= 2 || (AP_SERVER_MINORVERSION_NUMBER == 1 && AP_SERVER_PATCHLEVEL_NUMBER >= 3)
-	#define USING_2_1_RECENT 1
-#else
-	#define USING_2_1_RECENT 0
-#endif
-
 /* mod_gnutls Cache Types */
 typedef enum {
 	/* No Cache */
@@ -84,6 +70,9 @@ typedef enum {
     mgs_cache_unset
 } mgs_cache_e;
 
+/* Internal cache data, defined in gnutls_cache.h */
+typedef struct mgs_cache* mgs_cache_t;
+
 typedef enum {
     mgs_cvm_unset,
     mgs_cvm_cartel,
@@ -94,9 +83,11 @@ typedef enum {
 /* Directory Configuration Record */
 typedef struct {
     int client_verify_mode;
-    const char* lua_bytecode;
-    apr_size_t lua_bytecode_len;
 } mgs_dirconf_rec;
+
+
+/* Internal per-vhost config for OCSP, defined in gnutls_ocsp.h */
+typedef struct mgs_ocsp_data* mgs_ocsp_data_t;
 
 
 /* The maximum number of certificates to send in a chain */
@@ -145,6 +136,8 @@ typedef struct {
 	/* Chose Cache Type */
     mgs_cache_e cache_type;
     const char* cache_config;
+    /* Internal cache data */
+    mgs_cache_t cache;
 
 	/* GnuTLS uses Session Tickets */
     int tickets;
@@ -215,6 +208,25 @@ typedef struct {
     mgs_client_verification_method_e client_verify_method;
 	/* Last Cache timestamp */
     apr_time_t last_cache_check;
+
+    /* Enable OCSP stapling */
+    unsigned char ocsp_staple;
+    /* Check nonce in OCSP responses? */
+    unsigned char ocsp_check_nonce;
+    /* Read OCSP response for stapling from this file instead of
+     * sending a request over HTTP */
+    char *ocsp_response_file;
+    /* Internal OCSP data for this server */
+    mgs_ocsp_data_t ocsp;
+    /* Mutex to prevent parallel OCSP requests */
+    apr_global_mutex_t *ocsp_mutex;
+    /* Cache timeout for OCSP responses. Note that the nextUpdate
+     * field of the response takes precedence if shorter. */
+    apr_interval_time_t ocsp_cache_time;
+    /* If an OCSP request fails wait this long before trying again. */
+    apr_interval_time_t ocsp_failure_timeout;
+    /* Socket timeout for OCSP requests */
+    apr_interval_time_t ocsp_socket_timeout;
 } mgs_srvconf_rec;
 
 /* Character Buffer */
@@ -346,51 +358,17 @@ int mgs_rehandshake(mgs_handle_t * ctxt);
 
 
 /**
- * Init the Cache after Configuration is done
- */
-int mgs_cache_post_config(apr_pool_t *p, server_rec *s,
-                                 mgs_srvconf_rec *sc);
-/**
- * Init the Cache inside each Process
- */
-int mgs_cache_child_init(apr_pool_t *p, server_rec *s,
-                                mgs_srvconf_rec *sc);
-/**
- * Setup the Session Caching
- */
-int mgs_cache_session_init(mgs_handle_t *ctxt);
-
-#define GNUTLS_SESSION_ID_STRING_LEN \
-    ((GNUTLS_MAX_SESSION_ID + 1) * 2)
-
-/**
  * Perform any reinitialization required in PKCS #11
  */
 int mgs_pkcs11_reinit(server_rec * s);
 
-/**
- * Convert a SSL Session ID into a Null Terminated Hex Encoded String
- * @param id raw SSL Session ID
- * @param idlen Length of the raw Session ID
- * @param str Location to store the Hex Encoded String
- * @param strsize The Maximum Length that can be stored in str
- */
-char *mgs_session_id2sz(unsigned char *id, int idlen,
-                                char *str, int strsize);
-
-/**
- * Convert a time_t into a Null Terminated String
- * @param t time_t time
- * @param str Location to store the Hex Encoded String
- * @param strsize The Maximum Length that can be stored in str
- */
-char *mgs_time2sz(time_t t, char *str, int strsize);
 
 
 /* Configuration Functions */
 
 /* Loads all files set in the configuration */
-int mgs_load_files(apr_pool_t * p, server_rec * s);
+int mgs_load_files(apr_pool_t *pconf, apr_pool_t *ptemp, server_rec *s)
+    __attribute__((nonnull));
 
 const char *mgs_set_srp_tpasswd_conf_file(cmd_parms * parms, void *dummy,
                                         const char *arg);
@@ -413,8 +391,7 @@ const char *mgs_set_pgpkey_file(cmd_parms * parms, void *dummy,
 const char *mgs_set_cache(cmd_parms * parms, void *dummy,
                           const char *type, const char* arg);
 
-const char *mgs_set_cache_timeout(cmd_parms * parms, void *dummy,
-                                  const char *arg);
+const char *mgs_set_timeout(cmd_parms *parms, void *dummy, const char *arg);
 
 const char *mgs_set_client_verify(cmd_parms * parms, void *dummy,
                                   const char *arg);
@@ -469,9 +446,10 @@ const char *mgs_store_cred_path(cmd_parms * parms,
 int mgs_hook_pre_config(apr_pool_t * pconf,
                         apr_pool_t * plog, apr_pool_t * ptemp);
 
-int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog,
-                         apr_pool_t * ptemp,
-                         server_rec * base_server);
+int mgs_hook_post_config(apr_pool_t *pconf,
+                         apr_pool_t *plog,
+                         apr_pool_t *ptemp,
+                         server_rec *base_server);
 
 void mgs_hook_child_init(apr_pool_t *p, server_rec *s);
 

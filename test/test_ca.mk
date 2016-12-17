@@ -8,6 +8,10 @@
 
 %.template: $(srcdir)/%.template.in
 	sed s/__HOSTNAME__/$(TEST_HOST)/ < $< > $@
+	if test -n "$(OCSP_PORT)"; then \
+		sed -i -e 's/^### ocsp/ocsp/' \
+			-e s/__OCSP_PORT__/$(OCSP_PORT)/ $@; \
+	fi
 
 %.uid: $(srcdir)/%.uid.in
 	sed s/__HOSTNAME__/$(TEST_HOST)/ < $< > $@
@@ -38,12 +42,14 @@
 	GNUPGHOME=$(dir $@) gpg --output $@ --armor --export "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)"
 
 # Import and signing modify the shared keyring, which leads to race
-# conditions with parallel make. Locking avoids this problem.
-%/cert.pgp: %/minimal.pgp authority/gpg.conf
+# conditions with parallel make. Locking avoids this problem. Building
+# authority/minimal.pgp (instead of just authority/gpg.conf) before
+# */cert.pgp avoids having to lock for all */minimal.pgp, too.
+%/cert.pgp: %/minimal.pgp authority/minimal.pgp
 	if test -r $@; then rm $@; fi
 	GNUPGHOME=authority $(GPG_FLOCK) gpg --import $<
 	GNUPGHOME=authority $(GPG_FLOCK) gpg --batch --sign-key --no-tty --yes "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)"
-	GNUPGHOME=authority gpg --output $@ --armor --export "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)"
+	GNUPGHOME=authority $(GPG_FLOCK) gpg --output $@ --armor --export "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)"
 
 # special cases for the authorities' root certs:
 authority/x509.pem: authority.template authority/secret.key

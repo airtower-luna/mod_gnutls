@@ -1,5 +1,5 @@
 dnl 
-AC_INIT(mod_gnutls, 0.7.5)
+AC_INIT(mod_gnutls, 0.8.0)
 OOO_CONFIG_NICE(config.nice)
 MOD_GNUTLS_VERSION=AC_PACKAGE_VERSION
 AC_PREREQ(2.53)
@@ -25,13 +25,13 @@ AC_PROG_LIBTOOL
 
 AC_CONFIG_MACRO_DIR([m4])
 
-AP_VERSION=2.2.0
+AP_VERSION=2.4.0
 CHECK_APACHE(,$AP_VERSION,
     :,:,
     AC_MSG_ERROR([*** Apache version $AP_VERSION not found!])
 )
 
-PKG_CHECK_MODULES([LIBGNUTLS], [gnutls >= 3.1.4])
+PKG_CHECK_MODULES([LIBGNUTLS], [gnutls >= 3.3.0])
 
 LIBGNUTLS_VERSION=`pkg-config --modversion gnutls`
 
@@ -90,6 +90,30 @@ AS_IF([test "${FLOCK}" != "no"],
 # disable flock if requested by user or it doesn't support timeout
 AM_CONDITIONAL([DISABLE_FLOCK],
 	       [test "$enable_flock" = "no" || test "$flock_works" = "no"])
+
+# openssl is needed as the responder for OCSP tests
+AC_PATH_PROG([OPENSSL], [openssl], [no])
+# OCSP checks with gnutls-cli from GnuTLS versions before 3.3.23,
+# 3.4.12, or 3.5.1 (on the respective 3.x branch) fail if intermediate
+# CAs cannot be status checked, even if there are no intermediate CAs
+# like in the mod_gnutls test suite where end entity certificates are
+# directly issued by a root CA.
+AC_MSG_CHECKING([for gnutls-cli version supporting OCSP for EE under root CA])
+AC_PREPROC_IFELSE(
+	[AC_LANG_SOURCE([[#include "gnutls/gnutls.h"
+			#if GNUTLS_VERSION_NUMBER < 0x030317
+			#error
+			#elif GNUTLS_VERSION_NUMBER >= 0x030400 && GNUTLS_VERSION_NUMBER < 0x03040c
+			#error
+			#elif GNUTLS_VERSION_NUMBER == 0x030500
+			#error
+			#endif
+			]])],
+	[gnutls_ocsp_ok="yes"],
+	[gnutls_ocsp_ok="no"],
+)
+AC_MSG_RESULT([$gnutls_ocsp_ok])
+AM_CONDITIONAL([ENABLE_OCSP_TEST], [test "${OPENSSL}" != "no" && test "${gnutls_ocsp_ok}" = "yes"])
 
 dnl Enable test namespaces? Default is "yes".
 AC_ARG_ENABLE(test-namespaces,
@@ -215,25 +239,38 @@ AC_ARG_VAR([SOFTHSM_LIB], [Absolute path of the SoftHSM PKCS @%:@11 module to \
 			  library paths.])
 
 dnl Build list of "Listen" statements for Apache
-LISTEN_LIST="# Listen addresses for the test servers"
+LISTEN_LIST="@%:@ Listen addresses for the test servers"
 for i in ${TEST_IP}; do
 	LISTEN_LIST="${LISTEN_LIST}
 Listen ${i}:\${TEST_PORT}"
 done
-dnl HTTP ports, only active if TEST_HTTP_PORT is defined
+# Available extra ports, tests can "Define" variables of the listed
+# names in their apache.conf to enable them.
+for j in TEST_HTTP_PORT OCSP_PORT; do
 LISTEN_LIST="${LISTEN_LIST}
-<IfDefine TEST_HTTP_PORT>"
+<IfDefine ${j}>"
 for i in ${TEST_IP}; do
 	LISTEN_LIST="${LISTEN_LIST}
-	Listen ${i}:\${TEST_HTTP_PORT}"
+	Listen ${i}:\${${j}}"
 done
 LISTEN_LIST="${LISTEN_LIST}
 </IfDefine>"
+done
 AC_SUBST(LISTEN_LIST)
 AM_SUBST_NOTMAKE(LISTEN_LIST)
 
+DX_DOXYGEN_FEATURE(ON)
+DX_DOT_FEATURE(ON)
+DX_HTML_FEATURE(ON)
+DX_MAN_FEATURE(OFF)
+DX_RTF_FEATURE(OFF)
+DX_XML_FEATURE(OFF)
+DX_PDF_FEATURE(ON)
+DX_PS_FEATURE(OFF)
+DX_INIT_DOXYGEN([mod_gnutls], [doc/doxygen.conf], [doc/api])
+
 AC_CONFIG_FILES([Makefile src/Makefile test/Makefile test/tests/Makefile \
-			doc/Makefile include/mod_gnutls.h \
+			doc/Makefile doc/doxygen.conf include/mod_gnutls.h \
 			test/proxy_backend.conf \
 			test/apache-conf/listen.conf \
 			test/apache-conf/netns.conf])

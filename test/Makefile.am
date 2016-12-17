@@ -28,18 +28,30 @@ dist_check_SCRIPTS += test-16_view-status.bash \
 	test-23_TLS_reverse_proxy_mismatched_priorities.bash \
 	test-24_pkcs11_cert.bash \
 	test-25_Disable_TLS_1.0.bash \
-	test-26_redirect_HTTP_to_HTTPS.bash
+	test-26_redirect_HTTP_to_HTTPS.bash \
+	test-27_OCSP_server.bash
 
 TESTS = $(dist_check_SCRIPTS)
 
 check_PROGRAMS = pgpcrc
 pgpcrc_SOURCES = pgpcrc.c
 
+# build OCSP database tool
+if ENABLE_OCSP_TEST
+check_PROGRAMS += gen_ocsp_index
+gen_ocsp_index_SOURCES = gen_ocsp_index.c cert_helper.c
+gen_ocsp_index_LDFLAGS = $(LIBGNUTLS_LIBS)
+noinst_HEADERS = cert_helper.h
+endif
+
 # Identities in the miniature CA, server, and client environment for
 # the test suite
 shared_identities = server authority client imposter rogueca
 pgp_identities = $(shared_identities)
 x509_only_identities = rogueclient
+if ENABLE_OCSP_TEST
+x509_only_identities += ocsp-responder
+endif
 x509_identities = $(shared_identities) $(x509_only_identities)
 identities = $(shared_identities) $(x509_only_identities)
 # Append strings after ":=" to each identity to generate a list of
@@ -73,8 +85,8 @@ check_DATA = $(tokens) server/crl.pem
 MOSTLYCLEANFILES = cache/* logs/* outputs/* server/crl.pem
 
 cert_templates = authority.template.in client.template.in \
-	imposter.template.in rogueca.template rogueclient.template.in \
-	server.template.in
+	imposter.template.in ocsp-responder.template rogueca.template \
+	rogueclient.template.in server.template.in
 generated_templates = authority.template client.template \
 	imposter.template rogueclient.template server.template
 
@@ -116,6 +128,22 @@ $(msva_home)/trustdb.gpg: authority/minimal.pgp client/cert.pgp
 	printf "keyserver does-not-exist.example\n" > $(msva_home)/gpg.conf
 endif
 
+if ENABLE_OCSP_TEST
+# rules to build OCSP database
+check_DATA += authority/ocsp_index.txt
+MOSTLYCLEANFILES += authority/ocsp_index.txt authority/ocsp_index.txt.attr
+authority/ocsp_index.txt: $(x509_tokens) gen_ocsp_index authority/ocsp_index.txt.attr
+	./gen_ocsp_index server/x509.pem client/x509.pem > $@
+
+authority/ocsp_index.txt.attr: authority/secret.key
+	echo "unique_subject = no" > $@
+
+# build certificate chain file for server
+check_DATA += server/x509-chain.pem
+MOSTLYCLEANFILES += server/x509-chain.pem
+%/x509-chain.pem: %/x509.pem authority/x509.pem
+	cat $< authority/x509.pem > $@
+endif
 
 # SoftHSM tokens. Note that the SoftHSM 2 token is a directory and
 # hence has to be treated slightly differently.
@@ -158,7 +186,9 @@ if USE_MSVA
 endif
 
 # Apache configuration and data files
-apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/secret.txt data/test.txt mime.types proxy_mods.conf
+apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/ocsp.cgi \
+	data/secret.txt data/test.txt mime.types ocsp_server.conf \
+	proxy_mods.conf
 
 EXTRA_DIST = $(apache_data) $(cert_templates) $(shared_identities:=.uid.in) \
 	common.bash proxy_backend.bash runtests server-crl.template \
@@ -176,6 +206,10 @@ lock_wait = 30
 TEST_PORT ?= 9932
 # port for MSVA in test cases that use it
 MSVA_PORT ?= 9933
+# port for OCSP server (Apache vhost if enabled)
+if ENABLE_OCSP_TEST
+OCSP_PORT ?= 9936
+endif
 # maximum time to wait for MSVA startup (milliseconds)
 TEST_MSVA_MAX_WAIT ?= 10000
 # wait loop time for MSVA startup (milliseconds)
@@ -199,6 +233,11 @@ if HAVE_SOFTHSM
 AM_TESTS_ENVIRONMENT += export SOFTHSM="@SOFTHSM@"; \
 	export SOFTHSM_MAJOR_VERSION="@SOFTHSM_MAJOR_VERSION@"; \
 	export SOFTHSM_LIB="@SOFTHSM_LIB@"
+endif
+
+if ENABLE_OCSP_TEST
+AM_TESTS_ENVIRONMENT += export OPENSSL="@OPENSSL@"; \
+	export OCSP_PORT="$(OCSP_PORT)";
 endif
 
 if ENABLE_NETNS

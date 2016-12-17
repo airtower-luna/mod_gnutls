@@ -1,8 +1,8 @@
-/**
+/*
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2008, 2014 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
- *  Copyright 2015 Thomas Klute
+ *  Copyright 2015-2016 Thomas Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -15,10 +15,10 @@
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- *
  */
 
 #include "mod_gnutls.h"
+#include "gnutls_ocsp.h"
 
 #ifdef APLOG_USE_MODULE
 APLOG_USE_MODULE(gnutls);
@@ -31,11 +31,7 @@ static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
     ap_hook_post_config(mgs_hook_post_config, aszPre, NULL,
                         APR_HOOK_REALLY_LAST);
     /* HTTP Scheme Hook */
-#if USING_2_1_RECENT
     ap_hook_http_scheme(mgs_hook_http_scheme, NULL, NULL, APR_HOOK_MIDDLE);
-#else
-    ap_hook_http_method(mgs_hook_http_scheme, NULL, NULL, APR_HOOK_MIDDLE);
-#endif
     /* Default Port Hook */
     ap_hook_default_port(mgs_hook_default_port, NULL, NULL, APR_HOOK_MIDDLE);
     /* Pre-Connect Hook */
@@ -75,9 +71,11 @@ static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
 
 
 
-/*
- * mod_rewrite calls this function to fill %{HTTPS}. A non-zero return
- * value means that HTTPS is in use.
+/**
+ * mod_rewrite calls this function to fill %{HTTPS}.
+ *
+ * @param c the connection to check
+ * @return non-zero value if HTTPS is in use, zero if not
  */
 int ssl_is_https(conn_rec *c)
 {
@@ -228,7 +226,7 @@ static const command_rec mgs_config_cmds[] = {
     RSRC_CONF,
     "TLS Server SRP Parameters file"),
 #endif
-    AP_INIT_TAKE1("GnuTLSCacheTimeout", mgs_set_cache_timeout,
+    AP_INIT_TAKE1("GnuTLSCacheTimeout", mgs_set_timeout,
     NULL,
     RSRC_CONF,
     "Cache Timeout"),
@@ -274,7 +272,34 @@ static const command_rec mgs_config_cmds[] = {
     RSRC_CONF,
     "The priorities to enable for proxy connections (ciphers, key exchange, "
     "MACs, compression)."),
+    AP_INIT_FLAG("GnuTLSOCSPStapling", mgs_ocsp_stapling_enable,
+                 NULL, RSRC_CONF,
+                 "Enable OCSP stapling"),
+    AP_INIT_FLAG("GnuTLSOCSPCheckNonce", mgs_set_ocsp_check_nonce,
+                 NULL, RSRC_CONF,
+                 "Check nonce in OCSP responses?"),
+    AP_INIT_TAKE1("GnuTLSOCSPResponseFile", mgs_store_ocsp_response_path,
+                  NULL, RSRC_CONF,
+                  "Read OCSP response for stapling from this file instead "
+                  "of sending a request over HTTP (must be updated "
+                  "externally)"),
+    AP_INIT_TAKE1("GnuTLSOCSPCacheTimeout", mgs_set_timeout,
+                  NULL, RSRC_CONF,
+                  "Cache timeout for OCSP responses"),
+    AP_INIT_TAKE1("GnuTLSOCSPFailureTimeout", mgs_set_timeout,
+                  NULL, RSRC_CONF,
+                  "Wait this many seconds before retrying a failed OCSP "
+                  "request"),
+    AP_INIT_TAKE1("GnuTLSOCSPSocketTimeout", mgs_set_timeout,
+                  NULL, RSRC_CONF,
+                  "Socket timeout for OCSP requests"),
+#ifdef __clang__
+    /* Workaround for this clang bug:
+     * https://llvm.org/bugs/show_bug.cgi?id=21689 */
+    {},
+#else
     { NULL },
+#endif
 };
 
 module AP_MODULE_DECLARE_DATA gnutls_module = {
