@@ -1,3 +1,9 @@
+mod-gnutls (0.8.0-1) unstable; urgency=medium
+
+  * New upstream release
+
+ -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Sun, 18 Dec 2016 00:58:42 +0100
+
 mod-gnutls (0.7.5-2) unstable; urgency=medium
 
   * improve build-deps for architectures that do not have pandoc.
