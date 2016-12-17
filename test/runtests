@@ -188,6 +188,16 @@ else
 	|| [ -e "${t}/fail.server" ]
 fi
 
+# check OCSP server
+if [ -n "${CHECK_OCSP_SERVER}" ]; then
+    if [ -n "${OCSP_RESPONSE_FILE}" ]; then
+	store_ocsp="--outfile ${OCSP_RESPONSE_FILE}"
+    fi
+    echo "---- Testing OCSP server ----"
+    ocsptool --ask --nonce --load-issuer authority/x509.pem --load-cert server/x509.pem ${store_ocsp}
+    echo "---- OCSP test done ----"
+fi
+
 # PID file for sleep command (explanation below)
 sleep_pidfile="$(mktemp mod_gnutls_test-XXXXXX.pid)"
 

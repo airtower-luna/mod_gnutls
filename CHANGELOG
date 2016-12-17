@@ -1,6 +1,21 @@
-**TODO:
-- Handle Unclean Shutdowns
-- make session cache use generic apache caches
+** Version 0.8.0 (2016-12-11)
+- New: Support for OCSP stapling
+- Bugfix: Access to DBM cache is locked using global mutex
+  "gnutls-cache"
+- Bugfix: GnuTLSSessionTickets is now disabled by default as described
+  in the handbook
+- Fixed memory leak while checking proxy backend certificate
+- Fixed memory leaks in post_config
+- Safely delete session ticket key (requires GnuTLS >= 3.4)
+- Improved error handling in post_config hook
+- Various handbook updates
+- Internal API documentation can be generated using Doxygen
+- Unused code has been removed (conditionals for GnuTLS 2.x and Apache
+  versions before 2.2, internal Lua bytecode structure last used in
+  2011).
+- Test suite: Fixed locking for access to the PGP keyring of the test
+  certificate authority
+- mod_gnutls can be built using Clang (unsupported)
 
 ** Version 0.7.5 (2016-05-28)
 - Sunil Mohan Adapa reported retry loops during session shutdown in

@@ -1,4 +1,4 @@
-/**
+/*
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2008, 2014 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
@@ -16,13 +16,16 @@
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- *
  */
 
 #include "mod_gnutls.h"
+#include "gnutls_cache.h"
+#include "gnutls_ocsp.h"
 #include "http_vhost.h"
 #include "ap_mpm.h"
 #include "mod_status.h"
+#include <util_mutex.h>
+#include <apr_escape.h>
 
 #ifdef ENABLE_MSVA
 #include <msv/msv.h>
@@ -32,10 +35,6 @@
 APLOG_USE_MODULE(gnutls);
 #endif
 
-#if !USING_2_1_RECENT
-extern server_rec *ap_server_conf;
-#endif
-
 #if MOD_GNUTLS_DEBUG
 static apr_file_t *debug_log_fp;
 #endif
@@ -43,6 +42,10 @@ static apr_file_t *debug_log_fp;
 #define IS_PROXY_STR(c) \
     ((c->is_proxy == GNUTLS_ENABLED_TRUE) ? "proxy " : "")
 
+/** Key to encrypt session tickets. Must be kept secret. This key is
+ * generated in the `pre_config` hook and thus constant across
+ * forks. The problem with this approach is that it does not support
+ * regular key rotation. */
 static gnutls_datum_t session_ticket_key = {NULL, 0};
 
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt);
@@ -53,11 +56,16 @@ static int mgs_status_hook(request_rec *r, int flags);
 #ifdef ENABLE_MSVA
 static const char* mgs_x509_construct_uid(request_rec * pool, gnutls_x509_crt_t cert);
 #endif
-static int load_proxy_x509_credentials(server_rec *s);
+static int load_proxy_x509_credentials(apr_pool_t *pconf, apr_pool_t *ptemp, server_rec *s)
+    __attribute__((nonnull));
 
 /* Pool Cleanup Function */
-apr_status_t mgs_cleanup_pre_config(void *data __attribute__((unused))) {
-	/* Free all session data */
+apr_status_t mgs_cleanup_pre_config(void *data __attribute__((unused)))
+{
+    /* Free session ticket master key */
+#if GNUTLS_VERSION_NUMBER >= 0x030400
+    gnutls_memset(session_ticket_key.data, 0, session_ticket_key.size);
+#endif
     gnutls_free(session_ticket_key.data);
     session_ticket_key.data = NULL;
     session_ticket_key.size = 0;
@@ -125,7 +133,10 @@ int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog, apr_pool_t * ptem
 
     AP_OPTIONAL_HOOK(status_hook, mgs_status_hook, NULL, NULL, APR_HOOK_MIDDLE);
 
-	/* Register a pool clean-up function */
+    ap_mutex_register(pconf, MGS_CACHE_MUTEX_NAME, NULL, APR_LOCK_DEFAULT, 0);
+    ap_mutex_register(pconf, MGS_OCSP_MUTEX_NAME, NULL, APR_LOCK_DEFAULT, 0);
+
+    /* Register a pool clean-up function */
     apr_pool_cleanup_register(pconf, NULL, mgs_cleanup_pre_config, apr_pool_cleanup_null);
 
     return OK;
@@ -155,6 +166,13 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session) {
     gnutls_credentials_set(session, GNUTLS_CRD_CERTIFICATE, ctxt->sc->certs);
     /* Set Anon credentials */
     gnutls_credentials_set(session, GNUTLS_CRD_ANON, ctxt->sc->anon_creds);
+
+    if (ctxt->sc->ocsp_staple)
+    {
+        gnutls_certificate_set_ocsp_status_request_function(ctxt->sc->certs,
+                                                            mgs_get_ocsp_response,
+                                                            ctxt);
+    }
 
 #ifdef ENABLE_SRP
 	/* Set SRP credentials */
@@ -294,8 +312,19 @@ static int read_pgpcrt_cn(server_rec * s, apr_pool_t * p,
     return rv;
 }
 
-int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused)), apr_pool_t * ptemp __attribute__((unused)), server_rec * base_server) {
-
+/**
+ * Post config hook.
+ *
+ * Must return OK or DECLINED on success, something else on
+ * error. These codes are defined in Apache httpd.h along with the
+ * HTTP status codes, so I'm going to use HTTP error codes both for
+ * fun (and to avoid conflicts).
+ */
+int mgs_hook_post_config(apr_pool_t *pconf,
+                         apr_pool_t *plog __attribute__((unused)),
+                         apr_pool_t *ptemp,
+                         server_rec *base_server)
+{
     int rv;
     server_rec *s;
     gnutls_dh_params_t dh_params = NULL;
@@ -315,12 +344,26 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
     sc_base = (mgs_srvconf_rec *) ap_get_module_config(s->module_config, &gnutls_module);
 
 
-    rv = mgs_cache_post_config(p, s, sc_base);
-    if (rv != 0) {
+    rv = mgs_cache_post_config(pconf, s, sc_base);
+    if (rv != APR_SUCCESS)
+    {
         ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, s,
-                "GnuTLS: Post Config for GnuTLSCache Failed."
-                " Shutting Down.");
-        exit(-1);
+                     "Post config for cache failed.");
+        return HTTP_INSUFFICIENT_STORAGE;
+    }
+
+    if (sc_base->ocsp_mutex == NULL)
+    {
+        rv = ap_global_mutex_create(&sc_base->ocsp_mutex, NULL,
+                                    MGS_OCSP_MUTEX_NAME, NULL,
+                                    base_server, pconf, 0);
+        if (rv != APR_SUCCESS)
+        {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, base_server,
+                         "Failed to create mutex '" MGS_OCSP_MUTEX_NAME
+                         "'.");
+            return HTTP_INTERNAL_SERVER_ERROR;
+        }
     }
 
     /* If GnuTLSP11Module is set, load the listed PKCS #11
@@ -351,25 +394,39 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
         }
     }
 
-    for (s = base_server; s; s = s->next) {
+    for (s = base_server; s; s = s->next)
+    {
         sc = (mgs_srvconf_rec *) ap_get_module_config(s->module_config, &gnutls_module);
         sc->cache_type = sc_base->cache_type;
         sc->cache_config = sc_base->cache_config;
         sc->cache_timeout = sc_base->cache_timeout;
+        sc->cache = sc_base->cache;
 
-        rv = mgs_load_files(p, s);
+        rv = mgs_load_files(pconf, ptemp, s);
         if (rv != 0) {
             ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
                 "GnuTLS: Loading required files failed."
                 " Shutting Down.");
-            exit(-1);
+            return HTTP_NOT_FOUND;
+        }
+
+        if (sc->ocsp_staple == GNUTLS_ENABLED_UNSET)
+            sc->ocsp_staple = GNUTLS_ENABLED_FALSE;
+
+        sc->ocsp_mutex = sc_base->ocsp_mutex;
+        /* init OCSP configuration if OCSP is enabled for this host */
+        if (sc->ocsp_staple)
+        {
+            rv = mgs_ocsp_post_config_server(pconf, ptemp, s);
+            if (rv != OK && rv != DECLINED)
+                return rv;
         }
 
         /* defaults for unset values: */
         if (sc->enabled == GNUTLS_ENABLED_UNSET)
             sc->enabled = GNUTLS_ENABLED_FALSE;
         if (sc->tickets == GNUTLS_ENABLED_UNSET)
-            sc->tickets = GNUTLS_ENABLED_TRUE;
+            sc->tickets = GNUTLS_ENABLED_FALSE;
         if (sc->export_certificates_size < 0)
             sc->export_certificates_size = 0;
         if (sc->client_verify_mode == -1)
@@ -382,7 +439,7 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
             ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
                     "GnuTLS: Host '%s:%d' is missing the GnuTLSPriorities directive!",
                     s->server_hostname, s->port);
-            exit(-1);
+            return HTTP_NOT_ACCEPTABLE;
         }
 
         /* Check if DH params have been set per host */
@@ -414,24 +471,25 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
 			ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
 						"GnuTLS: Host '%s:%d' is missing a Certificate File!",
 						s->server_hostname, s->port);
-            exit(-1);
+            return HTTP_UNAUTHORIZED;
         }
         if (sc->enabled == GNUTLS_ENABLED_TRUE &&
             ((sc->certs_x509_chain_num > 0 && sc->privkey_x509 == NULL) ||
-             (sc->cert_crt_pgp[0] != NULL && sc->privkey_pgp == NULL))) {
+             (sc->cert_crt_pgp != NULL && sc->privkey_pgp == NULL)))
+        {
 			ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
 						"GnuTLS: Host '%s:%d' is missing a Private Key File!",
 						s->server_hostname, s->port);
-            exit(-1);
+            return HTTP_UNAUTHORIZED;
         }
 
         if (sc->enabled == GNUTLS_ENABLED_TRUE) {
             rv = -1;
             if (sc->certs_x509_chain_num > 0) {
-                rv = read_crt_cn(s, p, sc->certs_x509_crt_chain[0], &sc->cert_cn);
+                rv = read_crt_cn(s, pconf, sc->certs_x509_crt_chain[0], &sc->cert_cn);
             }
             if (rv < 0 && sc->cert_pgp != NULL) {
-                rv = read_pgpcrt_cn(s, p, sc->cert_crt_pgp[0], &sc->cert_cn);
+                rv = read_pgpcrt_cn(s, pconf, sc->cert_crt_pgp[0], &sc->cert_cn);
 			}
 
             if (rv < 0) {
@@ -445,41 +503,42 @@ int mgs_hook_post_config(apr_pool_t * p, apr_pool_t * plog __attribute__((unused
 
         if (sc->enabled == GNUTLS_ENABLED_TRUE
             && sc->proxy_enabled == GNUTLS_ENABLED_TRUE
-            && load_proxy_x509_credentials(s) != APR_SUCCESS)
+            && load_proxy_x509_credentials(pconf, ptemp, s) != APR_SUCCESS)
         {
             ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
                          "%s: loading proxy credentials for host "
                          "'%s:%d' failed, exiting!",
                          __func__, s->server_hostname, s->port);
-            exit(-1);
+            return HTTP_PROXY_AUTHENTICATION_REQUIRED;
         }
     }
 
 
-    ap_add_version_component(p, "mod_gnutls/" MOD_GNUTLS_VERSION);
+    ap_add_version_component(pconf, "mod_gnutls/" MOD_GNUTLS_VERSION);
 
     {
         const char* libvers = gnutls_check_version(NULL);
         char* gnutls_version = NULL;
-        if(libvers && (gnutls_version = apr_psprintf(p, "GnuTLS/%s", libvers))) {
-            ap_add_version_component(p, gnutls_version);
+        if(libvers && (gnutls_version = apr_psprintf(pconf, "GnuTLS/%s", libvers))) {
+            ap_add_version_component(pconf, gnutls_version);
         } else {
             // In case we could not create the above string go for the static version instead
-            ap_add_version_component(p, "GnuTLS/" GNUTLS_VERSION "-static");
+            ap_add_version_component(pconf, "GnuTLS/" GNUTLS_VERSION "-static");
         }
     }
 
     return OK;
 }
 
-void mgs_hook_child_init(apr_pool_t * p, server_rec *s) {
+void mgs_hook_child_init(apr_pool_t *p, server_rec *s)
+{
     apr_status_t rv = APR_SUCCESS;
-    mgs_srvconf_rec *sc =
-        (mgs_srvconf_rec *) ap_get_module_config(s->module_config, &gnutls_module);
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(s->module_config, &gnutls_module);
 
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
-    /* if we use PKCS #11 reinitialize it */
 
+    /* if we use PKCS #11 reinitialize it */
     if (mgs_pkcs11_reinit(s) < 0) {
             ap_log_error(APLOG_MARK, APLOG_EMERG, 0, s,
                     "GnuTLS: Failed to reinitialize PKCS #11");
@@ -493,6 +552,14 @@ void mgs_hook_child_init(apr_pool_t * p, server_rec *s) {
                     "GnuTLS: Failed to run Cache Init");
         }
     }
+
+    /* reinit OCSP mutex */
+    const char *lockfile = apr_global_mutex_lockfile(sc->ocsp_mutex);
+    rv = apr_global_mutex_child_init(&sc->ocsp_mutex, lockfile, p);
+    if (rv != APR_SUCCESS)
+        ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
+                     "Failed to reinit mutex '" MGS_OCSP_MUTEX_NAME "'.");
+
     /* Block SIGPIPE Signals */
     rv = apr_signal_block(SIGPIPE);
     if(rv != APR_SUCCESS) {
@@ -540,8 +607,6 @@ apr_port_t mgs_hook_default_port(const request_rec * r) {
 
 #define MAX_HOST_LEN 255
 
-#if USING_2_1_RECENT
-
 typedef struct {
     mgs_handle_t *ctxt;
     mgs_srvconf_rec *sc;
@@ -553,10 +618,13 @@ typedef struct {
  *
  * @param x vhost callback record
  * @param s server record
+ * @param tsc mod_gnutls server data for `s`
+ *
  * @return true if a match, false otherwise
  *
  */
-int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc) {
+int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc)
+{
 	apr_array_header_t *names;
 	int rv = 0;
 	char ** name;
@@ -599,7 +667,8 @@ int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc) 
 	return rv;
 }
 
-static int vhost_cb(void *baton, conn_rec * conn __attribute__((unused)), server_rec * s) {
+static int vhost_cb(void *baton, conn_rec *conn, server_rec * s)
+{
     mgs_srvconf_rec *tsc;
     vhost_cb_rec *x = baton;
     int ret;
@@ -617,17 +686,17 @@ static int vhost_cb(void *baton, conn_rec * conn __attribute__((unused)), server
          * in the certificate. */
         ret = gnutls_x509_crt_check_hostname(tsc->certs_x509_crt_chain[0], s->server_hostname);
         if (0 == ret)
-            ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
-                         "GnuTLS: the certificate doesn't match requested hostname "
-                         "'%s'", s->server_hostname);
+            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, conn,
+                          "GnuTLS: the certificate doesn't match requested "
+                          "hostname '%s'", s->server_hostname);
     } else {
-        ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
-                     "GnuTLS: SNI request for '%s' but no X.509 certs available at all",
-                     s->server_hostname);
+        ap_log_cerror(APLOG_MARK, APLOG_INFO, 0, conn,
+                      "GnuTLS: SNI request for '%s' but no X.509 certs "
+                      "available at all",
+                      s->server_hostname);
     }
 	return check_server_aliases(x, s, tsc);
 }
-#endif
 
 mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
 {
@@ -636,12 +705,7 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
     size_t data_len = MAX_HOST_LEN;
     char sni_name[MAX_HOST_LEN];
     mgs_handle_t *ctxt;
-#if USING_2_1_RECENT
     vhost_cb_rec cbx;
-#else
-    server_rec *s;
-    mgs_srvconf_rec *tsc;
-#endif
 
     if (session == NULL)
         return NULL;
@@ -657,10 +721,9 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
     }
 
     if (sni_type != GNUTLS_NAME_DNS) {
-        ap_log_error(APLOG_MARK, APLOG_CRIT, 0,
-                ctxt->c->base_server,
-                "GnuTLS: Unknown type '%d' for SNI: "
-                "'%s'", sni_type, sni_name);
+        ap_log_cerror(APLOG_MARK, APLOG_CRIT, 0, ctxt->c,
+                      "GnuTLS: Unknown type '%d' for SNI: '%s'",
+                      sni_type, sni_name);
         return NULL;
     }
 
@@ -668,7 +731,6 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
      * Code in the Core already sets up the c->base_server as the base
      * for this IP/Port combo.  Trust that the core did the 'right' thing.
      */
-#if USING_2_1_RECENT
     cbx.ctxt = ctxt;
     cbx.sc = NULL;
     cbx.sni_name = sni_name;
@@ -677,19 +739,6 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
     if (rv == 1) {
         return cbx.sc;
     }
-#else
-    for (s = ap_server_conf; s; s = s->next) {
-
-        tsc = (mgs_srvconf_rec *) ap_get_module_config(s->module_config,
-                                                       &gnutls_module);
-
-        if (tsc->enabled != GNUTLS_ENABLED_TRUE) { continue; }
-
-        if(check_server_aliases(x, s, tsc)) {
-            return tsc;
-        }
-    }
-#endif
     return NULL;
 }
 
@@ -790,7 +839,8 @@ static void create_gnutls_handle(conn_rec * c)
                           "gnutls_init for server side failed: %s (%d)",
                           gnutls_strerror(err), err);
         /* Initialize Session Tickets */
-        if (session_ticket_key.data != NULL && ctxt->sc->tickets != 0)
+        if (session_ticket_key.data != NULL &&
+            ctxt->sc->tickets == GNUTLS_ENABLED_TRUE)
         {
             err = gnutls_session_ticket_enable_server(ctxt->session, &session_ticket_key);
             if (err != GNUTLS_E_SUCCESS)
@@ -875,7 +925,6 @@ int mgs_hook_pre_connection(conn_rec * c, void *csd __attribute__((unused)))
 
 int mgs_hook_fixups(request_rec * r) {
     unsigned char sbuf[GNUTLS_MAX_SESSION_ID];
-    char buf[AP_IOBUFSIZE];
     const char *tmp;
     size_t len;
     mgs_handle_t *ctxt;
@@ -945,8 +994,8 @@ int mgs_hook_fixups(request_rec * r) {
 
     len = sizeof (sbuf);
     gnutls_session_get_id(ctxt->session, sbuf, &len);
-    tmp = mgs_session_id2sz(sbuf, len, buf, sizeof (buf));
-    apr_table_setn(env, "SSL_SESSION_ID", apr_pstrdup(r->pool, tmp));
+    apr_table_setn(env, "SSL_SESSION_ID",
+                   apr_pescape_hex(r->pool, sbuf, len, 0));
 
     if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_X509) {
 	mgs_add_common_cert_vars(r, ctxt->sc->certs_x509_crt_chain[0], 0, ctxt->sc->export_certificates_size);
@@ -1081,8 +1130,8 @@ static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, in
 
     len = sizeof (sbuf);
     gnutls_x509_crt_get_serial(cert, sbuf, &len);
-    tmp = mgs_session_id2sz(sbuf, len, buf, sizeof (buf));
-    apr_table_setn(env, MGS_SIDE("_M_SERIAL"), apr_pstrdup(r->pool, tmp));
+    apr_table_setn(env, MGS_SIDE("_M_SERIAL"),
+                   apr_pescape_hex(r->pool, sbuf, len, 0));
 
     ret = gnutls_x509_crt_get_version(cert);
     if (ret > 0)
@@ -1198,8 +1247,8 @@ static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t ce
 
     len = sizeof (sbuf);
     gnutls_openpgp_crt_get_fingerprint(cert, sbuf, &len);
-    tmp = mgs_session_id2sz(sbuf, len, buf, sizeof (buf));
-    apr_table_setn(env, MGS_SIDE("_FINGERPRINT"), apr_pstrdup(r->pool, tmp));
+    apr_table_setn(env, MGS_SIDE("_FINGERPRINT"),
+                   apr_pescape_hex(r->pool, sbuf, len, 0));
 
     ret = gnutls_openpgp_crt_get_version(cert);
     if (ret > 0)
@@ -1760,33 +1809,68 @@ static int gtls_check_server_cert(gnutls_session_t session)
         return err;
     }
 
-    gnutls_datum_t * out = gnutls_malloc(sizeof(gnutls_datum_t));
-    /* GNUTLS_CRT_X509: ATM, only X509 is supported for proxy certs
-     * 0: according to function API, the last argument should be 0 */
-    err = gnutls_certificate_verification_status_print(status, GNUTLS_CRT_X509,
-                                                       out, 0);
-    if (err != GNUTLS_E_SUCCESS)
+    if (status == 0)
         ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
-                      "%s: server verify print failed: %s (%d)",
-                      __func__, gnutls_strerror(err), err);
+                      "%s: server certificate is trusted.",
+                      __func__);
     else
     {
-        /* If the certificate is trusted, logging the result is just
-         * nice for debugging. But if the back end server provided an
-         * untrusted certificate, warn! */
-        int level = (status == 0 ? APLOG_DEBUG : APLOG_WARNING);
-        ap_log_cerror(APLOG_MARK, level, 0, ctxt->c,
-                      "%s: server certificate verify result: %s",
-                      __func__, out->data);
+        gnutls_datum_t out;
+        /* GNUTLS_CRT_X509: ATM, only X509 is supported for proxy
+         * certs 0: according to function API, the last argument
+         * should be 0 */
+        err = gnutls_certificate_verification_status_print(status,
+                                                           GNUTLS_CRT_X509,
+                                                           &out, 0);
+        if (err != GNUTLS_E_SUCCESS)
+            ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, ctxt->c,
+                          "%s: server verify print failed: %s (%d)",
+                          __func__, gnutls_strerror(err), err);
+        else
+            ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, ctxt->c,
+                          "%s: %s",
+                          __func__, out.data);
+        gnutls_free(out.data);
     }
 
-    gnutls_free(out);
     return status;
 }
 
 
 
-static apr_status_t load_proxy_x509_credentials(server_rec *s)
+static apr_status_t cleanup_proxy_x509_credentials(void *arg)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *) arg;
+
+    if (sc->proxy_x509_creds)
+    {
+        /* This implicitly releases the associated trust list
+         * sc->proxy_x509_tl, too. */
+        gnutls_certificate_free_credentials(sc->proxy_x509_creds);
+        sc->proxy_x509_creds = NULL;
+        sc->proxy_x509_tl = NULL;
+    }
+
+    if (sc->anon_client_creds)
+    {
+        gnutls_anon_free_client_credentials(sc->anon_client_creds);
+        sc->anon_client_creds = NULL;
+    }
+
+    if (sc->proxy_priorities)
+    {
+        gnutls_priority_deinit(sc->proxy_priorities);
+        sc->proxy_priorities = NULL;
+    }
+
+    return APR_SUCCESS;
+}
+
+
+
+static apr_status_t load_proxy_x509_credentials(apr_pool_t *pconf,
+                                                apr_pool_t *ptemp,
+                                                server_rec *s)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
@@ -1794,12 +1878,16 @@ static apr_status_t load_proxy_x509_credentials(server_rec *s)
     if (sc == NULL)
         return APR_EGENERAL;
 
-    apr_status_t ret = APR_SUCCESS;
+    apr_status_t ret = APR_EINIT;
     int err = GNUTLS_E_SUCCESS;
+
+    /* Cleanup function for the GnuTLS structures allocated below */
+    apr_pool_cleanup_register(pconf, sc, cleanup_proxy_x509_credentials,
+                              apr_pool_cleanup_null);
 
     /* Function pool, gets destroyed before exit. */
     apr_pool_t *pool;
-    ret = apr_pool_create(&pool, s->process->pool);
+    ret = apr_pool_create(&pool, ptemp);
     if (ret != APR_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, ret, s,

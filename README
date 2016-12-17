@@ -21,9 +21,9 @@ Past maintainers and other contributors:
 Prerequisites
 -------------
 
- * GnuTLS          >= 3.1.4 <http://www.gnutls.org/> (3.2.* or newer preferred)
- * Apache HTTPD    >= 2.2 <http://httpd.apache.org/> (2.4.* preferred)
- * autotools, GNU make, & gcc
+ * GnuTLS          >= 3.3 <https://www.gnutls.org/> (3.4 or newer recommended)
+ * Apache HTTPD    >= 2.4 <https://httpd.apache.org/>
+ * autotools, GNU make, & GCC
  * libmsv          >= 0.1 (Optional, enable with ./configure --enable-msva)
  * pandoc   (for documentation, optional)
  * pdflatex (for PDF documentation, optional)
@@ -31,7 +31,7 @@ Prerequisites
 Installation
 ------------
 
- tar xzvf mod_gnutls-version.tar.gz
+ tar xzvf mod_gnutls-version.tar.bz2
  cd mod_gnutls-version/
  autoreconf -fiv
  ./configure
@@ -42,6 +42,10 @@ Installation
 It is recommended to run "make check" before "make install". You may
 need to pass TEST_HOST or TEST_IP to ./configure for the tests to work
 correctly, please see test/README for details.
+
+If Doxygen is available, you can build internal API documentation
+using "make doxygen-doc". The documentation will be placed in
+doc/api/.
 
 Configuration
 -------------

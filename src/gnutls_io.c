@@ -1,8 +1,8 @@
-/**
+/*
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2008 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
- *  Copyright 2015 Thomas Klute
+ *  Copyright 2015-2016 Thomas Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- *
  */
 
 #include "mod_gnutls.h"
@@ -24,7 +23,12 @@
 APLOG_USE_MODULE(gnutls);
 #endif
 
+#if defined(__GNUC__) && __GNUC__ < 5 && !defined(__clang__)
+#include <inttypes.h>
+#endif
+
 /**
+ * @file
  * Describe how the GnuTLS Filter system works here
  *  - Basicly the same as what mod_ssl does with OpenSSL.
  *
@@ -42,8 +46,8 @@ APLOG_USE_MODULE(gnutls);
     ((c->is_proxy == GNUTLS_ENABLED_TRUE) ? "proxy " : "")
 
 /**
- * Convert APR_EINTR or APR_EAGAIN to the match raw error code. Needed
- * to pass the status on to GnuTLS from the pull function.
+ * Convert `APR_EINTR` or `APR_EAGAIN` to the matching errno. Needed
+ * to pass the status on to GnuTLS from the pull and push functions.
  */
 #define EAI_APR_TO_RAW(s) (APR_STATUS_IS_EAGAIN(s) ? EAGAIN : EINTR)
 
@@ -58,10 +62,9 @@ static apr_status_t gnutls_io_filter_error(ap_filter_t * f,
     switch (status) {
     case HTTP_BAD_REQUEST:
         /* log the situation */
-        ap_log_error(APLOG_MARK, APLOG_INFO, 0,
-                     f->c->base_server,
-                     "GnuTLS handshake failed: HTTP spoken on HTTPS port; "
-                     "trying to send HTML error page");
+        ap_log_cerror(APLOG_MARK, APLOG_INFO, 0, f->c,
+                      "GnuTLS handshake failed: HTTP spoken on HTTPS port; "
+                      "trying to send HTML error page");
         mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
             ap_get_module_config(f->c->base_server->module_config,
                                  &gnutls_module);
@@ -400,14 +403,8 @@ tryagain:
 
     if (maxtries < 1) {
         ctxt->status = -1;
-#if USING_2_1_RECENT
         ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, ctxt->c,
                 "GnuTLS: Handshake Failed. Hit Maximum Attempts");
-#else
-        ap_log_error(APLOG_MARK, APLOG_ERR, 0,
-                ctxt->c->base_server,
-                "GnuTLS: Handshake Failed. Hit Maximum Attempts");
-#endif
         if (ctxt->session) {
             gnutls_alert_send(ctxt->session, GNUTLS_AL_FATAL,
                     gnutls_error_to_alert
@@ -422,30 +419,20 @@ tryagain:
         if (ret == GNUTLS_E_WARNING_ALERT_RECEIVED
                 || ret == GNUTLS_E_FATAL_ALERT_RECEIVED) {
             errcode = gnutls_alert_get(ctxt->session);
-            ap_log_error(APLOG_MARK, APLOG_INFO, 0,
-                    ctxt->c->base_server,
-                    "GnuTLS: Handshake Alert (%d) '%s'.",
-                    errcode,
-                    gnutls_alert_get_name(errcode));
+            ap_log_cerror(APLOG_MARK, APLOG_INFO, 0, ctxt->c,
+                          "GnuTLS: Handshake Alert (%d) '%s'.",
+                          errcode, gnutls_alert_get_name(errcode));
         }
 
         if (!gnutls_error_is_fatal(ret)) {
-            ap_log_error(APLOG_MARK, APLOG_INFO, 0,
-                    ctxt->c->base_server,
-                    "GnuTLS: Non-Fatal Handshake Error: (%d) '%s'",
-                    ret, gnutls_strerror(ret));
+            ap_log_cerror(APLOG_MARK, APLOG_INFO, 0, ctxt->c,
+                          "GnuTLS: Non-Fatal Handshake Error: (%d) '%s'",
+                          ret, gnutls_strerror(ret));
             goto tryagain;
         }
-#if USING_2_1_RECENT
         ap_log_cerror(APLOG_MARK, APLOG_INFO, 0, ctxt->c,
                 "GnuTLS: Handshake Failed (%d) '%s'", ret,
                 gnutls_strerror(ret));
-#else
-        ap_log_error(APLOG_MARK, APLOG_INFO, 0,
-                ctxt->c->base_server,
-                "GnuTLS: Handshake Failed (%d) '%s'", ret,
-                gnutls_strerror(ret));
-#endif
         ctxt->status = -1;
         if (ctxt->session) {
             gnutls_alert_send(ctxt->session, GNUTLS_AL_FATAL,
@@ -482,9 +469,8 @@ int mgs_rehandshake(mgs_handle_t * ctxt) {
 
     if (rv != 0) {
         /* the client did not want to rehandshake. goodbye */
-        ap_log_error(APLOG_MARK, APLOG_WARNING, 0,
-                ctxt->c->base_server,
-                "GnuTLS: Client Refused Rehandshake request.");
+        ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, ctxt->c,
+                      "GnuTLS: Client Refused Rehandshake request.");
         return -1;
     }
 
@@ -500,6 +486,10 @@ int mgs_rehandshake(mgs_handle_t * ctxt) {
 /**
  * Close the TLS session associated with the given connection
  * structure and free its resources
+ *
+ * @param ctxt the mod_gnutls session context
+ *
+ * @return a GnuTLS status code, hopefully `GNUTLS_E_SUCCESS`
  */
 static int mgs_bye(mgs_handle_t* ctxt)
 {
@@ -578,10 +568,34 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
             /* you're asking us to speculatively read a negative number of bytes! */
             return APR_ENOTIMPL;
         }
-        /* Err. This is bad. readbytes *can* be a 64bit int! len.. is NOT */
-        if ((apr_size_t) readbytes < len) {
+        /* 'readbytes' and 'len' are of different integer types, which
+         * might have different lengths. Read sizes should be too
+         * small for 32 or 64 bit to matter, but we have to make
+         * sure. */
+#if defined(__GNUC__) && __GNUC__ < 5 && !defined(__clang__)
+        if ((apr_size_t) readbytes < len)
+        {
+            /* If readbytes is negative the function fails in the
+             * check above, but the compiler doesn't get that. */
+            if (__builtin_expect(imaxabs(readbytes) > SIZE_MAX, 0))
+            {
+                ap_log_cerror(APLOG_MARK, APLOG_CRIT, APR_EINVAL, ctxt->c,
+                              "%s: prevented buffer length overflow",
+                              __func__);
+                return APR_EINVAL;
+            }
             len = (apr_size_t) readbytes;
         }
+#else
+        if ((apr_size_t) readbytes < len
+            && __builtin_add_overflow(readbytes, 0, &len))
+        {
+            ap_log_cerror(APLOG_MARK, APLOG_CRIT, APR_EINVAL, ctxt->c,
+                          "%s: prevented buffer length overflow",
+                          __func__);
+            return APR_EINVAL;
+        }
+#endif
         status =
                 gnutls_io_input_read(ctxt, ctxt->input_buffer, &len);
     } else if (ctxt->input_mode == AP_MODE_GETLINE) {
@@ -618,6 +632,13 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
     return status;
 }
 
+/**
+ * Try to flush the output bucket brigade.
+ *
+ * @param ctxt the mod_gnutls session context
+ *
+ * @return `1` on success, `-1` on failure.
+ */
 static ssize_t write_flush(mgs_handle_t * ctxt) {
     apr_bucket *e;
 
@@ -734,14 +755,10 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
 
                 if (ret < 0) {
                     /* error sending output */
-                    ap_log_error(APLOG_MARK,
-                            APLOG_INFO,
-                            ctxt->output_rc,
-                            ctxt->c->base_server,
-                            "GnuTLS: Error writing data."
-                            " (%d) '%s'",
-                            (int) ret,
-                            gnutls_strerror(ret));
+                    ap_log_cerror(APLOG_MARK, APLOG_INFO, ctxt->output_rc,
+                                  ctxt->c,
+                                  "GnuTLS: Error writing data. (%d) '%s'",
+                                  ret, gnutls_strerror(ret));
                     if (ctxt->output_rc == APR_SUCCESS) {
                         ctxt->output_rc =
                                 APR_EGENERAL;
@@ -765,15 +782,32 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
 /**
  * Pull function for GnuTLS
  *
- * Generic errnos used for gnutls_transport_set_errno:
- * EIO: Unknown I/O error
- * ECONNABORTED: Input BB does not exist (NULL)
+ * Generic errnos used for `gnutls_transport_set_errno()`:
+ * * `EAGAIN`: no data available at the moment, try again (maybe later)
+ * * `EINTR`: read was interrupted, try again
+ * * `EIO`: Unknown I/O error
+ * * `ECONNABORTED`: Input BB does not exist (`NULL`)
  *
- * The reason we are not using APR_TO_OS_ERROR to map apr_status_t to
- * errnos is this warning in the APR documentation: "If the statcode
- * was not created by apr_get_os_error or APR_FROM_OS_ERROR, the
- * results are undefined." We cannot know if this applies to any error
- * we might encounter.
+ * The reason we are not using `APR_TO_OS_ERROR` to map `apr_status_t`
+ * to errnos is this warning [in the APR documentation][apr-warn]:
+ *
+ * > If the statcode was not created by apr_get_os_error or
+ * > APR_FROM_OS_ERROR, the results are undefined.
+ *
+ * We cannot know if this applies to any error we might encounter.
+ *
+ * @param ptr GnuTLS session data pointer (the mod_gnutls context
+ * structure)
+ *
+ * @param buffer buffer for the read data
+ *
+ * @param len maximum number of bytes to read (must fit into the
+ * buffer)
+ *
+ * @return The number of bytes read (may be zero on EOF), or `-1` on
+ * error. Note that some errors may warrant another try (see above).
+ *
+ * [apr-warn]: https://apr.apache.org/docs/apr/1.4/group__apr__errno.html#ga2385cae04b04afbdcb65f1a45c4d8506 "Apache Portable Runtime: Error Codes"
  */
 ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
                            void *buffer, size_t len)
@@ -870,12 +904,21 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
 /**
  * Push function for GnuTLS
  *
- * In case of unexpected errors gnutls_transport_set_errno is called
- * with EIO.  The reason we are not using APR_TO_OS_ERROR to map
- * apr_status_t to errnos is this warning in the APR documentation:
- * "If the statcode was not created by apr_get_os_error or
- * APR_FROM_OS_ERROR, the results are undefined." We cannot know if
- * this applies to any error we might encounter.
+ * `gnutls_transport_set_errno()` will be called with `EAGAIN` or
+ * `EINTR` on recoverable errors, or `EIO` in case of unexpected
+ * errors. See the description of mgs_transport_read() for details on
+ * possible error codes.
+ *
+ * @param ptr GnuTLS session data pointer (the mod_gnutls context
+ * structure)
+ *
+ * @param buffer buffer containing the data to send
+ *
+ * @param len length of the data
+ * buffer)
+ *
+ * @return The number of written bytes, or `-1` on error. Note that
+ * some errors may warrant another try (see above).
  */
 ssize_t mgs_transport_write(gnutls_transport_ptr_t ptr,
                             const void *buffer, size_t len)
