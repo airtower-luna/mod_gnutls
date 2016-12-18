@@ -2,24 +2,25 @@ Source: mod-gnutls
 Section: httpd
 Priority: extra
 Maintainer: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
-Build-Depends: apache2-bin <!nocheck>,
-               apache2-dev,
-               curl <!nocheck> | wget <!nocheck>,
-               debhelper (>= 9.20141010),
-               dh-apache2,
-               dh-autoreconf,
-               dpkg-dev (>= 1.17.14),
-               gnutls-bin <!nocheck>,
-               libapr1-dev,
-               libgnutls28-dev (>= 3.1.4) | libgnutls-dev (>= 3.1.4),
-               libmsv-dev (>= 1.0),
-               libwww-perl,
-               monkeysphere (>= 0.36) <!nocheck>,
-               msva-perl [linux-any] <!nocheck>,
-               pandoc [!m68k !powerpc !sh4 !x32] | markdown [m68k powerpc sh4 x32],
-               pkg-config,
-               procps <!nocheck>,
-               softhsm2 <!nocheck> | softhsm <!nocheck>
+Build-Depends:
+ apache2-bin <!nocheck>,
+ apache2-dev,
+ curl <!nocheck> | wget <!nocheck>,
+ debhelper (>= 9.20141010),
+ dh-apache2,
+ dh-autoreconf,
+ dpkg-dev (>= 1.17.14),
+ gnutls-bin <!nocheck>,
+ libapr1-dev,
+ libgnutls28-dev (>= 3.1.4) | libgnutls-dev (>= 3.1.4),
+ libmsv-dev (>= 1.0),
+ libwww-perl,
+ monkeysphere (>= 0.36) <!nocheck>,
+ msva-perl [linux-any] <!nocheck>,
+ pandoc [!m68k !powerpc !sh4 !x32] | markdown [m68k powerpc sh4 x32],
+ pkg-config,
+ procps <!nocheck>,
+ softhsm2 <!nocheck> | softhsm <!nocheck>,
 Standards-Version: 3.9.8
 Homepage: https://mod.gnutls.org/
 Vcs-Git: https://mod.gnutls.org/git/mod_gnutls
@@ -27,7 +28,9 @@ Vcs-Browser: https://mod.gnutls.org/browser/mod_gnutls
 
 Package: libapache2-mod-gnutls
 Architecture: any
-Depends: ${misc:Depends}, ${shlibs:Depends}
+Depends:
+ ${misc:Depends},
+ ${shlibs:Depends},
 Description: Apache module for SSL and TLS encryption with GnuTLS
  mod_gnutls provides SSL 3.0, TLS 1.0, 1.1 and 1.2 encryption with the GnuTLS
  library. It's similar in purpose to mod_ssl, but doesn't use OpenSSL.
