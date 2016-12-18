@@ -32,5 +32,9 @@ Depends:
  ${misc:Depends},
  ${shlibs:Depends},
 Description: Apache module for SSL and TLS encryption with GnuTLS
- mod_gnutls provides SSL 3.0, TLS 1.0, 1.1 and 1.2 encryption with the GnuTLS
+ mod_gnutls provides TLS 1.0, 1.1 and 1.2 encryption with the GnuTLS
  library. It's similar in purpose to mod_ssl, but doesn't use OpenSSL.
+ .
+ Among its interesting features, it supports OCSP stapling, PKCS 11
+ modules for hardware access to secret key material, OpenPGP
+ certificates, and SRP negotiation.
