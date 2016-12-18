@@ -1,0 +1,2 @@
+# Please see https://bugs.debian.org/796285 for the rationale for this override
+apache2-module-depends-on-real-apache2-package apache2-bin
