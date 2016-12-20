@@ -494,7 +494,7 @@ static gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
     }
 
     ap_log_cerror(APLOG_MARK, APLOG_TRACE1, rv, ctxt->c,
-                  "fetched %ld bytes from cache",
+                  "fetched %" APR_SIZE_T_FMT " bytes from cache",
                   dbmval.dsize);
 
     memcpy(data.data, dbmval.dptr + sizeof (apr_time_t), data.size);
@@ -587,7 +587,8 @@ static int dbm_cache_store(server_rec *s, gnutls_datum_t key,
     apr_global_mutex_unlock(sc->cache->mutex);
 
     ap_log_error(APLOG_MARK, APLOG_TRACE1, rv, s,
-                 "stored %ld bytes of data (%ld byte key) in cache '%s'",
+                 "stored %" APR_SIZE_T_FMT " bytes of data (%"
+                 APR_SIZE_T_FMT " byte key) in cache '%s'",
                  dbmval.dsize, dbmkey.dsize, sc->cache_config);
 
     apr_pool_destroy(spool);
