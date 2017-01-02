@@ -17,6 +17,7 @@ Build-Depends:
  libwww-perl,
  monkeysphere (>= 0.36) <!nocheck>,
  msva-perl [linux-any] <!nocheck>,
+ openssl <!nocheck>,
  pandoc [!m68k !powerpc !sh4 !x32] | markdown [m68k powerpc sh4 x32],
  pkg-config,
  procps <!nocheck>,
@@ -32,9 +33,9 @@ Depends:
  ${misc:Depends},
  ${shlibs:Depends},
 Description: Apache module for SSL and TLS encryption with GnuTLS
- mod_gnutls provides TLS 1.0, 1.1 and 1.2 encryption with the GnuTLS
- library. It's similar in purpose to mod_ssl, but doesn't use OpenSSL.
- .
- Among its interesting features, it supports OCSP stapling, PKCS 11
- modules for hardware access to secret key material, OpenPGP
- certificates, and SRP negotiation.
+ mod_gnutls provides TLS encryption using the GnuTLS library. It's
+ similar in purpose to mod_ssl, but doesn't use OpenSSL, and provides
+ some additional features:
+  * PKCS #11 access to server keys and certificates,
+  * OpenPGP authentication, and
+  * using Monkeysphere for client certificate validation.
