@@ -1,3 +1,6 @@
+** Version 0.8.1 (2016-12-20)
+- Bugfix: Use APR_SIZE_T_FMT for portable apr_size_t formatting
+
 ** Version 0.8.0 (2016-12-11)
 - New: Support for OCSP stapling
 - Bugfix: Access to DBM cache is locked using global mutex
