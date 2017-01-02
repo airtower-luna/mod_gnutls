@@ -6,3 +6,4 @@ t/authority.template
 t/client.template
 t/server.uid
 config.nice
+test/authority/tofu.db
