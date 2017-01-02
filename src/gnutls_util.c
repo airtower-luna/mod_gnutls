@@ -28,7 +28,7 @@ const char* http_post_header(apr_pool_t *p, apr_uri_t *uri,
                         "Host: %s\r\n"
                         "Content-Type: %s\r\n"
                         "Accept: %s\r\n"
-                        "Content-Length: %ld\r\n\r\n",
+                        "Content-Length: %" APR_SIZE_T_FMT "\r\n\r\n",
                         apr_uri_unparse(p, uri, APR_URI_UNP_OMITSITEPART),
                         uri->hostname, content_type,
                         accept != NULL ? accept : "*/*",
