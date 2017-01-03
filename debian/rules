@@ -13,7 +13,11 @@ override_dh_auto_configure:
 	fi
 
 override_dh_auto_test:
-	VERBOSE=1 dh_auto_test
+	if ! VERBOSE=1 dh_auto_test; then     \
+	  for i in test/logs/*.error.log; do  \
+	    echo $$i; cat $$i; echo ======= ; \
+          done; false;                        \
+	fi
 
 override_dh_auto_install:
 
