@@ -1,3 +1,9 @@
+mod-gnutls (0.8.1-2) unstable; urgency=medium
+
+  * try to print results of failed tests
+
+ -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Tue, 03 Jan 2017 04:06:12 -0500
+
 mod-gnutls (0.8.1-1) unstable; urgency=medium
 
   * New upstream release (Closes: #848743)
