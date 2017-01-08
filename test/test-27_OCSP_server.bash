@@ -6,6 +6,8 @@
 
 # trigger OCSP server test in the runtests script
 export CHECK_OCSP_SERVER="true"
+echo "OCSP index for the test CA:"
+cat authority/ocsp_index.txt
 
 ${srcdir}/runtests t-27
 ret=${?}
