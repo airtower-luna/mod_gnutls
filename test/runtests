@@ -178,14 +178,16 @@ fi
 printf "TESTING: %s%s\n" "$TEST_NAME" "$EXPECTED_FAILURE"
 trap apache_down_err EXIT
 if [ -n "${USE_MSVA}" ]; then
-    MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT" \
-					${flock_cmd} \
-					${APACHE2} -f "${t}/apache.conf" -k start \
-	|| [ -e "${t}/fail.server" ]
-else
-    ${flock_cmd} \
-	${APACHE2} -f "${t}/apache.conf" -k start \
-	|| [ -e "${t}/fail.server" ]
+    export MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT"
+fi
+if ! ${flock_cmd} ${APACHE2} -f "${t}/apache.conf" -k start; then
+    if [ -e "${t}/fail.server" ]; then
+	echo "Apache HTTPD failed to start as expected."
+	exit 0
+    else
+	echo "Apache HTTPD unexpectedly failed to start."
+	exit 1
+    fi
 fi
 
 # check OCSP server
