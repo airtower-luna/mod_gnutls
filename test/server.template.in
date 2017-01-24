@@ -1,4 +1,4 @@
-serial=2
+serial=587198681
 cn=__HOSTNAME__
 tls_www_server
 signing_key

@@ -18,6 +18,7 @@
  * implied.  See the License for the specific language governing
  * permissions and limitations under the License.
  */
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,8 +51,8 @@ static int index_line(const char* filename)
     /* revocation time & optional reason (YYMMDDHHMMSSZ[,reason]), if
      * any */
     char* revocation = "";
-    /* serial number (hex) */
-    char serial[128];
+    /* serial number (hex), allocated when the length is known */
+    char* serial = NULL;
     /* certificate filename, or "unknown" */
     char* fname = "unknown";
     /* certificate DN */
@@ -63,16 +64,28 @@ static int index_line(const char* filename)
     gmtime_r(&etime, &etmp);
     strftime(expires, sizeof(expires), "%y%m%d%H%M%SZ", &etmp);
 
-    unsigned long long sno = 0;
-    size_t serial_size = sizeof(sno);
-    gnutls_x509_crt_get_serial(cert, &sno, &serial_size);
-    snprintf(serial, sizeof(serial), "%llx", sno);
+    /* determine size of the serial number (in bytes) */
+    size_t serial_size = 0;
+    gnutls_x509_crt_get_serial(cert, NULL, &serial_size);
+    /* allocate memory for serial number and its string representation */
+    uint8_t* sno = calloc(serial_size, sizeof(uint8_t));
+    serial = calloc(serial_size * 2 + 1, sizeof(char));
+    /* actually get the serial */
+    gnutls_x509_crt_get_serial(cert, sno, &serial_size);
+    /* print serial into the buffer byte for byte */
+    for (int i = 0; i < serial_size; i++)
+        snprintf(serial + (2 * i), 3, "%.2X", sno[i]);
+    /* free binary serial */
+    free(sno);
 
     size_t dn_size = sizeof(dn);
     gnutls_x509_crt_get_dn(cert, dn, &dn_size);
 
     fprintf(stdout, "%s\t%s\t%s\t%s\t%s\t%s\n",
             flag, expires, revocation, serial, fname, dn);
+
+    /* free hex serial */
+    free(serial);
 
 cleanup:
     gnutls_x509_crt_deinit(cert);

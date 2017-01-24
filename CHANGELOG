@@ -1,3 +1,7 @@
+** Version 0.8.2 (2017-01-08)
+- Test suite: Ensure CRLF line ends in HTTP headers
+- Test suite, gen_ocsp_index.c: Handle serial as fixed order byte array
+
 ** Version 0.8.1 (2016-12-20)
 - Bugfix: Use APR_SIZE_T_FMT for portable apr_size_t formatting
 

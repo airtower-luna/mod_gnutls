@@ -207,7 +207,11 @@ sleep_pidfile="$(mktemp mod_gnutls_test-XXXXXX.pid)"
 # failing tests. Sending sleep to the background allows the test
 # case to proceed instead of waiting for it to return. The sleep
 # process is stopped after gnutls-cli terminates.
-if (sed "s/__HOSTNAME__/${TEST_HOST}/" <${t}/input && \
+#
+# The line end manipulation in sed guarantees that all header lines
+# end with CRLF as required by RFC 7230, Section 3.1.1 regardless of
+# the line ends in the input file.
+if (sed -r "s/__HOSTNAME__/${TEST_HOST}/;s/\r?$/\r/" <${t}/input && \
 	   run_with_pidfile "${sleep_pidfile}" sleep "${TEST_QUERY_DELAY}" &) | \
        gnutls-cli -p "${TEST_PORT}" $(cat ${t}/gnutls-cli.args) "${TEST_HOST}" \
        | tee "$output" && test "${PIPESTATUS[1]}" -eq 0;
