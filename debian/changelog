@@ -1,3 +1,9 @@
+mod-gnutls (0.8.2-1) unstable; urgency=medium
+
+  * New upstream release
+
+ -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Mon, 23 Jan 2017 23:16:28 -0500
+
 mod-gnutls (0.8.1-2) unstable; urgency=medium
 
   * try to print results of failed tests
