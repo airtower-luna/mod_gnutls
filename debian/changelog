@@ -1,3 +1,10 @@
+mod-gnutls (0.8.2-2) unstable; urgency=medium
+
+  * break out build dependencies for different arches
+  * cherry-pick patch from upstream for non-parallel test suite
+
+ -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Sun, 05 Feb 2017 18:20:12 -0500
+
 mod-gnutls (0.8.2-1) unstable; urgency=medium
 
   * New upstream release
