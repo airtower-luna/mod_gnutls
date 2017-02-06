@@ -233,6 +233,16 @@ AC_ARG_VAR([TEST_IP], [List of IP addresses to use for server instances \
 		      enclosed in square brackets.])
 AM_SUBST_NOTMAKE(TEST_IP)
 
+: ${TEST_LOCK_WAIT:="30"}
+: ${TEST_QUERY_TIMEOUT:="30"}
+AC_ARG_VAR([TEST_LOCK_WAIT], [Timeout in seconds to acquire locks for \
+			     Apache instances in the test suite, or the \
+			     previous instance to remove its PID file if \
+			     flock is not used. Default is 30.])
+AC_ARG_VAR([TEST_QUERY_TIMEOUT], [Timeout in seconds for HTTPS requests \
+				 sent using gnutls-cli in the test suite. \
+				 Default is 30.])
+
 dnl Allow user to set SoftHSM PKCS #11 module
 AC_ARG_VAR([SOFTHSM_LIB], [Absolute path of the SoftHSM PKCS @%:@11 module to \
 			  use. By default the test suite will search common \

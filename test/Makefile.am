@@ -198,9 +198,6 @@ EXTRA_DIST = $(apache_data) $(cert_templates) $(shared_identities:=.uid.in) \
 test_lockfile = ./test.lock
 # Lockfile for the proxy backend Apache process (if any)
 backend_lockfile = ./backend.lock
-# Maximum wait time in seconds for flock to aquire instance lock
-# files, or Apache to remove its PID file
-lock_wait = 30
 
 # port for the main Apache server
 TEST_PORT ?= 9932
@@ -214,18 +211,16 @@ endif
 TEST_MSVA_MAX_WAIT ?= 10000
 # wait loop time for MSVA startup (milliseconds)
 TEST_MSVA_WAIT ?= 400
-# seconds for the HTTP request to be sent and responded to
-TEST_QUERY_DELAY ?= 30
 
 AM_TESTS_ENVIRONMENT = export APACHE2=@APACHE2@; \
 	export AP_LIBEXECDIR=@AP_LIBEXECDIR@; \
-	export TEST_LOCK_WAIT="$(lock_wait)"; \
+	export TEST_LOCK_WAIT="@TEST_LOCK_WAIT@"; \
 	export TEST_HOST="@TEST_HOST@"; \
 	export TEST_PORT="$(TEST_PORT)"; \
 	export MSVA_PORT="$(MSVA_PORT)"; \
 	export TEST_MSVA_MAX_WAIT="$(TEST_MSVA_MAX_WAIT)"; \
 	export TEST_MSVA_WAIT="$(TEST_MSVA_WAIT)"; \
-	export TEST_QUERY_DELAY="$(TEST_QUERY_DELAY)"; \
+	export TEST_QUERY_TIMEOUT="@TEST_QUERY_TIMEOUT@"; \
 	export BACKEND_HOST="@TEST_HOST@"; \
 	export HTTP_CLI="@HTTP_CLI@";
 

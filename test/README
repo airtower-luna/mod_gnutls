@@ -129,8 +129,8 @@ on your expected setup (along with the variables that can be passed to
 
  * If a machine is particularly slow or under heavy load, it's
    possible that these tests will fail for timing
-   reasons. [TEST_QUERY_DELAY (seconds for the HTTP request to be sent
-   and responded to)]
+   reasons. [TEST_QUERY_TIMEOUT (timeout for the HTTPS request in
+   seconds)]
 
 The first two of these issues are avoided when the tests are isolated
 using network namespaces, which is the default (see "Implementation"
