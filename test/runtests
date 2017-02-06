@@ -157,7 +157,7 @@ if [ -n "${USE_TEST_NAMESPACE}" ]; then
     echo "Using namespaces to isolate tests, no need for locking."
     flock_cmd=""
 elif [ -n "${TEST_LOCK}" ]; then
-    flock_cmd="${FLOCK} -w ${TEST_LOCK_WAIT} $(realpath ${TEST_LOCK})"
+    flock_cmd="${FLOCK} --verbose -w ${TEST_LOCK_WAIT} $(realpath ${TEST_LOCK})"
 else
     echo "Locking disabled, using wait based on Apache PID file."
     wait_pid_gone "${TEST_PID}"

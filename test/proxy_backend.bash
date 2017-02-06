@@ -37,7 +37,7 @@ function backend_apache
 			 "locking."
 		    flock_cmd=""
 		elif [ -n "${lockfile}" ]; then
-		    flock_cmd="${FLOCK} -w ${TEST_LOCK_WAIT} ${lockfile}"
+		    flock_cmd="${FLOCK} --verbose -w ${TEST_LOCK_WAIT} ${lockfile}"
 		else
 		    echo "Locking disabled, using wait based on proxy PID file."
 		    wait_pid_gone "${BACKEND_PID}"
