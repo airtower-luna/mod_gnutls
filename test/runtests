@@ -88,6 +88,8 @@ function kill_by_pidfile()
 	local pid=$(cat "${pidfile}")
 	if [ -n "${pid}" ] && ps -p "${pid}"; then
 	    kill "${pid}"
+	else
+	    echo "No running process with PID ${pid} (${pidfile})."
 	fi
 	rm "${pidfile}"
     fi
