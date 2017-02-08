@@ -83,8 +83,18 @@ AS_IF([test "${FLOCK}" != "no"],
 	lockfile="$(mktemp)"
 	AS_IF([${FLOCK} --timeout 1 ${lockfile} true >&AS_MESSAGE_LOG_FD 2>&1],
 	      [flock_works="yes"], [flock_works="no"])
-	rm "${lockfile}"
 	AC_MSG_RESULT([$flock_works])
+	# Old versions of flock do not support --verbose. They fail
+	# without executing the command but still return 0. Check for
+	# this behavior by testing if the rm command was executed.
+	AC_MSG_CHECKING([whether ${FLOCK} supports --verbose])
+	testfile="$(mktemp)"
+	AS_IF([${FLOCK} --verbose --timeout 1 ${lockfile} rm "${testfile}" \
+			>&AS_MESSAGE_LOG_FD 2>&1; test ! -e "${testfile}"],
+	      [flock_verbose="yes"; FLOCK="${FLOCK} --verbose"],
+	      [flock_verbose="no"; rm "${testfile}"])
+	AC_MSG_RESULT([$flock_verbose])
+	rm "${lockfile}"
       ],
       [flock_works="no"])
 # disable flock if requested by user or it doesn't support timeout
