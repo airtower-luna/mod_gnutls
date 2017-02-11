@@ -182,6 +182,12 @@ trap apache_down_err EXIT
 if [ -n "${USE_MSVA}" ]; then
     export MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT"
 fi
+
+# If VERBOSE is enabled, log the HTTPD build configuration
+if [ -n "${VERBOSE}" ]; then
+    ${APACHE2} -f "${srcdir}/base_apache.conf" -V
+fi
+
 if ! ${flock_cmd} ${APACHE2} -f "${t}/apache.conf" -k start; then
     if [ -e "${t}/fail.server" ]; then
 	echo "Apache HTTPD failed to start as expected."
