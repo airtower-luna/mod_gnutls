@@ -152,11 +152,11 @@ AM_CONDITIONAL([ENABLE_NETNS], [test "$use_netns" != "no"])
 # Adjust Apache configuration for tests accordingly: Use pthread mutex
 # and test specific PID files if using namespaces, defaults otherwise.
 AS_IF([test "$use_netns" = "yes"],
-      [MUTEX_TYPE="pthread"; PID_AFFIX="-\${TEST_NAME}"],
-      [MUTEX_TYPE="default"; PID_AFFIX=""])
-AC_SUBST(MUTEX_TYPE)
+      [MUTEX_CONF="Mutex pthread default"; PID_AFFIX="-\${TEST_NAME}"],
+      [MUTEX_CONF=""; PID_AFFIX=""])
+AC_SUBST(MUTEX_CONF)
 AC_SUBST(PID_AFFIX)
-AM_SUBST_NOTMAKE(MUTEX_TYPE)
+AM_SUBST_NOTMAKE(MUTEX_CONF)
 AM_SUBST_NOTMAKE(PID_AFFIX)
 
 AC_ARG_ENABLE(msva,
