@@ -64,7 +64,7 @@ AC_ARG_ENABLE(strict,
 
 STRICT_CFLAGS=""
 if test "$use_strict" != "no"; then
-        STRICT_CFLAGS="-Wall -Werror -Wextra"
+	STRICT_CFLAGS="-Wall -Werror -Wextra -Wno-error=deprecated-declarations"
 fi
 
 AC_MSG_CHECKING([whether to enable SRP functionality])
