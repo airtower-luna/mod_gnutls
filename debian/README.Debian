@@ -12,10 +12,5 @@ must add at least these three directives, using your own certificate and key,
 
   </IfModule>
 
-More examples are provided in online documentation,
-http://www.outoforder.cc/projects/apache/mod_gnutls/docs/
-
-mod_gnutls doesn't yet support RFC 2817, upgrading to TLS,
-http://ietf.org/rfc/rfc2817.txt
-
- -- Jack Bates <ms419@freezone.co.uk>  Thu, 26 Jul 2007 13:54:30 -0700
+More examples are provided in the handbook, installed at
+/usr/share/doc/libapache2-mod-gnutls/mod_gnutls_manual.html
