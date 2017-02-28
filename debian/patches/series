@@ -5,3 +5,4 @@
 0005-Check-if-flock-supports-verbose.patch
 0006-Test-suite-Do-not-explicitly-set-the-mutex-type-to-d.patch
 0007-Do-not-treat-warnings-about-deprecated-declarations-.patch
+0008-Wait-for-OCSP-server-to-become-available.patch
