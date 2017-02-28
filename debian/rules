@@ -7,7 +7,9 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 
 override_dh_auto_configure:
 	if [ "$(DEB_HOST_ARCH_OS)" = "linux" ]; then \
-		dh_auto_configure -- --with-apxs=/usr/bin/apxs2 --enable-msva; \
+		dh_auto_configure -- TEST_LOCK_WAIT=600 \
+			TEST_QUERY_TIMEOUT=300 \
+			--with-apxs=/usr/bin/apxs2 --enable-msva; \
 	else \
 		dh_auto_configure -- --with-apxs=/usr/bin/apxs2; \
 	fi
