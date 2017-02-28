@@ -1,3 +1,13 @@
+mod-gnutls (0.8.2-3) UNRELEASED; urgency=medium
+
+  * Add test suite and compatibility patches from master
+  * Increase test timeouts to avoid false failures
+  * Wait for OCSP server during tests (possible timing issue)
+  * Update documentation location, remove reference to RFC 2817
+  * Closes: #855933
+
+ -- Thomas Klute <thomas2.klute@uni-dortmund.de>  Tue, 28 Feb 2017 21:39:12 +0100
+
 mod-gnutls (0.8.2-2) unstable; urgency=medium
 
   * break out build dependencies for different arches
