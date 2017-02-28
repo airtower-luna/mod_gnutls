@@ -1,1 +1,7 @@
 0001-Test-suite-Do-not-continue-test-case-if-Apache-insta.patch
+0002-Test-suite-Run-flock-with-verbose-to-log-timeouts.patch
+0003-Test-suite-Log-if-a-process-to-be-stopped-by-PID-fil.patch
+0004-Test-suite-Make-timeouts-for-server-locks-and-HTTPS-.patch
+0005-Check-if-flock-supports-verbose.patch
+0006-Test-suite-Do-not-explicitly-set-the-mutex-type-to-d.patch
+0007-Do-not-treat-warnings-about-deprecated-declarations-.patch

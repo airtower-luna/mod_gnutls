@@ -1,0 +1,107 @@
+From: Thomas Klute <thomas2.klute@uni-dortmund.de>
+Date: Mon, 6 Feb 2017 18:05:25 +0100
+Subject: Test suite: Make timeouts for server locks and HTTPS requests
+ configurable
+
+If TEST_LOCK_WAIT or TEST_QUERY_TIMEOUT are provided at configure
+time, their values are stored and used instead of the default.
+---
+ configure.ac     | 10 ++++++++++
+ test/Makefile.am |  9 ++-------
+ test/README      |  4 ++--
+ test/runtests    |  4 ++--
+ 4 files changed, 16 insertions(+), 11 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index e9c455e..0577435 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -233,6 +233,16 @@ AC_ARG_VAR([TEST_IP], [List of IP addresses to use for server instances \
+ 		      enclosed in square brackets.])
+ AM_SUBST_NOTMAKE(TEST_IP)
+ 
++: ${TEST_LOCK_WAIT:="30"}
++: ${TEST_QUERY_TIMEOUT:="30"}
++AC_ARG_VAR([TEST_LOCK_WAIT], [Timeout in seconds to acquire locks for \
++			     Apache instances in the test suite, or the \
++			     previous instance to remove its PID file if \
++			     flock is not used. Default is 30.])
++AC_ARG_VAR([TEST_QUERY_TIMEOUT], [Timeout in seconds for HTTPS requests \
++				 sent using gnutls-cli in the test suite. \
++				 Default is 30.])
++
+ dnl Allow user to set SoftHSM PKCS #11 module
+ AC_ARG_VAR([SOFTHSM_LIB], [Absolute path of the SoftHSM PKCS @%:@11 module to \
+ 			  use. By default the test suite will search common \
+diff --git a/test/Makefile.am b/test/Makefile.am
+index affe15c..9fa9c84 100644
+--- a/test/Makefile.am
++++ b/test/Makefile.am
+@@ -198,9 +198,6 @@ EXTRA_DIST = $(apache_data) $(cert_templates) $(shared_identities:=.uid.in) \
+ test_lockfile = ./test.lock
+ # Lockfile for the proxy backend Apache process (if any)
+ backend_lockfile = ./backend.lock
+-# Maximum wait time in seconds for flock to aquire instance lock
+-# files, or Apache to remove its PID file
+-lock_wait = 30
+ 
+ # port for the main Apache server
+ TEST_PORT ?= 9932
+@@ -214,18 +211,16 @@ endif
+ TEST_MSVA_MAX_WAIT ?= 10000
+ # wait loop time for MSVA startup (milliseconds)
+ TEST_MSVA_WAIT ?= 400
+-# seconds for the HTTP request to be sent and responded to
+-TEST_QUERY_DELAY ?= 30
+ 
+ AM_TESTS_ENVIRONMENT = export APACHE2=@APACHE2@; \
+ 	export AP_LIBEXECDIR=@AP_LIBEXECDIR@; \
+-	export TEST_LOCK_WAIT="$(lock_wait)"; \
++	export TEST_LOCK_WAIT="@TEST_LOCK_WAIT@"; \
+ 	export TEST_HOST="@TEST_HOST@"; \
+ 	export TEST_PORT="$(TEST_PORT)"; \
+ 	export MSVA_PORT="$(MSVA_PORT)"; \
+ 	export TEST_MSVA_MAX_WAIT="$(TEST_MSVA_MAX_WAIT)"; \
+ 	export TEST_MSVA_WAIT="$(TEST_MSVA_WAIT)"; \
+-	export TEST_QUERY_DELAY="$(TEST_QUERY_DELAY)"; \
++	export TEST_QUERY_TIMEOUT="@TEST_QUERY_TIMEOUT@"; \
+ 	export BACKEND_HOST="@TEST_HOST@"; \
+ 	export HTTP_CLI="@HTTP_CLI@";
+ 
+diff --git a/test/README b/test/README
+index c49b7db..b377125 100644
+--- a/test/README
++++ b/test/README
+@@ -129,8 +129,8 @@ on your expected setup (along with the variables that can be passed to
+ 
+  * If a machine is particularly slow or under heavy load, it's
+    possible that these tests will fail for timing
+-   reasons. [TEST_QUERY_DELAY (seconds for the HTTP request to be sent
+-   and responded to)]
++   reasons. [TEST_QUERY_TIMEOUT (timeout for the HTTPS request in
++   seconds)]
+ 
+ The first two of these issues are avoided when the tests are isolated
+ using network namespaces, which is the default (see "Implementation"
+diff --git a/test/runtests b/test/runtests
+index 9e98b8d..718b27f 100755
+--- a/test/runtests
++++ b/test/runtests
+@@ -18,7 +18,7 @@ else
+ fi
+ 
+ BADVARS=0
+-for v in APACHE2 TEST_HOST TEST_PORT TEST_QUERY_DELAY TEST_MSVA_WAIT \
++for v in APACHE2 TEST_HOST TEST_PORT TEST_QUERY_TIMEOUT TEST_MSVA_WAIT \
+ 		 MSVA_PORT; do
+     if [ ! -v "$v" ]; then
+         printf "You need to set the %s environment variable\n" "$v" >&2
+@@ -216,7 +216,7 @@ sleep_pidfile="$(mktemp mod_gnutls_test-XXXXXX.pid)"
+ # end with CRLF as required by RFC 7230, Section 3.1.1 regardless of
+ # the line ends in the input file.
+ if (sed -r "s/__HOSTNAME__/${TEST_HOST}/;s/\r?$/\r/" <${t}/input && \
+-	   run_with_pidfile "${sleep_pidfile}" sleep "${TEST_QUERY_DELAY}" &) | \
++	   run_with_pidfile "${sleep_pidfile}" sleep "${TEST_QUERY_TIMEOUT}" &) | \
+        gnutls-cli -p "${TEST_PORT}" $(cat ${t}/gnutls-cli.args) "${TEST_HOST}" \
+        | tee "$output" && test "${PIPESTATUS[1]}" -eq 0;
+ then
