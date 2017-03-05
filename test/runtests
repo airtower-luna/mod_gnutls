@@ -18,7 +18,7 @@ else
 fi
 
 BADVARS=0
-for v in APACHE2 TEST_HOST TEST_PORT TEST_QUERY_TIMEOUT TEST_MSVA_WAIT \
+for v in APACHE2 TEST_HOST TEST_PORT TEST_QUERY_TIMEOUT TEST_SERVICE_WAIT \
 		 MSVA_PORT; do
     if [ ! -v "$v" ]; then
         printf "You need to set the %s environment variable\n" "$v" >&2
@@ -126,28 +126,11 @@ if [ -n "${USE_MSVA}" ]; then
     trap stop_msva EXIT
 
     printf "TESTING: initial MSVA verification\n"
-    # set to 0 if MSVA is up
-    ret=1
     export MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT"
 
-    # convert TEST_MSVA_WAIT to seconds because that's what "sleep" expects
-    TEST_MSVA_SLEEP="$((${TEST_MSVA_WAIT} / 1000)).$((${TEST_MSVA_WAIT} % 1000))"
-    # wait at most TEST_MSVA_MAX_WAIT milliseconds for MSVA to get ready
-    waited=0
-    until [ ${ret} -eq 0 ] \
-	      || [ ${waited} -ge ${TEST_MSVA_MAX_WAIT} ]; do
-	if msva-query-agent https "$(cat client.uid)" x509pem client < client/x509.pem
-	then
-	    ret=0
-	else
-	    echo "MSVA not ready yet"
-	fi
-	sleep "${TEST_MSVA_SLEEP}"
-	waited=$((${waited} + ${TEST_MSVA_WAIT}))
-    done
-
+    msva_test_cmd="msva-query-agent https \"$(cat client.uid)\" x509pem client < client/x509.pem"
     # check if MSVA is up, fail if not
-    if [ ${ret} -eq 0 ]; then
+    if wait_ready "${msva_test_cmd}"; then
 	printf "\nSUCCESS: initial MSVA verification\n"
     else
 	printf "\nFAIL: initial MSVA verification\n"
@@ -206,7 +189,7 @@ if [ -n "${CHECK_OCSP_SERVER}" ]; then
 	store_ocsp="--outfile ${OCSP_RESPONSE_FILE}"
     fi
     echo "---- Testing OCSP server ----"
-    ocsptool --ask --nonce --load-issuer authority/x509.pem --load-cert server/x509.pem ${store_ocsp}
+    wait_ready "ocsptool --ask --nonce --load-issuer authority/x509.pem --load-cert server/x509.pem ${store_ocsp}"
     echo "---- OCSP test done ----"
 fi
 

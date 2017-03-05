@@ -208,9 +208,9 @@ if ENABLE_OCSP_TEST
 OCSP_PORT ?= 9936
 endif
 # maximum time to wait for MSVA startup (milliseconds)
-TEST_MSVA_MAX_WAIT ?= 10000
+TEST_SERVICE_MAX_WAIT ?= 10000
 # wait loop time for MSVA startup (milliseconds)
-TEST_MSVA_WAIT ?= 400
+TEST_SERVICE_WAIT ?= 400
 
 AM_TESTS_ENVIRONMENT = export APACHE2=@APACHE2@; \
 	export AP_LIBEXECDIR=@AP_LIBEXECDIR@; \
@@ -218,8 +218,8 @@ AM_TESTS_ENVIRONMENT = export APACHE2=@APACHE2@; \
 	export TEST_HOST="@TEST_HOST@"; \
 	export TEST_PORT="$(TEST_PORT)"; \
 	export MSVA_PORT="$(MSVA_PORT)"; \
-	export TEST_MSVA_MAX_WAIT="$(TEST_MSVA_MAX_WAIT)"; \
-	export TEST_MSVA_WAIT="$(TEST_MSVA_WAIT)"; \
+	export TEST_SERVICE_MAX_WAIT="$(TEST_SERVICE_MAX_WAIT)"; \
+	export TEST_SERVICE_WAIT="$(TEST_SERVICE_WAIT)"; \
 	export TEST_QUERY_TIMEOUT="@TEST_QUERY_TIMEOUT@"; \
 	export BACKEND_HOST="@TEST_HOST@"; \
 	export HTTP_CLI="@HTTP_CLI@";
