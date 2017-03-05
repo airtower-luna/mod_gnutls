@@ -33,9 +33,11 @@ fi
 # write script file and line to stderr on error
 function pinpoint_error()
 {
-    echo "${1} failed at line ${2}!" >&2
+    echo "Command \"${BASH_COMMAND}\" failed. Call trace:" >&2
+    local stack=0
+    while caller $((stack++)) >&2; do true; done
 }
-trap 'pinpoint_error ${BASH_SOURCE} ${LINENO}' ERR
+trap 'pinpoint_error' ERR
 
 function stop_msva()
 {
