@@ -25,7 +25,7 @@ Build-Depends:
  softhsm2 <!nocheck> | softhsm <!nocheck>,
 Standards-Version: 3.9.8
 Homepage: https://mod.gnutls.org/
-Vcs-Git: https://mod.gnutls.org/git/mod_gnutls
+Vcs-Git: https://mod.gnutls.org/git/mod_gnutls -b debian
 Vcs-Browser: https://mod.gnutls.org/browser/mod_gnutls
 
 Package: libapache2-mod-gnutls
