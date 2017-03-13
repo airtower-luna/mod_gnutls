@@ -6,9 +6,6 @@ set -e
 if [ -z "${BACKEND_HOST}" ]; then
     export BACKEND_HOST="localhost"
 fi
-if [ -z "${BACKEND_IP}" ]; then
-    export BACKEND_IP="::1"
-fi
 if [ -z "${BACKEND_PORT}" ]; then
     export BACKEND_PORT="9934"
 fi
@@ -27,7 +24,6 @@ function backend_apache
     TEST_NAME="$(basename "${dir}")"
     (
 	export TEST_NAME
-	export TEST_IP="${BACKEND_IP}"
 	export TEST_PORT="${BACKEND_PORT}"
 	export srcdir="$(realpath ${srcdir})"
 	case $action in
