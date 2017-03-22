@@ -358,12 +358,7 @@ int mgs_hook_post_config(apr_pool_t *pconf,
                                     MGS_OCSP_MUTEX_NAME, NULL,
                                     base_server, pconf, 0);
         if (rv != APR_SUCCESS)
-        {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, base_server,
-                         "Failed to create mutex '" MGS_OCSP_MUTEX_NAME
-                         "'.");
-            return HTTP_INTERNAL_SERVER_ERROR;
-        }
+            return rv;
     }
 
     /* If GnuTLSP11Module is set, load the listed PKCS #11
