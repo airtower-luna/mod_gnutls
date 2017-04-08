@@ -23,4 +23,6 @@ msva.gnupghome
 *.lock
 gen_ocsp_index
 pgpcrc
+gnutls_openpgp_support
 .deps
+.libs

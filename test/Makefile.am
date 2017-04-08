@@ -34,13 +34,17 @@ dist_check_SCRIPTS += test-16_view-status.bash \
 TEST_EXTENSIONS = .bash
 TESTS = $(dist_check_SCRIPTS)
 
-check_PROGRAMS = pgpcrc
+check_PROGRAMS = pgpcrc gnutls_openpgp_support
 pgpcrc_SOURCES = pgpcrc.c
+gnutls_openpgp_support_SOURCES = gnutls_openpgp_support.c
+gnutls_openpgp_support_CFLAGS = $(LIBGNUTLS_CFLAGS)
+gnutls_openpgp_support_LDFLAGS = $(LIBGNUTLS_LIBS)
 
 # build OCSP database tool
 if ENABLE_OCSP_TEST
 check_PROGRAMS += gen_ocsp_index
 gen_ocsp_index_SOURCES = gen_ocsp_index.c cert_helper.c
+gen_ocsp_index_CFLAGS = $(LIBGNUTLS_CFLAGS)
 gen_ocsp_index_LDFLAGS = $(LIBGNUTLS_LIBS)
 noinst_HEADERS = cert_helper.h
 endif
