@@ -327,7 +327,6 @@ int mgs_hook_post_config(apr_pool_t *pconf,
 {
     int rv;
     server_rec *s;
-    gnutls_dh_params_t dh_params = NULL;
     mgs_srvconf_rec *sc;
     mgs_srvconf_rec *sc_base;
     void *data = NULL;
@@ -437,13 +436,10 @@ int mgs_hook_post_config(apr_pool_t *pconf,
             return HTTP_NOT_ACCEPTABLE;
         }
 
-        /* Check if DH params have been set per host */
+        /* Set host DH params */
         if (sc->dh_params != NULL) {
             gnutls_certificate_set_dh_params(sc->certs, sc->dh_params);
             gnutls_anon_set_server_dh_params(sc->anon_creds, sc->dh_params);
-        } else if (dh_params) {
-            gnutls_certificate_set_dh_params(sc->certs, dh_params);
-            gnutls_anon_set_server_dh_params(sc->anon_creds, dh_params);
         }
 
         /* The call after this comment is a workaround for bug in
