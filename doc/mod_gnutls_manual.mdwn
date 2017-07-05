@@ -177,17 +177,24 @@ re-negotiation.
 
 ### GnuTLSDHFile
 
-Set to the PKCS \#3 encoded Diffie Hellman parameters
+Use the provided PKCS \#3 encoded Diffie-Hellman parameters
 
     GnuTLSDHFile FILEPATH
 
 Default: *none*\
 Context: server config, virtual host
 
-Takes an absolute or relative path to a PKCS \#3 encoded DH
-parameters.Those are used when the DHE key exchange method is enabled.
-You can generate this file using `certtool --generate-dh-params --bits
-2048`.  If not set `mod_gnutls` will use the included parameters.
+By default, `mod_gnutls` uses the DH parameters included with GnuTLS
+corresponding to the security level of the configured private keys if
+compiled with GnuTLS 3.5.6 or newer, and the ffdhe2048 DH group as
+defined in RFC 7919, Appendix A.1 otherwise.
+
+If you need to use different DH parameters, you can provide a PEM file
+containing them in PKCS \#3 encoding using this option. Please see the
+"[Parameter
+generation](https://gnutls.org/manual/html_node/Parameter-generation.html)"
+section of the GnuTLS documentation for a short discussion of the
+security implications.
 
 ### GnuTLSPriorities
 
