@@ -192,8 +192,8 @@ endif
 
 # Apache configuration and data files
 apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/ocsp.cgi \
-	data/secret.txt data/test.txt mime.types ocsp_server.conf \
-	proxy_mods.conf
+	data/secret.txt data/test.txt ffdhe3072.pem mime.types \
+	ocsp_server.conf proxy_mods.conf
 
 EXTRA_DIST = $(apache_data) $(cert_templates) $(shared_identities:=.uid.in) \
 	common.bash proxy_backend.bash runtests server-crl.template \
