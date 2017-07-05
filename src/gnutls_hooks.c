@@ -610,6 +610,18 @@ int mgs_hook_post_config(apr_pool_t *pconf,
             return HTTP_UNAUTHORIZED;
         }
 
+        /* If OpenPGP support is already disabled in the loaded GnuTLS
+         * library startup will fail if the configuration tries to
+         * load PGP credentials. Otherwise warn affected users about
+         * deprecation. */
+        if (sc->pgp_cert_file || sc->pgp_key_file || sc->pgp_ring_file)
+            ap_log_error(APLOG_MARK, APLOG_WARNING, 0, s,
+                         "Host '%s:%d' is configured to use OpenPGP auth. "
+                         "OpenPGP support has been deprecated in GnuTLS "
+                         "since version 3.5.9 and will be removed from "
+                         "mod_gnutls in a future release.",
+                         s->server_hostname, s->port);
+
         if (sc->enabled == GNUTLS_ENABLED_TRUE) {
             rv = -1;
             if (sc->certs_x509_chain_num > 0) {

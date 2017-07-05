@@ -360,6 +360,11 @@ This file may contain a list of trusted authorities.
 OpenPGP Certificate Authentication
 ----------------------------------
 
+*Warning:* OpenPGP support has been deprecated in GnuTLS since version
+3.5.9 and will be removed completely. Consequently, OpenPGP support in
+`mod_gnutls` is deprecated as well and will be removed in a future
+release.
+
 ### GnuTLSPGPCertificateFile
 
 Set to a base64 Encoded Server OpenPGP Certificate
