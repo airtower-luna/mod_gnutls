@@ -83,18 +83,10 @@ static int load_datum_from_file(apr_pool_t * pool,
     return 0;
 }
 
-/* 2048-bit group parameters from SRP specification */
-const char static_dh_params[] = "-----BEGIN DH PARAMETERS-----\n"
-        "MIIBBwKCAQCsa9tBMkqam/Fm3l4TiVgvr3K2ZRmH7gf8MZKUPbVgUKNzKcu0oJnt\n"
-        "gZPgdXdnoT3VIxKrSwMxDc1/SKnaBP1Q6Ag5ae23Z7DPYJUXmhY6s2YaBfvV+qro\n"
-        "KRipli8Lk7hV+XmT7Jde6qgNdArb9P90c1nQQdXDPqcdKB5EaxR3O8qXtDoj+4AW\n"
-        "dr0gekNsZIHx0rkHhxdGGludMuaI+HdIVEUjtSSw1X1ep3onddLs+gMs+9v1L7N4\n"
-        "YWAnkATleuavh05zA85TKZzMBBx7wwjYKlaY86jQw4JxrjX46dv7tpS1yAPYn3rk\n"
-        "Nd4jbVJfVHWbZeNy/NaO8g+nER+eSv9zAgEC\n"
-        "-----END DH PARAMETERS-----\n";
 
-/*
- * Clean up the various GnuTLS data structures allocated from
+
+/**
+ * Clean up the various GnuTLS data structures allocated by
  * mgs_load_files()
  */
 static apr_status_t mgs_pool_free_credentials(void *arg)
@@ -253,52 +245,38 @@ int mgs_load_files(apr_pool_t *pconf, apr_pool_t *ptemp, server_rec *s)
     }
 #endif
 
-    if (sc->dh_params == NULL)
+    /* Load user provided DH parameters, if any */
+    if (sc->dh_file)
     {
-        ret = gnutls_dh_params_init(&sc->dh_params);
-        if (ret < 0) {
+        if (sc->dh_params == NULL)
+        {
+            ret = gnutls_dh_params_init(&sc->dh_params);
+            if (ret < 0) {
+                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                             "GnuTLS: Failed to initialize"
+                             ": (%d) %s", ret, gnutls_strerror(ret));
+                ret = -1;
+                goto cleanup;
+            }
+        }
+
+        if (load_datum_from_file(spool, sc->dh_file, &data) != 0) {
             ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                         "GnuTLS: Failed to initialize"
-                         ": (%d) %s", ret, gnutls_strerror(ret));
+                         "GnuTLS: Error Reading " "DH params '%s'", sc->dh_file);
             ret = -1;
             goto cleanup;
         }
 
-        /* Load DH parameters */
-        if (sc->dh_file)
-        {
-            if (load_datum_from_file(spool, sc->dh_file, &data) != 0) {
-                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                             "GnuTLS: Error Reading " "DH params '%s'", sc->dh_file);
-                ret = -1;
-                goto cleanup;
-            }
-
-            ret =
-                gnutls_dh_params_import_pkcs3(sc->dh_params, &data,
-                                              GNUTLS_X509_FMT_PEM);
-            if (ret < 0) {
-                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                             "GnuTLS: Failed to Import "
-                             "DH params '%s': (%d) %s", sc->dh_file, ret,
-                             gnutls_strerror(ret));
-                ret = -1;
-                goto cleanup;
-            }
-        } else {
-            gnutls_datum_t pdata = {
-                (void *) static_dh_params,
-                sizeof(static_dh_params)
-            };
-
-            ret = gnutls_dh_params_import_pkcs3(sc->dh_params, &pdata, GNUTLS_X509_FMT_PEM);
-            if (ret < 0) {
-                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                             "GnuTLS: Unable to generate or load DH Params: (%d) %s",
-                             ret, gnutls_strerror(ret));
-                ret = -1;
-                goto cleanup;
-            }
+        ret =
+            gnutls_dh_params_import_pkcs3(sc->dh_params, &data,
+                                          GNUTLS_X509_FMT_PEM);
+        if (ret < 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "GnuTLS: Failed to Import "
+                         "DH params '%s': (%d) %s", sc->dh_file, ret,
+                         gnutls_strerror(ret));
+            ret = -1;
+            goto cleanup;
         }
     }
 
@@ -1108,6 +1086,7 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
     sc->tickets = GNUTLS_ENABLED_UNSET;
     sc->priorities = NULL;
     sc->dh_params = NULL;
+    sc->dh_file = NULL;
     sc->ca_list = NULL;
     sc->ca_list_size = 0;
     sc->proxy_enabled = GNUTLS_ENABLED_UNSET;

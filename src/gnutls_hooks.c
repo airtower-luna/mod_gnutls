@@ -312,6 +312,138 @@ static int read_pgpcrt_cn(server_rec * s, apr_pool_t * p,
     return rv;
 }
 
+
+
+#if GNUTLS_VERSION_NUMBER >= 0x030506
+#define HAVE_KNOWN_DH_GROUPS 1
+#endif
+#ifdef HAVE_KNOWN_DH_GROUPS
+/**
+ * Try to estimate a GnuTLS security parameter based on the given
+ * private key. Any errors are logged.
+ *
+ * @param s The `server_rec` to use for logging
+ *
+ * @param key The private key to use
+ *
+ * @return `gnutls_sec_param_t` as returned by
+ * `gnutls_pk_bits_to_sec_param` for the key properties, or
+ * GNUTLS_SEC_PARAM_UNKNOWN in case of error
+ */
+static gnutls_sec_param_t sec_param_from_privkey(server_rec *server,
+                                                 gnutls_privkey_t key)
+{
+    unsigned int bits = 0;
+    int pk_algo = gnutls_privkey_get_pk_algorithm(key, &bits);
+    if (pk_algo < 0)
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, server,
+                     "%s: Could not get private key parameters: %s (%d)",
+                     __func__, gnutls_strerror(pk_algo), pk_algo);
+        return GNUTLS_SEC_PARAM_UNKNOWN;
+    }
+    return gnutls_pk_bits_to_sec_param(pk_algo, bits);
+}
+#else
+/** ffdhe2048 DH group as defined in RFC 7919, Appendix A.1. This is
+ * the default DH group if mod_gnutls is compiled agains a GnuTLS
+ * version that does not provide known DH groups based on security
+ * parameters (before 3.5.6). */
+static const char FFDHE2048_PKCS3[] =
+    "-----BEGIN DH PARAMETERS-----\n"
+    "MIIBDAKCAQEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz\n"
+    "+8yTnc4kmz75fS/jY2MMddj2gbICrsRhetPfHtXV/WVhJDP1H18GbtCFY2VVPe0a\n"
+    "87VXE15/V8k1mE8McODmi3fipona8+/och3xWKE2rec1MKzKT0g6eXq8CrGCsyT7\n"
+    "YdEIqUuyyOP7uWrat2DX9GgdT0Kj3jlN9K5W7edjcrsZCwenyO4KbXCeAvzhzffi\n"
+    "7MA0BM0oNC9hkXL+nOmFg/+OTxIy7vKBg8P+OxtMb61zO7X8vC7CIAXFjvGDfRaD\n"
+    "ssbzSibBsu/6iGtCOGEoXJf//////////wIBAgICAQA=\n"
+    "-----END DH PARAMETERS-----\n";
+const gnutls_datum_t default_dh_params = {
+    (void *) FFDHE2048_PKCS3,
+    sizeof(FFDHE2048_PKCS3)
+};
+#endif
+
+
+
+/**
+ * Configure the default DH groups to use for the given server. When
+ * compiled against GnuTLS version 3.5.6 or newer the known DH group
+ * matching the GnuTLS security parameter estimated from the private
+ * key is used. Otherwise the ffdhe2048 DH group as defined in RFC
+ * 7919, Appendix A.1 is the default.
+ *
+ * @param server the host to configure
+ *
+ * @return `OK` on success, `HTTP_UNAUTHORIZED` otherwise
+ */
+static int set_default_dh_param(server_rec *server)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(server->module_config, &gnutls_module);
+
+#ifdef HAVE_KNOWN_DH_GROUPS
+    gnutls_sec_param_t seclevel = GNUTLS_SEC_PARAM_UNKNOWN;
+    if (sc->privkey_x509)
+    {
+        seclevel = sec_param_from_privkey(server, sc->privkey_x509);
+        ap_log_error(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, server,
+                     "%s: GnuTLS security param estimated based on "
+                     "private key '%s': %s",
+                     __func__, sc->x509_key_file,
+                     gnutls_sec_param_get_name(seclevel));
+    }
+
+    if (seclevel == GNUTLS_SEC_PARAM_UNKNOWN)
+        seclevel = GNUTLS_SEC_PARAM_MEDIUM;
+    ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, server,
+                 "%s: Setting DH params for security level '%s'.",
+                 __func__, gnutls_sec_param_get_name(seclevel));
+
+    int ret = gnutls_certificate_set_known_dh_params(sc->certs, seclevel);
+    if (ret < 0)
+    {
+        ap_log_error(APLOG_MARK, APLOG_EMERG, APR_EGENERAL, server,
+                     "%s: setting known DH params failed: %s (%d)",
+                     __func__, gnutls_strerror(ret), ret);
+        return HTTP_UNAUTHORIZED;
+    }
+    ret = gnutls_anon_set_server_known_dh_params(sc->anon_creds, seclevel);
+    if (ret < 0)
+    {
+        ap_log_error(APLOG_MARK, APLOG_EMERG, APR_EGENERAL, server,
+                     "%s: setting known DH params failed: %s (%d)",
+                     __func__, gnutls_strerror(ret), ret);
+        return HTTP_UNAUTHORIZED;
+    }
+#else
+    int ret = gnutls_dh_params_init(&sc->dh_params);
+    if (ret < 0)
+    {
+        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
+                     "%s: Failed to initialize DH params structure: "
+                     "%s (%d)", __func__, gnutls_strerror(ret), ret);
+        return HTTP_UNAUTHORIZED;
+    }
+    ret = gnutls_dh_params_import_pkcs3(sc->dh_params, &default_dh_params,
+                                        GNUTLS_X509_FMT_PEM);
+    if (ret < 0)
+    {
+        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
+                     "%s: Failed to import default DH params: %s (%d)",
+                     __func__, gnutls_strerror(ret), ret);
+        return HTTP_UNAUTHORIZED;
+    }
+
+    gnutls_certificate_set_dh_params(sc->certs, sc->dh_params);
+    gnutls_anon_set_server_dh_params(sc->anon_creds, sc->dh_params);
+#endif
+
+    return OK;
+}
+
+
+
 /**
  * Post config hook.
  *
@@ -436,10 +568,14 @@ int mgs_hook_post_config(apr_pool_t *pconf,
             return HTTP_NOT_ACCEPTABLE;
         }
 
-        /* Set host DH params */
+        /* Set host DH params from user configuration or defaults */
         if (sc->dh_params != NULL) {
             gnutls_certificate_set_dh_params(sc->certs, sc->dh_params);
             gnutls_anon_set_server_dh_params(sc->anon_creds, sc->dh_params);
+        } else {
+            rv = set_default_dh_param(s);
+            if (rv != OK)
+                return rv;
         }
 
         /* The call after this comment is a workaround for bug in
