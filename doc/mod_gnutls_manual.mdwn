@@ -900,7 +900,8 @@ The distinguished name of client's certificate in RFC2253 format.
 `SSL_CLIENT_I_DN`
 -----------------
 
-The SSL or TLS cipher suite name
+The distinguished name of the issuer of the client's certificate in
+RFC2253 format.
 
 `SSL_CLIENT_S_AN%`
 ------------------
