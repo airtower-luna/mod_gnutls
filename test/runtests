@@ -143,7 +143,7 @@ TEST_PID="apache2.pid"
 if [ -n "${USE_TEST_NAMESPACE}" ]; then
     echo "Using namespaces to isolate tests, no need for locking."
     flock_cmd=""
-elif [ -n "${TEST_LOCK}" ]; then
+elif [ -n "${FLOCK}" ]; then
     flock_cmd="${FLOCK} -w ${TEST_LOCK_WAIT} $(realpath ${TEST_LOCK})"
 else
     echo "Locking disabled, using wait based on Apache PID file."
