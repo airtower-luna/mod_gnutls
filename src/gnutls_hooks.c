@@ -69,8 +69,6 @@ apr_status_t mgs_cleanup_pre_config(void *data __attribute__((unused)))
     gnutls_free(session_ticket_key.data);
     session_ticket_key.data = NULL;
     session_ticket_key.size = 0;
-	/* Deinitialize GnuTLS Library */
-    gnutls_global_deinit();
     return APR_SUCCESS;
 }
 
@@ -115,13 +113,6 @@ int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog, apr_pool_t * ptem
 		ap_log_perror(APLOG_MARK, APLOG_EMERG, 0, plog, "gnutls_check_version() failed. Required: "
 					"gnutls-%s Found: gnutls-%s", LIBGNUTLS_VERSION, gnutls_check_version(NULL));
         return DONE;
-    }
-
-	/* Initialize GnuTLS Library */
-    ret = gnutls_global_init();
-    if (ret < 0) {
-		ap_log_perror(APLOG_MARK, APLOG_EMERG, 0, plog, "gnutls_global_init: %s", gnutls_strerror(ret));
-		return DONE;
     }
 
 	/* Generate a Session Key */
