@@ -445,15 +445,10 @@ tryagain:
     } else {
         /* all done with the handshake */
         ctxt->status = 1;
-        /* If the session was resumed, we did not set the correct
-         * server_rec in ctxt->sc.  Go Find it. (ick!)
-         */
-        if (gnutls_session_is_resumed(ctxt->session)) {
-            mgs_srvconf_rec *sc;
-            sc = mgs_find_sni_server(ctxt->session);
-            if (sc) {
-                ctxt->sc = sc;
-            }
+        if (gnutls_session_is_resumed(ctxt->session))
+        {
+            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                          "%s: TLS session resumed.", __func__);
         }
         return GNUTLS_E_SUCCESS;
     }
