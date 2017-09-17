@@ -3,7 +3,7 @@
  *  Copyright 2008, 2014 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
  *  Copyright 2013-2014 Daniel Kahn Gillmor
- *  Copyright 2015-2016 Thomas Klute
+ *  Copyright 2015-2017 Thomas Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -740,7 +740,11 @@ apr_port_t mgs_hook_default_port(const request_rec * r) {
     return 443;
 }
 
-#define MAX_HOST_LEN 255
+/**
+ * Default buffer size for SNI data, including the terminating NULL
+ * byte. The size matches what gnutls-cli uses initially.
+ */
+#define DEFAULT_SNI_HOST_LEN 256
 
 typedef struct {
     mgs_handle_t *ctxt;
@@ -833,35 +837,68 @@ static int vhost_cb(void *baton, conn_rec *conn, server_rec * s)
 	return check_server_aliases(x, s, tsc);
 }
 
+/**
+ * Get SNI data from GnuTLS (if any) and search for a matching virtual
+ * host configuration. This method is called from the post client
+ * hello function.
+ *
+ * @param session the GnuTLS session
+ *
+ * @return either the matching mod_gnutls server config, or `NULL`
+ */
 mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
 {
-    unsigned int sni_type;
-    size_t data_len = MAX_HOST_LEN;
-    char sni_name[MAX_HOST_LEN];
-
-    if (session == NULL)
-        return NULL;
-
     mgs_handle_t *ctxt = gnutls_session_get_ptr(session);
-    int rv = gnutls_server_name_get(session, sni_name,
-                                    &data_len, &sni_type, 0);
 
+    char *sni_name = apr_palloc(ctxt->c->pool, DEFAULT_SNI_HOST_LEN);
+    size_t sni_len = DEFAULT_SNI_HOST_LEN;
+    unsigned int sni_type;
 
-    if (rv != 0) {
-        ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_EGENERAL, ctxt->c,
-                      "%s: no SNI data found: %s (%d)",
+    /* Search for a DNS SNI element. Note that RFC 6066 prohibits more
+     * than one server name per type. */
+    int sni_index = -1;
+    int rv = 0;
+    do {
+        /* The sni_index is incremented before each use, so if the
+         * loop terminates with a type match we will have the right
+         * one stored. */
+        rv = gnutls_server_name_get(session, sni_name,
+                                    &sni_len, &sni_type, ++sni_index);
+        if (rv == GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE)
+        {
+            ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_EGENERAL, ctxt->c,
+                          "%s: no DNS SNI found (last index: %d).",
+                          __func__, sni_index);
+            return NULL;
+        }
+    } while (sni_type != GNUTLS_NAME_DNS);
+    /* The (rv == GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE) path inside
+     * the loop above returns, so if we reach this point we have a DNS
+     * SNI at the current index. */
+
+    if (rv == GNUTLS_E_SHORT_MEMORY_BUFFER)
+    {
+        /* Allocate a new buffer of the right size and retry */
+        sni_name = apr_palloc(ctxt->c->pool, sni_len);
+        ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, ctxt->c,
+                      "%s: reallocated SNI data buffer for %" APR_SIZE_T_FMT
+                      " bytes.", __func__, sni_len);
+        rv = gnutls_server_name_get(session, sni_name,
+                                    &sni_len, &sni_type, sni_index);
+    }
+
+    /* Unless there's a bug in the GnuTLS API only GNUTLS_E_IDNA_ERROR
+     * can occur here, but a catch all is safer and no more
+     * complicated. */
+    if (rv != GNUTLS_E_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_INFO, APR_EGENERAL, ctxt->c,
+                      "%s: error while getting SNI DNS data: '%s' (%d).",
                       __func__, gnutls_strerror(rv), rv);
         return NULL;
     }
 
-    if (sni_type != GNUTLS_NAME_DNS) {
-        ap_log_cerror(APLOG_MARK, APLOG_CRIT, 0, ctxt->c,
-                      "GnuTLS: Unknown type '%d' for SNI: '%s'",
-                      sni_type, sni_name);
-        return NULL;
-    }
-
-    ap_log_cerror(APLOG_MARK, APLOG_TRACE1, 0, ctxt->c,
+    ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, ctxt->c,
                   "%s: client requested server '%s'.",
                   __func__, sni_name);
 
