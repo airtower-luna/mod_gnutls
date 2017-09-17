@@ -133,21 +133,27 @@ int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog, apr_pool_t * ptem
     return OK;
 }
 
-static int mgs_select_virtual_server_cb(gnutls_session_t session) {
-
-    mgs_handle_t *ctxt = NULL;
-    mgs_srvconf_rec *tsc = NULL;
+/**
+ * Post client hello function for GnuTLS, used to configure the TLS
+ * server based on virtual host configuration. Uses SNI to select the
+ * virtual host if available.
+ *
+ * @param session the TLS session
+ *
+ * @return zero or a GnuTLS error code, as required by GnuTLS hook
+ * definition
+ */
+static int mgs_select_virtual_server_cb(gnutls_session_t session)
+{
     int ret = 0;
+    mgs_handle_t *ctxt = gnutls_session_get_ptr(session);
 
-    _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
-
-    ctxt = gnutls_transport_get_ptr(session);
-
-    /* find the virtual server */
-    tsc = mgs_find_sni_server(session);
-
-    if (tsc != NULL) {
-        // Found a TLS vhost based on the SNI from the client; use it instead.
+    /* try to find a virtual host */
+    mgs_srvconf_rec *tsc = mgs_find_sni_server(session);
+    if (tsc != NULL)
+    {
+        /* Found a TLS vhost based on the SNI, configure the
+         * connection context. */
         ctxt->sc = tsc;
 	}
 
@@ -176,11 +182,10 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session) {
      * enabled on this virtual server. Note that here we ignore the version
      * negotiation.
      */
-
     ret = gnutls_priority_set(session, ctxt->sc->priorities);
+
     /* actually it shouldn't fail since we have checked at startup */
     return ret;
-
 }
 
 static int cert_retrieve_fn(gnutls_session_t session,
@@ -830,23 +835,22 @@ static int vhost_cb(void *baton, conn_rec *conn, server_rec * s)
 
 mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
 {
-    int rv;
     unsigned int sni_type;
     size_t data_len = MAX_HOST_LEN;
     char sni_name[MAX_HOST_LEN];
-    mgs_handle_t *ctxt;
-    vhost_cb_rec cbx;
 
     if (session == NULL)
         return NULL;
 
-    _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
-    ctxt = gnutls_transport_get_ptr(session);
+    mgs_handle_t *ctxt = gnutls_session_get_ptr(session);
+    int rv = gnutls_server_name_get(session, sni_name,
+                                    &data_len, &sni_type, 0);
 
-    rv = gnutls_server_name_get(ctxt->session, sni_name,
-            &data_len, &sni_type, 0);
 
     if (rv != 0) {
+        ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_EGENERAL, ctxt->c,
+                      "%s: no SNI data found: %s (%d)",
+                      __func__, gnutls_strerror(rv), rv);
         return NULL;
     }
 
@@ -857,14 +861,18 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
         return NULL;
     }
 
-    /**
-     * Code in the Core already sets up the c->base_server as the base
-     * for this IP/Port combo.  Trust that the core did the 'right' thing.
-     */
-    cbx.ctxt = ctxt;
-    cbx.sc = NULL;
-    cbx.sni_name = sni_name;
+    ap_log_cerror(APLOG_MARK, APLOG_TRACE1, 0, ctxt->c,
+                  "%s: client requested server '%s'.",
+                  __func__, sni_name);
 
+    /* Search for vhosts matching connection parameters and the
+     * SNI. If a match is found, cbx.sc will contain the mod_gnutls
+     * server config for the vhost. */
+    vhost_cb_rec cbx = {
+        .ctxt = ctxt,
+        .sc = NULL,
+        .sni_name = sni_name
+    };
     rv = ap_vhost_iterate_given_conn(ctxt->c, vhost_cb, &cbx);
     if (rv == 1) {
         return cbx.sc;
