@@ -732,9 +732,9 @@ Server Name Indication Example
 ------------------------------
 
 `mod_gnutls` supports "Server Name Indication", as specified in
-RFC 3546. This allows hosting many TLS websites with a single IP
-address. All recent browsers support this standard. Here is an
-example using SNI:
+[RFC 6066, Section 3](https://tools.ietf.org/html/rfc6066#section-3). This
+allows hosting many TLS websites with a single IP address. All recent
+browsers support this standard. Here is an example using SNI:
 
      # Load the module into Apache.
      LoadModule gnutls_module modules/mod_gnutls.so
