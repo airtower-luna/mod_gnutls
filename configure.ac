@@ -266,7 +266,7 @@ Listen ${i}:\${TEST_PORT}"
 done
 # Available extra ports, tests can "Define" variables of the listed
 # names in their apache.conf to enable them.
-for j in TEST_HTTP_PORT OCSP_PORT; do
+for j in TEST_HTTP_PORT; do
 LISTEN_LIST="${LISTEN_LIST}
 <IfDefine ${j}>"
 for i in ${TEST_IP}; do
