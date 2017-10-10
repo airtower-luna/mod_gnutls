@@ -3,16 +3,6 @@
 set -e
 . ${srcdir}/common.bash
 
-if [ -z "${BACKEND_HOST}" ]; then
-    export BACKEND_HOST="localhost"
-fi
-if [ -z "${BACKEND_PORT}" ]; then
-    export BACKEND_PORT="9934"
-fi
-: ${srcdir:="."}
-: ${APACHE2:="apache2"}
-: ${TEST_LOCK_WAIT:="30"}
-
 function backend_apache
 {
     # needed for start and stop
@@ -27,7 +17,6 @@ function backend_apache
     TEST_NAME="$(basename "${dir}")"
     (
 	export TEST_NAME
-	export TEST_PORT="${BACKEND_PORT}"
 	export srcdir="$(realpath ${srcdir})"
 	local flock_cmd=""
 	case ${action} in

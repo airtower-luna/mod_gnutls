@@ -210,7 +210,9 @@ ocsp_lockfile = ./ocsp.lock
 TEST_PORT ?= 9932
 # port for MSVA in test cases that use it
 MSVA_PORT ?= 9933
-# port for OCSP server (Apache vhost if enabled)
+# port for TLS proxy backend server
+BACKEND_PORT ?= 9934
+# port for the OCSP responder
 if ENABLE_OCSP_TEST
 OCSP_PORT ?= 9936
 endif
@@ -229,6 +231,7 @@ AM_TESTS_ENVIRONMENT = export APACHE2=@APACHE2@; \
 	export TEST_SERVICE_WAIT="$(TEST_SERVICE_WAIT)"; \
 	export TEST_QUERY_TIMEOUT="@TEST_QUERY_TIMEOUT@"; \
 	export BACKEND_HOST="@TEST_HOST@"; \
+	export BACKEND_PORT="$(BACKEND_PORT)"; \
 	export HTTP_CLI="@HTTP_CLI@";
 
 if HAVE_SOFTHSM
