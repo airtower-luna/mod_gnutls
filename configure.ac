@@ -291,7 +291,7 @@ DX_INIT_DOXYGEN([mod_gnutls], [doc/doxygen.conf], [doc/api])
 
 AC_CONFIG_FILES([Makefile src/Makefile test/Makefile test/tests/Makefile \
 			doc/Makefile doc/doxygen.conf include/mod_gnutls.h \
-			test/proxy_backend.conf \
+			test/proxy_backend.conf test/ocsp_server.conf \
 			test/apache-conf/listen.conf \
 			test/apache-conf/netns.conf])
 AC_OUTPUT

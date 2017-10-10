@@ -1,5 +1,6 @@
 cache
 proxy_backend.conf
+ocsp_server.conf
 *~
 logs
 outputs

@@ -1,6 +1,17 @@
+Define	OCSP_PORT	${OCSP_PORT}
+Define	TEST_PORT	${OCSP_PORT}
+
+Include ${srcdir}/base_apache.conf
+
 Include		${srcdir}/cgi_module.conf
 LoadModule	env_module		${AP_LIBEXECDIR}/mod_env.so
 LoadModule	rewrite_module		${AP_LIBEXECDIR}/mod_rewrite.so
+
+# separate log and PID file
+CustomLog	logs/${TEST_NAME}.ocsp.access.log combined
+ErrorLog	logs/${TEST_NAME}.ocsp.error.log
+PidFile		ocsp@PID_AFFIX@.pid
+
 <IfDefine !OCSP_INDEX>
 	# Default index file, define OCSP_INDEX in the test specific
 	# config to override

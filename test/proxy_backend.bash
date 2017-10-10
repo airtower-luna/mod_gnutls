@@ -9,7 +9,6 @@ fi
 if [ -z "${BACKEND_PORT}" ]; then
     export BACKEND_PORT="9934"
 fi
-: ${BACKEND_PID:="backend.pid"}
 : ${srcdir:="."}
 : ${APACHE2:="apache2"}
 : ${TEST_LOCK_WAIT:="30"}
@@ -20,7 +19,9 @@ function backend_apache
     dir="${1}"
     conf="${2}"
     action="${3}"
-    # needed only for start
+    # Needed only for start. The "lockfile" parameter is used as flock
+    # lock file or PID file to watch depending on whether FLOCK is
+    # set.
     lockfile="${4}"
 
     TEST_NAME="$(basename "${dir}")"
@@ -38,7 +39,7 @@ function backend_apache
 		    flock_cmd="${FLOCK} -w ${TEST_LOCK_WAIT} ${lockfile}"
 		else
 		    echo "Locking disabled, using wait based on proxy PID file."
-		    wait_pid_gone "${BACKEND_PID}"
+		    wait_pid_gone "${lockfile}"
 		fi
 		${flock_cmd} \
 		    ${APACHE2} -f "$(realpath ${testdir}/${conf})" -k start || return 1

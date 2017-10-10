@@ -193,7 +193,7 @@ endif
 # Apache configuration and data files
 apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/ocsp.cgi \
 	data/secret.txt data/test.txt ffdhe3072.pem mime.types \
-	ocsp_server.conf proxy_mods.conf
+	proxy_mods.conf
 
 EXTRA_DIST = $(apache_data) $(cert_templates) $(shared_identities:=.uid.in) \
 	common.bash proxy_backend.bash runtests server-crl.template \
@@ -203,6 +203,8 @@ EXTRA_DIST = $(apache_data) $(cert_templates) $(shared_identities:=.uid.in) \
 test_lockfile = ./test.lock
 # Lockfile for the proxy backend Apache process (if any)
 backend_lockfile = ./backend.lock
+# Lockfile for the OCSP server Apache process (if any)
+ocsp_lockfile = ./ocsp.lock
 
 # port for the main Apache server
 TEST_PORT ?= 9932
@@ -244,13 +246,19 @@ if ENABLE_NETNS
 AM_TESTS_ENVIRONMENT += export UNSHARE="@UNSHARE@"; \
 	export USE_TEST_NAMESPACE=1;
 endif
-# Without flock tests must not run in parallel. Otherwise set lock files.
+# Without flock tests must not run in parallel, and PID files are used
+# to prevent conflicts between server instances. Otherwise set lock
+# files for flock.
 if DISABLE_FLOCK
+AM_TESTS_ENVIRONMENT += export TEST_LOCK="apache2.pid"; \
+	export BACKEND_LOCK="backend.pid"; \
+	export OCSP_LOCK="ocsp.pid";
 .NOTPARALLEL:
 else
 AM_TESTS_ENVIRONMENT += export FLOCK="@FLOCK@"; \
 	export TEST_LOCK="$(test_lockfile)"; \
-	export BACKEND_LOCK="$(backend_lockfile)";
+	export BACKEND_LOCK="$(backend_lockfile)"; \
+	export OCSP_LOCK="$(ocsp_lockfile)";
 endif
 
 # Echo AM_TESTS_ENVIRONMENT. This can be useful for debugging, e.g. if
