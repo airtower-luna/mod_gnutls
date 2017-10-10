@@ -138,7 +138,6 @@ if [ -n "${USE_MSVA}" ]; then
     fi
 fi
 
-TEST_PID="apache2.pid"
 # configure locking for the Apache process
 if [ -n "${USE_TEST_NAMESPACE}" ]; then
     echo "Using namespaces to isolate tests, no need for locking."
@@ -147,7 +146,7 @@ elif [ -n "${FLOCK}" ]; then
     flock_cmd="${FLOCK} -w ${TEST_LOCK_WAIT} $(realpath ${TEST_LOCK})"
 else
     echo "Locking disabled, using wait based on Apache PID file."
-    wait_pid_gone "${TEST_PID}"
+    wait_pid_gone "${TEST_LOCK}"
     flock_cmd=""
 fi
 
