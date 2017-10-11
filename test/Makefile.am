@@ -183,12 +183,26 @@ if USE_MSVA
 	-rmdir $(msva_home)/private-keys-v1.d || true
 endif
 
+# Delete test data directories, and wait for test services to
+# exit. The reason for the wait is that Apache instances may take some
+# time to exit and delete their PID files. Occasionally some PID files
+# where still around during "distcheck" runs by the time the target
+# checked if the build directory was really empty after "distclean",
+# breaking the build. Delaying "clean-local" until PID files are gone
+# avoids this issue, and the timeout will expose actually unclean
+# stops.
 clean-local:
 	-rmdir $(identities) || true
 	-rmdir $(extra_dirs) || true
 if USE_MSVA
 	-rmdir $(msva_home) || true
 endif
+	wait=0; \
+	while ls *.pid && test "$$wait" -lt "@TEST_LOCK_WAIT@"; do \
+		wait=$$(($$wait + 1)); \
+		echo "waiting for test services to exit ($$wait seconds)"; \
+		sleep 1; \
+	done
 
 # Apache configuration and data files
 apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/ocsp.cgi \
