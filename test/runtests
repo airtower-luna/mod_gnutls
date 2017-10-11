@@ -6,6 +6,7 @@
 
 set -e
 . ${srcdir}/common.bash
+. ${srcdir}/proxy_backend.bash
 netns_reexec ${@}
 
 testid="${1##t-}"
@@ -16,6 +17,7 @@ if [ -z "$testid" ] ; then
 else
     testid=${srcdir}/tests/"$(printf "%02d" "$testid")"_*
 fi
+testdir="$(realpath ${testid})"
 
 BADVARS=0
 for v in APACHE2 TEST_HOST TEST_PORT TEST_QUERY_TIMEOUT TEST_SERVICE_WAIT \
@@ -99,10 +101,14 @@ function kill_by_pidfile()
 
 function apache_down_err() {
     printf "FAILURE: %s\n" "$TEST_NAME"
-    ${APACHE2} -f "${t}/apache.conf" -k stop || true
+    ${APACHE2} -f "${testdir}/apache.conf" -k stop || true
     if [ -e output ]; then
 	printf "\ngnutls-cli outputs:\n"
 	diff_output_filter_headers "output" "$output" || true
+    fi
+
+    if [ -r "${testdir}/backend.conf" ]; then
+	backend_apache "${testdir}" "backend.conf" stop || true
     fi
 
     if [ -n "${sleep_pidfile}" ]; then
@@ -150,13 +156,12 @@ else
     flock_cmd=""
 fi
 
-t="$(realpath ${testid})"
 export srcdir="$(realpath ${srcdir})"
-export TEST_NAME="$(basename "$t")"
+export TEST_NAME="$(basename "${testdir}")"
 output="outputs/${TEST_NAME}.output"
 rm -f "$output"
 
-if [ -e ${t}/fail.* ]; then
+if [ -e ${testdir}/fail.* ]; then
     EXPECTED_FAILURE="$(printf " (expected: %s)" fail.*)"
 else
     unset EXPECTED_FAILURE
@@ -172,8 +177,13 @@ if [ -n "${VERBOSE}" ]; then
     ${APACHE2} -f "${srcdir}/base_apache.conf" -V
 fi
 
-if ! ${flock_cmd} ${APACHE2} -f "${t}/apache.conf" -k start; then
-    if [ -e "${t}/fail.server" ]; then
+echo "${testdir}/backend.conf"
+if [ -r "${testdir}/backend.conf" ]; then
+    backend_apache "${testdir}" "backend.conf" start "${BACKEND_LOCK}"
+fi
+
+if ! ${flock_cmd} ${APACHE2} -f "${testdir}/apache.conf" -k start; then
+    if [ -e "${testdir}/fail.server" ]; then
 	echo "Apache HTTPD failed to start as expected."
 	exit 0
     else
@@ -205,18 +215,18 @@ sleep_pidfile="$(mktemp mod_gnutls_test-XXXXXX.pid)"
 # The line end manipulation in sed guarantees that all header lines
 # end with CRLF as required by RFC 7230, Section 3.1.1 regardless of
 # the line ends in the input file.
-if (sed -r "s/__HOSTNAME__/${TEST_HOST}/;s/\r?$/\r/" <${t}/input && \
+if (sed -r "s/__HOSTNAME__/${TEST_HOST}/;s/\r?$/\r/" <${testdir}/input && \
 	   run_with_pidfile "${sleep_pidfile}" sleep "${TEST_QUERY_TIMEOUT}" &) | \
-       gnutls-cli -p "${TEST_PORT}" $(cat ${t}/gnutls-cli.args) "${TEST_HOST}" \
+       gnutls-cli -p "${TEST_PORT}" $(cat ${testdir}/gnutls-cli.args) "${TEST_HOST}" \
        | tee "$output" && test "${PIPESTATUS[1]}" -eq 0;
 then
-    if [ -e ${t}/fail* ]; then
-        printf "%s should have failed but succeeded\n" "$(basename "$t")" >&2
+    if [ -e ${testdir}/fail* ]; then
+        printf "%s should have failed but succeeded\n" "$(basename "$testdir")" >&2
         exit 1
     fi
 else
-    if [ ! -e ${t}/fail* ]; then
-        printf "%s should have succeeded but failed\n" "$(basename "$t")" >&2
+    if [ ! -e ${testdir}/fail* ]; then
+        printf "%s should have succeeded but failed\n" "$(basename "$testdir")" >&2
         exit 1
     fi
 fi
@@ -224,16 +234,20 @@ fi
 kill_by_pidfile "${sleep_pidfile}"
 unset sleep_pidfile
 
-if [ -e ${t}/output ] ; then
-    diff_output_filter_headers "${t}/output" "$output" >&2
+if [ -e ${testdir}/output ] ; then
+    diff_output_filter_headers "${testdir}/output" "$output" >&2
 fi
 if [ -n "${USE_MSVA}" ]; then
     trap stop_msva EXIT
 else
     trap - EXIT
 fi
-${APACHE2} -f "${t}/apache.conf" -k stop || [ -e ${t}/fail.server ]
+${APACHE2} -f "${testdir}/apache.conf" -k stop || [ -e ${testdir}/fail.server ]
 printf "SUCCESS: %s\n" "$TEST_NAME"
+
+if [ -r "${testdir}/backend.conf" ]; then
+    backend_apache "${testdir}" "backend.conf" stop || true
+fi
 
 if [ -n "${USE_MSVA}" ]; then
     stop_msva
