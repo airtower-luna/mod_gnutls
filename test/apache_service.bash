@@ -3,7 +3,7 @@
 set -e
 . ${srcdir}/common.bash
 
-function backend_apache
+function apache_service
 {
     # needed for start and stop
     local dir="${1}"

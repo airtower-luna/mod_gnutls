@@ -196,7 +196,7 @@ apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/ocsp.cgi \
 	proxy_mods.conf
 
 EXTRA_DIST = $(apache_data) $(cert_templates) $(shared_identities:=.uid.in) \
-	common.bash proxy_backend.bash runtests server-crl.template \
+	apache_service.bash common.bash runtests server-crl.template \
 	softhsm.bash
 
 # Lockfile for the main Apache process

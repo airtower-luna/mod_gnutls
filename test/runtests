@@ -6,7 +6,7 @@
 
 set -e
 . ${srcdir}/common.bash
-. ${srcdir}/proxy_backend.bash
+. ${srcdir}/apache_service.bash
 netns_reexec ${@}
 
 testid="${1##t-}"
@@ -108,7 +108,7 @@ function apache_down_err() {
     fi
 
     if [ -r "${testdir}/backend.conf" ]; then
-	backend_apache "${testdir}" "backend.conf" stop || true
+	apache_service "${testdir}" "backend.conf" stop || true
     fi
 
     if [ -n "${sleep_pidfile}" ]; then
@@ -179,7 +179,7 @@ fi
 
 echo "${testdir}/backend.conf"
 if [ -r "${testdir}/backend.conf" ]; then
-    backend_apache "${testdir}" "backend.conf" start "${BACKEND_LOCK}"
+    apache_service "${testdir}" "backend.conf" start "${BACKEND_LOCK}"
 fi
 
 if ! ${flock_cmd} ${APACHE2} -f "${testdir}/apache.conf" -k start; then
@@ -246,7 +246,7 @@ ${APACHE2} -f "${testdir}/apache.conf" -k stop || [ -e ${testdir}/fail.server ]
 printf "SUCCESS: %s\n" "$TEST_NAME"
 
 if [ -r "${testdir}/backend.conf" ]; then
-    backend_apache "${testdir}" "backend.conf" stop || true
+    apache_service "${testdir}" "backend.conf" stop || true
 fi
 
 if [ -n "${USE_MSVA}" ]; then

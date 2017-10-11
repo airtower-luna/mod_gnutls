@@ -10,7 +10,7 @@ netns_reexec ${@}
 
 testdir="${srcdir}/tests/26_redirect_HTTP_to_HTTPS"
 TEST_NAME="$(basename ${testdir})"
-. $(dirname ${0})/proxy_backend.bash
+. $(dirname ${0})/apache_service.bash
 
 : ${TEST_HTTP_PORT:="9935"}
 export TEST_HTTP_PORT
@@ -21,9 +21,9 @@ export TEST_HTTP_PORT
 export BACKEND_PORT="${TEST_PORT}"
 function stop_backend
 {
-    backend_apache "${testdir}" "apache.conf" stop
+    apache_service "${testdir}" "apache.conf" stop
 }
-backend_apache "${testdir}" "apache.conf" start "${TEST_LOCK}"
+apache_service "${testdir}" "apache.conf" start "${TEST_LOCK}"
 trap stop_backend EXIT
 
 output="outputs/${TEST_NAME}.output"
@@ -45,5 +45,5 @@ fi
 # used ciphersuite.
 grep "Current TLS session: (TLS" "${output}"
 
-backend_apache "${testdir}" "apache.conf" stop
+apache_service "${testdir}" "apache.conf" stop
 trap - EXIT
