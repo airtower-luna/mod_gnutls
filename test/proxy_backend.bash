@@ -6,13 +6,13 @@ set -e
 function backend_apache
 {
     # needed for start and stop
-    dir="${1}"
-    conf="${2}"
-    action="${3}"
+    local dir="${1}"
+    local conf="${2}"
+    local action="${3}"
     # Needed only for start. The "lockfile" parameter is used as flock
     # lock file or PID file to watch depending on whether FLOCK is
     # set.
-    lockfile="${4}"
+    local lockfile="${4}"
 
     TEST_NAME="$(basename "${dir}")"
     (
@@ -31,10 +31,10 @@ function backend_apache
 		    wait_pid_gone "${lockfile}"
 		fi
 		${flock_cmd} \
-		    ${APACHE2} -f "$(realpath ${testdir}/${conf})" -k start || return 1
+		    ${APACHE2} -f "$(realpath ${dir}/${conf})" -k start || return 1
 		;;
 	    stop)
-		${APACHE2} -f "$(realpath ${testdir}/${conf})" -k stop || return 1
+		${APACHE2} -f "$(realpath ${dir}/${conf})" -k stop || return 1
 		;;
 	    *)
 		echo "${FUNCNAME[0]}: Invalid action \"${action}\"." >&2
