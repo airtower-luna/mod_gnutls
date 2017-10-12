@@ -113,9 +113,23 @@ MOSTLYCLEANFILES += */x509.pem $(generated_templates) *.uid
 # one day, so regenerating them is both fast and frequently
 # necessary.
 MOSTLYCLEANFILES += */*.pgp */*.pgp.raw */*.gpg */*.gpg~ */gpg.conf \
-	authority/lock */*.kbx */*.kbx~ */S.gpg-agent */private-keys-v1.d/*
+	authority/lock */*.kbx */*.kbx~ */S.gpg-agent */private-keys-v1.d/* \
+	authority/tofu.db
 # GnuPG random pool, no need to regenerate on every build
 CLEANFILES += authority/random_seed
+
+# GnuPG 2 starts gpg-agent processes per GNUPGHOME (one for every PGP
+# identity) while creating the PGP certificates. This target is called
+# by both "check-local" and "mostlyclean-local": The former because
+# agent processes are started while preparing for "check" and are no
+# longer needed afterwards, the latter to make sure they are gone
+# along with their certificates.
+stop-gnupg-agent:
+	for id in $(pgp_identities) $(msva_home); do \
+		GNUPGHOME=$$id/ gpgconf --kill gpg-agent || true; \
+	done
+
+check-local: stop-gnupg-agent
 
 # Delete lock files for test servers on "mostlyclean" target.
 MOSTLYCLEANFILES += *.lock
@@ -128,7 +142,7 @@ MOSTLYCLEANFILES += $(msva_home)/trustdb.gpg
 $(msva_home)/trustdb.gpg: authority/minimal.pgp client/cert.pgp
 	mkdir -p -m 0700 $(dir $@)
 	GNUPGHOME=$(dir $@) gpg --import < $<
-	printf "%s:6:\n" "$$(GNUPGHOME=authority gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" | GNUPGHOME=$(dir $@) gpg --import-ownertrust
+	printf "%s:6:\n" "$$(GNUPGHOME=authority/ gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" | GNUPGHOME=$(dir $@) gpg --import-ownertrust
 	GNUPGHOME=$(dir $@) gpg --import < client/cert.pgp
 	printf "keyserver does-not-exist.example\n" > $(msva_home)/gpg.conf
 endif
@@ -175,9 +189,10 @@ extra_dirs = logs cache outputs
 make-test-dirs:
 	mkdir -p $(extra_dirs)
 
-.PHONY: make-test-dirs clean-softhsm2-db
+.PHONY: make-test-dirs clean-softhsm2-db stop-gnupg-agent
 
-mostlyclean-local: clean-softhsm2-db
+
+mostlyclean-local: clean-softhsm2-db stop-gnupg-agent
 	-rmdir $(pgp_identities:=/private-keys-v1.d) || true
 if USE_MSVA
 	-rmdir $(msva_home)/private-keys-v1.d || true
