@@ -284,7 +284,10 @@ typedef struct {
 /* apr_signal_block() for blocking SIGPIPE */
 apr_status_t apr_signal_block(int signum);
 
- /* Proxy Support */
+/* Proxy Support */
+/** mod_proxy adds a note with this key to the connection->notes table
+ * for client connections */
+#define PROXY_SNI_NOTE "proxy-request-hostname"
 /* An optional function which returns non-zero if the given connection
 is using SSL/TLS. */
 APR_DECLARE_OPTIONAL_FN(int, ssl_is_https, (conn_rec *));

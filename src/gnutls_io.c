@@ -394,6 +394,30 @@ static int gnutls_do_handshake(mgs_handle_t * ctxt) {
         return -1;
     }
 
+    /* Enable SNI for proxy connections */
+    if (ctxt->is_proxy == GNUTLS_ENABLED_TRUE)
+    {
+        /* Get peer hostname from note left by mod_proxy */
+        const char *peer_hostname =
+            apr_table_get(ctxt->c->notes, PROXY_SNI_NOTE);
+        /* Used only as target for apr_ipsubnet_create() */
+        apr_ipsubnet_t *probe;
+        /* Check if the note is present (!= NULL) and NOT an IP
+         * address */
+        if ((peer_hostname) != NULL
+            && (apr_ipsubnet_create(&probe, peer_hostname, NULL, ctxt->c->pool)
+                != APR_SUCCESS))
+        {
+            ret = gnutls_server_name_set(ctxt->session, GNUTLS_NAME_DNS,
+                                         peer_hostname, strlen(peer_hostname));
+            if (ret != GNUTLS_E_SUCCESS)
+                ap_log_cerror(APLOG_MARK, APLOG_ERR, ret, ctxt->c,
+                              "Could not set SNI '%s' for proxy connection: "
+                              "%s (%d)",
+                              peer_hostname, gnutls_strerror(ret), ret);
+        }
+    }
+
 tryagain:
     do {
         ret = gnutls_handshake(ctxt->session);

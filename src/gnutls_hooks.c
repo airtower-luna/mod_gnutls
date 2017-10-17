@@ -1965,10 +1965,10 @@ static int gtls_check_server_cert(gnutls_session_t session)
 
     /* Get peer hostname from a note left by mod_proxy */
     const char *peer_hostname =
-        apr_table_get(ctxt->c->notes, "proxy-request-hostname");
+        apr_table_get(ctxt->c->notes, PROXY_SNI_NOTE);
     if (peer_hostname == NULL)
         ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, ctxt->c,
-                      "%s: proxy-request-hostname is NULL, cannot check "
+                      "%s: " PROXY_SNI_NOTE " NULL, cannot check "
                       "peer's hostname", __func__);
 
     /* Verify certificate, including hostname match. Should
