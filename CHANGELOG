@@ -1,10 +1,14 @@
-** UNRELEASED
+** Version 0.8.3 (2017-10-20)
 - Use GnuTLS' default DH parameters by default
 - Handle long Server Name Indication data and gracefully ignore
   unknown SNI types
+- Send SNI for proxy connections
 - Deprecate OpenPGP support like GnuTLS did (will be removed
   completely in a future release)
-- Fix documentation of SSL_CLIENT_I_DN
+- Do not announce session ticket support for proxy connections
+- Minor documentation updates (SSL_CLIENT_I_DN, reference for SNI)
+- Test suite: Simplify handling of proxy backend servers and OCSP
+  responders
 - Test suite: stability/compatibility fixes
 
 ** Version 0.8.2 (2017-01-08)
