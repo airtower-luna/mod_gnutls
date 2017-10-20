@@ -999,11 +999,6 @@ static void create_gnutls_handle(conn_rec * c)
             ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
                           "gnutls_init for proxy connection failed: %s (%d)",
                           gnutls_strerror(err), err);
-        err = gnutls_session_ticket_enable_client(ctxt->session);
-        if (err != GNUTLS_E_SUCCESS)
-            ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
-                          "gnutls_session_ticket_enable_client failed: %s (%d)",
-                          gnutls_strerror(err), err);
     }
     else
     {
