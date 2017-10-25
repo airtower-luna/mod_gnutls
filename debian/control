@@ -1,6 +1,6 @@
 Source: mod-gnutls
 Section: httpd
-Priority: extra
+Priority: optional
 Maintainer: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
 Build-Depends:
  apache2-bin <!nocheck>,
