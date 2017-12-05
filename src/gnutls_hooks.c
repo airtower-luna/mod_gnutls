@@ -164,13 +164,6 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session)
     /* Set Anon credentials */
     gnutls_credentials_set(session, GNUTLS_CRD_ANON, ctxt->sc->anon_creds);
 
-    if (ctxt->sc->ocsp_staple)
-    {
-        gnutls_certificate_set_ocsp_status_request_function(ctxt->sc->certs,
-                                                            mgs_get_ocsp_response,
-                                                            ctxt);
-    }
-
 #ifdef ENABLE_SRP
 	/* Set SRP credentials */
     if (ctxt->sc->srp_tpasswd_conf_file != NULL && ctxt->sc->srp_tpasswd_file != NULL) {

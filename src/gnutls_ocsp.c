@@ -736,11 +736,11 @@ void mgs_cache_ocsp_failure(server_rec *s)
 
 
 
-int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
-                          void *ptr,
+int mgs_get_ocsp_response(gnutls_session_t session,
+                          void *ptr __attribute__((unused)),
                           gnutls_datum_t *ocsp_response)
 {
-    mgs_handle_t *ctxt = (mgs_handle_t *) ptr;
+    mgs_handle_t *ctxt = gnutls_session_get_ptr(session);
     if (!ctxt->sc->ocsp_staple || ctxt->sc->cache == NULL)
     {
         /* OCSP must be enabled and caching requires a cache. */
@@ -974,6 +974,11 @@ int mgs_ocsp_post_config_server(apr_pool_t *pconf,
     apr_pool_cleanup_register(pconf, sc->ocsp->trust,
                               mgs_cleanup_trust_list,
                               apr_pool_cleanup_null);
+
+    /* enable status request callback */
+    gnutls_certificate_set_ocsp_status_request_function(sc->certs,
+                                                        mgs_get_ocsp_response,
+                                                        sc);
 
     return OK;
 }
