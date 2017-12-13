@@ -116,10 +116,10 @@ int ssl_engine_disable(conn_rec *c)
     ctxt->enabled = GNUTLS_ENABLED_FALSE;
     ctxt->is_proxy = GNUTLS_ENABLED_TRUE;
 
-    if (c->input_filters)
-        ap_remove_input_filter(c->input_filters);
-    if (c->output_filters)
-        ap_remove_output_filter(c->output_filters);
+    if (ctxt->input_filter)
+        ap_remove_input_filter(ctxt->input_filter);
+    if (ctxt->output_filter)
+        ap_remove_output_filter(ctxt->output_filter);
 
     return 1;
 }
