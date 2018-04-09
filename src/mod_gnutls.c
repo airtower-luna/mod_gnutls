@@ -19,6 +19,7 @@
 
 #include "mod_gnutls.h"
 #include "gnutls_ocsp.h"
+#include "gnutls_util.h"
 
 #ifdef APLOG_USE_MODULE
 APLOG_USE_MODULE(gnutls);
@@ -106,13 +107,7 @@ int ssl_engine_disable(conn_rec *c)
     }
 
     /* disable TLS for this connection */
-    mgs_handle_t *ctxt = (mgs_handle_t *)
-        ap_get_module_config(c->conn_config, &gnutls_module);
-    if (ctxt == NULL)
-    {
-        ctxt = apr_pcalloc(c->pool, sizeof (*ctxt));
-        ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
-    }
+    mgs_handle_t *ctxt = init_gnutls_ctxt(c);
     ctxt->enabled = GNUTLS_ENABLED_FALSE;
     ctxt->is_proxy = GNUTLS_ENABLED_TRUE;
 
@@ -138,13 +133,7 @@ int ssl_proxy_enable(conn_rec *c)
     }
 
     /* enable TLS for this connection */
-    mgs_handle_t *ctxt = (mgs_handle_t *)
-        ap_get_module_config(c->conn_config, &gnutls_module);
-    if (ctxt == NULL)
-    {
-        ctxt = apr_pcalloc(c->pool, sizeof (*ctxt));
-        ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
-    }
+    mgs_handle_t *ctxt = init_gnutls_ctxt(c);
     ctxt->enabled = GNUTLS_ENABLED_TRUE;
     ctxt->is_proxy = GNUTLS_ENABLED_TRUE;
     return 1;

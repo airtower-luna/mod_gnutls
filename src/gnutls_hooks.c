@@ -21,6 +21,7 @@
 #include "mod_gnutls.h"
 #include "gnutls_cache.h"
 #include "gnutls_ocsp.h"
+#include "gnutls_util.h"
 #include "http_vhost.h"
 #include "ap_mpm.h"
 #include "mod_status.h"
@@ -956,23 +957,11 @@ static apr_status_t cleanup_gnutls_session(void *data)
 
 static void create_gnutls_handle(conn_rec * c)
 {
-    /* Get mod_gnutls server configuration */
-    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
-            ap_get_module_config(c->base_server->module_config, &gnutls_module);
-
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
 
     /* Get connection specific configuration */
-    mgs_handle_t *ctxt = (mgs_handle_t *) ap_get_module_config(c->conn_config, &gnutls_module);
-    if (ctxt == NULL)
-    {
-        ctxt = apr_pcalloc(c->pool, sizeof (*ctxt));
-        ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
-        ctxt->is_proxy = GNUTLS_ENABLED_FALSE;
-    }
+    mgs_handle_t *ctxt = init_gnutls_ctxt(c);
     ctxt->enabled = GNUTLS_ENABLED_TRUE;
-    ctxt->c = c;
-    ctxt->sc = sc;
     ctxt->status = 0;
     ctxt->input_rc = APR_SUCCESS;
     ctxt->input_bb = apr_brigade_create(c->pool, c->bucket_alloc);

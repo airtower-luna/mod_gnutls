@@ -20,6 +20,7 @@
 #include <apr_pools.h>
 #include <apr_uri.h>
 #include <gnutls/gnutls.h>
+#include "mod_gnutls.h"
 
 #ifndef __MOD_GNUTLS_UTIL_H__
 #define __MOD_GNUTLS_UTIL_H__
@@ -65,5 +66,11 @@ apr_status_t sock_send_buf(apr_socket_t *sock, const char *buf,
 apr_status_t datum_from_file(apr_pool_t *p, const char* filename,
                              gnutls_datum_t *datum)
     __attribute__((nonnull));
+
+/**
+ * Allocate the connection configuration structure if necessary, set
+ * some defaults.
+ */
+mgs_handle_t *init_gnutls_ctxt(conn_rec *c);
 
 #endif /* __MOD_GNUTLS_UTIL_H__ */
