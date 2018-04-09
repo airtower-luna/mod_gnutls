@@ -25,6 +25,10 @@
 APLOG_USE_MODULE(gnutls);
 #endif
 
+int ssl_engine_set(conn_rec *c,
+                   ap_conf_vector_t *dir_conf __attribute__((unused)),
+                   int proxy, int enable);
+
 static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
 {
     /* Try Run Post-Config Hook After mod_proxy */
@@ -65,6 +69,7 @@ static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
     /* mod_proxy calls these functions */
     APR_REGISTER_OPTIONAL_FN(ssl_proxy_enable);
     APR_REGISTER_OPTIONAL_FN(ssl_engine_disable);
+    APR_REGISTER_OPTIONAL_FN(ssl_engine_set);
 
     /* mod_rewrite calls this function to detect HTTPS */
     APR_REGISTER_OPTIONAL_FN(ssl_is_https);
@@ -98,45 +103,55 @@ int ssl_is_https(conn_rec *c)
 
 
 
-int ssl_engine_disable(conn_rec *c)
+/**
+ * In Apache versions from 2.4.33 mod_proxy uses this function to set
+ * up its client connections. Note that mod_gnutls does not (yet)
+ * implement per directory configuration for such connections.
+ *
+ * @param c the connection
+ * @param dir_conf per directory configuration, unused for now
+ * @param proxy Is this a proxy connection?
+ * @param enable Should TLS be enabled on this connection?
+ *
+ * @param `true` (1) if successful, `false` (0) otherwise
+ */
+int ssl_engine_set(conn_rec *c,
+                   ap_conf_vector_t *dir_conf __attribute__((unused)),
+                   int proxy, int enable)
 {
-    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
-        ap_get_module_config(c->base_server->module_config, &gnutls_module);
-    if(sc->enabled == GNUTLS_ENABLED_FALSE) {
-        return 1;
+    mgs_handle_t *ctxt = init_gnutls_ctxt(c);
+
+    /* If TLS proxy has been requested, check if support is enabled
+     * for the server */
+    if (proxy && (ctxt->sc->proxy_enabled != GNUTLS_ENABLED_TRUE))
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+                      "%s: mod_proxy requested TLS proxy, but not enabled "
+                      "for %s", __func__, ctxt->sc->cert_cn);
+        return 0;
     }
 
-    /* disable TLS for this connection */
-    mgs_handle_t *ctxt = init_gnutls_ctxt(c);
-    ctxt->enabled = GNUTLS_ENABLED_FALSE;
-    ctxt->is_proxy = GNUTLS_ENABLED_TRUE;
+    if (proxy)
+        ctxt->is_proxy = GNUTLS_ENABLED_TRUE;
+    else
+        ctxt->is_proxy = GNUTLS_ENABLED_FALSE;
 
-    if (ctxt->input_filter)
-        ap_remove_input_filter(ctxt->input_filter);
-    if (ctxt->output_filter)
-        ap_remove_output_filter(ctxt->output_filter);
+    if (enable)
+        ctxt->enabled = GNUTLS_ENABLED_TRUE;
+    else
+        ctxt->enabled = GNUTLS_ENABLED_FALSE;
 
     return 1;
 }
 
+int ssl_engine_disable(conn_rec *c)
+{
+    return ssl_engine_set(c, NULL, 0, 0);
+}
+
 int ssl_proxy_enable(conn_rec *c)
 {
-    /* check if TLS proxy support is enabled */
-    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
-        ap_get_module_config(c->base_server->module_config, &gnutls_module);
-    if (sc->proxy_enabled != GNUTLS_ENABLED_TRUE)
-    {
-        ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
-                      "%s: mod_proxy requested TLS proxy, but not enabled "
-                      "for %s", __func__, sc->cert_cn);
-        return 0;
-    }
-
-    /* enable TLS for this connection */
-    mgs_handle_t *ctxt = init_gnutls_ctxt(c);
-    ctxt->enabled = GNUTLS_ENABLED_TRUE;
-    ctxt->is_proxy = GNUTLS_ENABLED_TRUE;
-    return 1;
+    return ssl_engine_set(c, NULL, 1, 1);
 }
 
 static const command_rec mgs_config_cmds[] = {

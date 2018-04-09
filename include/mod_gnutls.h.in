@@ -296,6 +296,9 @@ APR_DECLARE_OPTIONAL_FN(int, ssl_is_https, (conn_rec *));
  * connections. */
 APR_DECLARE_OPTIONAL_FN(int, ssl_proxy_enable, (conn_rec *));
 APR_DECLARE_OPTIONAL_FN(int, ssl_engine_disable, (conn_rec *));
+APR_DECLARE_OPTIONAL_FN(int, ssl_engine_set, (conn_rec *,
+                                              ap_conf_vector_t *,
+                                              int proxy, int enable));
 int ssl_is_https(conn_rec *c);
 int ssl_proxy_enable(conn_rec *c);
 int ssl_engine_disable(conn_rec *c);
