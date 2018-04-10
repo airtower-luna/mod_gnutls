@@ -1059,12 +1059,20 @@ int mgs_hook_pre_connection(conn_rec * c, void *csd __attribute__((unused)))
 {
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
 
+    if (c->master)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_TRACE1, 0, c,
+                      "%s declined secondary connection", __func__);
+        return DECLINED;
+    }
+
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(c->base_server->module_config, &gnutls_module);
     mgs_handle_t *ctxt = (mgs_handle_t *)
         ap_get_module_config(c->conn_config, &gnutls_module);
 
-    if ((sc && (!sc->enabled)) || (ctxt && ctxt->enabled == GNUTLS_ENABLED_FALSE))
+    if ((sc && (!sc->enabled))
+        || (ctxt && ctxt->enabled == GNUTLS_ENABLED_FALSE))
     {
         ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, c, "%s declined connection",
                       __func__);
@@ -1116,8 +1124,7 @@ int mgs_hook_fixups(request_rec * r) {
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
     apr_table_t *env = r->subprocess_env;
 
-    ctxt = ap_get_module_config(r->connection->conn_config,
-                                &gnutls_module);
+    ctxt = get_effective_gnutls_ctxt(r->connection);
 
     if (!ctxt || ctxt->enabled != GNUTLS_ENABLED_TRUE || ctxt->session == NULL)
     {
@@ -1197,9 +1204,7 @@ int mgs_hook_authz(request_rec * r) {
     dc = ap_get_module_config(r->per_dir_config, &gnutls_module);
 
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
-    ctxt =
-            ap_get_module_config(r->connection->conn_config,
-            &gnutls_module);
+    ctxt = get_effective_gnutls_ctxt(r->connection);
 
     if (!ctxt || ctxt->session == NULL) {
         return DECLINED;
@@ -1929,8 +1934,7 @@ static int mgs_status_hook(request_rec *r, int flags)
 
     if (sc->enabled != GNUTLS_ENABLED_FALSE)
     {
-        mgs_handle_t* ctxt =
-            ap_get_module_config(r->connection->conn_config, &gnutls_module);
+        mgs_handle_t* ctxt = get_effective_gnutls_ctxt(r->connection);
         if (ctxt && ctxt->session != NULL)
         {
             char* s_info = gnutls_session_get_desc(ctxt->session);
