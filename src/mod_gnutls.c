@@ -73,6 +73,30 @@ static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
 
     /* mod_rewrite calls this function to detect HTTPS */
     APR_REGISTER_OPTIONAL_FN(ssl_is_https);
+    /* some modules look up TLS-related variables */
+    APR_REGISTER_OPTIONAL_FN(ssl_var_lookup);
+}
+
+
+
+/**
+ * Get the connection context, resolving to a master connection if
+ * any.
+ *
+ * @param c the connection handle
+ *
+ * @return mod_gnutls session context, might be `NULL`
+ */
+mgs_handle_t* get_effective_gnutls_ctxt(conn_rec *c)
+{
+    mgs_handle_t *ctxt = (mgs_handle_t *)
+        ap_get_module_config(c->conn_config, &gnutls_module);
+    if (!(ctxt != NULL && ctxt->enabled) && (c->master != NULL))
+    {
+        ctxt = (mgs_handle_t *)
+            ap_get_module_config(c->master->conn_config, &gnutls_module);
+    }
+    return ctxt;
 }
 
 
@@ -85,10 +109,9 @@ static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
  */
 int ssl_is_https(conn_rec *c)
 {
+    mgs_handle_t *ctxt = get_effective_gnutls_ctxt(c);
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(c->base_server->module_config, &gnutls_module);
-    mgs_handle_t *ctxt = (mgs_handle_t *)
-        ap_get_module_config(c->conn_config, &gnutls_module);
 
     if(sc->enabled == GNUTLS_ENABLED_FALSE
        || ctxt == NULL
@@ -99,6 +122,60 @@ int ssl_is_https(conn_rec *c)
     }
     /* Connection is Using SSL/TLS */
     return 1;
+}
+
+
+
+/**
+ * Return variables describing the current TLS session (if any).
+ *
+ * mod_ssl doc for this function: "This function must remain safe to
+ * use for a non-SSL connection." mod_http2 uses it to check if an
+ * acceptable TLS session is used.
+ */
+char* ssl_var_lookup(apr_pool_t *p, server_rec *s __attribute__((unused)),
+                     conn_rec *c, request_rec *r, char *var)
+{
+    /*
+     * When no pool is given try to find one
+     */
+    if (p == NULL) {
+        if (r != NULL)
+            p = r->pool;
+        else if (c != NULL)
+            p = c->pool;
+        else
+            return NULL;
+    }
+
+    if (strcmp(var, "HTTPS") == 0)
+    {
+        if (c != NULL && ssl_is_https(c))
+            return "on";
+        else
+            return "off";
+    }
+
+    mgs_handle_t *ctxt = get_effective_gnutls_ctxt(c);
+
+    /* TLS parameters are empty if there is no session */
+    if (ctxt == NULL || ctxt->c == NULL)
+        return NULL;
+
+    if (strcmp(var, "SSL_PROTOCOL") == 0)
+        return apr_pstrdup(p, gnutls_protocol_get_name(gnutls_protocol_get_version(ctxt->session)));
+
+    if (strcmp(var, "SSL_CIPHER") == 0)
+        return apr_pstrdup(p, gnutls_cipher_suite_get_name(gnutls_kx_get(ctxt->session),
+                                                           gnutls_cipher_get(ctxt->session),
+                                                           gnutls_mac_get(ctxt->session)));
+
+    /* mod_ssl supports a LOT more variables */
+    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, c,
+                  "unsupported variable requested: '%s'",
+                  var);
+
+    return NULL;
 }
 
 
