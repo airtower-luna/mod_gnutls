@@ -29,19 +29,23 @@ int ssl_engine_set(conn_rec *c,
                    ap_conf_vector_t *dir_conf __attribute__((unused)),
                    int proxy, int enable);
 
+static const char * const mod_proxy[] = { "mod_proxy.c", NULL };
+static const char * const mod_http2[] = { "mod_http2.c", NULL };
+
 static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
 {
     /* Try Run Post-Config Hook After mod_proxy */
-    static const char * const aszPre[] = { "mod_proxy.c", NULL };
-    ap_hook_post_config(mgs_hook_post_config, aszPre, NULL,
-                        APR_HOOK_REALLY_LAST);
+    ap_hook_post_config(mgs_hook_post_config, mod_proxy, mod_http2,
+                        APR_HOOK_MIDDLE);
     /* HTTP Scheme Hook */
     ap_hook_http_scheme(mgs_hook_http_scheme, NULL, NULL, APR_HOOK_MIDDLE);
     /* Default Port Hook */
     ap_hook_default_port(mgs_hook_default_port, NULL, NULL, APR_HOOK_MIDDLE);
     /* Pre-Connect Hook */
-    ap_hook_pre_connection(mgs_hook_pre_connection, NULL, NULL,
+    ap_hook_pre_connection(mgs_hook_pre_connection, mod_http2, NULL,
                            APR_HOOK_MIDDLE);
+    ap_hook_process_connection(mgs_hook_process_connection,
+                               NULL, mod_http2, APR_HOOK_MIDDLE);
     /* Pre-Config Hook */
     ap_hook_pre_config(mgs_hook_pre_config, NULL, NULL,
                        APR_HOOK_MIDDLE);

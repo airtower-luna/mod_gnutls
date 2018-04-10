@@ -1075,6 +1075,34 @@ int mgs_hook_pre_connection(conn_rec * c, void *csd __attribute__((unused)))
     return OK;
 }
 
+
+
+/**
+ * process_connection hook: Do a zero byte read to trigger the
+ * handshake. Doesn't change anything for traditional protocols that
+ * just do reads, but HTTP/2 needs the TLS handshake and ALPN to
+ * happen before its process_connection hook runs.
+ */
+int mgs_hook_process_connection(conn_rec* c)
+{
+    mgs_handle_t *ctxt = (mgs_handle_t *)
+        ap_get_module_config(c->conn_config, &gnutls_module);
+
+    if ((ctxt != NULL) && (ctxt->enabled == GNUTLS_ENABLED_TRUE))
+    {
+        /* This connection is supposed to use TLS. Give the filters a
+         * kick with a zero byte read to trigger the handshake. */
+        apr_bucket_brigade* temp =
+            apr_brigade_create(c->pool, c->bucket_alloc);
+        ap_get_brigade(c->input_filters, temp,
+                       AP_MODE_INIT, APR_BLOCK_READ, 0);
+        apr_brigade_destroy(temp);
+    }
+    return DECLINED;
+}
+
+
+
 int mgs_hook_fixups(request_rec * r) {
     unsigned char sbuf[GNUTLS_MAX_SESSION_ID];
     const char *tmp;

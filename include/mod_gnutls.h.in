@@ -469,6 +469,8 @@ apr_port_t mgs_hook_default_port(const request_rec * r);
 
 int mgs_hook_pre_connection(conn_rec * c, void *csd);
 
+int mgs_hook_process_connection(conn_rec* c);
+
 int mgs_hook_fixups(request_rec *r);
 
 int mgs_hook_authz(request_rec *r);
