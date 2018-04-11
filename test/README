@@ -2,7 +2,7 @@ Unit Tests for Apache's mod_gnutls
 ==================================
 
 Authors: Daniel Kahn Gillmor <dkg@fifthhorseman.net>
-	 Thomas Klute <thomas2.klute@uni-dortmund.de>
+	 Fiona Klute <fiona.klute@gmx.de>
 
 There are a lot of ways that a TLS-capable web server can go wrong.  I
 want to at least test for some basic/common configurations.

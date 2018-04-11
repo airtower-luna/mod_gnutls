@@ -1,3 +1,8 @@
+** Version 0.8.4 (UNRELEASED)
+- Support Apache HTTPD 2.4.33 API for proxy TLS connections
+- Support TLS for HTTP/2 connections with mod_http2
+- Fix configuration of OCSP stapling callback
+
 ** Version 0.8.3 (2017-10-20)
 - Use GnuTLS' default DH parameters by default
 - Handle long Server Name Indication data and gracefully ignore

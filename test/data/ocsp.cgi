@@ -1,7 +1,7 @@
 #!/bin/bash
 # CGI wrapper to use "openssl ocsp" as a simple OCSP responder
 #
-# Copyright 2016 Thomas Klute
+# Copyright 2016 Fiona Klute
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you
 # may not use this file except in compliance with the License.  You
