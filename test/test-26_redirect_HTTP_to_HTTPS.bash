@@ -15,16 +15,12 @@ TEST_NAME="$(basename ${testdir})"
 : ${TEST_HTTP_PORT:="9935"}
 export TEST_HTTP_PORT
 
-# "Proxy backend" functions are used to start the only instance needed
-# here without "runtests". We have to override BACKEND_PORT to make it
-# match what a runtests-based test would use.
-export BACKEND_PORT="${TEST_PORT}"
-function stop_backend
+function stop_server
 {
     apache_service "${testdir}" "apache.conf" stop
 }
 apache_service "${testdir}" "apache.conf" start "${TEST_LOCK}"
-trap stop_backend EXIT
+trap stop_server EXIT
 
 output="outputs/${TEST_NAME}.output"
 rm -f "$output"
@@ -45,5 +41,5 @@ fi
 # used ciphersuite.
 grep "Current TLS session: (TLS" "${output}"
 
-apache_service "${testdir}" "apache.conf" stop
+stop_server
 trap - EXIT
