@@ -134,6 +134,144 @@ int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog, apr_pool_t * ptem
     return OK;
 }
 
+
+
+/**
+ * Get the list of available protocols for this connection and add it
+ * to the GnuTLS session. Must run before the client hello function.
+ */
+static void prepare_alpn_proposals(mgs_handle_t *ctxt)
+{
+    /* Check if any protocol upgrades are available
+     *
+     * The "report_all" parameter to ap_get_protocol_upgrades() is 0
+     * (report only more preferable protocols) because setting it to 1
+     * doesn't actually report ALL protocols, but only all except the
+     * current one. This way we can at least list the current one as
+     * available by appending it without potentially negotiating a
+     * less preferred protocol. */
+    const apr_array_header_t *pupgrades = NULL;
+    apr_status_t ret =
+        ap_get_protocol_upgrades(ctxt->c, NULL, ctxt->c->base_server,
+                                 /*report_all*/ 0, &pupgrades);
+    if (ret != APR_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, ctxt->c,
+                      "%s: ap_get_protocol_upgrades() failed, "
+                      "cannot configure ALPN!", __func__);
+        return;
+    }
+
+    if (pupgrades == NULL || pupgrades->nelts == 0)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_TRACE1, 0, ctxt->c,
+                      "%s: No protocol upgrades available.", __func__);
+        return;
+    }
+
+    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
+                  "%s: Found %d protocol upgrade(s) for ALPN: %s",
+                  __func__, pupgrades->nelts,
+                  apr_array_pstrcat(ctxt->c->pool, pupgrades, ','));
+    gnutls_datum_t *alpn_protos =
+        apr_palloc(ctxt->c->pool,
+                   (pupgrades->nelts + 1) * sizeof(gnutls_datum_t));
+    for (int i = 0; i < pupgrades->nelts; i++)
+    {
+        alpn_protos[i].data = (void *) APR_ARRAY_IDX(pupgrades, i, char *);
+        alpn_protos[i].size =
+            strnlen(APR_ARRAY_IDX(pupgrades, i, char *),
+                    pupgrades->elt_size);
+    }
+
+    /* Add the current (default) protocol at the end of the list */
+    alpn_protos[pupgrades->nelts].data =
+        (void*) apr_pstrdup(ctxt->c->pool, ap_get_protocol(ctxt->c));
+    alpn_protos[pupgrades->nelts].size =
+        strlen((char*) alpn_protos[pupgrades->nelts].data);
+    ap_log_cerror(APLOG_MARK, APLOG_TRACE1, 0, ctxt->c,
+                  "%s: Adding current protocol %s to ALPN set.",
+                  __func__, alpn_protos[pupgrades->nelts].data);
+
+    gnutls_alpn_set_protocols(ctxt->session,
+                              alpn_protos,
+                              pupgrades->nelts,
+                              GNUTLS_ALPN_SERVER_PRECEDENCE);
+}
+
+
+
+/**
+ * Check if ALPN selected any protocol upgrade, try to switch if so.
+ */
+static int process_alpn_result(mgs_handle_t *ctxt)
+{
+    int ret = 0;
+    gnutls_datum_t alpn_proto;
+    ret = gnutls_alpn_get_selected_protocol(ctxt->session, &alpn_proto);
+    if (ret != GNUTLS_E_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, ctxt->c,
+                      "%s: No ALPN result: %s (%d)",
+                      __func__, gnutls_strerror(ret), ret);
+        return GNUTLS_E_SUCCESS;
+    }
+
+    apr_array_header_t *client_protos =
+        apr_array_make(ctxt->c->pool, 1, sizeof(char *));
+    /* apr_pstrndup to ensure that the protocol is null terminated */
+    APR_ARRAY_PUSH(client_protos, char *) =
+        apr_pstrndup(ctxt->c->pool, (char*) alpn_proto.data, alpn_proto.size);
+    const char *selected =
+        ap_select_protocol(ctxt->c, NULL, ctxt->c->base_server,
+                           client_protos);
+
+    /* ap_select_protocol() will return NULL if none of the ALPN
+     * proposals matched. GnuTLS negotiated alpn_proto based on the
+     * list provided by the server, but the vhost might have changed
+     * based on SNI. Apache seems to adjust the proposal list to avoid
+     * such issues though.
+     *
+     * GnuTLS will return a fatal "no_application_protocol" alert as
+     * required by RFC 7301 if the post client hello function returns
+     * GNUTLS_E_NO_APPLICATION_PROTOCOL. */
+    if (!selected)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
+                      "%s: ap_select_protocol() returned NULL! Please "
+                      "make sure any overlapping vhosts have the same "
+                      "protocols available.",
+                      __func__);
+        return GNUTLS_E_NO_APPLICATION_PROTOCOL;
+    }
+
+    if (strcmp(selected, ap_get_protocol(ctxt->c)) == 0)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, ctxt->c,
+                      "%s: Already using protocol '%s', nothing to do.",
+                      __func__, selected);
+        return GNUTLS_E_SUCCESS;
+    }
+
+    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                  "%s: Switching protocol to '%s' based on ALPN.",
+                  __func__, selected);
+    apr_status_t status = ap_switch_protocol(ctxt->c, NULL,
+                                             ctxt->c->base_server,
+                                             selected);
+    if (status != APR_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, status, ctxt->c,
+                      "%s: Protocol switch to '%s' failed!",
+                      __func__, selected);
+        return GNUTLS_E_NO_APPLICATION_PROTOCOL;
+    }
+    /* ALPN done! */
+    return GNUTLS_E_SUCCESS;
+}
+
+
+
 /**
  * Post client hello function for GnuTLS, used to configure the TLS
  * server based on virtual host configuration. Uses SNI to select the
@@ -172,10 +310,13 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session)
     }
 #endif
 
-    /* update the priorities - to avoid negotiating a ciphersuite that is not
+    ret = process_alpn_result(ctxt);
+    if (ret != GNUTLS_E_SUCCESS)
+        return ret;
+
+    /* Update the priorities - to avoid negotiating a ciphersuite that is not
      * enabled on this virtual server. Note that here we ignore the version
-     * negotiation.
-     */
+     * negotiation. */
     ret = gnutls_priority_set(session, ctxt->sc->priorities);
 
     /* actually it shouldn't fail since we have checked at startup */
@@ -1038,6 +1179,8 @@ static void create_gnutls_handle(conn_rec * c)
                           "failed: %s (%d)",
                           __func__, gnutls_strerror(err), err);
     }
+
+    prepare_alpn_proposals(ctxt);
 
     /* Initialize Session Cache */
     mgs_cache_session_init(ctxt);
