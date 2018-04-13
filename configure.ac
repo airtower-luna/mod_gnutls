@@ -1,4 +1,4 @@
-AC_INIT(mod_gnutls, 0.8.3)
+AC_INIT(mod_gnutls, 0.8.4)
 OOO_CONFIG_NICE(config.nice)
 MOD_GNUTLS_VERSION=AC_PACKAGE_VERSION
 AC_PREREQ(2.53)

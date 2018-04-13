@@ -1,4 +1,4 @@
-** Version 0.8.4 (UNRELEASED)
+** Version 0.8.4 (2018-04-13)
 - Support Apache HTTPD 2.4.33 API for proxy TLS connections
 - Support TLS for HTTP/2 connections with mod_http2
 - Fix configuration of OCSP stapling callback
