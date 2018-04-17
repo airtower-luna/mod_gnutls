@@ -6,7 +6,7 @@ Build-Depends:
  apache2-bin <!nocheck>,
  apache2-dev,
  curl <!nocheck> | wget <!nocheck>,
- debhelper (>= 10~),
+ debhelper (>= 11~),
  dh-apache2,
  dh-autoreconf,
  dpkg-dev (>= 1.17.14),
