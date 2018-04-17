@@ -3,7 +3,7 @@
  *  Copyright 2008, 2014 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
  *  Copyright 2013-2014 Daniel Kahn Gillmor
- *  Copyright 2015-2016 Thomas Klute
+ *  Copyright 2015-2017 Thomas Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -69,8 +69,6 @@ apr_status_t mgs_cleanup_pre_config(void *data __attribute__((unused)))
     gnutls_free(session_ticket_key.data);
     session_ticket_key.data = NULL;
     session_ticket_key.size = 0;
-	/* Deinitialize GnuTLS Library */
-    gnutls_global_deinit();
     return APR_SUCCESS;
 }
 
@@ -117,13 +115,6 @@ int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog, apr_pool_t * ptem
         return DONE;
     }
 
-	/* Initialize GnuTLS Library */
-    ret = gnutls_global_init();
-    if (ret < 0) {
-		ap_log_perror(APLOG_MARK, APLOG_EMERG, 0, plog, "gnutls_global_init: %s", gnutls_strerror(ret));
-		return DONE;
-    }
-
 	/* Generate a Session Key */
     ret = gnutls_session_ticket_key_generate(&session_ticket_key);
     if (ret < 0) {
@@ -142,21 +133,27 @@ int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog, apr_pool_t * ptem
     return OK;
 }
 
-static int mgs_select_virtual_server_cb(gnutls_session_t session) {
-
-    mgs_handle_t *ctxt = NULL;
-    mgs_srvconf_rec *tsc = NULL;
+/**
+ * Post client hello function for GnuTLS, used to configure the TLS
+ * server based on virtual host configuration. Uses SNI to select the
+ * virtual host if available.
+ *
+ * @param session the TLS session
+ *
+ * @return zero or a GnuTLS error code, as required by GnuTLS hook
+ * definition
+ */
+static int mgs_select_virtual_server_cb(gnutls_session_t session)
+{
     int ret = 0;
+    mgs_handle_t *ctxt = gnutls_session_get_ptr(session);
 
-    _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
-
-    ctxt = gnutls_transport_get_ptr(session);
-
-    /* find the virtual server */
-    tsc = mgs_find_sni_server(session);
-
-    if (tsc != NULL) {
-        // Found a TLS vhost based on the SNI from the client; use it instead.
+    /* try to find a virtual host */
+    mgs_srvconf_rec *tsc = mgs_find_sni_server(session);
+    if (tsc != NULL)
+    {
+        /* Found a TLS vhost based on the SNI, configure the
+         * connection context. */
         ctxt->sc = tsc;
 	}
 
@@ -185,11 +182,10 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session) {
      * enabled on this virtual server. Note that here we ignore the version
      * negotiation.
      */
-
     ret = gnutls_priority_set(session, ctxt->sc->priorities);
+
     /* actually it shouldn't fail since we have checked at startup */
     return ret;
-
 }
 
 static int cert_retrieve_fn(gnutls_session_t session,
@@ -312,6 +308,138 @@ static int read_pgpcrt_cn(server_rec * s, apr_pool_t * p,
     return rv;
 }
 
+
+
+#if GNUTLS_VERSION_NUMBER >= 0x030506
+#define HAVE_KNOWN_DH_GROUPS 1
+#endif
+#ifdef HAVE_KNOWN_DH_GROUPS
+/**
+ * Try to estimate a GnuTLS security parameter based on the given
+ * private key. Any errors are logged.
+ *
+ * @param s The `server_rec` to use for logging
+ *
+ * @param key The private key to use
+ *
+ * @return `gnutls_sec_param_t` as returned by
+ * `gnutls_pk_bits_to_sec_param` for the key properties, or
+ * GNUTLS_SEC_PARAM_UNKNOWN in case of error
+ */
+static gnutls_sec_param_t sec_param_from_privkey(server_rec *server,
+                                                 gnutls_privkey_t key)
+{
+    unsigned int bits = 0;
+    int pk_algo = gnutls_privkey_get_pk_algorithm(key, &bits);
+    if (pk_algo < 0)
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, server,
+                     "%s: Could not get private key parameters: %s (%d)",
+                     __func__, gnutls_strerror(pk_algo), pk_algo);
+        return GNUTLS_SEC_PARAM_UNKNOWN;
+    }
+    return gnutls_pk_bits_to_sec_param(pk_algo, bits);
+}
+#else
+/** ffdhe2048 DH group as defined in RFC 7919, Appendix A.1. This is
+ * the default DH group if mod_gnutls is compiled agains a GnuTLS
+ * version that does not provide known DH groups based on security
+ * parameters (before 3.5.6). */
+static const char FFDHE2048_PKCS3[] =
+    "-----BEGIN DH PARAMETERS-----\n"
+    "MIIBDAKCAQEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz\n"
+    "+8yTnc4kmz75fS/jY2MMddj2gbICrsRhetPfHtXV/WVhJDP1H18GbtCFY2VVPe0a\n"
+    "87VXE15/V8k1mE8McODmi3fipona8+/och3xWKE2rec1MKzKT0g6eXq8CrGCsyT7\n"
+    "YdEIqUuyyOP7uWrat2DX9GgdT0Kj3jlN9K5W7edjcrsZCwenyO4KbXCeAvzhzffi\n"
+    "7MA0BM0oNC9hkXL+nOmFg/+OTxIy7vKBg8P+OxtMb61zO7X8vC7CIAXFjvGDfRaD\n"
+    "ssbzSibBsu/6iGtCOGEoXJf//////////wIBAgICAQA=\n"
+    "-----END DH PARAMETERS-----\n";
+const gnutls_datum_t default_dh_params = {
+    (void *) FFDHE2048_PKCS3,
+    sizeof(FFDHE2048_PKCS3)
+};
+#endif
+
+
+
+/**
+ * Configure the default DH groups to use for the given server. When
+ * compiled against GnuTLS version 3.5.6 or newer the known DH group
+ * matching the GnuTLS security parameter estimated from the private
+ * key is used. Otherwise the ffdhe2048 DH group as defined in RFC
+ * 7919, Appendix A.1 is the default.
+ *
+ * @param server the host to configure
+ *
+ * @return `OK` on success, `HTTP_UNAUTHORIZED` otherwise
+ */
+static int set_default_dh_param(server_rec *server)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(server->module_config, &gnutls_module);
+
+#ifdef HAVE_KNOWN_DH_GROUPS
+    gnutls_sec_param_t seclevel = GNUTLS_SEC_PARAM_UNKNOWN;
+    if (sc->privkey_x509)
+    {
+        seclevel = sec_param_from_privkey(server, sc->privkey_x509);
+        ap_log_error(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, server,
+                     "%s: GnuTLS security param estimated based on "
+                     "private key '%s': %s",
+                     __func__, sc->x509_key_file,
+                     gnutls_sec_param_get_name(seclevel));
+    }
+
+    if (seclevel == GNUTLS_SEC_PARAM_UNKNOWN)
+        seclevel = GNUTLS_SEC_PARAM_MEDIUM;
+    ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, server,
+                 "%s: Setting DH params for security level '%s'.",
+                 __func__, gnutls_sec_param_get_name(seclevel));
+
+    int ret = gnutls_certificate_set_known_dh_params(sc->certs, seclevel);
+    if (ret < 0)
+    {
+        ap_log_error(APLOG_MARK, APLOG_EMERG, APR_EGENERAL, server,
+                     "%s: setting known DH params failed: %s (%d)",
+                     __func__, gnutls_strerror(ret), ret);
+        return HTTP_UNAUTHORIZED;
+    }
+    ret = gnutls_anon_set_server_known_dh_params(sc->anon_creds, seclevel);
+    if (ret < 0)
+    {
+        ap_log_error(APLOG_MARK, APLOG_EMERG, APR_EGENERAL, server,
+                     "%s: setting known DH params failed: %s (%d)",
+                     __func__, gnutls_strerror(ret), ret);
+        return HTTP_UNAUTHORIZED;
+    }
+#else
+    int ret = gnutls_dh_params_init(&sc->dh_params);
+    if (ret < 0)
+    {
+        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
+                     "%s: Failed to initialize DH params structure: "
+                     "%s (%d)", __func__, gnutls_strerror(ret), ret);
+        return HTTP_UNAUTHORIZED;
+    }
+    ret = gnutls_dh_params_import_pkcs3(sc->dh_params, &default_dh_params,
+                                        GNUTLS_X509_FMT_PEM);
+    if (ret < 0)
+    {
+        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
+                     "%s: Failed to import default DH params: %s (%d)",
+                     __func__, gnutls_strerror(ret), ret);
+        return HTTP_UNAUTHORIZED;
+    }
+
+    gnutls_certificate_set_dh_params(sc->certs, sc->dh_params);
+    gnutls_anon_set_server_dh_params(sc->anon_creds, sc->dh_params);
+#endif
+
+    return OK;
+}
+
+
+
 /**
  * Post config hook.
  *
@@ -327,7 +455,6 @@ int mgs_hook_post_config(apr_pool_t *pconf,
 {
     int rv;
     server_rec *s;
-    gnutls_dh_params_t dh_params = NULL;
     mgs_srvconf_rec *sc;
     mgs_srvconf_rec *sc_base;
     void *data = NULL;
@@ -358,12 +485,7 @@ int mgs_hook_post_config(apr_pool_t *pconf,
                                     MGS_OCSP_MUTEX_NAME, NULL,
                                     base_server, pconf, 0);
         if (rv != APR_SUCCESS)
-        {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, base_server,
-                         "Failed to create mutex '" MGS_OCSP_MUTEX_NAME
-                         "'.");
-            return HTTP_INTERNAL_SERVER_ERROR;
-        }
+            return rv;
     }
 
     /* If GnuTLSP11Module is set, load the listed PKCS #11
@@ -442,13 +564,14 @@ int mgs_hook_post_config(apr_pool_t *pconf,
             return HTTP_NOT_ACCEPTABLE;
         }
 
-        /* Check if DH params have been set per host */
+        /* Set host DH params from user configuration or defaults */
         if (sc->dh_params != NULL) {
             gnutls_certificate_set_dh_params(sc->certs, sc->dh_params);
             gnutls_anon_set_server_dh_params(sc->anon_creds, sc->dh_params);
-        } else if (dh_params) {
-            gnutls_certificate_set_dh_params(sc->certs, dh_params);
-            gnutls_anon_set_server_dh_params(sc->anon_creds, dh_params);
+        } else {
+            rv = set_default_dh_param(s);
+            if (rv != OK)
+                return rv;
         }
 
         /* The call after this comment is a workaround for bug in
@@ -482,6 +605,18 @@ int mgs_hook_post_config(apr_pool_t *pconf,
 						s->server_hostname, s->port);
             return HTTP_UNAUTHORIZED;
         }
+
+        /* If OpenPGP support is already disabled in the loaded GnuTLS
+         * library startup will fail if the configuration tries to
+         * load PGP credentials. Otherwise warn affected users about
+         * deprecation. */
+        if (sc->pgp_cert_file || sc->pgp_key_file || sc->pgp_ring_file)
+            ap_log_error(APLOG_MARK, APLOG_WARNING, 0, s,
+                         "Host '%s:%d' is configured to use OpenPGP auth. "
+                         "OpenPGP support has been deprecated in GnuTLS "
+                         "since version 3.5.9 and will be removed from "
+                         "mod_gnutls in a future release.",
+                         s->server_hostname, s->port);
 
         if (sc->enabled == GNUTLS_ENABLED_TRUE) {
             rv = -1;
@@ -605,7 +740,11 @@ apr_port_t mgs_hook_default_port(const request_rec * r) {
     return 443;
 }
 
-#define MAX_HOST_LEN 255
+/**
+ * Default buffer size for SNI data, including the terminating NULL
+ * byte. The size matches what gnutls-cli uses initially.
+ */
+#define DEFAULT_SNI_HOST_LEN 256
 
 typedef struct {
     mgs_handle_t *ctxt;
@@ -698,43 +837,79 @@ static int vhost_cb(void *baton, conn_rec *conn, server_rec * s)
 	return check_server_aliases(x, s, tsc);
 }
 
+/**
+ * Get SNI data from GnuTLS (if any) and search for a matching virtual
+ * host configuration. This method is called from the post client
+ * hello function.
+ *
+ * @param session the GnuTLS session
+ *
+ * @return either the matching mod_gnutls server config, or `NULL`
+ */
 mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
 {
-    int rv;
+    mgs_handle_t *ctxt = gnutls_session_get_ptr(session);
+
+    char *sni_name = apr_palloc(ctxt->c->pool, DEFAULT_SNI_HOST_LEN);
+    size_t sni_len = DEFAULT_SNI_HOST_LEN;
     unsigned int sni_type;
-    size_t data_len = MAX_HOST_LEN;
-    char sni_name[MAX_HOST_LEN];
-    mgs_handle_t *ctxt;
-    vhost_cb_rec cbx;
 
-    if (session == NULL)
-        return NULL;
+    /* Search for a DNS SNI element. Note that RFC 6066 prohibits more
+     * than one server name per type. */
+    int sni_index = -1;
+    int rv = 0;
+    do {
+        /* The sni_index is incremented before each use, so if the
+         * loop terminates with a type match we will have the right
+         * one stored. */
+        rv = gnutls_server_name_get(session, sni_name,
+                                    &sni_len, &sni_type, ++sni_index);
+        if (rv == GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE)
+        {
+            ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_EGENERAL, ctxt->c,
+                          "%s: no DNS SNI found (last index: %d).",
+                          __func__, sni_index);
+            return NULL;
+        }
+    } while (sni_type != GNUTLS_NAME_DNS);
+    /* The (rv == GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE) path inside
+     * the loop above returns, so if we reach this point we have a DNS
+     * SNI at the current index. */
 
-    _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
-    ctxt = gnutls_transport_get_ptr(session);
+    if (rv == GNUTLS_E_SHORT_MEMORY_BUFFER)
+    {
+        /* Allocate a new buffer of the right size and retry */
+        sni_name = apr_palloc(ctxt->c->pool, sni_len);
+        ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, ctxt->c,
+                      "%s: reallocated SNI data buffer for %" APR_SIZE_T_FMT
+                      " bytes.", __func__, sni_len);
+        rv = gnutls_server_name_get(session, sni_name,
+                                    &sni_len, &sni_type, sni_index);
+    }
 
-    rv = gnutls_server_name_get(ctxt->session, sni_name,
-            &data_len, &sni_type, 0);
-
-    if (rv != 0) {
+    /* Unless there's a bug in the GnuTLS API only GNUTLS_E_IDNA_ERROR
+     * can occur here, but a catch all is safer and no more
+     * complicated. */
+    if (rv != GNUTLS_E_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_INFO, APR_EGENERAL, ctxt->c,
+                      "%s: error while getting SNI DNS data: '%s' (%d).",
+                      __func__, gnutls_strerror(rv), rv);
         return NULL;
     }
 
-    if (sni_type != GNUTLS_NAME_DNS) {
-        ap_log_cerror(APLOG_MARK, APLOG_CRIT, 0, ctxt->c,
-                      "GnuTLS: Unknown type '%d' for SNI: '%s'",
-                      sni_type, sni_name);
-        return NULL;
-    }
+    ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, ctxt->c,
+                  "%s: client requested server '%s'.",
+                  __func__, sni_name);
 
-    /**
-     * Code in the Core already sets up the c->base_server as the base
-     * for this IP/Port combo.  Trust that the core did the 'right' thing.
-     */
-    cbx.ctxt = ctxt;
-    cbx.sc = NULL;
-    cbx.sni_name = sni_name;
-
+    /* Search for vhosts matching connection parameters and the
+     * SNI. If a match is found, cbx.sc will contain the mod_gnutls
+     * server config for the vhost. */
+    vhost_cb_rec cbx = {
+        .ctxt = ctxt,
+        .sc = NULL,
+        .sni_name = sni_name
+    };
     rv = ap_vhost_iterate_given_conn(ctxt->c, vhost_cb, &cbx);
     if (rv == 1) {
         return cbx.sc;
@@ -823,11 +998,6 @@ static void create_gnutls_handle(conn_rec * c)
         if (err != GNUTLS_E_SUCCESS)
             ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
                           "gnutls_init for proxy connection failed: %s (%d)",
-                          gnutls_strerror(err), err);
-        err = gnutls_session_ticket_enable_client(ctxt->session);
-        if (err != GNUTLS_E_SUCCESS)
-            ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
-                          "gnutls_session_ticket_enable_client failed: %s (%d)",
                           gnutls_strerror(err), err);
     }
     else
@@ -1790,10 +1960,10 @@ static int gtls_check_server_cert(gnutls_session_t session)
 
     /* Get peer hostname from a note left by mod_proxy */
     const char *peer_hostname =
-        apr_table_get(ctxt->c->notes, "proxy-request-hostname");
+        apr_table_get(ctxt->c->notes, PROXY_SNI_NOTE);
     if (peer_hostname == NULL)
         ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, ctxt->c,
-                      "%s: proxy-request-hostname is NULL, cannot check "
+                      "%s: " PROXY_SNI_NOTE " NULL, cannot check "
                       "peer's hostname", __func__);
 
     /* Verify certificate, including hostname match. Should

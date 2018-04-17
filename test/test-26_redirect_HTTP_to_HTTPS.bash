@@ -10,22 +10,20 @@ netns_reexec ${@}
 
 testdir="${srcdir}/tests/26_redirect_HTTP_to_HTTPS"
 TEST_NAME="$(basename ${testdir})"
-. $(dirname ${0})/proxy_backend.bash
+. $(dirname ${0})/apache_service.bash
 
 : ${TEST_HTTP_PORT:="9935"}
 export TEST_HTTP_PORT
 
 # "Proxy backend" functions are used to start the only instance needed
-# here without "runtests". We have to override BACKEND_PID and
-# BACKEND_PORT to make them match what a runtests-based test would
-# use.
-export BACKEND_PID="apache2.pid"
+# here without "runtests". We have to override BACKEND_PORT to make it
+# match what a runtests-based test would use.
 export BACKEND_PORT="${TEST_PORT}"
 function stop_backend
 {
-    backend_apache "${testdir}" "apache.conf" stop
+    apache_service "${testdir}" "apache.conf" stop
 }
-backend_apache "${testdir}" "apache.conf" start "${TEST_LOCK}"
+apache_service "${testdir}" "apache.conf" start "${TEST_LOCK}"
 trap stop_backend EXIT
 
 output="outputs/${TEST_NAME}.output"
@@ -47,5 +45,5 @@ fi
 # used ciphersuite.
 grep "Current TLS session: (TLS" "${output}"
 
-backend_apache "${testdir}" "apache.conf" stop
+apache_service "${testdir}" "apache.conf" stop
 trap - EXIT

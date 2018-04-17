@@ -284,7 +284,10 @@ typedef struct {
 /* apr_signal_block() for blocking SIGPIPE */
 apr_status_t apr_signal_block(int signum);
 
- /* Proxy Support */
+/* Proxy Support */
+/** mod_proxy adds a note with this key to the connection->notes table
+ * for client connections */
+#define PROXY_SNI_NOTE "proxy-request-hostname"
 /* An optional function which returns non-zero if the given connection
 is using SSL/TLS. */
 APR_DECLARE_OPTIONAL_FN(int, ssl_is_https, (conn_rec *));
@@ -423,17 +426,12 @@ const char *mgs_set_priorities(cmd_parms * parms, void *dummy,
 const char *mgs_set_tickets(cmd_parms * parms, void *dummy,
                             const int arg);
 
-const char *mgs_set_require_section(cmd_parms *cmd,
-                                    void *mconfig, const char *arg);
 void *mgs_config_server_create(apr_pool_t * p, server_rec * s);
 void *mgs_config_server_merge(apr_pool_t *p, void *BASE, void *ADD);
 
 void *mgs_config_dir_merge(apr_pool_t *p, void *basev, void *addv);
 
 void *mgs_config_dir_create(apr_pool_t *p, char *dir);
-
-const char *mgs_set_require_bytecode(cmd_parms *cmd,
-                                    void *mconfig, const char *arg);
 
 mgs_srvconf_rec* mgs_find_sni_server(gnutls_session_t session);
 

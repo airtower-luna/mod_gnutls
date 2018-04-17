@@ -31,15 +31,20 @@ dist_check_SCRIPTS += test-16_view-status.bash \
 	test-26_redirect_HTTP_to_HTTPS.bash \
 	test-27_OCSP_server.bash
 
+TEST_EXTENSIONS = .bash
 TESTS = $(dist_check_SCRIPTS)
 
-check_PROGRAMS = pgpcrc
+check_PROGRAMS = pgpcrc gnutls_openpgp_support
 pgpcrc_SOURCES = pgpcrc.c
+gnutls_openpgp_support_SOURCES = gnutls_openpgp_support.c
+gnutls_openpgp_support_CFLAGS = $(LIBGNUTLS_CFLAGS)
+gnutls_openpgp_support_LDFLAGS = $(LIBGNUTLS_LIBS)
 
 # build OCSP database tool
 if ENABLE_OCSP_TEST
 check_PROGRAMS += gen_ocsp_index
 gen_ocsp_index_SOURCES = gen_ocsp_index.c cert_helper.c
+gen_ocsp_index_CFLAGS = $(LIBGNUTLS_CFLAGS)
 gen_ocsp_index_LDFLAGS = $(LIBGNUTLS_LIBS)
 noinst_HEADERS = cert_helper.h
 endif
@@ -108,9 +113,23 @@ MOSTLYCLEANFILES += */x509.pem $(generated_templates) *.uid
 # one day, so regenerating them is both fast and frequently
 # necessary.
 MOSTLYCLEANFILES += */*.pgp */*.pgp.raw */*.gpg */*.gpg~ */gpg.conf \
-	authority/lock */*.kbx */*.kbx~ */S.gpg-agent */private-keys-v1.d/*
+	authority/lock */*.kbx */*.kbx~ */S.gpg-agent */private-keys-v1.d/* \
+	authority/tofu.db
 # GnuPG random pool, no need to regenerate on every build
 CLEANFILES += authority/random_seed
+
+# GnuPG 2 starts gpg-agent processes per GNUPGHOME (one for every PGP
+# identity) while creating the PGP certificates. This target is called
+# by both "check-local" and "mostlyclean-local": The former because
+# agent processes are started while preparing for "check" and are no
+# longer needed afterwards, the latter to make sure they are gone
+# along with their certificates.
+stop-gnupg-agent:
+	for id in $(pgp_identities) $(msva_home); do \
+		GNUPGHOME=$$id/ gpgconf --kill gpg-agent || true; \
+	done
+
+check-local: stop-gnupg-agent
 
 # Delete lock files for test servers on "mostlyclean" target.
 MOSTLYCLEANFILES += *.lock
@@ -123,7 +142,7 @@ MOSTLYCLEANFILES += $(msva_home)/trustdb.gpg
 $(msva_home)/trustdb.gpg: authority/minimal.pgp client/cert.pgp
 	mkdir -p -m 0700 $(dir $@)
 	GNUPGHOME=$(dir $@) gpg --import < $<
-	printf "%s:6:\n" "$$(GNUPGHOME=authority gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" | GNUPGHOME=$(dir $@) gpg --import-ownertrust
+	printf "%s:6:\n" "$$(GNUPGHOME=authority/ gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" | GNUPGHOME=$(dir $@) gpg --import-ownertrust
 	GNUPGHOME=$(dir $@) gpg --import < client/cert.pgp
 	printf "keyserver does-not-exist.example\n" > $(msva_home)/gpg.conf
 endif
@@ -170,63 +189,78 @@ extra_dirs = logs cache outputs
 make-test-dirs:
 	mkdir -p $(extra_dirs)
 
-.PHONY: make-test-dirs clean-softhsm2-db
+.PHONY: make-test-dirs clean-softhsm2-db stop-gnupg-agent
 
-mostlyclean-local: clean-softhsm2-db
+
+mostlyclean-local: clean-softhsm2-db stop-gnupg-agent
 	-rmdir $(pgp_identities:=/private-keys-v1.d) || true
 if USE_MSVA
 	-rmdir $(msva_home)/private-keys-v1.d || true
 endif
 
+# Delete test data directories, and wait for test services to
+# exit. The reason for the wait is that Apache instances may take some
+# time to exit and delete their PID files. Occasionally some PID files
+# where still around during "distcheck" runs by the time the target
+# checked if the build directory was really empty after "distclean",
+# breaking the build. Delaying "clean-local" until PID files are gone
+# avoids this issue, and the timeout will expose actually unclean
+# stops.
 clean-local:
 	-rmdir $(identities) || true
 	-rmdir $(extra_dirs) || true
 if USE_MSVA
 	-rmdir $(msva_home) || true
 endif
+	wait=0; \
+	while ls *.pid && test "$$wait" -lt "@TEST_LOCK_WAIT@"; do \
+		wait=$$(($$wait + 1)); \
+		echo "waiting for test services to exit ($$wait seconds)"; \
+		sleep 1; \
+	done
 
 # Apache configuration and data files
 apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/ocsp.cgi \
-	data/secret.txt data/test.txt mime.types ocsp_server.conf \
+	data/secret.txt data/test.txt ffdhe3072.pem mime.types \
 	proxy_mods.conf
 
 EXTRA_DIST = $(apache_data) $(cert_templates) $(shared_identities:=.uid.in) \
-	common.bash proxy_backend.bash runtests server-crl.template \
+	apache_service.bash common.bash runtests server-crl.template \
 	softhsm.bash
 
 # Lockfile for the main Apache process
 test_lockfile = ./test.lock
 # Lockfile for the proxy backend Apache process (if any)
 backend_lockfile = ./backend.lock
-# Maximum wait time in seconds for flock to aquire instance lock
-# files, or Apache to remove its PID file
-lock_wait = 30
+# Lockfile for the OCSP server Apache process (if any)
+ocsp_lockfile = ./ocsp.lock
 
 # port for the main Apache server
 TEST_PORT ?= 9932
 # port for MSVA in test cases that use it
 MSVA_PORT ?= 9933
-# port for OCSP server (Apache vhost if enabled)
+# port for TLS proxy backend server
+BACKEND_PORT ?= 9934
+# port for the OCSP responder
 if ENABLE_OCSP_TEST
 OCSP_PORT ?= 9936
 endif
 # maximum time to wait for MSVA startup (milliseconds)
-TEST_MSVA_MAX_WAIT ?= 10000
+TEST_SERVICE_MAX_WAIT ?= 10000
 # wait loop time for MSVA startup (milliseconds)
-TEST_MSVA_WAIT ?= 400
-# seconds for the HTTP request to be sent and responded to
-TEST_QUERY_DELAY ?= 30
+TEST_SERVICE_WAIT ?= 400
 
 AM_TESTS_ENVIRONMENT = export APACHE2=@APACHE2@; \
 	export AP_LIBEXECDIR=@AP_LIBEXECDIR@; \
-	export TEST_LOCK_WAIT="$(lock_wait)"; \
+	export TEST_LOCK_WAIT="@TEST_LOCK_WAIT@"; \
 	export TEST_HOST="@TEST_HOST@"; \
 	export TEST_PORT="$(TEST_PORT)"; \
 	export MSVA_PORT="$(MSVA_PORT)"; \
-	export TEST_MSVA_MAX_WAIT="$(TEST_MSVA_MAX_WAIT)"; \
-	export TEST_MSVA_WAIT="$(TEST_MSVA_WAIT)"; \
-	export TEST_QUERY_DELAY="$(TEST_QUERY_DELAY)"; \
+	export TEST_SERVICE_MAX_WAIT="$(TEST_SERVICE_MAX_WAIT)"; \
+	export TEST_SERVICE_WAIT="$(TEST_SERVICE_WAIT)"; \
+	export TEST_QUERY_TIMEOUT="@TEST_QUERY_TIMEOUT@"; \
 	export BACKEND_HOST="@TEST_HOST@"; \
+	export BACKEND_PORT="$(BACKEND_PORT)"; \
 	export HTTP_CLI="@HTTP_CLI@";
 
 if HAVE_SOFTHSM
@@ -244,13 +278,19 @@ if ENABLE_NETNS
 AM_TESTS_ENVIRONMENT += export UNSHARE="@UNSHARE@"; \
 	export USE_TEST_NAMESPACE=1;
 endif
-# Without flock tests must not run in parallel. Otherwise set lock files.
+# Without flock tests must not run in parallel, and PID files are used
+# to prevent conflicts between server instances. Otherwise set lock
+# files for flock.
 if DISABLE_FLOCK
+AM_TESTS_ENVIRONMENT += export TEST_LOCK="apache2.pid"; \
+	export BACKEND_LOCK="backend.pid"; \
+	export OCSP_LOCK="ocsp.pid";
 .NOTPARALLEL:
 else
 AM_TESTS_ENVIRONMENT += export FLOCK="@FLOCK@"; \
 	export TEST_LOCK="$(test_lockfile)"; \
-	export BACKEND_LOCK="$(backend_lockfile)";
+	export BACKEND_LOCK="$(backend_lockfile)"; \
+	export OCSP_LOCK="$(ocsp_lockfile)";
 endif
 
 # Echo AM_TESTS_ENVIRONMENT. This can be useful for debugging, e.g. if
