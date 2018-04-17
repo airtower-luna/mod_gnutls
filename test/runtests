@@ -6,6 +6,7 @@
 
 set -e
 . ${srcdir}/common.bash
+. ${srcdir}/apache_service.bash
 netns_reexec ${@}
 
 testid="${1##t-}"
@@ -16,9 +17,10 @@ if [ -z "$testid" ] ; then
 else
     testid=${srcdir}/tests/"$(printf "%02d" "$testid")"_*
 fi
+testdir="$(realpath ${testid})"
 
 BADVARS=0
-for v in APACHE2 TEST_HOST TEST_PORT TEST_QUERY_DELAY TEST_MSVA_WAIT \
+for v in APACHE2 TEST_HOST TEST_PORT TEST_QUERY_TIMEOUT TEST_SERVICE_WAIT \
 		 MSVA_PORT; do
     if [ ! -v "$v" ]; then
         printf "You need to set the %s environment variable\n" "$v" >&2
@@ -33,9 +35,11 @@ fi
 # write script file and line to stderr on error
 function pinpoint_error()
 {
-    echo "${1} failed at line ${2}!" >&2
+    echo "Command \"${BASH_COMMAND}\" failed. Call trace:" >&2
+    local stack=0
+    while caller $((stack++)) >&2; do true; done
 }
-trap 'pinpoint_error ${BASH_SOURCE} ${LINENO}' ERR
+trap 'pinpoint_error' ERR
 
 function stop_msva()
 {
@@ -88,6 +92,8 @@ function kill_by_pidfile()
 	local pid=$(cat "${pidfile}")
 	if [ -n "${pid}" ] && ps -p "${pid}"; then
 	    kill "${pid}"
+	else
+	    echo "No running process with PID ${pid} (${pidfile})."
 	fi
 	rm "${pidfile}"
     fi
@@ -95,10 +101,18 @@ function kill_by_pidfile()
 
 function apache_down_err() {
     printf "FAILURE: %s\n" "$TEST_NAME"
-    ${APACHE2} -f "${t}/apache.conf" -k stop || true
+    ${APACHE2} -f "${testdir}/apache.conf" -k stop || true
     if [ -e output ]; then
 	printf "\ngnutls-cli outputs:\n"
 	diff_output_filter_headers "output" "$output" || true
+    fi
+
+    if [ -r "${testdir}/backend.conf" ]; then
+	apache_service "${testdir}" "backend.conf" stop || true
+    fi
+
+    if [ -r "${testdir}/ocsp.conf" ]; then
+	apache_service "${testdir}" "ocsp.conf" stop || true
     fi
 
     if [ -n "${sleep_pidfile}" ]; then
@@ -122,28 +136,11 @@ if [ -n "${USE_MSVA}" ]; then
     trap stop_msva EXIT
 
     printf "TESTING: initial MSVA verification\n"
-    # set to 0 if MSVA is up
-    ret=1
     export MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT"
 
-    # convert TEST_MSVA_WAIT to seconds because that's what "sleep" expects
-    TEST_MSVA_SLEEP="$((${TEST_MSVA_WAIT} / 1000)).$((${TEST_MSVA_WAIT} % 1000))"
-    # wait at most TEST_MSVA_MAX_WAIT milliseconds for MSVA to get ready
-    waited=0
-    until [ ${ret} -eq 0 ] \
-	      || [ ${waited} -ge ${TEST_MSVA_MAX_WAIT} ]; do
-	if msva-query-agent https "$(cat client.uid)" x509pem client < client/x509.pem
-	then
-	    ret=0
-	else
-	    echo "MSVA not ready yet"
-	fi
-	sleep "${TEST_MSVA_SLEEP}"
-	waited=$((${waited} + ${TEST_MSVA_WAIT}))
-    done
-
+    msva_test_cmd="msva-query-agent https \"$(cat client.uid)\" x509pem client < client/x509.pem"
     # check if MSVA is up, fail if not
-    if [ ${ret} -eq 0 ]; then
+    if wait_ready "${msva_test_cmd}"; then
 	printf "\nSUCCESS: initial MSVA verification\n"
     else
 	printf "\nFAIL: initial MSVA verification\n"
@@ -151,26 +148,24 @@ if [ -n "${USE_MSVA}" ]; then
     fi
 fi
 
-TEST_PID="apache2.pid"
 # configure locking for the Apache process
 if [ -n "${USE_TEST_NAMESPACE}" ]; then
     echo "Using namespaces to isolate tests, no need for locking."
     flock_cmd=""
-elif [ -n "${TEST_LOCK}" ]; then
+elif [ -n "${FLOCK}" ]; then
     flock_cmd="${FLOCK} -w ${TEST_LOCK_WAIT} $(realpath ${TEST_LOCK})"
 else
     echo "Locking disabled, using wait based on Apache PID file."
-    wait_pid_gone "${TEST_PID}"
+    wait_pid_gone "${TEST_LOCK}"
     flock_cmd=""
 fi
 
-t="$(realpath ${testid})"
 export srcdir="$(realpath ${srcdir})"
-export TEST_NAME="$(basename "$t")"
+export TEST_NAME="$(basename "${testdir}")"
 output="outputs/${TEST_NAME}.output"
 rm -f "$output"
 
-if [ -e ${t}/fail.* ]; then
+if [ -e ${testdir}/fail.* ]; then
     EXPECTED_FAILURE="$(printf " (expected: %s)" fail.*)"
 else
     unset EXPECTED_FAILURE
@@ -178,14 +173,37 @@ fi
 printf "TESTING: %s%s\n" "$TEST_NAME" "$EXPECTED_FAILURE"
 trap apache_down_err EXIT
 if [ -n "${USE_MSVA}" ]; then
-    MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT" \
-					${flock_cmd} \
-					${APACHE2} -f "${t}/apache.conf" -k start \
-	|| [ -e "${t}/fail.server" ]
-else
-    ${flock_cmd} \
-	${APACHE2} -f "${t}/apache.conf" -k start \
-	|| [ -e "${t}/fail.server" ]
+    export MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT"
+fi
+
+# If VERBOSE is enabled, log the HTTPD build configuration
+if [ -n "${VERBOSE}" ]; then
+    ${APACHE2} -f "${srcdir}/base_apache.conf" -V
+fi
+
+# Start OCSP responder, if configured
+if [ -r "${testdir}/ocsp.conf" ]; then
+    apache_service "${testdir}" "ocsp.conf" start "${OCSP_LOCK}"
+    CHECK_OCSP_SERVER="true"
+    if [ -n "${VERBOSE}" ]; then
+	echo "OCSP index for the test CA:"
+	cat authority/ocsp_index.txt
+    fi
+fi
+
+# Start proxy backend server, if configured
+if [ -r "${testdir}/backend.conf" ]; then
+    apache_service "${testdir}" "backend.conf" start "${BACKEND_LOCK}"
+fi
+
+if ! ${flock_cmd} ${APACHE2} -f "${testdir}/apache.conf" -k start; then
+    if [ -e "${testdir}/fail.server" ]; then
+	echo "Apache HTTPD failed to start as expected."
+	exit 0
+    else
+	echo "Apache HTTPD unexpectedly failed to start."
+	exit 1
+    fi
 fi
 
 # check OCSP server
@@ -194,7 +212,7 @@ if [ -n "${CHECK_OCSP_SERVER}" ]; then
 	store_ocsp="--outfile ${OCSP_RESPONSE_FILE}"
     fi
     echo "---- Testing OCSP server ----"
-    ocsptool --ask --nonce --load-issuer authority/x509.pem --load-cert server/x509.pem ${store_ocsp}
+    wait_ready "ocsptool --ask --nonce --load-issuer authority/x509.pem --load-cert server/x509.pem ${store_ocsp}"
     echo "---- OCSP test done ----"
 fi
 
@@ -211,18 +229,18 @@ sleep_pidfile="$(mktemp mod_gnutls_test-XXXXXX.pid)"
 # The line end manipulation in sed guarantees that all header lines
 # end with CRLF as required by RFC 7230, Section 3.1.1 regardless of
 # the line ends in the input file.
-if (sed -r "s/__HOSTNAME__/${TEST_HOST}/;s/\r?$/\r/" <${t}/input && \
-	   run_with_pidfile "${sleep_pidfile}" sleep "${TEST_QUERY_DELAY}" &) | \
-       gnutls-cli -p "${TEST_PORT}" $(cat ${t}/gnutls-cli.args) "${TEST_HOST}" \
+if (sed -r "s/__HOSTNAME__/${TEST_HOST}/;s/\r?$/\r/" <${testdir}/input && \
+	   run_with_pidfile "${sleep_pidfile}" sleep "${TEST_QUERY_TIMEOUT}" &) | \
+       gnutls-cli -p "${TEST_PORT}" $(cat ${testdir}/gnutls-cli.args) "${TEST_HOST}" \
        | tee "$output" && test "${PIPESTATUS[1]}" -eq 0;
 then
-    if [ -e ${t}/fail* ]; then
-        printf "%s should have failed but succeeded\n" "$(basename "$t")" >&2
+    if [ -e ${testdir}/fail* ]; then
+        printf "%s should have failed but succeeded\n" "$(basename "$testdir")" >&2
         exit 1
     fi
 else
-    if [ ! -e ${t}/fail* ]; then
-        printf "%s should have succeeded but failed\n" "$(basename "$t")" >&2
+    if [ ! -e ${testdir}/fail* ]; then
+        printf "%s should have succeeded but failed\n" "$(basename "$testdir")" >&2
         exit 1
     fi
 fi
@@ -230,16 +248,24 @@ fi
 kill_by_pidfile "${sleep_pidfile}"
 unset sleep_pidfile
 
-if [ -e ${t}/output ] ; then
-    diff_output_filter_headers "${t}/output" "$output" >&2
+if [ -e ${testdir}/output ] ; then
+    diff_output_filter_headers "${testdir}/output" "$output" >&2
 fi
 if [ -n "${USE_MSVA}" ]; then
     trap stop_msva EXIT
 else
     trap - EXIT
 fi
-${APACHE2} -f "${t}/apache.conf" -k stop || [ -e ${t}/fail.server ]
+${APACHE2} -f "${testdir}/apache.conf" -k stop || [ -e ${testdir}/fail.server ]
 printf "SUCCESS: %s\n" "$TEST_NAME"
+
+if [ -r "${testdir}/backend.conf" ]; then
+    apache_service "${testdir}" "backend.conf" stop || true
+fi
+
+if [ -r "${testdir}/ocsp.conf" ]; then
+    apache_service "${testdir}" "ocsp.conf" stop || true
+fi
 
 if [ -n "${USE_MSVA}" ]; then
     stop_msva

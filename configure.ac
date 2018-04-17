@@ -1,5 +1,4 @@
-dnl 
-AC_INIT(mod_gnutls, 0.8.2)
+AC_INIT(mod_gnutls, 0.8.3)
 OOO_CONFIG_NICE(config.nice)
 MOD_GNUTLS_VERSION=AC_PACKAGE_VERSION
 AC_PREREQ(2.53)
@@ -64,7 +63,7 @@ AC_ARG_ENABLE(strict,
 
 STRICT_CFLAGS=""
 if test "$use_strict" != "no"; then
-        STRICT_CFLAGS="-Wall -Werror -Wextra"
+	STRICT_CFLAGS="-Wall -Werror -Wextra -Wno-error=deprecated-declarations"
 fi
 
 AC_MSG_CHECKING([whether to enable SRP functionality])
@@ -83,8 +82,18 @@ AS_IF([test "${FLOCK}" != "no"],
 	lockfile="$(mktemp)"
 	AS_IF([${FLOCK} --timeout 1 ${lockfile} true >&AS_MESSAGE_LOG_FD 2>&1],
 	      [flock_works="yes"], [flock_works="no"])
-	rm "${lockfile}"
 	AC_MSG_RESULT([$flock_works])
+	# Old versions of flock do not support --verbose. They fail
+	# without executing the command but still return 0. Check for
+	# this behavior by testing if the rm command was executed.
+	AC_MSG_CHECKING([whether ${FLOCK} supports --verbose])
+	testfile="$(mktemp)"
+	AS_IF([${FLOCK} --verbose --timeout 1 ${lockfile} rm "${testfile}" \
+			>&AS_MESSAGE_LOG_FD 2>&1; test ! -e "${testfile}"],
+	      [flock_verbose="yes"; FLOCK="${FLOCK} --verbose"],
+	      [flock_verbose="no"; rm "${testfile}"])
+	AC_MSG_RESULT([$flock_verbose])
+	rm "${lockfile}"
       ],
       [flock_works="no"])
 # disable flock if requested by user or it doesn't support timeout
@@ -142,11 +151,11 @@ AM_CONDITIONAL([ENABLE_NETNS], [test "$use_netns" != "no"])
 # Adjust Apache configuration for tests accordingly: Use pthread mutex
 # and test specific PID files if using namespaces, defaults otherwise.
 AS_IF([test "$use_netns" = "yes"],
-      [MUTEX_TYPE="pthread"; PID_AFFIX="-\${TEST_NAME}"],
-      [MUTEX_TYPE="default"; PID_AFFIX=""])
-AC_SUBST(MUTEX_TYPE)
+      [MUTEX_CONF="Mutex pthread default"; PID_AFFIX="-\${TEST_NAME}"],
+      [MUTEX_CONF=""; PID_AFFIX=""])
+AC_SUBST(MUTEX_CONF)
 AC_SUBST(PID_AFFIX)
-AM_SUBST_NOTMAKE(MUTEX_TYPE)
+AM_SUBST_NOTMAKE(MUTEX_CONF)
 AM_SUBST_NOTMAKE(PID_AFFIX)
 
 AC_ARG_ENABLE(msva,
@@ -233,6 +242,16 @@ AC_ARG_VAR([TEST_IP], [List of IP addresses to use for server instances \
 		      enclosed in square brackets.])
 AM_SUBST_NOTMAKE(TEST_IP)
 
+: ${TEST_LOCK_WAIT:="30"}
+: ${TEST_QUERY_TIMEOUT:="30"}
+AC_ARG_VAR([TEST_LOCK_WAIT], [Timeout in seconds to acquire locks for \
+			     Apache instances in the test suite, or the \
+			     previous instance to remove its PID file if \
+			     flock is not used. Default is 30.])
+AC_ARG_VAR([TEST_QUERY_TIMEOUT], [Timeout in seconds for HTTPS requests \
+				 sent using gnutls-cli in the test suite. \
+				 Default is 30.])
+
 dnl Allow user to set SoftHSM PKCS #11 module
 AC_ARG_VAR([SOFTHSM_LIB], [Absolute path of the SoftHSM PKCS @%:@11 module to \
 			  use. By default the test suite will search common \
@@ -246,7 +265,7 @@ Listen ${i}:\${TEST_PORT}"
 done
 # Available extra ports, tests can "Define" variables of the listed
 # names in their apache.conf to enable them.
-for j in TEST_HTTP_PORT OCSP_PORT; do
+for j in TEST_HTTP_PORT; do
 LISTEN_LIST="${LISTEN_LIST}
 <IfDefine ${j}>"
 for i in ${TEST_IP}; do
@@ -271,7 +290,7 @@ DX_INIT_DOXYGEN([mod_gnutls], [doc/doxygen.conf], [doc/api])
 
 AC_CONFIG_FILES([Makefile src/Makefile test/Makefile test/tests/Makefile \
 			doc/Makefile doc/doxygen.conf include/mod_gnutls.h \
-			test/proxy_backend.conf \
+			test/proxy_backend.conf test/ocsp_server.conf \
 			test/apache-conf/listen.conf \
 			test/apache-conf/netns.conf])
 AC_OUTPUT
@@ -282,6 +301,8 @@ echo ""
 echo "   * mod_gnutls version:	${MOD_GNUTLS_VERSION}"
 echo "   * Apache Modules directory:	${AP_LIBEXECDIR}"
 echo "   * GnuTLS Library version:	${LIBGNUTLS_VERSION}"
+echo "   * CFLAGS for GnuTLS:		${LIBGNUTLS_CFLAGS}"
+echo "   * LDFLAGS for GnuTLS:	${LIBGNUTLS_LIBS}"
 echo "   * SRP Authentication:	${use_srp}"
 echo "   * MSVA Client Verification:	${use_msva}"
 echo "   * Build documentation:	${build_doc}"
