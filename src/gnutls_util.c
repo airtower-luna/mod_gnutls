@@ -1,5 +1,5 @@
 /*
- *  Copyright 2016 Thomas Klute
+ *  Copyright 2016-2018 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -124,4 +124,29 @@ apr_status_t datum_from_file(apr_pool_t *p, const char* filename,
 #endif
 
     return rv;
+}
+
+
+
+mgs_handle_t *init_gnutls_ctxt(conn_rec *c)
+{
+    mgs_handle_t *ctxt = (mgs_handle_t *)
+        ap_get_module_config(c->conn_config, &gnutls_module);
+    if (ctxt == NULL)
+    {
+        ctxt = apr_pcalloc(c->pool, sizeof (*ctxt));
+        ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
+
+        /* Get mod_gnutls server configuration */
+        mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+            ap_get_module_config(c->base_server->module_config,
+                                 &gnutls_module);
+
+        /* Set up connection and server references */
+        ctxt->c = c;
+        ctxt->sc = sc;
+        /* Default, unconditionally changed in proxy setup functions */
+        ctxt->is_proxy = GNUTLS_ENABLED_FALSE;
+    }
+    return ctxt;
 }

@@ -1,7 +1,7 @@
 /**
  * Helper functions for certificate handling in the mod_gnutls test suite
  *
- * Copyright 2016 Thomas Klute
+ * Copyright 2016 Fiona Klute
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you
  * may not use this file except in compliance with the License.  You

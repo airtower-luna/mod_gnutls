@@ -1,4 +1,4 @@
-AC_INIT(mod_gnutls, 0.8.3)
+AC_INIT(mod_gnutls, 0.8.4)
 OOO_CONFIG_NICE(config.nice)
 MOD_GNUTLS_VERSION=AC_PACKAGE_VERSION
 AC_PREREQ(2.53)
@@ -24,7 +24,7 @@ AC_PROG_LIBTOOL
 
 AC_CONFIG_MACRO_DIR([m4])
 
-AP_VERSION=2.4.0
+AP_VERSION=2.4.17
 CHECK_APACHE(,$AP_VERSION,
     :,:,
     AC_MSG_ERROR([*** Apache version $AP_VERSION not found!])

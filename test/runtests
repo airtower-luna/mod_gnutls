@@ -2,7 +2,7 @@
 
 # Authors:
 # Daniel Kahn Gillmor <dkg@fifthhorseman.net>
-# Thomas Klute <thomas2.klute@uni-dortmund.de>
+# Fiona Klute <fiona.klute@gmx.de>
 
 set -e
 . ${srcdir}/common.bash

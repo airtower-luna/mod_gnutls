@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 # Authors:
 # Daniel Kahn Gillmor <dkg@fifthhorseman.net>
-# Thomas Klute <thomas2.klute@uni-dortmund.de>
+# Fiona Klute <fiona.klute@gmx.de>
 
 # General rules to set up a miniature CA & server & client environment
 # for the test suite
