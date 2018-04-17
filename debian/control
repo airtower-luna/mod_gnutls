@@ -8,7 +8,6 @@ Build-Depends:
  curl <!nocheck> | wget <!nocheck>,
  debhelper (>= 11~),
  dh-apache2,
- dh-autoreconf,
  dpkg-dev (>= 1.17.14),
  gnutls-bin <!nocheck>,
  libapr1-dev,

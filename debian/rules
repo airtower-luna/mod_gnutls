@@ -3,7 +3,7 @@
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 
 %:
-	dh $@ --with apache2,autoreconf
+	dh $@ --with apache2
 
 override_dh_auto_configure:
 	if [ "$(DEB_HOST_ARCH_OS)" = "linux" ]; then \
