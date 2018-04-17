@@ -1,5 +1,5 @@
 /*
- *  Copyright 2016 Thomas Klute
+ *  Copyright 2016 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -736,19 +736,21 @@ void mgs_cache_ocsp_failure(server_rec *s)
 
 
 
-int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
-                          void *ptr,
+int mgs_get_ocsp_response(gnutls_session_t session,
+                          void *ptr __attribute__((unused)),
                           gnutls_datum_t *ocsp_response)
 {
-    mgs_handle_t *ctxt = (mgs_handle_t *) ptr;
-    if (!ctxt->sc->ocsp_staple || ctxt->sc->cache == NULL)
+    mgs_handle_t *ctxt = gnutls_session_get_ptr(session);
+    mgs_srvconf_rec *sc = ctxt->sc;
+
+    if (!sc->ocsp_staple || sc->cache == NULL)
     {
         /* OCSP must be enabled and caching requires a cache. */
         return GNUTLS_E_NO_CERTIFICATE_STATUS;
     }
 
-    *ocsp_response = ctxt->sc->cache->fetch(ctxt,
-                                            ctxt->sc->ocsp->fingerprint);
+    *ocsp_response = sc->cache->fetch(ctxt,
+                                      sc->ocsp->fingerprint);
     if (ocsp_response->size == 0)
     {
         ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_EGENERAL, ctxt->c,
@@ -774,21 +776,21 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
     ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
                   "No valid OCSP response in cache, trying to update.");
 
-    apr_status_t rv = apr_global_mutex_trylock(ctxt->sc->ocsp_mutex);
+    apr_status_t rv = apr_global_mutex_trylock(sc->ocsp_mutex);
     if (APR_STATUS_IS_EBUSY(rv))
     {
         /* Another thread is currently holding the mutex, wait. */
-        apr_global_mutex_lock(ctxt->sc->ocsp_mutex);
+        apr_global_mutex_lock(sc->ocsp_mutex);
         /* Check if this other thread updated the response we need. It
          * would be better to have a vhost specific mutex, but at the
          * moment there's no good way to integrate that with the
          * Apache Mutex directive. */
-        *ocsp_response = ctxt->sc->cache->fetch(ctxt,
-                                                ctxt->sc->ocsp->fingerprint);
+        *ocsp_response = sc->cache->fetch(ctxt,
+                                          sc->ocsp->fingerprint);
         if (ocsp_response->size > 0)
         {
             /* Got a valid response now, unlock mutex and return. */
-            apr_global_mutex_unlock(ctxt->sc->ocsp_mutex);
+            apr_global_mutex_unlock(sc->ocsp_mutex);
             return GNUTLS_E_SUCCESS;
         }
         else
@@ -805,14 +807,14 @@ int mgs_get_ocsp_response(gnutls_session_t session __attribute__((unused)),
                       "Caching a fresh OCSP response failed");
         /* cache failure to rate limit retries */
         mgs_cache_ocsp_failure(ctxt->c->base_server);
-        apr_global_mutex_unlock(ctxt->sc->ocsp_mutex);
+        apr_global_mutex_unlock(sc->ocsp_mutex);
         goto fail_cleanup;
     }
-    apr_global_mutex_unlock(ctxt->sc->ocsp_mutex);
+    apr_global_mutex_unlock(sc->ocsp_mutex);
 
     /* retry reading from cache */
-    *ocsp_response = ctxt->sc->cache->fetch(ctxt,
-                                            ctxt->sc->ocsp->fingerprint);
+    *ocsp_response = sc->cache->fetch(ctxt,
+                                      sc->ocsp->fingerprint);
     if (ocsp_response->size == 0)
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
@@ -974,6 +976,11 @@ int mgs_ocsp_post_config_server(apr_pool_t *pconf,
     apr_pool_cleanup_register(pconf, sc->ocsp->trust,
                               mgs_cleanup_trust_list,
                               apr_pool_cleanup_null);
+
+    /* enable status request callback */
+    gnutls_certificate_set_ocsp_status_request_function(sc->certs,
+                                                        mgs_get_ocsp_response,
+                                                        sc);
 
     return OK;
 }
