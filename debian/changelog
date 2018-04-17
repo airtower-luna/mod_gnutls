@@ -48,7 +48,7 @@ mod-gnutls (0.7.5-2) unstable; urgency=medium
 
 mod-gnutls (0.7.5-1) unstable; urgency=medium
 
-  * new upstream release (Closes: #825654) 
+  * new upstream release (Closes: #825654)
   * drop patches already applied upstream.
 
  -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Tue, 31 May 2016 14:10:44 -0400
@@ -122,7 +122,7 @@ mod-gnutls (0.6-1.4) unstable; urgency=low
 mod-gnutls (0.6-1.3) unstable; urgency=medium
 
   * Non-maintainer upload.
-  * Fix "GnuTLSClientVerify require is ignored", check server wide 
+  * Fix "GnuTLSClientVerify require is ignored", check server wide
     GnuTLSClientVerify if not set for directory (Closes: #578663)
 
  -- Thomas Klute <thomas2.klute@uni-dortmund.de>  Fri, 20 Feb 2015 19:01:54 +0100
