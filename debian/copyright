@@ -1,14 +1,18 @@
-Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: mod_gnutls
-Source: http://www.outoforder.cc/projects/apache/mod_gnutls/
+Source: https://mod.gnutls.org/
 
 Files: *
 Copyright: 2004-2005 Paul Querna <chip@force-elite.com>
            2007, 2008 Nikos Mavrogiannopoulos <nmav@gnutls.org>
+           2013-2015 Daniel Kahn Gillmor <dkg@fifthhorseman.net>
+           2015-2018 Thomas Klute <thomas2.klute@uni-dortmund.de>
+           2018 Fiona Klute <fiona.klute@gmx.de>
 License: Apache-2.0
 
 Files: debian/*
 Copyright: 2007 Jack Bates <ms419@freezone.co.uk>
+ 2013-2018 Daniel Kahn Gillmor <dkg@fifthhorseman.net>
 License: Apache-2.0
 
 License: Apache-2.0
