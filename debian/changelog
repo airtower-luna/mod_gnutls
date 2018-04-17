@@ -1,3 +1,24 @@
+mod-gnutls (0.8.4-1) unstable; urgency=medium
+
+  [ Daniel Kahn Gillmor ]
+  * New upstream signing key.
+  * moving to PEP-14 branch naming
+
+  [ Thomas Klute ]
+  * Remove all patches, they have been included in 0.8.3
+  * Fix lintian warning priority-extra-is-replaced-by-priority-optional
+
+  [ Daniel Kahn Gillmor ]
+  * Standards-Version: bump to 4.1.4 (no changes needed)
+  * move to debhelper 11
+  * Rules-Requires-Root: no
+  * fixup dh 11 transition
+  * d/changelog: strip trailing whitespace
+  * d/copyright: update URLs, authorship information
+  * ship NOTICE file as required by Apache 2.0 license
+
+ -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Mon, 16 Apr 2018 18:00:55 -0700
+
 mod-gnutls (0.8.2-3) unstable; urgency=medium
 
   [ Thomas Klute ]
