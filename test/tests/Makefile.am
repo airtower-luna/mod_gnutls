@@ -13,7 +13,6 @@ EXTRA_DIST = \
 	11_basic_client_verification_fail/apache.conf 11_basic_client_verification_fail/fail.client 11_basic_client_verification_fail/gnutls-cli.args 11_basic_client_verification_fail/input \
 	12_cgi_variables/apache.conf 12_cgi_variables/gnutls-cli.args 12_cgi_variables/input 12_cgi_variables/output \
 	13_cgi_variables_no_client_cert/apache.conf 13_cgi_variables_no_client_cert/gnutls-cli.args 13_cgi_variables_no_client_cert/input 13_cgi_variables_no_client_cert/output \
-	14_basic_openpgp/apache.conf 14_basic_openpgp/gnutls-cli.args 14_basic_openpgp/input 14_basic_openpgp/output \
 	15_basic_msva/apache.conf 15_basic_msva/gnutls-cli.args 15_basic_msva/input 15_basic_msva/output \
 	16_view-status/apache.conf 16_view-status/gnutls-cli.args 16_view-status/input 16_view-status/output \
 	17_cgi_vars_large_cert/apache.conf 17_cgi_vars_large_cert/gnutls-cli.args 17_cgi_vars_large_cert/input 17_cgi_vars_large_cert/output \

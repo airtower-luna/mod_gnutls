@@ -54,7 +54,6 @@ static gnutls_datum_t session_ticket_key = {NULL, 0};
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt);
 /* use side==0 for server and side==1 for client */
 static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, int side, size_t export_cert_size);
-static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t cert, int side, size_t export_cert_size);
 static int mgs_status_hook(request_rec *r, int flags);
 #ifdef ENABLE_MSVA
 static const char* mgs_x509_construct_uid(request_rec * pool, gnutls_x509_crt_t cert);
@@ -351,12 +350,6 @@ static int cert_retrieve_fn(gnutls_session_t session,
         *pcert_length = ctxt->sc->certs_x509_chain_num;
         *privkey = ctxt->sc->privkey_x509;
         return 0;
-    } else if (gnutls_certificate_type_get(session) == GNUTLS_CRT_OPENPGP) {
-		// OPENPGP CERTIFICATE
-        *pcerts = ctxt->sc->cert_pgp;
-        *pcert_length = 1;
-        *privkey = ctxt->sc->privkey_pgp;
-        return 0;
     } else {
 		// UNKNOWN CERTIFICATE
 	    return -1;
@@ -415,31 +408,6 @@ static int read_crt_cn(server_rec * s, apr_pool_t * p, gnutls_x509_crt_t cert, c
                     break;
             }
         }
-    }
-
-    return rv;
-}
-
-static int read_pgpcrt_cn(server_rec * s, apr_pool_t * p,
-        gnutls_openpgp_crt_t cert, char **cert_cn) {
-    int rv = 0;
-    size_t data_len;
-
-
-    _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
-    *cert_cn = NULL;
-
-    data_len = 0;
-    rv = gnutls_openpgp_crt_get_name(cert, 0, NULL, &data_len);
-
-    if (rv == GNUTLS_E_SHORT_MEMORY_BUFFER && data_len > 1) {
-        *cert_cn = apr_palloc(p, data_len);
-        rv = gnutls_openpgp_crt_get_name(cert, 0, *cert_cn,
-                &data_len);
-    } else { /* No CN return subject alternative name */
-        ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
-                "No name found in PGP certificate for '%s:%d'.",
-                s->server_hostname, s->port);
     }
 
     return rv;
@@ -731,15 +699,14 @@ int mgs_hook_post_config(apr_pool_t *pconf,
         gnutls_certificate_set_retrieve_function2(sc->certs, cert_retrieve_fn);
 
         if ((sc->certs_x509_chain == NULL || sc->certs_x509_chain_num < 1) &&
-            sc->cert_pgp == NULL && sc->enabled == GNUTLS_ENABLED_TRUE) {
+            sc->enabled == GNUTLS_ENABLED_TRUE) {
 			ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
 						"GnuTLS: Host '%s:%d' is missing a Certificate File!",
 						s->server_hostname, s->port);
             return HTTP_UNAUTHORIZED;
         }
         if (sc->enabled == GNUTLS_ENABLED_TRUE &&
-            ((sc->certs_x509_chain_num > 0 && sc->privkey_x509 == NULL) ||
-             (sc->cert_crt_pgp != NULL && sc->privkey_pgp == NULL)))
+            (sc->certs_x509_chain_num > 0 && sc->privkey_x509 == NULL))
         {
 			ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
 						"GnuTLS: Host '%s:%d' is missing a Private Key File!",
@@ -747,26 +714,11 @@ int mgs_hook_post_config(apr_pool_t *pconf,
             return HTTP_UNAUTHORIZED;
         }
 
-        /* If OpenPGP support is already disabled in the loaded GnuTLS
-         * library startup will fail if the configuration tries to
-         * load PGP credentials. Otherwise warn affected users about
-         * deprecation. */
-        if (sc->pgp_cert_file || sc->pgp_key_file || sc->pgp_ring_file)
-            ap_log_error(APLOG_MARK, APLOG_WARNING, 0, s,
-                         "Host '%s:%d' is configured to use OpenPGP auth. "
-                         "OpenPGP support has been deprecated in GnuTLS "
-                         "since version 3.5.9 and will be removed from "
-                         "mod_gnutls in a future release.",
-                         s->server_hostname, s->port);
-
         if (sc->enabled == GNUTLS_ENABLED_TRUE) {
             rv = -1;
             if (sc->certs_x509_chain_num > 0) {
                 rv = read_crt_cn(s, pconf, sc->certs_x509_crt_chain[0], &sc->cert_cn);
             }
-            if (rv < 0 && sc->cert_pgp != NULL) {
-                rv = read_pgpcrt_cn(s, pconf, sc->cert_crt_pgp[0], &sc->cert_cn);
-			}
 
             if (rv < 0) {
                 ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
@@ -1334,9 +1286,8 @@ int mgs_hook_fixups(request_rec * r) {
                    apr_pescape_hex(r->pool, sbuf, len, 0));
 
     if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_X509) {
-	mgs_add_common_cert_vars(r, ctxt->sc->certs_x509_crt_chain[0], 0, ctxt->sc->export_certificates_size);
-    } else if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_OPENPGP) {
-        mgs_add_common_pgpcert_vars(r, ctxt->sc->cert_crt_pgp[0], 0, ctxt->sc->export_certificates_size);
+        mgs_add_common_cert_vars(r, ctxt->sc->certs_x509_crt_chain[0], 0,
+                                 ctxt->sc->export_certificates_size);
     }
 
     return rv;
@@ -1531,82 +1482,6 @@ static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, in
 }
 
 
-/* @param side 0: server, 1: client
- *
- * @param export_cert_size (int) maximum size for environment variable
- * to use for the PEM-encoded certificate (0 means do not export)
- */
-static void mgs_add_common_pgpcert_vars(request_rec * r, gnutls_openpgp_crt_t cert, int side, size_t export_cert_size) {
-
-	unsigned char sbuf[64]; /* buffer to hold serials */
-    char buf[AP_IOBUFSIZE];
-    const char *tmp;
-    size_t len;
-    int ret;
-
-    if (r == NULL)
-        return;
-
-    _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
-    apr_table_t *env = r->subprocess_env;
-
-    if (export_cert_size > 0) {
-        len = 0;
-        ret = gnutls_openpgp_crt_export(cert, GNUTLS_OPENPGP_FMT_BASE64, NULL, &len);
-        if (ret == GNUTLS_E_SHORT_MEMORY_BUFFER) {
-            if (len >= export_cert_size) {
-                apr_table_setn(env, MGS_SIDE("_CERT"),
-                               "GNUTLS_CERTIFICATE_SIZE_LIMIT_EXCEEDED");
-                ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                              "GnuTLS: Failed to export too-large OpenPGP certificate to environment");
-            } else {
-                char* cert_buf = apr_palloc(r->pool, len + 1);
-                if (cert_buf != NULL && gnutls_openpgp_crt_export(cert, GNUTLS_OPENPGP_FMT_BASE64, cert_buf, &len) >= 0) {
-                    cert_buf[len] = 0;
-                    apr_table_setn(env, MGS_SIDE("_CERT"), cert_buf);
-                } else {
-                    ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
-                                  "GnuTLS: failed to export OpenPGP certificate");
-                }
-            }
-        } else {
-            ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
-                          "GnuTLS: dazed and confused about OpenPGP certificate size");
-        }
-    }
-
-    len = sizeof (buf);
-    gnutls_openpgp_crt_get_name(cert, 0, buf, &len);
-    apr_table_setn(env, MGS_SIDE("_NAME"), apr_pstrmemdup(r->pool, buf, len));
-
-    len = sizeof (sbuf);
-    gnutls_openpgp_crt_get_fingerprint(cert, sbuf, &len);
-    apr_table_setn(env, MGS_SIDE("_FINGERPRINT"),
-                   apr_pescape_hex(r->pool, sbuf, len, 0));
-
-    ret = gnutls_openpgp_crt_get_version(cert);
-    if (ret > 0)
-        apr_table_setn(env, MGS_SIDE("_M_VERSION"),
-                       apr_psprintf(r->pool, "%u", ret));
-
-    apr_table_setn(env, MGS_SIDE("_CERT_TYPE"), "OPENPGP");
-
-    tmp =
-            mgs_time2sz(gnutls_openpgp_crt_get_expiration_time
-            (cert), buf, sizeof (buf));
-    apr_table_setn(env, MGS_SIDE("_V_END"), apr_pstrdup(r->pool, tmp));
-
-    tmp =
-            mgs_time2sz(gnutls_openpgp_crt_get_creation_time
-            (cert), buf, sizeof (buf));
-    apr_table_setn(env, MGS_SIDE("_V_START"), apr_pstrdup(r->pool, tmp));
-
-    ret = gnutls_openpgp_crt_get_pk_algorithm(cert, NULL);
-    if (ret >= 0) {
-        apr_table_setn(env, MGS_SIDE("_A_KEY"), gnutls_pk_algorithm_get_name(ret));
-    }
-
-}
 
 /* TODO: Allow client sending a X.509 certificate chain */
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
@@ -1618,9 +1493,9 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
     int rv = GNUTLS_E_NO_CERTIFICATE_FOUND, ret;
     unsigned int ch_size = 0;
 
+    // TODO: union no longer needed here after removing its "pgp" component.
     union {
         gnutls_x509_crt_t x509[MAX_CHAIN_SIZE];
-        gnutls_openpgp_crt_t pgp;
     } cert;
     apr_time_t expiration_time, cur_time;
 
@@ -1671,18 +1546,6 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
                 break;
             }
         }
-    } else if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_OPENPGP) {
-        if (cert_list_size > 1) {
-            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                    "GnuTLS: Failed to Verify Peer: "
-                    "Chained Client Certificates are not supported.");
-            return HTTP_FORBIDDEN;
-        }
-
-        gnutls_openpgp_crt_init(&cert.pgp);
-        rv = gnutls_openpgp_crt_import(cert.pgp, &cert_list[0],
-                GNUTLS_OPENPGP_FMT_RAW);
-
     } else
         return HTTP_FORBIDDEN;
 
@@ -1758,32 +1621,8 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
         }
 
     } else {
-        apr_time_ansi_put(&expiration_time,
-                gnutls_openpgp_crt_get_expiration_time
-                (cert.pgp));
-
-        switch(ctxt->sc->client_verify_method) {
-        case mgs_cvm_cartel:
-            rv = gnutls_openpgp_crt_verify_ring(cert.pgp,
-                                                ctxt->sc->pgp_list, 0,
-                                                &status);
-            break;
-#ifdef ENABLE_MSVA
-        case mgs_cvm_msva:
-            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                          "GnuTLS:  OpenPGP verification via MSVA is not yet implemented");
-            rv = GNUTLS_E_UNIMPLEMENTED_FEATURE;
-            break;
-#endif
-        default:
-            /* If this block is reached, that indicates a
-             * configuration error or bug in mod_gnutls (invalid value
-             * of ctxt->sc->client_verify_method). */
-            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                          "GnuTLS: Failed to Verify OpenPGP Peer: method '%s' is not supported",
-                          mgs_readable_cvm(ctxt->sc->client_verify_method));
-            rv = GNUTLS_E_UNIMPLEMENTED_FEATURE;
-        }
+        /* Unknown certificate type */
+        rv = GNUTLS_E_UNIMPLEMENTED_FEATURE;
     }
 
     /* "goto exit" at the end of this block skips evaluation of the
@@ -1794,7 +1633,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
                 rv, gnutls_strerror(rv));
         if (rv == GNUTLS_E_NO_CERTIFICATE_FOUND)
             ap_log_rerror(APLOG_MARK, APLOG_EMERG, 0, r,
-                "GnuTLS: No certificate was found for verification. Did you set the GnuTLSX509CAFile or GnuTLSPGPKeyringFile directives?");
+                "GnuTLS: No certificate was found for verification. Did you set the GnuTLSClientCAFile directive?");
         ret = HTTP_FORBIDDEN;
         goto exit;
     }
@@ -1835,10 +1674,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
                 "GnuTLS: Peer Certificate is revoked.");
     }
 
-    if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_X509)
-        mgs_add_common_cert_vars(r, cert.x509[0], 1, ctxt->sc->export_certificates_size);
-    else if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_OPENPGP)
-        mgs_add_common_pgpcert_vars(r, cert.pgp, 1, ctxt->sc->export_certificates_size);
+    mgs_add_common_cert_vars(r, cert.x509[0], 1, ctxt->sc->export_certificates_size);
 
     {
         /* days remaining */
@@ -1866,9 +1702,7 @@ exit:
     if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_X509)
         for (unsigned int i = 0; i < ch_size; i++)
             gnutls_x509_crt_deinit(cert.x509[i]);
-    else if (gnutls_certificate_type_get(ctxt->session) ==
-             GNUTLS_CRT_OPENPGP)
-        gnutls_openpgp_crt_deinit(cert.pgp);
+
     return ret;
 }
 
@@ -1927,11 +1761,6 @@ static const char* mgs_x509_first_type_from_san(apr_pool_t *pool, gnutls_x509_su
  * We need this for client certification because a client gives us a
  * certificate, but doesn't tell us (in any other way) who they are
  * trying to authenticate as.
-
- * TODO: we might need another parallel for OpenPGP, but for that it's
- * much simpler: we can just assume that the first User ID marked as
- * "primary" (or the first User ID, period) is the identity the user
- * is trying to present as.
 
  * one complaint might be "but the user wanted to be another identity,
  * which is also in the certificate (e.g. in a SubjectAltName)"

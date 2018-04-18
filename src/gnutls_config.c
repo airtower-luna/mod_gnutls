@@ -141,30 +141,6 @@ static apr_status_t mgs_pool_free_credentials(void *arg)
         sc->ca_list = NULL;
     }
 
-    if (sc->cert_pgp)
-    {
-        gnutls_pcert_deinit(&sc->cert_pgp[0]);
-        sc->cert_pgp = NULL;
-        gnutls_openpgp_crt_deinit(sc->cert_crt_pgp[0]);
-        sc->cert_crt_pgp = NULL;
-    }
-
-    if (sc->privkey_pgp)
-    {
-        gnutls_privkey_deinit(sc->privkey_pgp);
-        sc->privkey_pgp = NULL;
-#if GNUTLS_VERSION_NUMBER < 0x030312
-        gnutls_openpgp_privkey_deinit(sc->privkey_pgp_internal);
-        sc->privkey_pgp_internal = NULL;
-#endif
-    }
-
-    if (sc->pgp_list)
-    {
-        gnutls_openpgp_keyring_deinit(sc->pgp_list);
-        sc->pgp_list = NULL;
-    }
-
     if (sc->priorities)
     {
         gnutls_priority_deinit(sc->priorities);
@@ -452,161 +428,6 @@ int mgs_load_files(apr_pool_t *pconf, apr_pool_t *ptemp, server_rec *s)
         }
     }
 
-    if (sc->pgp_cert_file && sc->cert_pgp == NULL)
-    {
-        sc->cert_pgp = apr_pcalloc(pconf, sizeof(sc->cert_pgp[0]));
-        sc->cert_crt_pgp = apr_pcalloc(pconf, sizeof(sc->cert_crt_pgp[0]));
-
-        if (load_datum_from_file(spool, sc->pgp_cert_file, &data) != 0) {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                         "GnuTLS: Error Reading " "Certificate '%s'",
-                         sc->pgp_cert_file);
-            ret = -1;
-            goto cleanup;
-        }
-
-        ret = gnutls_openpgp_crt_init(&sc->cert_crt_pgp[0]);
-        if (ret < 0) {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                         "GnuTLS: Failed to Init "
-                         "PGP Certificate: (%d) %s", ret,
-                         gnutls_strerror(ret));
-            ret = -1;
-            goto cleanup;
-        }
-
-        ret = gnutls_openpgp_crt_import(sc->cert_crt_pgp[0], &data,
-                                        GNUTLS_OPENPGP_FMT_BASE64);
-        if (ret < 0) {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                         "GnuTLS: Failed to Import "
-                         "PGP Certificate: (%d) %s", ret,
-                         gnutls_strerror(ret));
-            ret = -1;
-            goto cleanup;
-        }
-
-        ret = gnutls_pcert_import_openpgp(sc->cert_pgp,
-                                          sc->cert_crt_pgp[0], 0);
-        if (ret < 0) {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                         "GnuTLS: Failed to Import "
-                         "PGP pCertificate: (%d) %s", ret,
-                         gnutls_strerror(ret));
-            ret = -1;
-            goto cleanup;
-        }
-    }
-
-    /* Load the PGP key file */
-    if (sc->pgp_key_file && sc->privkey_pgp == NULL)
-    {
-        if (load_datum_from_file(spool, sc->pgp_key_file, &data) != 0) {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                         "GnuTLS: Error Reading " "Private Key '%s'",
-                         sc->pgp_key_file);
-            ret = -1;
-            goto cleanup;
-        }
-
-        ret = gnutls_privkey_init(&sc->privkey_pgp);
-        if (ret < 0) {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                         "GnuTLS: Failed to initialize"
-                         ": (%d) %s", ret, gnutls_strerror(ret));
-            ret = -1;
-            goto cleanup;
-        }
-
-#if GNUTLS_VERSION_NUMBER < 0x030312
-        /* GnuTLS versions before 3.3.12 contain a bug in
-         * gnutls_privkey_import_openpgp_raw which frees data that is
-         * accessed when the key is used, leading to segfault. Loading
-         * the key into a gnutls_openpgp_privkey_t and then assigning
-         * it to the gnutls_privkey_t works around the bug, hence this
-         * chain of gnutls_openpgp_privkey_init,
-         * gnutls_openpgp_privkey_import and
-         * gnutls_privkey_import_openpgp. */
-        ret = gnutls_openpgp_privkey_init(&sc->privkey_pgp_internal);
-        if (ret != 0) {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                         "GnuTLS: Failed to initialize "
-                         "PGP Private Key '%s': (%d) %s",
-                         sc->pgp_key_file, ret, gnutls_strerror(ret));
-            ret = -1;
-            goto cleanup;
-        }
-
-        ret = gnutls_openpgp_privkey_import(sc->privkey_pgp_internal, &data,
-                                            GNUTLS_OPENPGP_FMT_BASE64, NULL, 0);
-        if (ret != 0) {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                         "GnuTLS: Failed to Import "
-                         "PGP Private Key '%s': (%d) %s",
-                         sc->pgp_key_file, ret, gnutls_strerror(ret));
-            ret = -1;
-            goto cleanup;
-        }
-
-        ret = gnutls_privkey_import_openpgp(sc->privkey_pgp,
-                                            sc->privkey_pgp_internal, 0);
-        if (ret != 0)
-        {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                         "GnuTLS: Failed to assign PGP Private Key '%s' "
-                         "to gnutls_privkey_t structure: (%d) %s",
-                         sc->pgp_key_file, ret, gnutls_strerror(ret));
-            ret = -1;
-            goto cleanup;
-        }
-#else
-        ret = gnutls_privkey_import_openpgp_raw(sc->privkey_pgp, &data,
-                                                GNUTLS_OPENPGP_FMT_BASE64,
-                                                NULL, NULL);
-        if (ret != 0)
-        {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                         "GnuTLS: Failed to Import "
-                         "PGP Private Key '%s': (%d) %s",
-                         sc->pgp_key_file, ret, gnutls_strerror(ret));
-            ret = -1;
-            goto cleanup;
-        }
-#endif
-    }
-
-    /* Load the keyring file */
-    if (sc->pgp_ring_file && sc->pgp_list == NULL)
-    {
-        if (load_datum_from_file(spool, sc->pgp_ring_file, &data) != 0) {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                         "GnuTLS: Error Reading " "Keyring File '%s'",
-                         sc->pgp_ring_file);
-            ret = -1;
-            goto cleanup;
-        }
-
-        ret = gnutls_openpgp_keyring_init(&sc->pgp_list);
-        if (ret < 0) {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                         "GnuTLS: Failed to initialize"
-                         "keyring: (%d) %s", ret, gnutls_strerror(ret));
-            ret = -1;
-            goto cleanup;
-        }
-
-        ret = gnutls_openpgp_keyring_import(sc->pgp_list, &data,
-                                            GNUTLS_OPENPGP_FMT_BASE64);
-        if (ret < 0) {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                         "GnuTLS: Failed to load "
-                         "Keyring File '%s': (%d) %s", sc->pgp_ring_file,
-                         ret, gnutls_strerror(ret));
-            ret = -1;
-            goto cleanup;
-        }
-    }
-
     if (sc->priorities_str && sc->priorities == NULL)
     {
         const char *err;
@@ -710,31 +531,6 @@ const char *mgs_set_key_file(cmd_parms * parms, void *dummy __attribute__((unuse
 						 &gnutls_module);
 
     sc->x509_key_file = apr_pstrdup(parms->pool, arg);
-
-    return NULL;
-}
-
-const char *mgs_set_pgpcert_file(cmd_parms * parms, void *dummy __attribute__((unused)),
-        const char *arg)
-{
-    mgs_srvconf_rec *sc =
-	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
-						 module_config,
-						 &gnutls_module);
-
-    sc->pgp_cert_file = ap_server_root_relative(parms->pool, arg);
-
-    return NULL;
-}
-
-const char *mgs_set_pgpkey_file(cmd_parms * parms, void *dummy __attribute__((unused)),
-        const char *arg) {
-    mgs_srvconf_rec *sc =
-	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
-						 module_config,
-						 &gnutls_module);
-
-    sc->pgp_key_file = ap_server_root_relative(parms->pool, arg);
 
     return NULL;
 }
@@ -926,18 +722,6 @@ const char *mgs_set_client_ca_file(cmd_parms * parms, void *dummy __attribute__(
     return NULL;
 }
 
-const char *mgs_set_keyring_file(cmd_parms * parms, void *dummy __attribute__((unused)),
-        const char *arg) {
-    mgs_srvconf_rec *sc =
-	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
-						 module_config,
-						 &gnutls_module);
-
-    sc->pgp_ring_file = ap_server_root_relative(parms->pool, arg);
-
-    return NULL;
-}
-
 /*
  * Enable TLS proxy operation if arg is true, disable it otherwise.
  */
@@ -1073,14 +857,6 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
     sc->p11_modules = NULL;
     sc->pin = NULL;
 
-    sc->cert_pgp = NULL;
-    sc->cert_crt_pgp = NULL;
-    sc->privkey_pgp = NULL;
-#if GNUTLS_VERSION_NUMBER < 0x030312
-    sc->privkey_pgp_internal = NULL;
-#endif
-    sc->pgp_list = NULL;
-
     sc->priorities_str = NULL;
     sc->cache_timeout = MGS_TIMEOUT_UNSET;
     sc->cache_type = mgs_cache_unset;
@@ -1161,9 +937,6 @@ void *mgs_config_server_merge(apr_pool_t * p, void *BASE, void *ADD)
     gnutls_srvconf_merge(x509_ca_file, NULL);
     gnutls_srvconf_merge(p11_modules, NULL);
     gnutls_srvconf_merge(pin, NULL);
-    gnutls_srvconf_merge(pgp_cert_file, NULL);
-    gnutls_srvconf_merge(pgp_key_file, NULL);
-    gnutls_srvconf_merge(pgp_ring_file, NULL);
     gnutls_srvconf_merge(dh_file, NULL);
     gnutls_srvconf_merge(priorities_str, NULL);
 
@@ -1185,9 +958,6 @@ void *mgs_config_server_merge(apr_pool_t * p, void *BASE, void *ADD)
 
     gnutls_srvconf_assign(ca_list);
     gnutls_srvconf_assign(ca_list_size);
-    gnutls_srvconf_assign(cert_pgp);
-    gnutls_srvconf_assign(cert_crt_pgp);
-    gnutls_srvconf_assign(pgp_list);
     gnutls_srvconf_assign(certs);
     gnutls_srvconf_assign(anon_creds);
     gnutls_srvconf_assign(srp_creds);

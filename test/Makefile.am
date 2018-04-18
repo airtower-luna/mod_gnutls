@@ -35,11 +35,8 @@ dist_check_SCRIPTS += test-16_view-status.bash \
 TEST_EXTENSIONS = .bash
 TESTS = $(dist_check_SCRIPTS)
 
-check_PROGRAMS = pgpcrc gnutls_openpgp_support
+check_PROGRAMS = pgpcrc
 pgpcrc_SOURCES = pgpcrc.c
-gnutls_openpgp_support_SOURCES = gnutls_openpgp_support.c
-gnutls_openpgp_support_CFLAGS = $(LIBGNUTLS_CFLAGS)
-gnutls_openpgp_support_LDFLAGS = $(LIBGNUTLS_LIBS)
 
 # build OCSP database tool
 if ENABLE_OCSP_TEST
@@ -52,9 +49,9 @@ endif
 
 # Identities in the miniature CA, server, and client environment for
 # the test suite
-shared_identities = server authority client imposter rogueca
+shared_identities = authority client
 pgp_identities = $(shared_identities)
-x509_only_identities = rogueclient
+x509_only_identities = server rogueca imposter rogueclient
 if ENABLE_OCSP_TEST
 x509_only_identities += ocsp-responder
 endif

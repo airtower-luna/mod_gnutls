@@ -1,3 +1,3 @@
 #!/bin/bash
-./gnutls_openpgp_support || exit $?
-${srcdir}/runtests t-14
+echo "OpenPGP support has been removed, skipping." 2>&1
+exit 77

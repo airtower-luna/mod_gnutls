@@ -32,7 +32,6 @@
 /* GnuTLS Library Headers */
 #include <gnutls/gnutls.h>
 #include <gnutls/abstract.h>
-#include <gnutls/openpgp.h>
 #include <gnutls/x509.h>
 
 #ifndef __mod_gnutls_h_inc
@@ -123,10 +122,6 @@ typedef struct {
     char *x509_key_file;
     char *x509_ca_file;
 
-    char *pgp_cert_file;
-    char *pgp_key_file;
-    char *pgp_ring_file;
-
     char *dh_file;
 
     char *priorities_str;
@@ -178,20 +173,6 @@ typedef struct {
 	/* Current x509 Certificate Private Key */
     gnutls_privkey_t privkey_x509;
 
-	/* OpenPGP Certificate */
-    gnutls_pcert_st *cert_pgp;
-    gnutls_openpgp_crt_t *cert_crt_pgp;
-
-	/* OpenPGP Certificate Private Key */
-    gnutls_privkey_t privkey_pgp;
-#if GNUTLS_VERSION_NUMBER < 0x030312
-    /* Internal structure for the OpenPGP private key, used in the
-     * workaround for a bug in gnutls_privkey_import_openpgp_raw that
-     * frees memory that is still needed. DO NOT USE for any other
-     * purpose. */
-    gnutls_openpgp_privkey_t privkey_pgp_internal;
-#endif
-
     /* Export full certificates to CGI environment: */
     int export_certificates_size;
 	/* GnuTLS Priorities */
@@ -200,8 +181,6 @@ typedef struct {
     gnutls_dh_params_t dh_params;
 	/* A list of CA Certificates */
     gnutls_x509_crt_t *ca_list;
-	/* OpenPGP Key Ring */
-    gnutls_openpgp_keyring_t pgp_list;
 	/* CA Certificate list size */
     unsigned int ca_list_size;
 	/* Client Certificate Verification Mode */
@@ -412,12 +391,6 @@ const char *mgs_set_cert_file(cmd_parms * parms, void *dummy,
 const char *mgs_set_key_file(cmd_parms * parms, void *dummy,
                              const char *arg);
 
-const char *mgs_set_pgpcert_file(cmd_parms * parms, void *dummy,
-                                        const char *arg);
-
-const char *mgs_set_pgpkey_file(cmd_parms * parms, void *dummy,
-                             const char *arg);
-
 const char *mgs_set_cache(cmd_parms * parms, void *dummy,
                           const char *type, const char* arg);
 
@@ -439,9 +412,6 @@ const char *mgs_set_pin(cmd_parms * parms, void *dummy,
                                    const char *arg);
 
 const char *mgs_set_srk_pin(cmd_parms * parms, void *dummy,
-                                   const char *arg);
-
-const char *mgs_set_keyring_file(cmd_parms * parms, void *dummy,
                                    const char *arg);
 
 const char *mgs_set_enabled(cmd_parms * parms, void *dummy,

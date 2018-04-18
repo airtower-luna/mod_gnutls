@@ -244,6 +244,8 @@ int ssl_proxy_enable(conn_rec *c)
     return ssl_engine_set(c, NULL, 1, 1);
 }
 
+#define OPENPGP_REMOVED "OpenPGP support has been removed."
+
 static const command_rec mgs_config_cmds[] = {
     AP_INIT_FLAG("GnuTLSProxyEngine", mgs_set_proxy_engine,
     NULL,
@@ -277,10 +279,6 @@ static const command_rec mgs_config_cmds[] = {
     NULL,
     RSRC_CONF,
     "Set the CA File to verify Client Certificates"),
-    AP_INIT_TAKE1("GnuTLSPGPKeyringFile", mgs_set_keyring_file,
-    NULL,
-    RSRC_CONF,
-    "Set the Keyring File to verify Client Certificates"),
     AP_INIT_TAKE1("GnuTLSDHFile", mgs_set_dh_file,
     NULL,
     RSRC_CONF,
@@ -301,14 +299,6 @@ static const command_rec mgs_config_cmds[] = {
     NULL,
     RSRC_CONF,
     "TLS Server X509 Private Key file"),
-    AP_INIT_TAKE1("GnuTLSPGPCertificateFile", mgs_set_pgpcert_file,
-    NULL,
-    RSRC_CONF,
-    "TLS Server PGP Certificate file"),
-    AP_INIT_TAKE1("GnuTLSPGPKeyFile", mgs_set_pgpkey_file,
-    NULL,
-    RSRC_CONF,
-    "TLS Server PGP Private key file"),
 #ifdef ENABLE_SRP
     AP_INIT_TAKE1("GnuTLSSRPPasswdFile", mgs_set_srp_tpasswd_file,
     NULL,
@@ -395,6 +385,12 @@ static const command_rec mgs_config_cmds[] = {
     AP_INIT_TAKE1("GnuTLSOCSPSocketTimeout", mgs_set_timeout,
                   NULL, RSRC_CONF,
                   "Socket timeout for OCSP requests"),
+    AP_INIT_RAW_ARGS("GnuTLSPGPKeyringFile",
+                     ap_set_deprecated, NULL, OR_ALL, OPENPGP_REMOVED),
+    AP_INIT_RAW_ARGS("GnuTLSPGPCertificateFile",
+                     ap_set_deprecated, NULL, OR_ALL, OPENPGP_REMOVED),
+    AP_INIT_RAW_ARGS("GnuTLSPGPKeyFile",
+                     ap_set_deprecated, NULL, OR_ALL, OPENPGP_REMOVED),
 #ifdef __clang__
     /* Workaround for this clang bug:
      * https://llvm.org/bugs/show_bug.cgi?id=21689 */
