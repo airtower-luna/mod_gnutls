@@ -19,11 +19,13 @@
 #include "gnutls_cache.h"
 #include "gnutls_config.h"
 #include "gnutls_util.h"
+#include "gnutls_watchdog.h"
 
 #include <apr_escape.h>
 #include <apr_lib.h>
 #include <apr_time.h>
 #include <gnutls/ocsp.h>
+#include <mod_watchdog.h>
 #include <time.h>
 
 #ifdef APLOG_USE_MODULE
@@ -922,6 +924,56 @@ apr_uri_t * mgs_cert_get_ocsp_uri(apr_pool_t *p, gnutls_x509_crt_t cert)
 
 
 
+/**
+ * Perform an asynchronous OCSP cache update. This is a callback for
+ * mod_watchdog, so the API is fixed.
+ *
+ * @param state watchdog state (starting/running/stopping)
+ * @param data callback data, contains the server_rec
+ * @param pool temporary callback pool destroyed after the call
+ * @return always `APR_SUCCESS` as required by the mod_watchdog API to
+ * indicate that the callback should be called again
+ */
+static apr_status_t mgs_async_ocsp_update(int state,
+                                          void *data,
+                                          apr_pool_t *pool __attribute__((unused)))
+{
+    /* If the server is stopping there's no need to do an OCSP
+     * update. */
+    if (state == AP_WATCHDOG_STATE_STOPPING)
+        return APR_SUCCESS;
+
+    server_rec *s = (server_rec *) data;
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(s->module_config, &gnutls_module);
+    apr_time_t expiry = 0;
+
+    /* Callbacks registered to one watchdog instance are run
+     * sequentially. Child watchdog threads are created in a
+     * child_init hook, but it doesn't guarantee when callbacks will
+     * be called for the first time.
+     *
+     * Using the mutex should help avoiding duplicate OCSP requests
+     * (async and during request handling) if requests arrive before
+     * the startup run completes. However, an early request might
+     * still get in between initial OCSP caching calls. */
+    if (state == AP_WATCHDOG_STATE_STARTING)
+        apr_global_mutex_lock(sc->ocsp_mutex);
+    apr_status_t rv = mgs_cache_ocsp_response(s, &expiry);
+    if (state == AP_WATCHDOG_STATE_STARTING)
+        apr_global_mutex_unlock(sc->ocsp_mutex);
+
+    /* TODO: error handling, fuzzy interval */
+
+    ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, s,
+                 "Async OCSP update done for %s:%d.",
+                 s->server_hostname, s->addrs->host_port);
+
+    return APR_SUCCESS;
+}
+
+
+
 /*
  * Like in the general post_config hook the HTTP status codes for
  * errors are just for fun. What matters is "neither OK nor DECLINED"
@@ -996,6 +1048,26 @@ int mgs_ocsp_post_config_server(apr_pool_t *pconf,
     gnutls_certificate_set_ocsp_status_request_function(sc->certs,
                                                         mgs_get_ocsp_response,
                                                         sc);
+
+    /* The watchdog structure may be NULL if mod_watchdog is
+     * unavailable. */
+    if (sc->singleton_wd != NULL)
+    {
+        apr_status_t rv =
+            sc->singleton_wd->register_callback(sc->singleton_wd->wd,
+                                                sc->ocsp_cache_time,
+                                                server, mgs_async_ocsp_update);
+        if (rv == APR_SUCCESS)
+            ap_log_error(APLOG_MARK, APLOG_INFO, rv, server,
+                         "Enabled async OCSP update via watchdog "
+                         "for %s:%d",
+                         server->server_hostname, server->addrs->host_port);
+        else
+            ap_log_error(APLOG_MARK, APLOG_WARNING, rv, server,
+                         "Enabling async OCSP update via watchdog "
+                         "for %s:%d failed!",
+                         server->server_hostname, server->addrs->host_port);
+    }
 
     return OK;
 }
