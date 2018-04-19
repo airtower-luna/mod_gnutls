@@ -24,6 +24,7 @@
 #include <apr_escape.h>
 #include <apr_lib.h>
 #include <apr_time.h>
+#include <gnutls/crypto.h>
 #include <gnutls/ocsp.h>
 #include <mod_watchdog.h>
 #include <time.h>
@@ -927,6 +928,14 @@ apr_uri_t * mgs_cert_get_ocsp_uri(apr_pool_t *p, gnutls_x509_crt_t cert)
 
 
 
+/** The maximum random fuzz interval that will not overflow. The
+ * permitted values are limited to whatever will not make an
+ * `apr_interval_time_t` variable overflow when multiplied with
+ * `APR_UINT16_MAX`. With apr_interval_time_t being a 64 bit signed
+ * integer the maximum fuzz interval is about 4.5 years, which should
+ * be more than plenty. */
+#define MAX_FUZZ_TIME (APR_INT64_MAX / APR_UINT16_MAX)
+
 /**
  * Perform an asynchronous OCSP cache update. This is a callback for
  * mod_watchdog, so the API is fixed.
@@ -962,10 +971,63 @@ static apr_status_t mgs_async_ocsp_update(int state,
     apr_global_mutex_lock(sc->ocsp_mutex);
     apr_status_t rv = mgs_cache_ocsp_response(server, &expiry);
 
-    /* TODO: fuzzy interval */
-    apr_interval_time_t next_interval = expiry - apr_time_now();
+    /* TODO: Make maximum fuzz time configurable and compare to
+     * allowed maximum during config */
+    ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, server,
+                 "%s: Maximum fuzz time without overflow: %" APR_INT64_T_FMT
+                 " seconds",
+                 __func__, apr_time_sec(MAX_FUZZ_TIME));
+
+    apr_interval_time_t next_interval;
     if (rv != APR_SUCCESS)
         next_interval = sc->ocsp_failure_timeout;
+    else
+    {
+        apr_uint16_t random_bytes;
+        int res = gnutls_rnd(GNUTLS_RND_NONCE, &random_bytes,
+                             sizeof(random_bytes));
+        if (__builtin_expect(res < 0, 0))
+        {
+            /* Shouldn't ever happen, because a working random number
+             * generator is required for establishing TLS sessions. */
+            random_bytes = (apr_uint16_t) apr_time_now();
+            ap_log_error(APLOG_MARK, APLOG_WARNING, APR_EGENERAL, server,
+                         "Error getting random number for fuzzy update "
+                         "interval: %s Falling back on truncated time.",
+                         gnutls_strerror(res));
+        }
+
+        /* Base fuzz is half the maximum (sc->ocsp_cache_time / 8 at
+         * the moment). The actual fuzz is between the maximum and
+         * half that. */
+        apr_interval_time_t base_fuzz = sc->ocsp_cache_time / 16;
+        apr_interval_time_t fuzz =
+            base_fuzz + base_fuzz * random_bytes / APR_UINT16_MAX;
+
+        /* With an extremly short timeout or weird nextUpdate value
+         * next_interval <= 0 might happen. Use the failure timeout to
+         * avoid endlessly repeating updates. */
+        next_interval = expiry - apr_time_now();
+        if (next_interval <= 0)
+        {
+            next_interval = sc->ocsp_failure_timeout;
+            ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, server,
+                         "OCSP cache expiration time of the response for "
+                         "%s:%d is in the past, repeating after failure "
+                         "timeout (GnuTLSOCSPFailureTimeout).",
+                         server->server_hostname, server->addrs->host_port);
+        }
+
+        /* It's possible to compare maximum fuzz and configured OCSP
+         * cache timeout at configuration time, but the interval until
+         * the nextUpdate value expires (or the failure timeout
+         * fallback above) might be shorter. Make sure that we don't
+         * end up with a negative interval. */
+        while (fuzz > next_interval)
+            fuzz /= 2;
+        next_interval -= fuzz;
+    }
+
     sc->singleton_wd->set_callback_interval(sc->singleton_wd->wd,
                                             next_interval,
                                             server, mgs_async_ocsp_update);
