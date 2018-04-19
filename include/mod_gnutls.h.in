@@ -142,8 +142,6 @@ typedef struct {
 	/* GnuTLS uses Session Tickets */
     int tickets;
 
-    /* --- Things initialized at _child_init --- */
-
     /* x509 Certificate Structure */
     gnutls_certificate_credentials_t certs;
     /* x509 credentials for proxy connections */
