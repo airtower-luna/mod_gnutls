@@ -30,15 +30,20 @@ int ssl_engine_set(conn_rec *c,
                    int proxy, int enable);
 
 #define MOD_HTTP2 "mod_http2.c"
+#define MOD_WATCHDOG "mod_watchdog.c"
 static const char * const mod_proxy[] = { "mod_proxy.c", NULL };
 static const char * const mod_http2[] = { MOD_HTTP2, NULL };
+static const char * const mod_watchdog[] = { MOD_WATCHDOG, NULL };
 
 static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
 {
     /* Watchdog callbacks must be configured before post_config of
-     * mod_watchdog runs, or the watchdog won't be started. */
+     * mod_watchdog runs, or the watchdog won't be started. Similarly,
+     * our child_init hook must run before mod_watchdog's because our
+     * watchdog threads are started there and need some child-specific
+     * resources. */
     static const char * const post_conf_succ[] =
-        { MOD_HTTP2, "mod_watchdog.c", NULL };
+        { MOD_HTTP2, MOD_WATCHDOG, NULL };
     ap_hook_post_config(mgs_hook_post_config, mod_proxy, post_conf_succ,
                         APR_HOOK_MIDDLE);
     /* HTTP Scheme Hook */
@@ -54,7 +59,7 @@ static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
     ap_hook_pre_config(mgs_hook_pre_config, NULL, NULL,
                        APR_HOOK_MIDDLE);
     /* Child-Init Hook */
-    ap_hook_child_init(mgs_hook_child_init, NULL, NULL,
+    ap_hook_child_init(mgs_hook_child_init, NULL, mod_watchdog,
                        APR_HOOK_MIDDLE);
     /* Authentication Hook */
     ap_hook_access_checker(mgs_hook_authz, NULL, NULL,
