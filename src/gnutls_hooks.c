@@ -22,6 +22,8 @@
 #include "gnutls_cache.h"
 #include "gnutls_ocsp.h"
 #include "gnutls_util.h"
+#include "gnutls_watchdog.h"
+
 #include "http_vhost.h"
 #include "ap_mpm.h"
 #include "mod_status.h"
@@ -651,6 +653,9 @@ int mgs_hook_post_config(apr_pool_t *pconf,
         }
     }
 
+    sc_base->singleton_wd =
+        mgs_new_singleton_watchdog(base_server, MGS_SINGLETON_WATCHDOG, pconf);
+
     for (s = base_server; s; s = s->next)
     {
         sc = (mgs_srvconf_rec *) ap_get_module_config(s->module_config, &gnutls_module);
@@ -658,6 +663,8 @@ int mgs_hook_post_config(apr_pool_t *pconf,
         sc->cache_config = sc_base->cache_config;
         sc->cache_timeout = sc_base->cache_timeout;
         sc->cache = sc_base->cache;
+
+        sc->singleton_wd = sc_base->singleton_wd;
 
         rv = mgs_load_files(pconf, ptemp, s);
         if (rv != 0) {

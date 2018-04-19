@@ -55,6 +55,10 @@ extern module AP_MODULE_DECLARE_DATA gnutls_module;
 /* Module Debug Mode */
 #define MOD_GNUTLS_DEBUG @OOO_MAINTAIN@
 
+/** Name of the module-wide singleton watchdog */
+#define MGS_SINGLETON_WATCHDOG "_mod_gnutls_singleton_"
+
+
 /* mod_gnutls Cache Types */
 typedef enum {
 	/* No Cache */
@@ -95,7 +99,7 @@ typedef struct mgs_ocsp_data* mgs_ocsp_data_t;
 /* The maximum number of SANs to read from a x509 certificate */
 #define MAX_CERT_SAN 5
 
-/* Server Configuration Record */
+/** Server Configuration Record */
 typedef struct {
     /* --- Configuration values --- */
 	/* Is the module enabled? */
@@ -225,6 +229,10 @@ typedef struct {
     apr_interval_time_t ocsp_failure_timeout;
     /* Socket timeout for OCSP requests */
     apr_interval_time_t ocsp_socket_timeout;
+
+    /** This module's singleton watchdog, used for async OCSP cache
+     * updates. */
+    struct mgs_watchdog *singleton_wd;
 } mgs_srvconf_rec;
 
 /* Character Buffer */

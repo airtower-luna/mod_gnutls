@@ -1111,6 +1111,8 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
     sc->ocsp_failure_timeout = MGS_TIMEOUT_UNSET;
     sc->ocsp_socket_timeout = MGS_TIMEOUT_UNSET;
 
+    sc->singleton_wd = NULL;
+
 /* this relies on GnuTLS never changing the gnutls_certificate_request_t enum to define -1 */
     sc->client_verify_mode = -1;
 
