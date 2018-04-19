@@ -455,6 +455,11 @@ static void dbm_cache_expire(server_rec *s)
 
 static gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
 {
+    server_rec *server = ctxt->c->base_server;
+    apr_pool_t *pool = ctxt->c->pool;
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(server->module_config, &gnutls_module);
+
     gnutls_datum_t data = {NULL, 0};
     apr_dbm_t *dbm;
     apr_datum_t dbmkey = {(char*) key.data, key.size};
@@ -463,18 +468,18 @@ static gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
     apr_status_t rv;
 
     /* check if it is time for cache expiration */
-    dbm_cache_expire(ctxt->c->base_server);
+    dbm_cache_expire(server);
 
-    apr_global_mutex_lock(ctxt->sc->cache->mutex);
+    apr_global_mutex_lock(sc->cache->mutex);
 
-    rv = apr_dbm_open_ex(&dbm, db_type(ctxt->sc),
-            ctxt->sc->cache_config, APR_DBM_READONLY,
-            SSL_DBM_FILE_MODE, ctxt->c->pool);
+    rv = apr_dbm_open_ex(&dbm, db_type(sc),
+                         sc->cache_config, APR_DBM_READONLY,
+                         SSL_DBM_FILE_MODE, pool);
     if (rv != APR_SUCCESS) {
-        ap_log_cerror(APLOG_MARK, APLOG_NOTICE, rv, ctxt->c,
-                      "error opening cache '%s'",
-                      ctxt->sc->cache_config);
-        apr_global_mutex_unlock(ctxt->sc->cache->mutex);
+        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv, server,
+                     "error opening cache '%s'",
+                     sc->cache_config);
+        apr_global_mutex_unlock(sc->cache->mutex);
         return data;
     }
 
@@ -497,9 +502,9 @@ static gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
         goto cleanup;
     }
 
-    ap_log_cerror(APLOG_MARK, APLOG_TRACE1, rv, ctxt->c,
-                  "fetched %" APR_SIZE_T_FMT " bytes from cache",
-                  dbmval.dsize);
+    ap_log_error(APLOG_MARK, APLOG_TRACE1, rv, server,
+                 "fetched %" APR_SIZE_T_FMT " bytes from cache",
+                 dbmval.dsize);
 
     memcpy(data.data, dbmval.dptr + sizeof (apr_time_t), data.size);
 
@@ -507,7 +512,7 @@ static gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
     apr_dbm_freedatum(dbm, dbmval);
  close_db:
     apr_dbm_close(dbm);
-    apr_global_mutex_unlock(ctxt->sc->cache->mutex);
+    apr_global_mutex_unlock(sc->cache->mutex);
 
     /* cache entry might have expired since last cache cleanup */
     if (expiry != 0 && expiry < apr_time_now())
@@ -515,8 +520,8 @@ static gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
         gnutls_free(data.data);
         data.data = NULL;
         data.size = 0;
-        ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, ctxt->c,
-                      "dropped expired cache data");
+        ap_log_error(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, server,
+                     "dropped expired cache data");
     }
 
     return data;
