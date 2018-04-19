@@ -1,5 +1,5 @@
 /*
- *  Copyright 2016 Fiona Klute
+ *  Copyright 2016-2018 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -771,8 +771,9 @@ int mgs_get_ocsp_response(gnutls_session_t session,
         return GNUTLS_E_NO_CERTIFICATE_STATUS;
     }
 
-    *ocsp_response = sc->cache->fetch(ctxt,
-                                      sc->ocsp->fingerprint);
+    *ocsp_response = ctxt->sc->cache->fetch(ctxt->c->base_server,
+                                            ctxt->sc->ocsp->fingerprint,
+                                            ctxt->c->pool);
     if (ocsp_response->size == 0)
     {
         ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_EGENERAL, ctxt->c,
@@ -807,8 +808,9 @@ int mgs_get_ocsp_response(gnutls_session_t session,
          * would be better to have a vhost specific mutex, but at the
          * moment there's no good way to integrate that with the
          * Apache Mutex directive. */
-        *ocsp_response = sc->cache->fetch(ctxt,
-                                          sc->ocsp->fingerprint);
+        *ocsp_response = ctxt->sc->cache->fetch(ctxt->c->base_server,
+                                                ctxt->sc->ocsp->fingerprint,
+                                                ctxt->c->pool);
         if (ocsp_response->size > 0)
         {
             /* Got a valid response now, unlock mutex and return. */
@@ -836,8 +838,9 @@ int mgs_get_ocsp_response(gnutls_session_t session,
     apr_global_mutex_unlock(sc->ocsp_mutex);
 
     /* retry reading from cache */
-    *ocsp_response = sc->cache->fetch(ctxt,
-                                      sc->ocsp->fingerprint);
+    *ocsp_response = ctxt->sc->cache->fetch(ctxt->c->base_server,
+                                            ctxt->sc->ocsp->fingerprint,
+                                            ctxt->c->pool);
     if (ocsp_response->size == 0)
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,

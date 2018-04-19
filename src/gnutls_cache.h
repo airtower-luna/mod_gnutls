@@ -1,7 +1,7 @@
 /*
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2014 Nikos Mavrogiannopoulos
- *  Copyright 2015-2016 Fiona Klute
+ *  Copyright 2015-2018 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -96,13 +96,18 @@ typedef int (*cache_store_func)(server_rec *s, gnutls_datum_t key,
  * allocated using `gnutls_malloc()` for compatibility with the GnuTLS
  * session caching API, and must be released using `gnutls_free()`.
  *
- * @param ctxt mod_gnutls session context for the request
+ * @param server server context for the request
+ *
  * @param key key for the cache entry to be fetched
+ *
+ * @param pool pool to allocate the response and other temporary
+ * memory from
  *
  * @return the requested cache entry, or `{NULL, 0}`
  */
-typedef gnutls_datum_t (*cache_fetch_func)(mgs_handle_t *ctxt,
-                                           gnutls_datum_t key);
+typedef gnutls_datum_t (*cache_fetch_func)(server_rec *server,
+                                           gnutls_datum_t key,
+                                           apr_pool_t *pool);
 /**
  * Internal cache configuration structure
  */

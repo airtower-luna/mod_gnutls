@@ -2,7 +2,7 @@
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2008 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
- *  Copyright 2015-2016 Fiona Klute
+ *  Copyright 2015-2018 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -325,16 +325,17 @@ static gnutls_datum_t mc_cache_fetch(server_rec *s, const char *key,
     return data;
 }
 
-static gnutls_datum_t mc_cache_fetch_generic(mgs_handle_t *ctxt,
-                                             gnutls_datum_t key)
+static gnutls_datum_t mc_cache_fetch_generic(server_rec *server,
+                                             gnutls_datum_t key,
+                                             apr_pool_t *pool)
 {
     gnutls_datum_t data = {NULL, 0};
-    const char *hex = apr_pescape_hex(ctxt->c->pool, key.data, key.size, 1);
+    const char *hex = apr_pescape_hex(pool, key.data, key.size, 1);
     if (hex == NULL)
         return data;
 
-    const char *strkey = apr_psprintf(ctxt->c->pool, MC_TAG "%s", hex);
-    return mc_cache_fetch(ctxt->c->base_server, strkey, ctxt->c->pool);
+    const char *strkey = apr_psprintf(pool, MC_TAG "%s", hex);
+    return mc_cache_fetch(server, strkey, pool);
 }
 
 static gnutls_datum_t mc_cache_fetch_session(void *baton, gnutls_datum_t key)
@@ -453,10 +454,11 @@ static void dbm_cache_expire(server_rec *s)
     return;
 }
 
-static gnutls_datum_t dbm_cache_fetch(mgs_handle_t *ctxt, gnutls_datum_t key)
+
+
+static gnutls_datum_t dbm_cache_fetch(server_rec *server, gnutls_datum_t key,
+                                      apr_pool_t *pool)
 {
-    server_rec *server = ctxt->c->base_server;
-    apr_pool_t *pool = ctxt->c->pool;
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(server->module_config, &gnutls_module);
 
@@ -536,7 +538,7 @@ static gnutls_datum_t dbm_cache_fetch_session(void *baton, gnutls_datum_t key)
     if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
         return data;
 
-    return dbm_cache_fetch(ctxt, dbmkey);
+    return dbm_cache_fetch(ctxt->c->base_server, dbmkey, ctxt->c->pool);
 }
 
 static int dbm_cache_store(server_rec *s, gnutls_datum_t key,
