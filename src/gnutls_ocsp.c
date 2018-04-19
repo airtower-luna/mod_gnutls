@@ -946,25 +946,21 @@ static apr_status_t mgs_async_ocsp_update(int state,
     if (state == AP_WATCHDOG_STATE_STOPPING)
         return APR_SUCCESS;
 
-    server_rec *s = (server_rec *) data;
+    server_rec *server = (server_rec *) data;
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
-        ap_get_module_config(s->module_config, &gnutls_module);
+        ap_get_module_config(server->module_config, &gnutls_module);
     apr_time_t expiry = 0;
 
-    /* Callbacks registered to one watchdog instance are run
-     * sequentially. Child watchdog threads are created in a
-     * child_init hook, but it doesn't guarantee when callbacks will
-     * be called for the first time.
-     *
-     * Using the mutex should help avoiding duplicate OCSP requests
-     * (async and during request handling) if requests arrive before
-     * the startup run completes. However, an early request might
-     * still get in between initial OCSP caching calls. */
-    if (state == AP_WATCHDOG_STATE_STARTING)
-        apr_global_mutex_lock(sc->ocsp_mutex);
-    apr_status_t rv = mgs_cache_ocsp_response(s, &expiry);
-    if (state == AP_WATCHDOG_STATE_STARTING)
-        apr_global_mutex_unlock(sc->ocsp_mutex);
+    /* Holding the mutex should help avoiding simultaneous synchronous
+     * and asynchronous OCSP requests in some edge cases: during
+     * startup if there's an early request, and if OCSP requests fail
+     * repeatedly until the cached response expires and a synchronous
+     * update is triggered before a failure cache entry is
+     * created. Usually there should be a good OCSP response in the
+     * cache and the mutex is never touched in
+     * mgs_get_ocsp_response. */
+    apr_global_mutex_lock(sc->ocsp_mutex);
+    apr_status_t rv = mgs_cache_ocsp_response(server, &expiry);
 
     /* TODO: fuzzy interval */
     apr_interval_time_t next_interval = expiry - apr_time_now();
@@ -972,16 +968,17 @@ static apr_status_t mgs_async_ocsp_update(int state,
         next_interval = sc->ocsp_failure_timeout;
     sc->singleton_wd->set_callback_interval(sc->singleton_wd->wd,
                                             next_interval,
-                                            s, mgs_async_ocsp_update);
+                                            server, mgs_async_ocsp_update);
 
-    /* TODO: cache error if no cache entry present to inhibit
-     * request-triggered updates */
-    ap_log_error(APLOG_MARK, rv == APR_SUCCESS ? APLOG_DEBUG : APLOG_ERR, rv, s,
+    ap_log_error(APLOG_MARK, rv == APR_SUCCESS ? APLOG_DEBUG : APLOG_WARNING,
+                 rv, server,
                  "Async OCSP update %s for %s:%d, next update in "
                  "%" APR_TIME_T_FMT " seconds.",
                  rv == APR_SUCCESS ? "done" : "failed",
-                 s->server_hostname, s->addrs->host_port,
+                 server->server_hostname, server->addrs->host_port,
                  apr_time_sec(next_interval));
+
+    apr_global_mutex_unlock(sc->ocsp_mutex);
 
     return APR_SUCCESS;
 }
