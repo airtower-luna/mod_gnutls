@@ -29,13 +29,17 @@ int ssl_engine_set(conn_rec *c,
                    ap_conf_vector_t *dir_conf __attribute__((unused)),
                    int proxy, int enable);
 
+#define MOD_HTTP2 "mod_http2.c"
 static const char * const mod_proxy[] = { "mod_proxy.c", NULL };
-static const char * const mod_http2[] = { "mod_http2.c", NULL };
+static const char * const mod_http2[] = { MOD_HTTP2, NULL };
 
 static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
 {
-    /* Try Run Post-Config Hook After mod_proxy */
-    ap_hook_post_config(mgs_hook_post_config, mod_proxy, mod_http2,
+    /* Watchdog callbacks must be configured before post_config of
+     * mod_watchdog runs, or the watchdog won't be started. */
+    static const char * const post_conf_succ[] =
+        { MOD_HTTP2, "mod_watchdog.c", NULL };
+    ap_hook_post_config(mgs_hook_post_config, mod_proxy, post_conf_succ,
                         APR_HOOK_MIDDLE);
     /* HTTP Scheme Hook */
     ap_hook_http_scheme(mgs_hook_http_scheme, NULL, NULL, APR_HOOK_MIDDLE);
