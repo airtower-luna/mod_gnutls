@@ -721,13 +721,18 @@ static apr_status_t mgs_cache_ocsp_response(server_rec *s,
 
 
 
-/*
+/**
  * Retries after failed OCSP requests must be rate limited. If the
  * responder is overloaded or buggy we don't want to add too much more
  * load, and if a MITM is messing with requests a repetition loop
- * might end up being a self-inflicted denial of service.
+ * might end up being a self-inflicted denial of service. This
+ * function writes a specially formed entry to the cache to indicate a
+ * recent failure.
+ *
+ * @param s the server for which an OCSP request failed
+ * @param timeout lifetime of the cache entry
  */
-void mgs_cache_ocsp_failure(server_rec *s)
+static void mgs_cache_ocsp_failure(server_rec *s, apr_interval_time_t timeout)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
@@ -737,7 +742,7 @@ void mgs_cache_ocsp_failure(server_rec *s)
         .data = &c,
         .size = sizeof(c)
     };
-    apr_time_t expiry = apr_time_now() + sc->ocsp_failure_timeout;
+    apr_time_t expiry = apr_time_now() + timeout;
 
     char date_str[APR_RFC822_DATE_LEN];
     apr_rfc822_date(date_str, expiry);
@@ -823,7 +828,8 @@ int mgs_get_ocsp_response(gnutls_session_t session,
         ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, ctxt->c,
                       "Caching a fresh OCSP response failed");
         /* cache failure to rate limit retries */
-        mgs_cache_ocsp_failure(ctxt->c->base_server);
+        mgs_cache_ocsp_failure(ctxt->c->base_server,
+                               ctxt->sc->ocsp_failure_timeout);
         apr_global_mutex_unlock(sc->ocsp_mutex);
         goto fail_cleanup;
     }
