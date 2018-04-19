@@ -744,12 +744,6 @@ static void mgs_cache_ocsp_failure(server_rec *s, apr_interval_time_t timeout)
     };
     apr_time_t expiry = apr_time_now() + timeout;
 
-    char date_str[APR_RFC822_DATE_LEN];
-    apr_rfc822_date(date_str, expiry);
-    ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
-                 "OCSP request for %s failed, next try after %s.",
-                 s->server_hostname, date_str);
-
     int r = sc->cache->store(s, sc->ocsp->fingerprint, dummy, expiry);
     if (r != 0)
         ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
