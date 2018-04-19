@@ -593,7 +593,19 @@ static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
 
 
 
-apr_status_t mgs_cache_ocsp_response(server_rec *s)
+/**
+ * Get a fresh OCSP response and put it into the cache.
+ *
+ * @param s server that needs a new response
+ *
+ * @param cache_expiry If not `NULL`, this `apr_time_t` will be set to
+ * the expiration time of the cache entry. Remains unchanged on
+ * failure.
+ *
+ * @return APR_SUCCESS or an APR error code
+ */
+static apr_status_t mgs_cache_ocsp_response(server_rec *s,
+                                            apr_time_t *cache_expiry)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
@@ -699,6 +711,9 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
                       "Storing OCSP response in cache failed.");
         return APR_EGENERAL;
     }
+
+    if (cache_expiry != NULL)
+        *cache_expiry = expiry;
     return APR_SUCCESS;
 }
 
@@ -800,7 +815,7 @@ int mgs_get_ocsp_response(gnutls_session_t session,
         }
     }
 
-    rv = mgs_cache_ocsp_response(ctxt->c->base_server);
+    rv = mgs_cache_ocsp_response(ctxt->c->base_server, NULL);
     if (rv != APR_SUCCESS)
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, ctxt->c,
