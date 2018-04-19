@@ -963,11 +963,22 @@ static apr_status_t mgs_async_ocsp_update(int state,
     if (state == AP_WATCHDOG_STATE_STARTING)
         apr_global_mutex_unlock(sc->ocsp_mutex);
 
-    /* TODO: error handling, fuzzy interval */
+    /* TODO: fuzzy interval */
+    apr_interval_time_t next_interval = expiry - apr_time_now();
+    if (rv != APR_SUCCESS)
+        next_interval = sc->ocsp_failure_timeout;
+    sc->singleton_wd->set_callback_interval(sc->singleton_wd->wd,
+                                            next_interval,
+                                            s, mgs_async_ocsp_update);
 
-    ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, s,
-                 "Async OCSP update done for %s:%d.",
-                 s->server_hostname, s->addrs->host_port);
+    /* TODO: cache error if no cache entry present to inhibit
+     * request-triggered updates */
+    ap_log_error(APLOG_MARK, rv == APR_SUCCESS ? APLOG_DEBUG : APLOG_ERR, rv, s,
+                 "Async OCSP update %s for %s:%d, next update in "
+                 "%" APR_TIME_T_FMT " seconds.",
+                 rv == APR_SUCCESS ? "done" : "failed",
+                 s->server_hostname, s->addrs->host_port,
+                 apr_time_sec(next_interval));
 
     return APR_SUCCESS;
 }
