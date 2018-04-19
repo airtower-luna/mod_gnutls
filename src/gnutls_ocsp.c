@@ -939,7 +939,7 @@ apr_uri_t * mgs_cert_get_ocsp_uri(apr_pool_t *p, gnutls_x509_crt_t cert)
  */
 static apr_status_t mgs_async_ocsp_update(int state,
                                           void *data,
-                                          apr_pool_t *pool __attribute__((unused)))
+                                          apr_pool_t *pool)
 {
     /* If the server is stopping there's no need to do an OCSP
      * update. */
@@ -978,6 +978,31 @@ static apr_status_t mgs_async_ocsp_update(int state,
                  server->server_hostname, server->addrs->host_port,
                  apr_time_sec(next_interval));
 
+    /* Check if there's still a response in the cache. If not, add a
+     * failure entry. If there already is a failure entry, refresh
+     * it. The lifetime of such entries is twice the error timeout to
+     * make sure they do not expire before the next scheduled
+     * update. */
+    if (rv != APR_SUCCESS)
+    {
+        const gnutls_datum_t ocsp_response =
+            sc->cache->fetch(server, sc->ocsp->fingerprint, pool);
+
+        if (ocsp_response.size == 0 ||
+            ((ocsp_response.size == sizeof(unsigned char)) &&
+             (*((unsigned char *) ocsp_response.data) ==
+              OCSP_FAILURE_CACHE_DATA)))
+        {
+            ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, server,
+                         "Caching OCSP request failure for %s:%d.",
+                         server->server_hostname, server->addrs->host_port);
+            mgs_cache_ocsp_failure(server, sc->ocsp_failure_timeout * 2);
+        }
+
+        /* Get rid of the response, if any */
+        if (ocsp_response.size != 0)
+            gnutls_free(ocsp_response.data);
+    }
     apr_global_mutex_unlock(sc->ocsp_mutex);
 
     return APR_SUCCESS;
