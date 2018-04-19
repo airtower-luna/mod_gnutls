@@ -291,22 +291,26 @@ static int mc_cache_store_session(void *baton, gnutls_datum_t key,
     return mc_cache_store(ctxt->c->base_server, strkey, data, timeout);
 }
 
-static gnutls_datum_t mc_cache_fetch(conn_rec *c, const char *key)
+/**
+ * @param s server reference for logging
+ * @param key the key to fetch
+ * @param pool pool from which to allocate memory for the result
+ */
+static gnutls_datum_t mc_cache_fetch(server_rec *s, const char *key,
+                                     apr_pool_t *pool)
 {
     apr_status_t rv = APR_SUCCESS;
     char *value;
     apr_size_t value_len;
     gnutls_datum_t data = {NULL, 0};
 
-    rv = apr_memcache_getp(mc, c->pool, key, &value, &value_len, NULL);
+    rv = apr_memcache_getp(mc, pool, key, &value, &value_len, NULL);
 
     if (rv != APR_SUCCESS)
     {
-#if MOD_GNUTLS_DEBUG
-        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, rv, c,
-                      "error fetching key '%s'",
-                      key);
-#endif
+        ap_log_error(APLOG_MARK, APLOG_TRACE2, rv, s,
+                     "error fetching key '%s'",
+                     key);
         return data;
     }
 
@@ -330,7 +334,7 @@ static gnutls_datum_t mc_cache_fetch_generic(mgs_handle_t *ctxt,
         return data;
 
     const char *strkey = apr_psprintf(ctxt->c->pool, MC_TAG "%s", hex);
-    return mc_cache_fetch(ctxt->c, strkey);
+    return mc_cache_fetch(ctxt->c->base_server, strkey, ctxt->c->pool);
 }
 
 static gnutls_datum_t mc_cache_fetch_session(void *baton, gnutls_datum_t key)
@@ -342,7 +346,7 @@ static gnutls_datum_t mc_cache_fetch_session(void *baton, gnutls_datum_t key)
     if (!strkey)
         return data;
 
-    return mc_cache_fetch(ctxt->c, strkey);
+    return mc_cache_fetch(ctxt->c->base_server, strkey, ctxt->c->pool);
 }
 
 static int mc_cache_delete(void *baton, gnutls_datum_t key) {
