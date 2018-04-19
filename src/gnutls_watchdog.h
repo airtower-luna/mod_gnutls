@@ -30,6 +30,16 @@ struct mgs_watchdog {
     ap_watchdog_t *wd;
 };
 
+/**
+ * Creates a new mgs_watchdog structure and initializes the
+ * included `apr_watchdog_t` with the named singleton watchdog.
+ *
+ * @param s server reference for logging
+ * @param name watchdog name
+ * @param p memory pool for the watchdog
+ *
+ * @return pointer to the new mgs_watchdog, or `NULL` on error
+ */
 struct mgs_watchdog* mgs_new_singleton_watchdog(server_rec *s, char *name,
                                                 apr_pool_t *p);
 
