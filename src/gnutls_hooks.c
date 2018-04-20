@@ -674,18 +674,6 @@ int mgs_hook_post_config(apr_pool_t *pconf,
             return HTTP_NOT_FOUND;
         }
 
-        if (sc->ocsp_staple == GNUTLS_ENABLED_UNSET)
-            sc->ocsp_staple = GNUTLS_ENABLED_FALSE;
-
-        sc->ocsp_mutex = sc_base->ocsp_mutex;
-        /* init OCSP configuration if OCSP is enabled for this host */
-        if (sc->ocsp_staple)
-        {
-            rv = mgs_ocsp_post_config_server(pconf, ptemp, s);
-            if (rv != OK && rv != DECLINED)
-                return rv;
-        }
-
         /* defaults for unset values: */
         if (sc->enabled == GNUTLS_ENABLED_UNSET)
             sc->enabled = GNUTLS_ENABLED_FALSE;
@@ -697,6 +685,17 @@ int mgs_hook_post_config(apr_pool_t *pconf,
             sc->client_verify_mode = GNUTLS_CERT_IGNORE;
         if (sc->client_verify_method == mgs_cvm_unset)
             sc->client_verify_method = mgs_cvm_cartel;
+        if (sc->ocsp_staple == GNUTLS_ENABLED_UNSET)
+            sc->ocsp_staple = GNUTLS_ENABLED_FALSE;
+
+        sc->ocsp_mutex = sc_base->ocsp_mutex;
+        /* init OCSP configuration if OCSP is enabled for this host */
+        if (sc->enabled && sc->ocsp_staple)
+        {
+            rv = mgs_ocsp_post_config_server(pconf, ptemp, s);
+            if (rv != OK && rv != DECLINED)
+                return rv;
+        }
 
         /* Check if the priorities have been set */
         if (sc->priorities == NULL && sc->enabled == GNUTLS_ENABLED_TRUE) {
