@@ -369,6 +369,10 @@ static const command_rec mgs_config_cmds[] = {
     AP_INIT_FLAG("GnuTLSOCSPStapling", mgs_ocsp_stapling_enable,
                  NULL, RSRC_CONF,
                  "Enable OCSP stapling"),
+    AP_INIT_FLAG("GnuTLSOCSPAutoRefresh", mgs_set_ocsp_auto_refresh,
+                 NULL, RSRC_CONF,
+                 "Regularly refresh cached OCSP response independent "
+                 "of TLS handshakes?"),
     AP_INIT_FLAG("GnuTLSOCSPCheckNonce", mgs_set_ocsp_check_nonce,
                  NULL, RSRC_CONF,
                  "Check nonce in OCSP responses?"),
@@ -384,6 +388,10 @@ static const command_rec mgs_config_cmds[] = {
                   NULL, RSRC_CONF,
                   "Wait this many seconds before retrying a failed OCSP "
                   "request"),
+    AP_INIT_TAKE1("GnuTLSOCSPFuzzTime", mgs_set_timeout,
+                  NULL, RSRC_CONF,
+                  "Update cached OCSP response up to this many seconds "
+                  "before it expires, if GnuTLSOCSPAutoRefresh is enabled."),
     AP_INIT_TAKE1("GnuTLSOCSPSocketTimeout", mgs_set_timeout,
                   NULL, RSRC_CONF,
                   "Socket timeout for OCSP requests"),

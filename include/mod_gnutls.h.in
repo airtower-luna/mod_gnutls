@@ -213,6 +213,8 @@ typedef struct {
 
     /* Enable OCSP stapling */
     unsigned char ocsp_staple;
+    /* Automatically refresh cached OCSP response? */
+    unsigned char ocsp_auto_refresh;
     /* Check nonce in OCSP responses? */
     unsigned char ocsp_check_nonce;
     /* Read OCSP response for stapling from this file instead of
@@ -227,6 +229,13 @@ typedef struct {
     apr_interval_time_t ocsp_cache_time;
     /* If an OCSP request fails wait this long before trying again. */
     apr_interval_time_t ocsp_failure_timeout;
+    /** How long before a cached OCSP response expires should it be
+     * updated? During configuration parsing this is set to the
+     * maximum, during post configuration the value will be set to
+     * half that. After each update the interval to for the next one
+     * is choosen randomly as `ocsp_fuzz_time + ocsp_fuzz_time *
+     * RANDOM` with `0 <= RANDOM <= 1`. */
+    apr_interval_time_t ocsp_fuzz_time;
     /* Socket timeout for OCSP requests */
     apr_interval_time_t ocsp_socket_timeout;
 

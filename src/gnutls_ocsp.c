@@ -91,6 +91,23 @@ const char *mgs_ocsp_stapling_enable(cmd_parms *parms,
 
 
 
+const char *mgs_set_ocsp_auto_refresh(cmd_parms *parms,
+                                      void *dummy __attribute__((unused)),
+                                      const int arg)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(parms->server->module_config, &gnutls_module);
+
+    if (arg)
+        sc->ocsp_auto_refresh = GNUTLS_ENABLED_TRUE;
+    else
+        sc->ocsp_auto_refresh = GNUTLS_ENABLED_FALSE;
+
+    return NULL;
+}
+
+
+
 const char *mgs_set_ocsp_check_nonce(cmd_parms *parms,
                                      void *dummy __attribute__((unused)),
                                      const int arg)
@@ -928,13 +945,13 @@ apr_uri_t * mgs_cert_get_ocsp_uri(apr_pool_t *p, gnutls_x509_crt_t cert)
 
 
 
-/** The maximum random fuzz interval that will not overflow. The
- * permitted values are limited to whatever will not make an
- * `apr_interval_time_t` variable overflow when multiplied with
- * `APR_UINT16_MAX`. With apr_interval_time_t being a 64 bit signed
- * integer the maximum fuzz interval is about 4.5 years, which should
- * be more than plenty. */
-#define MAX_FUZZ_TIME (APR_INT64_MAX / APR_UINT16_MAX)
+/** The maximum random fuzz base (half the maximum fuzz) that will not
+ * overflow. The permitted values are limited to whatever will not
+ * make an `apr_interval_time_t` variable overflow when multiplied
+ * with `APR_UINT16_MAX`. With apr_interval_time_t being a 64 bit
+ * signed integer the maximum fuzz interval is about 4.5 years, which
+ * should be more than plenty. */
+#define MAX_FUZZ_BASE (APR_INT64_MAX / APR_UINT16_MAX)
 
 /**
  * Perform an asynchronous OCSP cache update. This is a callback for
@@ -971,13 +988,6 @@ static apr_status_t mgs_async_ocsp_update(int state,
     apr_global_mutex_lock(sc->ocsp_mutex);
     apr_status_t rv = mgs_cache_ocsp_response(server, &expiry);
 
-    /* TODO: Make maximum fuzz time configurable and compare to
-     * allowed maximum during config */
-    ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, server,
-                 "%s: Maximum fuzz time without overflow: %" APR_INT64_T_FMT
-                 " seconds",
-                 __func__, apr_time_sec(MAX_FUZZ_TIME));
-
     apr_interval_time_t next_interval;
     if (rv != APR_SUCCESS)
         next_interval = sc->ocsp_failure_timeout;
@@ -997,12 +1007,10 @@ static apr_status_t mgs_async_ocsp_update(int state,
                          gnutls_strerror(res));
         }
 
-        /* Base fuzz is half the maximum (sc->ocsp_cache_time / 8 at
-         * the moment). The actual fuzz is between the maximum and
-         * half that. */
-        apr_interval_time_t base_fuzz = sc->ocsp_cache_time / 16;
-        apr_interval_time_t fuzz =
-            base_fuzz + base_fuzz * random_bytes / APR_UINT16_MAX;
+        /* Choose the fuzz interval for the next update between
+         * `sc->ocsp_fuzz_time` and twice that. */
+        apr_interval_time_t fuzz = sc->ocsp_fuzz_time
+            + (sc->ocsp_fuzz_time * random_bytes / APR_UINT16_MAX);
 
         /* With an extremly short timeout or weird nextUpdate value
          * next_interval <= 0 might happen. Use the failure timeout to
@@ -1095,6 +1103,8 @@ int mgs_ocsp_post_config_server(apr_pool_t *pconf,
     }
 
     /* set default values for unset parameters */
+    if (sc->ocsp_auto_refresh == GNUTLS_ENABLED_UNSET)
+        sc->ocsp_auto_refresh = GNUTLS_ENABLED_TRUE;
     if (sc->ocsp_check_nonce == GNUTLS_ENABLED_UNSET)
         sc->ocsp_check_nonce = GNUTLS_ENABLED_TRUE;
     if (sc->ocsp_cache_time == MGS_TIMEOUT_UNSET)
@@ -1103,6 +1113,30 @@ int mgs_ocsp_post_config_server(apr_pool_t *pconf,
         sc->ocsp_failure_timeout = apr_time_from_sec(MGS_OCSP_FAILURE_TIMEOUT);
     if (sc->ocsp_socket_timeout == MGS_TIMEOUT_UNSET)
         sc->ocsp_socket_timeout = apr_time_from_sec(MGS_OCSP_SOCKET_TIMEOUT);
+    /* Base fuzz is half the configured maximum, the actual fuzz is
+     * between the maximum and half that. The default maximum is
+     * sc->ocsp_cache_time / 8, or twice the failure timeout,
+     * whichever is larger (so the default guarantees at least one
+     * retry before the cache entry expires).*/
+    if (sc->ocsp_fuzz_time == MGS_TIMEOUT_UNSET)
+    {
+        sc->ocsp_fuzz_time = sc->ocsp_cache_time / 16;
+        if (sc->ocsp_fuzz_time < sc->ocsp_failure_timeout)
+            sc->ocsp_fuzz_time = sc->ocsp_failure_timeout;
+    }
+    else
+        sc->ocsp_fuzz_time = sc->ocsp_fuzz_time / 2;
+
+    /* This really shouldn't happen considering MAX_FUZZ_BASE is about
+     * 4.5 years, but better safe than sorry. */
+    if (sc->ocsp_fuzz_time > MAX_FUZZ_BASE)
+    {
+        ap_log_error(APLOG_MARK, APLOG_STARTUP, APR_EINVAL, server,
+                     "%s: Maximum fuzz time is too large, maximum "
+                     "supported value is %" APR_INT64_T_FMT " seconds",
+                     __func__, apr_time_sec(MAX_FUZZ_BASE) * 2);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
 
     sc->ocsp = apr_palloc(pconf, sizeof(struct mgs_ocsp_data));
 
@@ -1149,7 +1183,8 @@ int mgs_ocsp_post_config_server(apr_pool_t *pconf,
 
     /* The watchdog structure may be NULL if mod_watchdog is
      * unavailable. */
-    if (sc->singleton_wd != NULL)
+    if (sc->singleton_wd != NULL
+        && sc->ocsp_auto_refresh == GNUTLS_ENABLED_TRUE)
     {
         apr_status_t rv =
             sc->singleton_wd->register_callback(sc->singleton_wd->wd,

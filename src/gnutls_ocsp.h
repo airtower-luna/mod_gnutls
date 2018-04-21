@@ -1,5 +1,5 @@
 /*
- *  Copyright 2016 Fiona Klute
+ *  Copyright 2016-2018 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -52,6 +52,10 @@ struct mgs_ocsp_data {
 const char *mgs_ocsp_stapling_enable(cmd_parms *parms,
                                      void *dummy __attribute__((unused)),
                                      const int arg);
+
+const char *mgs_set_ocsp_auto_refresh(cmd_parms *parms,
+                                      void *dummy __attribute__((unused)),
+                                      const int arg);
 
 const char *mgs_set_ocsp_check_nonce(cmd_parms *parms,
                                      void *dummy __attribute__((unused)),

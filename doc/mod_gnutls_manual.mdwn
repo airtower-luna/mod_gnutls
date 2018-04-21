@@ -3,9 +3,9 @@
 * * * * *
 
 `mod_gnutls` is a module for the Apache web server that provides HTTPS
-(HTTP over Transport Layer Security (TLS) or the older Secure Sockets
-Layer (SSL)) using the GnuTLS library.  More information about the
-module can be found at [the project's website](https://mod.gnutls.org/).
+(HTTP over Transport Layer Security (TLS)) using the GnuTLS library.
+More information about the module can be found at
+[the project's website](https://mod.gnutls.org/).
 
 * * * * *
 
@@ -567,6 +567,41 @@ Using OCSP stapling has a few requirements:
 
 OCSP cache updates are serialized using the `gnutls-ocsp` mutex.
 
+### GnuTLSOCSPAutoRefresh
+
+Regularly refresh cached OCSP response independent of TLS handshakes?
+
+    GnuTLSOCSPAutoRefresh [On|Off]
+
+Default: *on*\
+Context: server config, virtual host
+
+By default `mod_gnutls` will regularly refresh the cached OCSP
+response for hosts that have OCSP stapling enabled, regardless of
+whether it is used. This has advantages over updating the OCSP
+response only if a TLS handshake needs it:
+
+* Updating the cached response before it expires can hide short
+  unavailability of the OCSP responder, if a repeated request is
+  successful before the cache expires (see below).
+
+* Handshakes are not slowed down by fetching responses.
+
+The interval to the next request is determined as follows: After a
+successful OCSP request the next one is scheduled for a random period
+between `GnuTLSOCSPFuzzTime` and half of it before
+`GnuTLSOCSPCacheTimeout` expires. For example, if the cache timeout is
+3600 seconds and the fuzz time 600 seconds, the next request will be
+sent after 3000 to 3300 seconds. If the validity period of the
+response expires before then, the selected interval is halved until it
+is smaller than the time until expiry. If an OCSP request fails, it is
+retried after `GnuTLSOCSPFailureTimeout`.
+
+Regularly updating the OCSP cache requires `mod_watchdog`,
+`mod_gnutls` will fall back to updating the OCSP cache during
+handshakes if `mod_watchdog` is not available or this option is set to
+`Off`.
+
 ### GnuTLSOCSPCheckNonce
 
 Check the nonce in OCSP responses?
@@ -639,6 +674,20 @@ overloading both the server using mod_gnutls and the CA's OCSP
 responder. A shorter value increases the load on both sides, a longer
 one means that stapling will remain disabled for longer after a failed
 request.
+
+### GnuTLSOCSPFuzzTime
+
+Update the cached OCSP response up to this time before the cache expires
+
+    GnuTLSOCSPFuzzTime SECONDS
+
+Default: *larger of GnuTLSOCSPCacheTimeout / 8 and GnuTLSOCSPFailureTimeout \* 2*\
+Context: server config, virtual host
+
+Refreshing the cached response before it expires hides short OCSP
+responder unavailability. See `GnuTLSOCSPAutoRefresh` for how this
+value is used, using at least twice `GnuTLSOCSPFailureTimeout` is
+recommended.
 
 ### GnuTLSOCSPSocketTimeout
 
