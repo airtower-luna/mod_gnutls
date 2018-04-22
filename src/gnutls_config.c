@@ -579,42 +579,61 @@ const char *mgs_set_srp_tpasswd_conf_file(cmd_parms * parms, void *dummy __attri
 
 #endif
 
-const char *mgs_set_cache(cmd_parms * parms, void *dummy __attribute__((unused)),
-        const char *type, const char *arg) {
+const char *mgs_set_cache(cmd_parms * parms,
+                          void *dummy __attribute__((unused)),
+                          const char *type, const char *arg)
+{
     const char *err;
     mgs_srvconf_rec *sc =
-	ap_get_module_config(parms->server->module_config,
-			     &gnutls_module);
-    if ((err = ap_check_cmd_context(parms, GLOBAL_ONLY))) {
-	return err;
+        ap_get_module_config(parms->server->module_config,
+                             &gnutls_module);
+    if ((err = ap_check_cmd_context(parms, GLOBAL_ONLY)))
+        return err;
+
+    /* none: disable cache */
+    if (strcasecmp("none", type) == 0)
+    {
+        sc->cache_type = mgs_cache_none;
+        sc->cache_config = NULL;
+        return NULL;
     }
 
-    if (strcasecmp("none", type) == 0) {
-	sc->cache_type = mgs_cache_none;
-	sc->cache_config = NULL;
-	return NULL;
-    } else if (strcasecmp("dbm", type) == 0) {
-	sc->cache_type = mgs_cache_dbm;
+    /* Try to split socache "type:config" style configuration */
+    const char* sep = ap_strchr_c(type, ':');
+    if (sep)
+    {
+        type = apr_pstrmemdup(parms->temp_pool, type, sep - type);
+        if (arg != NULL)
+        {
+            /* No mixing of socache style and legacy config! */
+            return "GnuTLSCache appears to have a mod_socache style "
+                "type:config value, but there is a second parameter!";
+        }
+        arg = ++sep;
+    }
+
+    if (strcasecmp("dbm", type) == 0) {
+        sc->cache_type = mgs_cache_dbm;
     } else if (strcasecmp("gdbm", type) == 0) {
-	sc->cache_type = mgs_cache_gdbm;
+        sc->cache_type = mgs_cache_gdbm;
     }
 #if HAVE_APR_MEMCACHE
     else if (strcasecmp("memcache", type) == 0) {
-	sc->cache_type = mgs_cache_memcache;
+        sc->cache_type = mgs_cache_memcache;
     }
 #endif
     else {
-	return "Invalid Type for GnuTLSCache!";
+        return "Invalid Type for GnuTLSCache!";
     }
 
     if (arg == NULL)
-	return "Invalid argument 2 for GnuTLSCache!";
+        return "Invalid argument 2 for GnuTLSCache!";
 
     if (sc->cache_type == mgs_cache_dbm
-	|| sc->cache_type == mgs_cache_gdbm) {
-	sc->cache_config = ap_server_root_relative(parms->pool, arg);
+        || sc->cache_type == mgs_cache_gdbm) {
+        sc->cache_config = ap_server_root_relative(parms->pool, arg);
     } else {
-	sc->cache_config = apr_pstrdup(parms->pool, arg);
+        sc->cache_config = apr_pstrdup(parms->pool, arg);
     }
 
     return NULL;

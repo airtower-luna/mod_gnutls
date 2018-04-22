@@ -391,9 +391,6 @@ const char *mgs_set_cert_file(cmd_parms * parms, void *dummy,
 const char *mgs_set_key_file(cmd_parms * parms, void *dummy,
                              const char *arg);
 
-const char *mgs_set_cache(cmd_parms * parms, void *dummy,
-                          const char *type, const char* arg);
-
 const char *mgs_set_timeout(cmd_parms *parms, void *dummy, const char *arg);
 
 const char *mgs_set_client_verify(cmd_parms * parms, void *dummy,
