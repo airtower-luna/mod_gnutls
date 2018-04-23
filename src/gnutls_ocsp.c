@@ -1091,6 +1091,7 @@ int mgs_ocsp_post_config_server(apr_pool_t *pconf,
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(server->module_config, &gnutls_module);
+    // TODO: check for cache!
 
     if (sc->certs_x509_chain_num < 2)
     {

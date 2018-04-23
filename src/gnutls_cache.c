@@ -47,6 +47,8 @@
 #include "mod_gnutls.h"
 #include "gnutls_config.h"
 
+#include <ap_socache.h>
+
 #if HAVE_APR_MEMCACHE
 #include "apr_memcache.h"
 #endif
@@ -128,487 +130,46 @@ char *mgs_time2sz(time_t in_time, char *str, int strsize)
     return str;
 }
 
-#if HAVE_APR_MEMCACHE
 
-/**
- * Turn a GnuTLS session ID into the key format we use with memcached
- * caches. Name the Session ID as `server:port.SessionID` to disallow
- * resuming sessions on different servers.
- *
- * @return `0` on success, `-1` on failure
- */
-static char *mgs_session_id2mc(conn_rec * c, unsigned char *id, int idlen)
-{
-    char sz[GNUTLS_SESSION_ID_STRING_LEN];
-    apr_status_t rv = apr_escape_hex(sz, id, idlen, 0, NULL);
-    if (rv != APR_SUCCESS)
-        return NULL;
 
-    return apr_psprintf(c->pool, MC_TAG "%s:%d.%s",
-            c->base_server->server_hostname,
-            c->base_server->port, sz);
-}
-
-/**
- * GnuTLS Session Cache using libmemcached
- *
- */
-
-/* The underlying apr_memcache system is thread safe... woohoo */
-static apr_memcache_t *mc;
-
-static int mc_cache_child_init(apr_pool_t * p, server_rec * s,
-        mgs_srvconf_rec * sc) {
-    apr_status_t rv = APR_SUCCESS;
-    int thread_limit = 0;
-    int nservers = 0;
-    char *cache_config;
-    char *split;
-    char *tok;
-
-    ap_mpm_query(AP_MPMQ_HARD_LIMIT_THREADS, &thread_limit);
-
-    /* Find all the servers in the first run to get a total count */
-    cache_config = apr_pstrdup(p, sc->cache_config);
-    split = apr_strtok(cache_config, " ", &tok);
-    while (split) {
-        nservers++;
-        split = apr_strtok(NULL, " ", &tok);
-    }
-
-    rv = apr_memcache_create(p, nservers, 0, &mc);
-    if (rv != APR_SUCCESS) {
-        ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
-                     "Failed to create Memcache object of size '%d'.",
-                     nservers);
-        return rv;
-    }
-
-    /* Now add each server to the memcache */
-    cache_config = apr_pstrdup(p, sc->cache_config);
-    split = apr_strtok(cache_config, " ", &tok);
-    while (split) {
-        apr_memcache_server_t *st;
-        char *host_str;
-        char *scope_id;
-        apr_port_t port;
-
-        rv = apr_parse_addr_port(&host_str, &scope_id, &port,
-                split, p);
-        if (rv != APR_SUCCESS) {
-            ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
-                         "Failed to parse server: '%s'", split);
-            return rv;
-        }
-
-        if (host_str == NULL) {
-            ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
-                         "Failed to parse server, "
-                         "no hostname specified: '%s'", split);
-            return rv;
-        }
-
-        if (port == 0) {
-            port = 11211; /* default port */
-        }
-
-        /* Should Max Conns be (thread_limit / nservers) ? */
-        rv = apr_memcache_server_create(p,
-                host_str, port,
-                0,
-                1, thread_limit, 600, &st);
-        if (rv != APR_SUCCESS) {
-            ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
-                         "Failed to create server: %s:%d",
-                         host_str, port);
-            return rv;
-        }
-
-        rv = apr_memcache_add_server(mc, st);
-        if (rv != APR_SUCCESS) {
-            ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
-                         "Failed to add server: %s:%d",
-                         host_str, port);
-            return rv;
-        }
-
-        split = apr_strtok(NULL, " ", &tok);
-    }
-    return rv;
-}
-
-static int mc_cache_store(server_rec *s, const char *key,
-                          gnutls_datum_t data, apr_uint32_t timeout)
-{
-    apr_status_t rv = apr_memcache_set(mc, key, (char *) data.data,
-                                       data.size, timeout, 0);
-
-    if (rv != APR_SUCCESS)
-    {
-        ap_log_error(APLOG_MARK, APLOG_CRIT, rv, s,
-                     "error storing key '%s' with %d bytes of data",
-                     key, data.size);
-        return -1;
-    }
-
-    return 0;
-}
-
-static int mc_cache_store_generic(server_rec *s, gnutls_datum_t key,
-                                  gnutls_datum_t data, apr_time_t expiry)
-{
-    apr_uint32_t timeout = apr_time_sec(expiry - apr_time_now());
-
-    apr_pool_t *p;
-    apr_pool_create(&p, NULL);
-
-    const char *hex = apr_pescape_hex(p, key.data, key.size, 1);
-    if (hex == NULL)
-    {
-        apr_pool_destroy(p);
-        return -1;
-    }
-
-    const char *strkey = apr_psprintf(p, MC_TAG "%s", hex);
-
-    int ret = mc_cache_store(s, strkey, data, timeout);
-
-    apr_pool_destroy(p);
-    return ret;
-}
-
-static int mc_cache_store_session(void *baton, gnutls_datum_t key,
-                                  gnutls_datum_t data)
-{
-    mgs_handle_t *ctxt = baton;
-
-    const char *strkey = mgs_session_id2mc(ctxt->c, key.data, key.size);
-    if (!strkey)
-        return -1;
-
-    apr_uint32_t timeout = apr_time_sec(ctxt->sc->cache_timeout);
-
-    return mc_cache_store(ctxt->c->base_server, strkey, data, timeout);
-}
-
-/**
- * @param s server reference for logging
- * @param key the key to fetch
- * @param pool pool from which to allocate memory for the result
- */
-static gnutls_datum_t mc_cache_fetch(server_rec *s, const char *key,
-                                     apr_pool_t *pool)
-{
-    apr_status_t rv = APR_SUCCESS;
-    char *value;
-    apr_size_t value_len;
-    gnutls_datum_t data = {NULL, 0};
-
-    rv = apr_memcache_getp(mc, pool, key, &value, &value_len, NULL);
-
-    if (rv != APR_SUCCESS)
-    {
-        ap_log_error(APLOG_MARK, APLOG_TRACE2, rv, s,
-                     "error fetching key '%s'",
-                     key);
-        return data;
-    }
-
-    /* TODO: Eliminate this memcpy. gnutls-- */
-    data.data = gnutls_malloc(value_len);
-    if (data.data == NULL)
-        return data;
-
-    data.size = value_len;
-    memcpy(data.data, value, value_len);
-
-    return data;
-}
-
-static gnutls_datum_t mc_cache_fetch_generic(server_rec *server,
-                                             gnutls_datum_t key,
-                                             apr_pool_t *pool)
-{
-    gnutls_datum_t data = {NULL, 0};
-    const char *hex = apr_pescape_hex(pool, key.data, key.size, 1);
-    if (hex == NULL)
-        return data;
-
-    const char *strkey = apr_psprintf(pool, MC_TAG "%s", hex);
-    return mc_cache_fetch(server, strkey, pool);
-}
-
-static gnutls_datum_t mc_cache_fetch_session(void *baton, gnutls_datum_t key)
-{
-    mgs_handle_t *ctxt = baton;
-    gnutls_datum_t data = {NULL, 0};
-
-    const char *strkey = mgs_session_id2mc(ctxt->c, key.data, key.size);
-    if (!strkey)
-        return data;
-
-    return mc_cache_fetch(ctxt->c->base_server, strkey, ctxt->c->pool);
-}
-
-static int mc_cache_delete(void *baton, gnutls_datum_t key) {
-    apr_status_t rv = APR_SUCCESS;
-    mgs_handle_t *ctxt = baton;
-    char *strkey = NULL;
-
-    strkey = mgs_session_id2mc(ctxt->c, key.data, key.size);
-    if (!strkey)
-        return -1;
-
-    rv = apr_memcache_delete(mc, strkey, 0);
-
-    if (rv != APR_SUCCESS) {
-        ap_log_error(APLOG_MARK, APLOG_DEBUG, rv,
-                     ctxt->c->base_server,
-                     "error deleting key '%s'",
-                     strkey);
-        return -1;
-    }
-
-    return 0;
-}
-
-#endif	/* have_apr_memcache */
-
-static const char *db_type(mgs_srvconf_rec * sc) {
-    if (sc->cache_type == mgs_cache_gdbm)
-        return "gdbm";
-    else
-        return "db";
-}
-
-#define SSL_DBM_FILE_MODE ( APR_UREAD | APR_UWRITE | APR_GREAD | APR_WREAD )
-
-static void dbm_cache_expire(server_rec *s)
-{
-    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
-        ap_get_module_config(s->module_config, &gnutls_module);
-
-    apr_status_t rv;
-    apr_dbm_t *dbm;
-    apr_datum_t dbmkey;
-    apr_datum_t dbmval;
-    apr_time_t dtime;
-    apr_pool_t *spool;
-    int total, deleted;
-
-    apr_time_t now = apr_time_now();
-
-    if (now - sc->last_cache_check < (sc->cache_timeout) / 2)
-        return;
-
-    sc->last_cache_check = now;
-
-    apr_pool_create(&spool, NULL);
-
-    total = 0;
-    deleted = 0;
-
-    apr_global_mutex_lock(sc->cache->mutex);
-
-    rv = apr_dbm_open_ex(&dbm, db_type(sc),
-            sc->cache_config, APR_DBM_RWCREATE,
-            SSL_DBM_FILE_MODE, spool);
-    if (rv != APR_SUCCESS) {
-        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv, s,
-                     "error opening cache '%s'",
-                     sc->cache_config);
-        apr_global_mutex_unlock(sc->cache->mutex);
-        apr_pool_destroy(spool);
-        return;
-    }
-
-    apr_dbm_firstkey(dbm, &dbmkey);
-    while (dbmkey.dptr != NULL) {
-        apr_dbm_fetch(dbm, dbmkey, &dbmval);
-        if (dbmval.dptr != NULL
-                && dbmval.dsize >= sizeof (apr_time_t)) {
-            memcpy(&dtime, dbmval.dptr, sizeof (apr_time_t));
-
-            if (now >= dtime) {
-                apr_dbm_delete(dbm, dbmkey);
-                deleted++;
-            }
-            apr_dbm_freedatum(dbm, dbmval);
-        } else {
-            apr_dbm_delete(dbm, dbmkey);
-            deleted++;
-        }
-        total++;
-        apr_dbm_nextkey(dbm, &dbmkey);
-    }
-    apr_dbm_close(dbm);
-
-    rv = apr_global_mutex_unlock(sc->cache->mutex);
-
-    ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, s,
-                 "Cleaned up cache '%s'. Deleted %d and left %d",
-                 sc->cache_config, deleted, total - deleted);
-
-    apr_pool_destroy(spool);
-
-    return;
-}
-
-
-
-static gnutls_datum_t dbm_cache_fetch(server_rec *server, gnutls_datum_t key,
-                                      apr_pool_t *pool)
+static int socache_store(server_rec *server, gnutls_datum_t key,
+                         gnutls_datum_t data, apr_time_t expiry)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(server->module_config, &gnutls_module);
 
-    gnutls_datum_t data = {NULL, 0};
-    apr_dbm_t *dbm;
-    apr_datum_t dbmkey = {(char*) key.data, key.size};
-    apr_datum_t dbmval;
-    apr_time_t expiry = 0;
-    apr_status_t rv;
-
-    /* check if it is time for cache expiration */
-    dbm_cache_expire(server);
+    apr_pool_t *spool;
+    apr_pool_create(&spool, NULL);
 
     apr_global_mutex_lock(sc->cache->mutex);
-
-    rv = apr_dbm_open_ex(&dbm, db_type(sc),
-                         sc->cache_config, APR_DBM_READONLY,
-                         SSL_DBM_FILE_MODE, pool);
-    if (rv != APR_SUCCESS) {
-        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv, server,
-                     "error opening cache '%s'",
-                     sc->cache_config);
-        apr_global_mutex_unlock(sc->cache->mutex);
-        return data;
-    }
-
-    rv = apr_dbm_fetch(dbm, dbmkey, &dbmval);
+    apr_status_t rv = sc->cache->prov->store(sc->cache->socache, server,
+                                             key.data, key.size,
+                                             expiry,
+                                             data.data, data.size,
+                                             spool);
+    apr_global_mutex_unlock(sc->cache->mutex);
 
     if (rv != APR_SUCCESS)
-        goto close_db;
-
-    if (dbmval.dptr == NULL || dbmval.dsize <= sizeof (apr_time_t))
-        goto cleanup;
-
-    data.size = dbmval.dsize - sizeof (apr_time_t);
-    /* get data expiration tag */
-    expiry = *((apr_time_t *) dbmval.dptr);
-
-    data.data = gnutls_malloc(data.size);
-    if (data.data == NULL)
     {
-        data.size = 0;
-        goto cleanup;
+        ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, server,
+                     "error storing in cache '%s:%s'",
+                     sc->cache->prov->name, sc->cache_config);
+        apr_pool_destroy(spool);
+        return -1;
     }
 
     ap_log_error(APLOG_MARK, APLOG_TRACE1, rv, server,
-                 "fetched %" APR_SIZE_T_FMT " bytes from cache",
-                 dbmval.dsize);
-
-    memcpy(data.data, dbmval.dptr + sizeof (apr_time_t), data.size);
-
- cleanup:
-    apr_dbm_freedatum(dbm, dbmval);
- close_db:
-    apr_dbm_close(dbm);
-    apr_global_mutex_unlock(sc->cache->mutex);
-
-    /* cache entry might have expired since last cache cleanup */
-    if (expiry != 0 && expiry < apr_time_now())
-    {
-        gnutls_free(data.data);
-        data.data = NULL;
-        data.size = 0;
-        ap_log_error(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, server,
-                     "dropped expired cache data");
-    }
-
-    return data;
-}
-
-static gnutls_datum_t dbm_cache_fetch_session(void *baton, gnutls_datum_t key)
-{
-    gnutls_datum_t data = {NULL, 0};
-    gnutls_datum_t dbmkey;
-    mgs_handle_t *ctxt = baton;
-
-    if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
-        return data;
-
-    return dbm_cache_fetch(ctxt->c->base_server, dbmkey, ctxt->c->pool);
-}
-
-static int dbm_cache_store(server_rec *s, gnutls_datum_t key,
-                           gnutls_datum_t data, apr_time_t expiry)
-{
-    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
-        ap_get_module_config(s->module_config, &gnutls_module);
-
-    apr_dbm_t *dbm;
-    apr_datum_t dbmkey = {(char*) key.data, key.size};
-    apr_datum_t dbmval;
-    apr_status_t rv;
-    apr_pool_t *spool;
-
-    /* check if it is time for cache expiration */
-    dbm_cache_expire(s);
-
-    apr_pool_create(&spool, NULL);
-
-    /* create DBM value */
-    dbmval.dsize = data.size + sizeof (apr_time_t);
-    dbmval.dptr = (char *) apr_palloc(spool, dbmval.dsize);
-
-    /* prepend expiration time */
-    memcpy((char *) dbmval.dptr, &expiry, sizeof (apr_time_t));
-    memcpy((char *) dbmval.dptr + sizeof (apr_time_t),
-            data.data, data.size);
-
-    apr_global_mutex_lock(sc->cache->mutex);
-
-    rv = apr_dbm_open_ex(&dbm, db_type(sc),
-                         sc->cache_config, APR_DBM_RWCREATE,
-                         SSL_DBM_FILE_MODE, spool);
-    if (rv != APR_SUCCESS)
-    {
-        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv, s,
-                     "error opening cache '%s'",
-                     sc->cache_config);
-        apr_global_mutex_unlock(sc->cache->mutex);
-        apr_pool_destroy(spool);
-        return -1;
-    }
-
-    rv = apr_dbm_store(dbm, dbmkey, dbmval);
-    if (rv != APR_SUCCESS)
-    {
-        ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, s,
-                     "error storing in cache '%s'",
-                     sc->cache_config);
-        apr_dbm_close(dbm);
-        apr_global_mutex_unlock(sc->cache->mutex);
-        apr_pool_destroy(spool);
-        return -1;
-    }
-
-    apr_dbm_close(dbm);
-    apr_global_mutex_unlock(sc->cache->mutex);
-
-    ap_log_error(APLOG_MARK, APLOG_TRACE1, rv, s,
-                 "stored %" APR_SIZE_T_FMT " bytes of data (%"
-                 APR_SIZE_T_FMT " byte key) in cache '%s'",
-                 dbmval.dsize, dbmkey.dsize, sc->cache_config);
-
+                 "stored %u bytes of data (%u byte key) in cache '%s:%s'",
+                 data.size, key.size,
+                 sc->cache->prov->name, sc->cache_config);
     apr_pool_destroy(spool);
-
     return 0;
 }
 
-static int dbm_cache_store_session(void *baton, gnutls_datum_t key,
-                                   gnutls_datum_t data)
+
+
+static int socache_store_session(void *baton, gnutls_datum_t key,
+                                 gnutls_datum_t data)
 {
     mgs_handle_t *ctxt = baton;
     gnutls_datum_t dbmkey;
@@ -618,100 +179,128 @@ static int dbm_cache_store_session(void *baton, gnutls_datum_t key,
 
     apr_time_t expiry = apr_time_now() + ctxt->sc->cache_timeout;
 
-    return dbm_cache_store(ctxt->c->base_server, dbmkey, data, expiry);
+    return socache_store(ctxt->c->base_server, dbmkey, data, expiry);
 }
 
-static int dbm_cache_delete(void *baton, gnutls_datum_t key)
+
+
+// 4K should be enough for OCSP responses and sessions alike
+#define SOCACHE_FETCH_BUF_SIZE 4096
+static gnutls_datum_t socache_fetch(server_rec *server, gnutls_datum_t key,
+                                    apr_pool_t *pool)
 {
-    apr_dbm_t *dbm;
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(server->module_config, &gnutls_module);
+
+    gnutls_datum_t data = {NULL, 0};
+    data.data = gnutls_malloc(SOCACHE_FETCH_BUF_SIZE);
+    if (data.data == NULL)
+        return data;
+    data.size = SOCACHE_FETCH_BUF_SIZE;
+
+    apr_pool_t *spool;
+    apr_pool_create(&spool, pool);
+
+    apr_global_mutex_lock(sc->cache->mutex);
+    apr_status_t rv = sc->cache->prov->retrieve(sc->cache->socache, server,
+                                                key.data, key.size,
+                                                data.data, &data.size,
+                                                spool);
+    apr_global_mutex_unlock(sc->cache->mutex);
+
+    if (rv != APR_SUCCESS)
+    {
+        /* APR_NOTFOUND means there's no such object. */
+        if (rv == APR_NOTFOUND)
+            ap_log_error(APLOG_MARK, APLOG_TRACE1, rv, server,
+                         "requested entry not found in cache '%s:%s'.",
+                         sc->cache->prov->name, sc->cache_config);
+        else
+            ap_log_error(APLOG_MARK, APLOG_WARNING, rv, server,
+                         "error fetching from cache '%s:%s'",
+                         sc->cache->prov->name, sc->cache_config);
+        /* free unused buffer */
+        gnutls_free(data.data);
+        data.data = NULL;
+        data.size = 0;
+    }
+    else
+    {
+        ap_log_error(APLOG_MARK, APLOG_TRACE1, rv, server,
+                     "fetched %u bytes from cache '%s:%s'",
+                     data.size, sc->cache->prov->name, sc->cache_config);
+    }
+    apr_pool_destroy(spool);
+
+    return data;
+}
+
+static gnutls_datum_t socache_fetch_session(void *baton, gnutls_datum_t key)
+{
+    gnutls_datum_t data = {NULL, 0};
+    gnutls_datum_t dbmkey;
+    mgs_handle_t *ctxt = baton;
+
+    if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
+        return data;
+
+    return socache_fetch(ctxt->c->base_server, dbmkey, ctxt->c->pool);
+}
+
+
+
+static int socache_delete(void *baton, gnutls_datum_t key)
+{
     gnutls_datum_t tmpkey;
     mgs_handle_t *ctxt = baton;
-    apr_status_t rv;
 
     if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &tmpkey) < 0)
         return -1;
-    apr_datum_t dbmkey = {(char*) tmpkey.data, tmpkey.size};
 
     apr_global_mutex_lock(ctxt->sc->cache->mutex);
-
-    rv = apr_dbm_open_ex(&dbm, db_type(ctxt->sc),
-            ctxt->sc->cache_config, APR_DBM_RWCREATE,
-            SSL_DBM_FILE_MODE, ctxt->c->pool);
-    if (rv != APR_SUCCESS) {
-        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
-                     ctxt->c->base_server,
-                     "error opening cache '%s'",
-                     ctxt->sc->cache_config);
-        apr_global_mutex_unlock(ctxt->sc->cache->mutex);
-        return -1;
-    }
-
-    rv = apr_dbm_delete(dbm, dbmkey);
-
-    if (rv != APR_SUCCESS) {
-        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
-                     ctxt->c->base_server,
-                     "error deleting from cache '%s'",
-                     ctxt->sc->cache_config);
-        apr_dbm_close(dbm);
-        apr_global_mutex_unlock(ctxt->sc->cache->mutex);
-        return -1;
-    }
-
-    apr_dbm_close(dbm);
+    apr_status_t rv = ctxt->sc->cache->prov->remove(ctxt->sc->cache->socache,
+                                                    ctxt->c->base_server,
+                                                    key.data, key.size,
+                                                    ctxt->c->pool);
     apr_global_mutex_unlock(ctxt->sc->cache->mutex);
 
+    if (rv != APR_SUCCESS) {
+        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
+                     ctxt->c->base_server,
+                     "error deleting from cache '%s:%s'",
+                     ctxt->sc->cache->prov->name, ctxt->sc->cache_config);
+        return -1;
+    }
     return 0;
 }
 
-static int dbm_cache_post_config(apr_pool_t * p, server_rec * s,
-        mgs_srvconf_rec * sc) {
-    apr_status_t rv;
-    apr_dbm_t *dbm;
-    const char *path1;
-    const char *path2;
 
-    rv = apr_dbm_open_ex(&dbm, db_type(sc), sc->cache_config,
-            APR_DBM_RWCREATE, SSL_DBM_FILE_MODE, p);
 
-    if (rv != APR_SUCCESS) {
-        ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
-                "GnuTLS: Cannot create DBM Cache at `%s'",
-                sc->cache_config);
-        return rv;
-    }
-
-    apr_dbm_close(dbm);
-
-    apr_dbm_get_usednames_ex(p, db_type(sc), sc->cache_config, &path1,
-            &path2);
-
-    /* The Following Code takes logic directly from mod_ssl's DBM Cache */
-#if !defined(OS2) && !defined(WIN32) && !defined(BEOS) && !defined(NETWARE)
-    /* Running as Root */
-    if (path1 && geteuid() == 0) {
-        if (0 != chown(path1, ap_unixd_config.user_id, -1))
-            ap_log_error(APLOG_MARK, APLOG_NOTICE, -1, s,
-                         "GnuTLS: could not chown cache path1 `%s' to uid %d (errno: %d)",
-                         path1, ap_unixd_config.user_id, errno);
-        if (path2 != NULL) {
-            if (0 != chown(path2, ap_unixd_config.user_id, -1))
-                ap_log_error(APLOG_MARK, APLOG_NOTICE, -1, s,
-                             "GnuTLS: could not chown cache path2 `%s' to uid %d (errno: %d)",
-                             path2, ap_unixd_config.user_id, errno);
-        }
-    }
-#endif
-
-    return rv;
+static apr_status_t cleanup_socache(void *data)
+{
+    server_rec *s = data;
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(s->module_config, &gnutls_module);
+    ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
+                 "Cleaning up socache '%s:%s'",
+                 sc->cache->prov->name, sc->cache_config);
+    sc->cache->prov->destroy(sc->cache->socache, s);
+    return APR_SUCCESS;
 }
 
-int mgs_cache_post_config(apr_pool_t * p, server_rec * s,
-        mgs_srvconf_rec * sc) {
 
+
+int mgs_cache_post_config(apr_pool_t *pconf, apr_pool_t *ptemp,
+                          server_rec *s, mgs_srvconf_rec *sc)
+{
+    apr_status_t rv = APR_SUCCESS;
     /* if GnuTLSCache was never explicitly set: */
-    if (sc->cache_type == mgs_cache_unset)
+    if (sc->cache_type == mgs_cache_unset || sc->cache_type == mgs_cache_none)
+    {
         sc->cache_type = mgs_cache_none;
+        /* Cache disabled, done. */
+        return APR_SUCCESS;
+    }
     /* if GnuTLSCacheTimeout was never explicitly set: */
     if (sc->cache_timeout == MGS_TIMEOUT_UNSET)
         sc->cache_timeout = apr_time_from_sec(MGS_DEFAULT_CACHE_TIMEOUT);
@@ -719,27 +308,82 @@ int mgs_cache_post_config(apr_pool_t * p, server_rec * s,
     /* initialize mutex only once */
     if (sc->cache == NULL)
     {
-        sc->cache = apr_palloc(p, sizeof(struct mgs_cache));
-        apr_status_t rv = ap_global_mutex_create(&sc->cache->mutex, NULL,
-                                                 MGS_CACHE_MUTEX_NAME,
-                                                 NULL, s, p, 0);
+        sc->cache = apr_palloc(pconf, sizeof(struct mgs_cache));
+        rv = ap_global_mutex_create(&sc->cache->mutex, NULL,
+                                    MGS_CACHE_MUTEX_NAME,
+                                    NULL, s, pconf, 0);
         if (rv != APR_SUCCESS)
             return rv;
     }
 
+    char *pname = NULL;
+
     if (sc->cache_type == mgs_cache_dbm || sc->cache_type == mgs_cache_gdbm)
     {
-        sc->cache->store = dbm_cache_store;
-        sc->cache->fetch = dbm_cache_fetch;
-        return dbm_cache_post_config(p, s, sc);
+        pname = "dbm";
+        sc->cache->store = socache_store;
+        sc->cache->fetch = socache_fetch;
+        //return dbm_cache_post_config(pconf, s, sc);
     }
 #if HAVE_APR_MEMCACHE
     else if (sc->cache_type == mgs_cache_memcache)
     {
-        sc->cache->store = mc_cache_store_generic;
-        sc->cache->fetch = mc_cache_fetch_generic;
+        pname = "memcache";
+        sc->cache->store = socache_store;
+        sc->cache->fetch = socache_fetch;
     }
 #endif
+    else if (sc->cache_type == mgs_cache_shmcb)
+    {
+        pname = "shmcb";
+        sc->cache->store = socache_store;
+        sc->cache->fetch = socache_fetch;
+    }
+
+    /* Find the right socache provider */
+    sc->cache->prov = ap_lookup_provider(AP_SOCACHE_PROVIDER_GROUP,
+                                         pname,
+                                         AP_SOCACHE_PROVIDER_VERSION);
+    if (sc->cache->prov)
+    {
+        /* Cache found; create it, passing anything beyond the colon. */
+        const char *err = sc->cache->prov->create(&sc->cache->socache,
+                                                  sc->cache_config,
+                                                  ptemp, pconf);
+        if (err != NULL)
+        {
+            ap_log_error(APLOG_MARK, APLOG_EMERG, APR_EGENERAL, s,
+                         "Creating cache '%s:%s' failed: %s",
+                         pname, sc->cache_config, err);
+            return HTTP_INSUFFICIENT_STORAGE;
+        }
+        ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
+                     "%s: Socache '%s' created.", __func__, pname);
+
+        // TODO: provide hints
+        rv = sc->cache->prov->init(sc->cache->socache,
+                                   "mod_gnutls-session", NULL, s, pconf);
+        if (rv != APR_SUCCESS)
+        {
+            ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
+                         "Initializing cache '%s:%s' failed!",
+                         pname, sc->cache_config);
+            return HTTP_INSUFFICIENT_STORAGE;
+        }
+        ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
+                     "%s: socache '%s:%s' created.", __func__,
+                     pname, sc->cache_config);
+    }
+    else
+    {
+        ap_log_error(APLOG_MARK, APLOG_EMERG, APR_EGENERAL, s,
+                     "Could not find socache provider '%s', please make sure "
+                     "that the provider name is valid and the "
+                     "appropriate mod_socache submodule is loaded.", pname);
+        return HTTP_NOT_FOUND;
+    }
+
+    apr_pool_pre_cleanup_register(pconf, s, cleanup_socache);
 
     return APR_SUCCESS;
 }
@@ -756,42 +400,22 @@ int mgs_cache_child_init(apr_pool_t * p,
         ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
                      "Failed to reinit mutex '%s'", MGS_CACHE_MUTEX_NAME);
 
-    if (sc->cache_type == mgs_cache_dbm
-            || sc->cache_type == mgs_cache_gdbm) {
-        return 0;
-    }
-#if HAVE_APR_MEMCACHE
-    else if (sc->cache_type == mgs_cache_memcache) {
-        return mc_cache_child_init(p, s, sc);
-    }
-#endif
     return 0;
 }
 
 #include <assert.h>
 
-int mgs_cache_session_init(mgs_handle_t * ctxt) {
-    if (ctxt->sc->cache_type == mgs_cache_dbm
-            || ctxt->sc->cache_type == mgs_cache_gdbm) {
+int mgs_cache_session_init(mgs_handle_t * ctxt)
+{
+    if (ctxt->sc->cache_type != mgs_cache_none)
+    {
         gnutls_db_set_retrieve_function(ctxt->session,
-                dbm_cache_fetch_session);
+                                        socache_fetch_session);
         gnutls_db_set_remove_function(ctxt->session,
-                dbm_cache_delete);
+                                      socache_delete);
         gnutls_db_set_store_function(ctxt->session,
-                dbm_cache_store_session);
+                                     socache_store_session);
         gnutls_db_set_ptr(ctxt->session, ctxt);
     }
-#if HAVE_APR_MEMCACHE
-    else if (ctxt->sc->cache_type == mgs_cache_memcache) {
-        gnutls_db_set_retrieve_function(ctxt->session,
-                mc_cache_fetch_session);
-        gnutls_db_set_remove_function(ctxt->session,
-                mc_cache_delete);
-        gnutls_db_set_store_function(ctxt->session,
-                mc_cache_store_session);
-        gnutls_db_set_ptr(ctxt->session, ctxt);
-    }
-#endif
-
     return 0;
 }

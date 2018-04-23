@@ -27,6 +27,7 @@
 
 #include "mod_gnutls.h"
 #include <httpd.h>
+#include <ap_socache.h>
 
 /** Name of the mod_gnutls cache access mutex, for use with Apache's
  * `Mutex` directive */
@@ -37,12 +38,14 @@
  * function is called after the configuration file(s) have been
  * parsed.
  *
- * @param p configuration memory pool
+ * @param pconf configuration memory pool
+ * @param ptemp temporary memory pool
  * @param s default server of the Apache configuration, head of the
  * server list
  * @param sc mod_gnutls data associated with `s`
  */
-int mgs_cache_post_config(apr_pool_t *p, server_rec *s, mgs_srvconf_rec *sc);
+int mgs_cache_post_config(apr_pool_t *pconf, apr_pool_t *ptemp,
+                          server_rec *s, mgs_srvconf_rec *sc);
 
 /**
  * (Re-)Initialize the cache in a child process after forking.
@@ -112,6 +115,10 @@ typedef gnutls_datum_t (*cache_fetch_func)(server_rec *server,
  * Internal cache configuration structure
  */
 struct mgs_cache {
+    /** Socache provider to use for this cache */
+    const ap_socache_provider_t *prov;
+    /** The actual socache instance */
+    ap_socache_instance_t *socache;
     /** Store function for this cache */
     cache_store_func store;
     /** Fetch function for this cache */

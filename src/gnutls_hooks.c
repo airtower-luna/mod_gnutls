@@ -576,7 +576,7 @@ int mgs_hook_post_config(apr_pool_t *pconf,
     sc_base = (mgs_srvconf_rec *) ap_get_module_config(s->module_config, &gnutls_module);
 
 
-    rv = mgs_cache_post_config(pconf, s, sc_base);
+    rv = mgs_cache_post_config(pconf, ptemp, s, sc_base);
     if (rv != APR_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_STARTUP, rv, s,

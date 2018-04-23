@@ -70,6 +70,7 @@ typedef enum {
 	/* Use Memcache */
     mgs_cache_memcache,
 #endif
+    mgs_cache_shmcb,
     mgs_cache_unset
 } mgs_cache_e;
 

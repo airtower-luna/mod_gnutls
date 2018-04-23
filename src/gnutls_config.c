@@ -622,6 +622,9 @@ const char *mgs_set_cache(cmd_parms * parms,
         sc->cache_type = mgs_cache_memcache;
     }
 #endif
+    else if (strcasecmp("shmcb", type) == 0) {
+        sc->cache_type = mgs_cache_shmcb;
+    }
     else {
         return "Invalid Type for GnuTLSCache!";
     }
