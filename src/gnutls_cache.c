@@ -141,13 +141,15 @@ static int socache_store(server_rec *server, gnutls_datum_t key,
     apr_pool_t *spool;
     apr_pool_create(&spool, NULL);
 
-    apr_global_mutex_lock(sc->cache->mutex);
+    if (sc->cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
+        apr_global_mutex_lock(sc->cache->mutex);
     apr_status_t rv = sc->cache->prov->store(sc->cache->socache, server,
                                              key.data, key.size,
                                              expiry,
                                              data.data, data.size,
                                              spool);
-    apr_global_mutex_unlock(sc->cache->mutex);
+    if (sc->cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
+        apr_global_mutex_unlock(sc->cache->mutex);
 
     if (rv != APR_SUCCESS)
     {
@@ -201,12 +203,14 @@ static gnutls_datum_t socache_fetch(server_rec *server, gnutls_datum_t key,
     apr_pool_t *spool;
     apr_pool_create(&spool, pool);
 
-    apr_global_mutex_lock(sc->cache->mutex);
+    if (sc->cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
+        apr_global_mutex_lock(sc->cache->mutex);
     apr_status_t rv = sc->cache->prov->retrieve(sc->cache->socache, server,
                                                 key.data, key.size,
                                                 data.data, &data.size,
                                                 spool);
-    apr_global_mutex_unlock(sc->cache->mutex);
+    if (sc->cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
+        apr_global_mutex_unlock(sc->cache->mutex);
 
     if (rv != APR_SUCCESS)
     {
@@ -257,12 +261,14 @@ static int socache_delete(void *baton, gnutls_datum_t key)
     if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &tmpkey) < 0)
         return -1;
 
-    apr_global_mutex_lock(ctxt->sc->cache->mutex);
+    if (ctxt->sc->cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
+        apr_global_mutex_lock(ctxt->sc->cache->mutex);
     apr_status_t rv = ctxt->sc->cache->prov->remove(ctxt->sc->cache->socache,
                                                     ctxt->c->base_server,
                                                     key.data, key.size,
                                                     ctxt->c->pool);
-    apr_global_mutex_unlock(ctxt->sc->cache->mutex);
+    if (ctxt->sc->cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
+        apr_global_mutex_unlock(ctxt->sc->cache->mutex);
 
     if (rv != APR_SUCCESS) {
         ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
