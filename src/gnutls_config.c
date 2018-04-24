@@ -617,11 +617,9 @@ const char *mgs_set_cache(cmd_parms * parms,
     } else if (strcasecmp("gdbm", type) == 0) {
         sc->cache_type = mgs_cache_gdbm;
     }
-#if HAVE_APR_MEMCACHE
     else if (strcasecmp("memcache", type) == 0) {
         sc->cache_type = mgs_cache_memcache;
     }
-#endif
     else if (strcasecmp("shmcb", type) == 0) {
         sc->cache_type = mgs_cache_shmcb;
     }

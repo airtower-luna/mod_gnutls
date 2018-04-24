@@ -37,8 +37,6 @@
 #ifndef __mod_gnutls_h_inc
 #define __mod_gnutls_h_inc
 
-#define HAVE_APR_MEMCACHE    @have_apr_memcache@
-
 extern module AP_MODULE_DECLARE_DATA gnutls_module;
 
 /* IO Filter names */
@@ -66,10 +64,8 @@ typedef enum {
     mgs_cache_dbm,
 	/* Use Gnu's version of Berkley DB */
     mgs_cache_gdbm,
-#if HAVE_APR_MEMCACHE
 	/* Use Memcache */
     mgs_cache_memcache,
-#endif
     mgs_cache_shmcb,
     mgs_cache_unset
 } mgs_cache_e;

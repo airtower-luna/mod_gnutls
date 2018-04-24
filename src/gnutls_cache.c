@@ -48,39 +48,18 @@
 #include "gnutls_config.h"
 
 #include <ap_socache.h>
-
-#if HAVE_APR_MEMCACHE
-#include "apr_memcache.h"
-#endif
-
-#include "apr_dbm.h"
 #include <apr_escape.h>
-
-#include "ap_mpm.h"
 #include <util_mutex.h>
-
-#include <unistd.h>
-#include <sys/types.h>
-
-#if !defined(OS2) && !defined(WIN32) && !defined(BEOS) && !defined(NETWARE)
-#include "unixd.h"
-#endif
 
 /** Default session cache timeout */
 #define MGS_DEFAULT_CACHE_TIMEOUT 300
 
-/** Prefix for keys used with a memcached cache */
-#define MC_TAG "mod_gnutls:"
 /** Maximum length of the hex string representation of a GnuTLS
  * session ID: two characters per byte, plus one more for `\0` */
 #if GNUTLS_VERSION_NUMBER >= 0x030400
 #define GNUTLS_SESSION_ID_STRING_LEN ((GNUTLS_MAX_SESSION_ID_SIZE * 2) + 1)
 #else
 #define GNUTLS_SESSION_ID_STRING_LEN ((GNUTLS_MAX_SESSION_ID * 2) + 1)
-#endif
-
-#if MODULE_MAGIC_NUMBER_MAJOR < 20081201
-#define ap_unixd_config unixd_config
 #endif
 
 #ifdef APLOG_USE_MODULE
@@ -325,26 +304,14 @@ int mgs_cache_post_config(apr_pool_t *pconf, apr_pool_t *ptemp,
     char *pname = NULL;
 
     if (sc->cache_type == mgs_cache_dbm || sc->cache_type == mgs_cache_gdbm)
-    {
         pname = "dbm";
-        sc->cache->store = socache_store;
-        sc->cache->fetch = socache_fetch;
-        //return dbm_cache_post_config(pconf, s, sc);
-    }
-#if HAVE_APR_MEMCACHE
     else if (sc->cache_type == mgs_cache_memcache)
-    {
         pname = "memcache";
-        sc->cache->store = socache_store;
-        sc->cache->fetch = socache_fetch;
-    }
-#endif
     else if (sc->cache_type == mgs_cache_shmcb)
-    {
         pname = "shmcb";
-        sc->cache->store = socache_store;
-        sc->cache->fetch = socache_fetch;
-    }
+
+    sc->cache->store = socache_store;
+    sc->cache->fetch = socache_fetch;
 
     /* Find the right socache provider */
     sc->cache->prov = ap_lookup_provider(AP_SOCACHE_PROVIDER_GROUP,

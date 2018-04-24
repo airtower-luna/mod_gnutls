@@ -176,10 +176,6 @@ fi
 AC_MSG_CHECKING([whether to enable MSVA functionality])
 AC_MSG_RESULT($use_msva)
 
-have_apr_memcache=0
-CHECK_APR_MEMCACHE([have_apr_memcache=1], [have_apr_memcache=0])
-AC_SUBST(have_apr_memcache)
-
 # Building documentation requires pandoc, which in turn needs pdflatex
 # to build PDF output.
 build_doc=no
@@ -212,8 +208,8 @@ fi
 
 AC_PATH_PROGS([HTTP_CLI], [curl wget], [no])
 
-MODULE_CFLAGS="${LIBGNUTLS_CFLAGS} ${SRP_CFLAGS} ${MSVA_CFLAGS} ${APR_MEMCACHE_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES} ${STRICT_CFLAGS}"
-MODULE_LIBS="${APR_MEMCACHE_LIBS} ${LIBGNUTLS_LIBS}"
+MODULE_CFLAGS="${LIBGNUTLS_CFLAGS} ${SRP_CFLAGS} ${MSVA_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES} ${STRICT_CFLAGS}"
+MODULE_LIBS="${LIBGNUTLS_LIBS}"
 
 AC_PATH_PROGS([SOFTHSM], [softhsm2-util softhsm], [no])
 if test "${SOFTHSM}" != "no"; then
