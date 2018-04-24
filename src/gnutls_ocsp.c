@@ -1091,15 +1091,21 @@ int mgs_ocsp_post_config_server(apr_pool_t *pconf,
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(server->module_config, &gnutls_module);
-    // TODO: check for cache!
 
     if (sc->certs_x509_chain_num < 2)
     {
-        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
+        ap_log_error(APLOG_MARK, APLOG_STARTUP, APR_EINVAL, server,
                      "OCSP stapling is enabled but no CA certificate "
                      "available for %s:%d, make sure it is included in "
                      "GnuTLSCertificateFile!",
                      server->server_hostname, server->addrs->host_port);
+        return HTTP_NOT_FOUND;
+    }
+
+    if (sc->cache == NULL)
+    {
+        ap_log_error(APLOG_MARK, APLOG_STARTUP, APR_EINVAL, server,
+                     "OCSP stapling is enabled but no cache configured!");
         return HTTP_NOT_FOUND;
     }
 
