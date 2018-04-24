@@ -722,7 +722,7 @@ static apr_status_t mgs_cache_ocsp_response(server_rec *s,
         expiry = next_update;
     }
 
-    int r = sc->cache->store(s, sc->ocsp->fingerprint, resp, expiry);
+    int r = mgs_cache_store(sc->cache, s, sc->ocsp->fingerprint, resp, expiry);
     /* destroy pool, and original copy of the OCSP response with it */
     apr_pool_destroy(tmp);
     if (r != 0)
@@ -762,7 +762,7 @@ static void mgs_cache_ocsp_failure(server_rec *s, apr_interval_time_t timeout)
     };
     apr_time_t expiry = apr_time_now() + timeout;
 
-    int r = sc->cache->store(s, sc->ocsp->fingerprint, dummy, expiry);
+    int r = mgs_cache_store(sc->cache, s, sc->ocsp->fingerprint, dummy, expiry);
     if (r != 0)
         ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
                      "Caching OCSP failure failed.");
@@ -783,9 +783,10 @@ int mgs_get_ocsp_response(gnutls_session_t session,
         return GNUTLS_E_NO_CERTIFICATE_STATUS;
     }
 
-    *ocsp_response = ctxt->sc->cache->fetch(ctxt->c->base_server,
-                                            ctxt->sc->ocsp->fingerprint,
-                                            ctxt->c->pool);
+    *ocsp_response = mgs_cache_fetch(ctxt->sc->cache,
+                                     ctxt->c->base_server,
+                                     ctxt->sc->ocsp->fingerprint,
+                                     ctxt->c->pool);
     if (ocsp_response->size == 0)
     {
         ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_EGENERAL, ctxt->c,
@@ -820,9 +821,10 @@ int mgs_get_ocsp_response(gnutls_session_t session,
          * would be better to have a vhost specific mutex, but at the
          * moment there's no good way to integrate that with the
          * Apache Mutex directive. */
-        *ocsp_response = ctxt->sc->cache->fetch(ctxt->c->base_server,
-                                                ctxt->sc->ocsp->fingerprint,
-                                                ctxt->c->pool);
+        *ocsp_response = mgs_cache_fetch(ctxt->sc->cache,
+                                         ctxt->c->base_server,
+                                         ctxt->sc->ocsp->fingerprint,
+                                         ctxt->c->pool);
         if (ocsp_response->size > 0)
         {
             /* Got a valid response now, unlock mutex and return. */
@@ -850,9 +852,10 @@ int mgs_get_ocsp_response(gnutls_session_t session,
     apr_global_mutex_unlock(sc->ocsp_mutex);
 
     /* retry reading from cache */
-    *ocsp_response = ctxt->sc->cache->fetch(ctxt->c->base_server,
-                                            ctxt->sc->ocsp->fingerprint,
-                                            ctxt->c->pool);
+    *ocsp_response = mgs_cache_fetch(ctxt->sc->cache,
+                                     ctxt->c->base_server,
+                                     ctxt->sc->ocsp->fingerprint,
+                                     ctxt->c->pool);
     if (ocsp_response->size == 0)
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
@@ -1056,7 +1059,7 @@ static apr_status_t mgs_async_ocsp_update(int state,
     if (rv != APR_SUCCESS)
     {
         const gnutls_datum_t ocsp_response =
-            sc->cache->fetch(server, sc->ocsp->fingerprint, pool);
+            mgs_cache_fetch(sc->cache, server, sc->ocsp->fingerprint, pool);
 
         if (ocsp_response.size == 0 ||
             ((ocsp_response.size == sizeof(unsigned char)) &&

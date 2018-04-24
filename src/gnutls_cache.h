@@ -81,8 +81,9 @@ int mgs_cache_session_init(mgs_handle_t *ctxt);
 char *mgs_time2sz(time_t t, char *str, int strsize);
 
 /**
- * Generic store function for the mod_gnutls object cache.
+ * Store function for the mod_gnutls object caches.
  *
+ * @param cache the cache to store the entry in
  * @param s server associated with the cache entry
  * @param key key for the cache entry
  * @param data data to be cached
@@ -90,14 +91,17 @@ char *mgs_time2sz(time_t t, char *str, int strsize);
  *
  * @return `-1` on error, `0` on success
  */
-typedef int (*cache_store_func)(server_rec *s, gnutls_datum_t key,
-                                gnutls_datum_t data, apr_time_t expiry);
+int mgs_cache_store(mgs_cache_t cache, server_rec *server, gnutls_datum_t key,
+                    gnutls_datum_t data, apr_time_t expiry);
+
 /**
- * Generic fetch function for the mod_gnutls object cache.
+ * Fetch function for the mod_gnutls object caches.
  *
  * *Warning*: The `data` element of the returned `gnutls_datum_t` is
  * allocated using `gnutls_malloc()` for compatibility with the GnuTLS
  * session caching API, and must be released using `gnutls_free()`.
+ *
+ * @param cache the cache to fetch from
  *
  * @param server server context for the request
  *
@@ -108,9 +112,9 @@ typedef int (*cache_store_func)(server_rec *s, gnutls_datum_t key,
  *
  * @return the requested cache entry, or `{NULL, 0}`
  */
-typedef gnutls_datum_t (*cache_fetch_func)(server_rec *server,
-                                           gnutls_datum_t key,
-                                           apr_pool_t *pool);
+gnutls_datum_t mgs_cache_fetch(mgs_cache_t cache, server_rec *server,
+                               gnutls_datum_t key, apr_pool_t *pool);
+
 /**
  * Internal cache configuration structure
  */
@@ -119,10 +123,6 @@ struct mgs_cache {
     const ap_socache_provider_t *prov;
     /** The actual socache instance */
     ap_socache_instance_t *socache;
-    /** Store function for this cache */
-    cache_store_func store;
-    /** Fetch function for this cache */
-    cache_fetch_func fetch;
     /** Mutex for cache access (used only if the cache type is not
      * thread-safe) */
     apr_global_mutex_t *mutex;

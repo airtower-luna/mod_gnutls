@@ -111,8 +111,9 @@ char *mgs_time2sz(time_t in_time, char *str, int strsize)
 
 
 
-static int socache_store(server_rec *server, gnutls_datum_t key,
-                         gnutls_datum_t data, apr_time_t expiry)
+int mgs_cache_store(mgs_cache_t cache __attribute__((unused)),
+                    server_rec *server, gnutls_datum_t key,
+                    gnutls_datum_t data, apr_time_t expiry)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(server->module_config, &gnutls_module);
@@ -160,15 +161,17 @@ static int socache_store_session(void *baton, gnutls_datum_t key,
 
     apr_time_t expiry = apr_time_now() + ctxt->sc->cache_timeout;
 
-    return socache_store(ctxt->c->base_server, dbmkey, data, expiry);
+    return mgs_cache_store(ctxt->sc->cache, ctxt->c->base_server,
+                           dbmkey, data, expiry);
 }
 
 
 
 // 4K should be enough for OCSP responses and sessions alike
 #define SOCACHE_FETCH_BUF_SIZE 4096
-static gnutls_datum_t socache_fetch(server_rec *server, gnutls_datum_t key,
-                                    apr_pool_t *pool)
+gnutls_datum_t mgs_cache_fetch(mgs_cache_t cache __attribute__((unused)),
+                               server_rec *server, gnutls_datum_t key,
+                               apr_pool_t *pool)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(server->module_config, &gnutls_module);
@@ -227,7 +230,8 @@ static gnutls_datum_t socache_fetch_session(void *baton, gnutls_datum_t key)
     if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
         return data;
 
-    return socache_fetch(ctxt->c->base_server, dbmkey, ctxt->c->pool);
+    return mgs_cache_fetch(ctxt->sc->cache, ctxt->c->base_server,
+                           dbmkey, ctxt->c->pool);
 }
 
 
@@ -309,9 +313,6 @@ int mgs_cache_post_config(apr_pool_t *pconf, apr_pool_t *ptemp,
         pname = "memcache";
     else if (sc->cache_type == mgs_cache_shmcb)
         pname = "shmcb";
-
-    sc->cache->store = socache_store;
-    sc->cache->fetch = socache_fetch;
 
     /* Find the right socache provider */
     sc->cache->prov = ap_lookup_provider(AP_SOCACHE_PROVIDER_GROUP,
