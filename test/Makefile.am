@@ -14,7 +14,7 @@ dist_check_SCRIPTS = test-00_basic.bash \
 	test-11_basic_client_verification_fail.bash \
 	test-12_cgi_variables.bash \
 	test-13_cgi_variables_no_client_cert.bash \
-	test-14_basic_openpgp.bash
+	test-14_resume_session.bash
 if USE_MSVA
 dist_check_SCRIPTS += test-15_basic_msva.bash
 endif
