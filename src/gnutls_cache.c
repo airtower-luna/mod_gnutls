@@ -111,9 +111,9 @@ char *mgs_time2sz(time_t in_time, char *str, int strsize)
 
 
 
-int mgs_cache_store(mgs_cache_t cache __attribute__((unused)),
-                    server_rec *server, gnutls_datum_t key,
-                    gnutls_datum_t data, apr_time_t expiry)
+int mgs_cache_store(mgs_cache_t cache, server_rec *server,
+                    gnutls_datum_t key, gnutls_datum_t data,
+                    apr_time_t expiry)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(server->module_config, &gnutls_module);
@@ -121,29 +121,31 @@ int mgs_cache_store(mgs_cache_t cache __attribute__((unused)),
     apr_pool_t *spool;
     apr_pool_create(&spool, NULL);
 
-    if (sc->cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
-        apr_global_mutex_lock(sc->cache->mutex);
-    apr_status_t rv = sc->cache->prov->store(sc->cache->socache, server,
-                                             key.data, key.size,
-                                             expiry,
-                                             data.data, data.size,
-                                             spool);
-    if (sc->cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
-        apr_global_mutex_unlock(sc->cache->mutex);
+    if (cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
+        apr_global_mutex_lock(cache->mutex);
+    apr_status_t rv = cache->prov->store(cache->socache, server,
+                                         key.data, key.size,
+                                         expiry,
+                                         data.data, data.size,
+                                         spool);
+    if (cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
+        apr_global_mutex_unlock(cache->mutex);
 
     if (rv != APR_SUCCESS)
     {
+        // TODO: clean up sc->cache_config reference
         ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, server,
                      "error storing in cache '%s:%s'",
-                     sc->cache->prov->name, sc->cache_config);
+                     cache->prov->name, sc->cache_config);
         apr_pool_destroy(spool);
         return -1;
     }
 
+    // TODO: clean up sc->cache_config reference
     ap_log_error(APLOG_MARK, APLOG_TRACE1, rv, server,
                  "stored %u bytes of data (%u byte key) in cache '%s:%s'",
                  data.size, key.size,
-                 sc->cache->prov->name, sc->cache_config);
+                 cache->prov->name, sc->cache_config);
     apr_pool_destroy(spool);
     return 0;
 }
@@ -185,26 +187,27 @@ gnutls_datum_t mgs_cache_fetch(mgs_cache_t cache __attribute__((unused)),
     apr_pool_t *spool;
     apr_pool_create(&spool, pool);
 
-    if (sc->cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
-        apr_global_mutex_lock(sc->cache->mutex);
-    apr_status_t rv = sc->cache->prov->retrieve(sc->cache->socache, server,
-                                                key.data, key.size,
-                                                data.data, &data.size,
-                                                spool);
-    if (sc->cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
-        apr_global_mutex_unlock(sc->cache->mutex);
+    if (cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
+        apr_global_mutex_lock(cache->mutex);
+    apr_status_t rv = cache->prov->retrieve(cache->socache, server,
+                                            key.data, key.size,
+                                            data.data, &data.size,
+                                            spool);
+    if (cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
+        apr_global_mutex_unlock(cache->mutex);
 
     if (rv != APR_SUCCESS)
     {
+        // TODO: clean up sc->cache_config references
         /* APR_NOTFOUND means there's no such object. */
         if (rv == APR_NOTFOUND)
             ap_log_error(APLOG_MARK, APLOG_TRACE1, rv, server,
                          "requested entry not found in cache '%s:%s'.",
-                         sc->cache->prov->name, sc->cache_config);
+                         cache->prov->name, sc->cache_config);
         else
             ap_log_error(APLOG_MARK, APLOG_WARNING, rv, server,
                          "error fetching from cache '%s:%s'",
-                         sc->cache->prov->name, sc->cache_config);
+                         cache->prov->name, sc->cache_config);
         /* free unused buffer */
         gnutls_free(data.data);
         data.data = NULL;
@@ -212,9 +215,10 @@ gnutls_datum_t mgs_cache_fetch(mgs_cache_t cache __attribute__((unused)),
     }
     else
     {
+        // TODO: clean up sc->cache_config reference
         ap_log_error(APLOG_MARK, APLOG_TRACE1, rv, server,
                      "fetched %u bytes from cache '%s:%s'",
-                     data.size, sc->cache->prov->name, sc->cache_config);
+                     data.size, cache->prov->name, sc->cache_config);
     }
     apr_pool_destroy(spool);
 
