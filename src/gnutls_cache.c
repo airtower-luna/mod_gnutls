@@ -20,27 +20,11 @@
 /**
  * @file gnutls_cache.c
  *
- * The signatures of the `(dbm|mc)_cache_...()` functions may be a bit
- * confusing: "store" and "expire" take a server_rec, "fetch" an
- * mgs_handle_t, and "delete" the `void*` required for a
- * `gnutls_db_remove_func`. The first two have matching `..._session`
- * functions to fit their respective GnuTLS session cache signatures.
- *
- * This is because "store", "expire" (dbm only), and "fetch" are also
- * needed for the OCSP cache. Their `..._session` variants have been
- * created to take care of the session cache specific parts, mainly
- * calculating the DB key from the session ID. They have to match the
- * appropriate GnuTLS DB function signatures.
- *
- * Additionally, there are the `mc_cache_(store|fetch)_generic()`
- * functions. They exist because memcached requires string keys while
- * DBM accepts binary keys, and provide wrappers to turn binary keys
- * into hex strings with a `mod_gnutls:` prefix.
- *
- * To update cached OCSP responses independent of client connections,
- * "store" and "expire" have to work without a connection context. On
- * the other hand "fetch" does not need to do that, because cached
- * OCSP responses will be retrieved for use in client connections.
+ * This file contains the cache implementation used for session
+ * caching and OCSP stapling. The `socache_*_session` functions
+ * implement the GnuTLS session cache API using the configured cache,
+ * using mgs_cache_store() and mgs_cache_fetch() as appropriate (see
+ * gnutls_cache.h).
  */
 
 #include "gnutls_cache.h"
@@ -67,7 +51,7 @@ APLOG_USE_MODULE(gnutls);
 #endif
 
 /**
- * Turn a GnuTLS session ID into the key format we use with DBM
+ * Turn a GnuTLS session ID into the key format we use for
  * caches. Name the Session ID as `server:port.SessionID` to disallow
  * resuming sessions on different servers.
  *
@@ -152,6 +136,19 @@ int mgs_cache_store(mgs_cache_t cache, server_rec *server,
 
 
 
+/**
+ * Store function for the GnuTLS session cache, see
+ * gnutls_db_set_store_function().
+ *
+ * @param baton mgs_handle_t for the connection, as set via
+ * gnutls_db_set_ptr()
+ *
+ * @param key object key to store
+ *
+ * @param data the object to store
+ *
+ * @return `0` in case of success, `-1` in case of failure
+ */
 static int socache_store_session(void *baton, gnutls_datum_t key,
                                  gnutls_datum_t data)
 {
@@ -225,6 +222,23 @@ gnutls_datum_t mgs_cache_fetch(mgs_cache_t cache __attribute__((unused)),
     return data;
 }
 
+
+
+/**
+ * Fetch function for the GnuTLS session cache, see
+ * gnutls_db_set_retrieve_function().
+ *
+ * *Warning*: The `data` element of the returned `gnutls_datum_t` is
+ * allocated using `gnutls_malloc()` for compatibility with the GnuTLS
+ * session caching API, and must be released using `gnutls_free()`.
+ *
+ * @param baton mgs_handle_t for the connection, as set via
+ * gnutls_db_set_ptr()
+ *
+ * @param key object key to fetch
+ *
+ * @return the requested cache entry, or `{NULL, 0}`
+ */
 static gnutls_datum_t socache_fetch_session(void *baton, gnutls_datum_t key)
 {
     gnutls_datum_t data = {NULL, 0};
@@ -240,7 +254,18 @@ static gnutls_datum_t socache_fetch_session(void *baton, gnutls_datum_t key)
 
 
 
-static int socache_delete(void *baton, gnutls_datum_t key)
+/**
+ * Remove function for the GnuTLS session cache, see
+ * gnutls_db_set_remove_function().
+ *
+ * @param baton mgs_handle_t for the connection, as set via
+ * gnutls_db_set_ptr()
+ *
+ * @param key object key to remove
+ *
+ * @return `0` in case of success, `-1` in case of failure
+ */
+static int socache_delete_session(void *baton, gnutls_datum_t key)
 {
     gnutls_datum_t tmpkey;
     mgs_handle_t *ctxt = baton;
@@ -381,8 +406,6 @@ int mgs_cache_child_init(apr_pool_t * p,
     return 0;
 }
 
-#include <assert.h>
-
 int mgs_cache_session_init(mgs_handle_t * ctxt)
 {
     if (ctxt->sc->cache_type != mgs_cache_none)
@@ -390,7 +413,7 @@ int mgs_cache_session_init(mgs_handle_t * ctxt)
         gnutls_db_set_retrieve_function(ctxt->session,
                                         socache_fetch_session);
         gnutls_db_set_remove_function(ctxt->session,
-                                      socache_delete);
+                                      socache_delete_session);
         gnutls_db_set_store_function(ctxt->session,
                                      socache_store_session);
         gnutls_db_set_ptr(ctxt->session, ctxt);
