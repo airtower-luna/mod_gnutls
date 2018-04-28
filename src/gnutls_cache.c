@@ -312,10 +312,11 @@ int mgs_cache_post_config(apr_pool_t *pconf, apr_pool_t *ptemp,
                           server_rec *s, mgs_srvconf_rec *sc)
 {
     apr_status_t rv = APR_SUCCESS;
-    /* if GnuTLSCache was never explicitly set: */
-    if (sc->cache_type == mgs_cache_unset || sc->cache_type == mgs_cache_none)
+    /* GnuTLSCache was never explicitly set or is disabled: */
+    if (sc->cache_enable == GNUTLS_ENABLED_UNSET
+        || sc->cache_enable == GNUTLS_ENABLED_FALSE)
     {
-        sc->cache_type = mgs_cache_none;
+        sc->cache_enable = GNUTLS_ENABLED_FALSE;
         /* Cache disabled, done. */
         return APR_SUCCESS;
     }
@@ -323,10 +324,10 @@ int mgs_cache_post_config(apr_pool_t *pconf, apr_pool_t *ptemp,
     if (sc->cache_timeout == MGS_TIMEOUT_UNSET)
         sc->cache_timeout = apr_time_from_sec(MGS_DEFAULT_CACHE_TIMEOUT);
 
-    /* initialize mutex only once */
+    /* initialize cache structure and mutex if needed */
     if (sc->cache == NULL)
     {
-        sc->cache = apr_palloc(pconf, sizeof(struct mgs_cache));
+        sc->cache = apr_pcalloc(pconf, sizeof(struct mgs_cache));
         rv = ap_global_mutex_create(&sc->cache->mutex, NULL,
                                     MGS_CACHE_MUTEX_NAME,
                                     NULL, s, pconf, 0);
@@ -334,18 +335,9 @@ int mgs_cache_post_config(apr_pool_t *pconf, apr_pool_t *ptemp,
             return rv;
     }
 
-    char *pname = NULL;
-
-    if (sc->cache_type == mgs_cache_dbm || sc->cache_type == mgs_cache_gdbm)
-        pname = "dbm";
-    else if (sc->cache_type == mgs_cache_memcache)
-        pname = "memcache";
-    else if (sc->cache_type == mgs_cache_shmcb)
-        pname = "shmcb";
-
     /* Find the right socache provider */
     sc->cache->prov = ap_lookup_provider(AP_SOCACHE_PROVIDER_GROUP,
-                                         pname,
+                                         sc->cache_type,
                                          AP_SOCACHE_PROVIDER_VERSION);
     if (sc->cache->prov)
     {
@@ -357,11 +349,11 @@ int mgs_cache_post_config(apr_pool_t *pconf, apr_pool_t *ptemp,
         {
             ap_log_error(APLOG_MARK, APLOG_EMERG, APR_EGENERAL, s,
                          "Creating cache '%s:%s' failed: %s",
-                         pname, sc->cache_config, err);
+                         sc->cache_type, sc->cache_config, err);
             return HTTP_INSUFFICIENT_STORAGE;
         }
         ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
-                     "%s: Socache '%s' created.", __func__, pname);
+                     "%s: Socache '%s' created.", __func__, sc->cache_type);
 
         // TODO: provide hints
         rv = sc->cache->prov->init(sc->cache->socache,
@@ -370,19 +362,20 @@ int mgs_cache_post_config(apr_pool_t *pconf, apr_pool_t *ptemp,
         {
             ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
                          "Initializing cache '%s:%s' failed!",
-                         pname, sc->cache_config);
+                         sc->cache_type, sc->cache_config);
             return HTTP_INSUFFICIENT_STORAGE;
         }
         ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
                      "%s: socache '%s:%s' created.", __func__,
-                     pname, sc->cache_config);
+                     sc->cache_type, sc->cache_config);
     }
     else
     {
         ap_log_error(APLOG_MARK, APLOG_EMERG, APR_EGENERAL, s,
                      "Could not find socache provider '%s', please make sure "
                      "that the provider name is valid and the "
-                     "appropriate mod_socache submodule is loaded.", pname);
+                     "appropriate mod_socache submodule is loaded.",
+                     sc->cache_type);
         return HTTP_NOT_FOUND;
     }
 
@@ -408,7 +401,7 @@ int mgs_cache_child_init(apr_pool_t * p,
 
 int mgs_cache_session_init(mgs_handle_t * ctxt)
 {
-    if (ctxt->sc->cache_type != mgs_cache_none)
+    if (ctxt->sc->cache_enable)
     {
         gnutls_db_set_retrieve_function(ctxt->session,
                                         socache_fetch_session);

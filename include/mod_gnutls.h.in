@@ -56,20 +56,6 @@ extern module AP_MODULE_DECLARE_DATA gnutls_module;
 #define MGS_SINGLETON_WATCHDOG "_mod_gnutls_singleton_"
 
 
-/* mod_gnutls Cache Types */
-typedef enum {
-	/* No Cache */
-    mgs_cache_none,
-	/* Use Old Berkley DB */
-    mgs_cache_dbm,
-	/* Use Gnu's version of Berkley DB */
-    mgs_cache_gdbm,
-	/* Use Memcache */
-    mgs_cache_memcache,
-    mgs_cache_shmcb,
-    mgs_cache_unset
-} mgs_cache_e;
-
 /* Internal cache data, defined in gnutls_cache.h */
 typedef struct mgs_cache* mgs_cache_t;
 
@@ -130,7 +116,9 @@ typedef struct {
 	/* Cache timeout value */
     int cache_timeout;
 	/* Chose Cache Type */
-    mgs_cache_e cache_type;
+    const char* cache_type;
+    /* Enable cache */
+    unsigned char cache_enable : 2;
     const char* cache_config;
     /* Internal cache data */
     mgs_cache_t cache;
@@ -184,8 +172,6 @@ typedef struct {
     int client_verify_mode;
 	/* Client Certificate Verification Method */
     mgs_client_verification_method_e client_verify_method;
-	/* Last Cache timestamp */
-    apr_time_t last_cache_check;
 
     /* Enable OCSP stapling */
     unsigned char ocsp_staple;

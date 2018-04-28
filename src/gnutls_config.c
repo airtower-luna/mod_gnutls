@@ -593,16 +593,19 @@ const char *mgs_set_cache(cmd_parms * parms,
     /* none: disable cache */
     if (strcasecmp("none", type) == 0)
     {
-        sc->cache_type = mgs_cache_none;
+        sc->cache_enable = GNUTLS_ENABLED_FALSE;
+        sc->cache_type = NULL;
         sc->cache_config = NULL;
         return NULL;
     }
+
+    sc->cache_enable = GNUTLS_ENABLED_TRUE;
 
     /* Try to split socache "type:config" style configuration */
     const char* sep = ap_strchr_c(type, ':');
     if (sep)
     {
-        type = apr_pstrmemdup(parms->temp_pool, type, sep - type);
+        sc->cache_type = apr_pstrmemdup(parms->pool, type, sep - type);
         if (arg != NULL)
         {
             /* No mixing of socache style and legacy config! */
@@ -611,31 +614,13 @@ const char *mgs_set_cache(cmd_parms * parms,
         }
         arg = ++sep;
     }
-
-    if (strcasecmp("dbm", type) == 0) {
-        sc->cache_type = mgs_cache_dbm;
-    } else if (strcasecmp("gdbm", type) == 0) {
-        sc->cache_type = mgs_cache_gdbm;
-    }
-    else if (strcasecmp("memcache", type) == 0) {
-        sc->cache_type = mgs_cache_memcache;
-    }
-    else if (strcasecmp("shmcb", type) == 0) {
-        sc->cache_type = mgs_cache_shmcb;
-    }
-    else {
-        return "Invalid Type for GnuTLSCache!";
-    }
+    else
+        sc->cache_type = apr_pstrdup(parms->pool, type);
 
     if (arg == NULL)
-        return "Invalid argument 2 for GnuTLSCache!";
-
-    if (sc->cache_type == mgs_cache_dbm
-        || sc->cache_type == mgs_cache_gdbm) {
-        sc->cache_config = ap_server_root_relative(parms->pool, arg);
-    } else {
+        sc->cache_config = "";
+    else
         sc->cache_config = apr_pstrdup(parms->pool, arg);
-    }
 
     return NULL;
 }
@@ -879,7 +864,8 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
 
     sc->priorities_str = NULL;
     sc->cache_timeout = MGS_TIMEOUT_UNSET;
-    sc->cache_type = mgs_cache_unset;
+    sc->cache_type = NULL;
+    sc->cache_enable = GNUTLS_ENABLED_UNSET;
     sc->cache_config = NULL;
     sc->cache = NULL;
     sc->tickets = GNUTLS_ENABLED_UNSET;

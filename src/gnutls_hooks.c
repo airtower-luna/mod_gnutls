@@ -628,6 +628,7 @@ int mgs_hook_post_config(apr_pool_t *pconf,
     {
         sc = (mgs_srvconf_rec *) ap_get_module_config(s->module_config, &gnutls_module);
         sc->cache_type = sc_base->cache_type;
+        sc->cache_enable = sc_base->cache_enable;
         sc->cache_config = sc_base->cache_config;
         sc->cache_timeout = sc_base->cache_timeout;
         sc->cache = sc_base->cache;
@@ -773,7 +774,7 @@ void mgs_hook_child_init(apr_pool_t *p, server_rec *s)
 	    exit(-1);
     }
 
-    if (sc->cache_type != mgs_cache_none) {
+    if (sc->cache_enable) {
         rv = mgs_cache_child_init(p, s, sc);
         if (rv != APR_SUCCESS) {
             ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
