@@ -123,6 +123,9 @@ struct mgs_cache {
     const ap_socache_provider_t *prov;
     /** The actual socache instance */
     ap_socache_instance_t *socache;
+    /** Cache configuration string (as passed to the socache create
+     * function, for logging) */
+    const char *config;
     /** Mutex for cache access (used only if the cache type is not
      * thread-safe) */
     apr_global_mutex_t *mutex;

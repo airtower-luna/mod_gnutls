@@ -117,19 +117,17 @@ int mgs_cache_store(mgs_cache_t cache, server_rec *server,
 
     if (rv != APR_SUCCESS)
     {
-        // TODO: clean up sc->cache_config reference
         ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, server,
                      "error storing in cache '%s:%s'",
-                     cache->prov->name, sc->cache_config);
+                     cache->prov->name, sc->cache->config);
         apr_pool_destroy(spool);
         return -1;
     }
 
-    // TODO: clean up sc->cache_config reference
     ap_log_error(APLOG_MARK, APLOG_TRACE1, rv, server,
                  "stored %u bytes of data (%u byte key) in cache '%s:%s'",
                  data.size, key.size,
-                 cache->prov->name, sc->cache_config);
+                 cache->prov->name, sc->cache->config);
     apr_pool_destroy(spool);
     return 0;
 }
@@ -168,9 +166,8 @@ static int socache_store_session(void *baton, gnutls_datum_t key,
 
 // 4K should be enough for OCSP responses and sessions alike
 #define SOCACHE_FETCH_BUF_SIZE 4096
-gnutls_datum_t mgs_cache_fetch(mgs_cache_t cache __attribute__((unused)),
-                               server_rec *server, gnutls_datum_t key,
-                               apr_pool_t *pool)
+gnutls_datum_t mgs_cache_fetch(mgs_cache_t cache, server_rec *server,
+                               gnutls_datum_t key, apr_pool_t *pool)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(server->module_config, &gnutls_module);
@@ -195,16 +192,15 @@ gnutls_datum_t mgs_cache_fetch(mgs_cache_t cache __attribute__((unused)),
 
     if (rv != APR_SUCCESS)
     {
-        // TODO: clean up sc->cache_config references
         /* APR_NOTFOUND means there's no such object. */
         if (rv == APR_NOTFOUND)
             ap_log_error(APLOG_MARK, APLOG_TRACE1, rv, server,
                          "requested entry not found in cache '%s:%s'.",
-                         cache->prov->name, sc->cache_config);
+                         cache->prov->name, sc->cache->config);
         else
             ap_log_error(APLOG_MARK, APLOG_WARNING, rv, server,
                          "error fetching from cache '%s:%s'",
-                         cache->prov->name, sc->cache_config);
+                         cache->prov->name, sc->cache->config);
         /* free unused buffer */
         gnutls_free(data.data);
         data.data = NULL;
@@ -212,10 +208,9 @@ gnutls_datum_t mgs_cache_fetch(mgs_cache_t cache __attribute__((unused)),
     }
     else
     {
-        // TODO: clean up sc->cache_config reference
         ap_log_error(APLOG_MARK, APLOG_TRACE1, rv, server,
                      "fetched %u bytes from cache '%s:%s'",
-                     data.size, cache->prov->name, sc->cache_config);
+                     data.size, cache->prov->name, sc->cache->config);
     }
     apr_pool_destroy(spool);
 
@@ -286,7 +281,7 @@ static int socache_delete_session(void *baton, gnutls_datum_t key)
         ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
                      ctxt->c->base_server,
                      "error deleting from cache '%s:%s'",
-                     ctxt->sc->cache->prov->name, ctxt->sc->cache_config);
+                     ctxt->sc->cache->prov->name, ctxt->sc->cache->config);
         return -1;
     }
     return 0;
@@ -301,7 +296,7 @@ static apr_status_t cleanup_socache(void *data)
         ap_get_module_config(s->module_config, &gnutls_module);
     ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
                  "Cleaning up socache '%s:%s'",
-                 sc->cache->prov->name, sc->cache_config);
+                 sc->cache->prov->name, sc->cache->config);
     sc->cache->prov->destroy(sc->cache->socache, s);
     return APR_SUCCESS;
 }
@@ -341,15 +336,16 @@ int mgs_cache_post_config(apr_pool_t *pconf, apr_pool_t *ptemp,
                                          AP_SOCACHE_PROVIDER_VERSION);
     if (sc->cache->prov)
     {
-        /* Cache found; create it, passing anything beyond the colon. */
+        /* Create and configure the cache instance. */
+        sc->cache->config = sc->cache_config;
         const char *err = sc->cache->prov->create(&sc->cache->socache,
-                                                  sc->cache_config,
+                                                  sc->cache->config,
                                                   ptemp, pconf);
         if (err != NULL)
         {
             ap_log_error(APLOG_MARK, APLOG_EMERG, APR_EGENERAL, s,
                          "Creating cache '%s:%s' failed: %s",
-                         sc->cache_type, sc->cache_config, err);
+                         sc->cache_type, sc->cache->config, err);
             return HTTP_INSUFFICIENT_STORAGE;
         }
         ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
@@ -362,12 +358,12 @@ int mgs_cache_post_config(apr_pool_t *pconf, apr_pool_t *ptemp,
         {
             ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
                          "Initializing cache '%s:%s' failed!",
-                         sc->cache_type, sc->cache_config);
+                         sc->cache_type, sc->cache->config);
             return HTTP_INSUFFICIENT_STORAGE;
         }
         ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
                      "%s: socache '%s:%s' created.", __func__,
-                     sc->cache_type, sc->cache_config);
+                     sc->cache_type, sc->cache->config);
     }
     else
     {
