@@ -20,6 +20,7 @@
 
 #include "mod_gnutls.h"
 #include "gnutls_cache.h"
+#include "gnutls_config.h"
 #include "gnutls_ocsp.h"
 #include "gnutls_util.h"
 #include "gnutls_watchdog.h"
@@ -630,8 +631,9 @@ int mgs_hook_post_config(apr_pool_t *pconf,
         sc->cache_type = sc_base->cache_type;
         sc->cache_enable = sc_base->cache_enable;
         sc->cache_config = sc_base->cache_config;
-        sc->cache_timeout = sc_base->cache_timeout;
         sc->cache = sc_base->cache;
+        if (sc->cache_timeout == MGS_TIMEOUT_UNSET)
+            sc->cache_timeout = sc_base->cache_timeout;
 
         sc->singleton_wd = sc_base->singleton_wd;
 

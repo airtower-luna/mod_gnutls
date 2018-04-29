@@ -639,12 +639,7 @@ const char *mgs_set_timeout(cmd_parms * parms,
         ap_get_module_config(parms->server->module_config, &gnutls_module);
 
     if (!apr_strnatcasecmp(parms->directive->directive, "GnuTLSCacheTimeout"))
-    {
-        const char *err;
-        if ((err = ap_check_cmd_context(parms, GLOBAL_ONLY)))
-            return err;
         sc->cache_timeout = apr_time_from_sec(argint);
-    }
     else if (!apr_strnatcasecmp(parms->directive->directive,
                                 "GnuTLSOCSPCacheTimeout"))
         sc->ocsp_cache_time = apr_time_from_sec(argint);
@@ -945,6 +940,7 @@ void *mgs_config_server_merge(apr_pool_t * p, void *BASE, void *ADD)
     gnutls_srvconf_merge(pin, NULL);
     gnutls_srvconf_merge(dh_file, NULL);
     gnutls_srvconf_merge(priorities_str, NULL);
+    gnutls_srvconf_merge(cache_timeout, MGS_TIMEOUT_UNSET);
 
     gnutls_srvconf_merge(proxy_x509_key_file, NULL);
     gnutls_srvconf_merge(proxy_x509_cert_file, NULL);

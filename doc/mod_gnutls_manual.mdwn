@@ -117,7 +117,7 @@ Timeout for TLS Session Cache expiration
     GnuTLSCacheTimeout SECONDS
 
 Default: `GnuTLSCacheTimeout 300`\
-Context: server config
+Context: server config, virtual host
 
 Sets the timeout for TLS Session Cache entries expiration. This value
 is also used for OCSP responses if they do not contain a `nextUpdate`
