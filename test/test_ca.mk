@@ -22,7 +22,7 @@
 	certtool --outfile $@ --generate-privkey
 
 %/secret.pgp.raw: %.uid %/secret.key
-	PEM2OPENPGP_EXPIRATION=86400 PEM2OPENPGP_USAGE_FLAGS=authenticate,certify,sign pem2openpgp "$$(cat $<)" < $(dir $@)secret.key > $@
+	PEM2OPENPGP_USAGE_FLAGS=authenticate,certify,sign pem2openpgp "$$(cat $<)" < $(dir $@)secret.key > $@
 
 %/secret.pgp: %/secret.pgp.raw pgpcrc
 	(printf -- '-----BEGIN PGP PRIVATE KEY BLOCK-----\nVersion: test\n\n' && \
