@@ -164,8 +164,12 @@ static int socache_store_session(void *baton, gnutls_datum_t key,
 
 
 
-// 4K should be enough for OCSP responses and sessions alike
-#define SOCACHE_FETCH_BUF_SIZE 4096
+/** 8K is the maximum size accepted when receiving OCSP responses,
+ * sessions cache entries should be much smaller. The buffer is
+ * reallocated to actual size after fetching, so memory waste is
+ * minimal and temporary. */
+#define SOCACHE_FETCH_BUF_SIZE (8 * 1024)
+
 gnutls_datum_t mgs_cache_fetch(mgs_cache_t cache, server_rec *server,
                                gnutls_datum_t key, apr_pool_t *pool)
 {
@@ -211,6 +215,18 @@ gnutls_datum_t mgs_cache_fetch(mgs_cache_t cache, server_rec *server,
         ap_log_error(APLOG_MARK, APLOG_TRACE1, rv, server,
                      "fetched %u bytes from cache '%s:%s'",
                      data.size, cache->prov->name, sc->cache->config);
+
+        /* Realloc buffer to data.size. Data size must be less than or
+         * equal to the initial buffer size, so this REALLY should not
+         * fail. */
+        data.data = gnutls_realloc(data.data, data.size);
+        if (__builtin_expect(data.data == NULL, 0))
+        {
+            ap_log_error(APLOG_MARK, APLOG_CRIT, APR_ENOMEM, server,
+                         "%s: Could not realloc fetch buffer to data size!",
+                         __func__);
+            data.size = 0;
+        }
     }
     apr_pool_destroy(spool);
 
