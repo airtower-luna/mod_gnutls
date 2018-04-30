@@ -2,6 +2,8 @@
 Define	TEST_PORT	${BACKEND_PORT}
 Include ${srcdir}/base_apache.conf
 
+Define	BACKEND_CACHE	shmcb:cache/gnutls_cache_${TEST_NAME}_backend(65536)
+
 # common options for proxy backend servers
 CustomLog	logs/${TEST_NAME}.backend.access.log combined
 ErrorLog	logs/${TEST_NAME}.backend.error.log
