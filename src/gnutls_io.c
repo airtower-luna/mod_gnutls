@@ -65,11 +65,7 @@ static apr_status_t gnutls_io_filter_error(ap_filter_t * f,
         ap_log_cerror(APLOG_MARK, APLOG_INFO, 0, f->c,
                       "GnuTLS handshake failed: HTTP spoken on HTTPS port; "
                       "trying to send HTML error page");
-        mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
-            ap_get_module_config(f->c->base_server->module_config,
-                                 &gnutls_module);
         ctxt->status = -1;
-        sc->non_ssl_request = 1;
 
         /* fake the request line */
         bucket = HTTP_ON_HTTPS_PORT_BUCKET(f->c->bucket_alloc);

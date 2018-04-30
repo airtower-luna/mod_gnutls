@@ -88,8 +88,6 @@ typedef struct {
     int enabled;
 	/* Is mod_proxy enabled? */
     int proxy_enabled;
-	/* A Plain HTTP request */
-    int non_ssl_request;
 
     /* List of PKCS #11 provider modules to load, only valid in the
      * base config, ignored in virtual hosts */
