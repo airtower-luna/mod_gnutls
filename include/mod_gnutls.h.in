@@ -113,11 +113,8 @@ typedef struct {
 
 	/* Cache timeout value */
     int cache_timeout;
-	/* Chose Cache Type */
-    const char* cache_type;
     /* Enable cache */
     unsigned char cache_enable : 2;
-    const char* cache_config;
     /* Internal cache data */
     mgs_cache_t cache;
 

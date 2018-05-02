@@ -17,6 +17,7 @@
  *  limitations under the License.
  */
 
+#include "gnutls_cache.h"
 #include "gnutls_config.h"
 #include "mod_gnutls.h"
 #include "gnutls_ocsp.h"
@@ -594,8 +595,6 @@ const char *mgs_set_cache(cmd_parms * parms,
     if (strcasecmp("none", type) == 0)
     {
         sc->cache_enable = GNUTLS_ENABLED_FALSE;
-        sc->cache_type = NULL;
-        sc->cache_config = NULL;
         return NULL;
     }
 
@@ -605,7 +604,7 @@ const char *mgs_set_cache(cmd_parms * parms,
     const char* sep = ap_strchr_c(type, ':');
     if (sep)
     {
-        sc->cache_type = apr_pstrmemdup(parms->pool, type, sep - type);
+        type = apr_pstrmemdup(parms->temp_pool, type, sep - type);
         if (arg != NULL)
         {
             /* No mixing of socache style and legacy config! */
@@ -614,15 +613,10 @@ const char *mgs_set_cache(cmd_parms * parms,
         }
         arg = ++sep;
     }
-    else
-        sc->cache_type = apr_pstrdup(parms->pool, type);
 
-    if (arg == NULL)
-        sc->cache_config = "";
-    else
-        sc->cache_config = apr_pstrdup(parms->pool, arg);
-
-    return NULL;
+    return mgs_cache_inst_config(&sc->cache, parms->server,
+                                 type, arg,
+                                 parms->pool, parms->temp_pool);
 }
 
 const char *mgs_set_timeout(cmd_parms * parms,
@@ -859,9 +853,7 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
 
     sc->priorities_str = NULL;
     sc->cache_timeout = MGS_TIMEOUT_UNSET;
-    sc->cache_type = NULL;
     sc->cache_enable = GNUTLS_ENABLED_UNSET;
-    sc->cache_config = NULL;
     sc->cache = NULL;
     sc->tickets = GNUTLS_ENABLED_UNSET;
     sc->priorities = NULL;

@@ -628,9 +628,7 @@ int mgs_hook_post_config(apr_pool_t *pconf,
     for (s = base_server; s; s = s->next)
     {
         sc = (mgs_srvconf_rec *) ap_get_module_config(s->module_config, &gnutls_module);
-        sc->cache_type = sc_base->cache_type;
         sc->cache_enable = sc_base->cache_enable;
-        sc->cache_config = sc_base->cache_config;
         sc->cache = sc_base->cache;
         if (sc->cache_timeout == MGS_TIMEOUT_UNSET)
             sc->cache_timeout = sc_base->cache_timeout;

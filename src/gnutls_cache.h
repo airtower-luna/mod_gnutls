@@ -34,6 +34,33 @@
 #define MGS_CACHE_MUTEX_NAME "gnutls-cache"
 
 /**
+ * Configure a cache instance
+ *
+ * This function is supposed to be called during config and
+ * initializes an mgs_cache_t by finding the named socache provider
+ * and creating a cache instance with the given configuration. Note
+ * that the socache instance is only created, not initialized, which
+ * is supposed to happen during post_config.
+ *
+ * @param cache pointer to the mgs_cache_t, memory will be allocated
+ * if currently NULL.
+ *
+ * @param server associated server for logging purposes
+ *
+ * @param type socache provider type
+ *
+ * @param config configuration string for the socache provider, may be
+ * `NULL` if the provider accepts an empty configuration
+ *
+ * @param pconf configuration memory pool
+ *
+ * @param ptemp temporary memory pool
+ */
+const char *mgs_cache_inst_config(mgs_cache_t *cache, server_rec *server,
+                                  const char* type, const char* config,
+                                  apr_pool_t *pconf, apr_pool_t *ptemp);
+
+/**
  * Initialize the internal cache configuration structure. This
  * function is called after the configuration file(s) have been
  * parsed.

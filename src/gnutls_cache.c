@@ -305,6 +305,106 @@ static int socache_delete_session(void *baton, gnutls_datum_t key)
 
 
 
+const char *mgs_cache_inst_config(mgs_cache_t *cache, server_rec *server,
+                                  const char* type, const char* config,
+                                  apr_pool_t *pconf, apr_pool_t *ptemp)
+{
+    /* allocate cache structure if needed */
+    if (*cache == NULL)
+    {
+        *cache = apr_pcalloc(pconf, sizeof(struct mgs_cache));
+        if (*cache == NULL)
+            return "Could not allocate memory for cache configuration!";
+    }
+    mgs_cache_t c = *cache;
+
+    /* Find the right socache provider */
+    c->prov = ap_lookup_provider(AP_SOCACHE_PROVIDER_GROUP,
+                                 type,
+                                 AP_SOCACHE_PROVIDER_VERSION);
+    if (c->prov == NULL)
+    {
+        return apr_psprintf(ptemp,
+                            "Could not find socache provider '%s', please "
+                            "make sure that the provider name is valid and "
+                            "the appropriate module is loaded (maybe "
+                            "mod_socache_%s.so?).",
+                            type, type);
+    }
+
+    /* shmcb works fine with NULL, but make sure there's a valid (if
+     * empty) string for logging */
+    if (config != NULL)
+        c->config = apr_pstrdup(pconf, config);
+    else
+        c->config = "";
+
+    /* Create and configure the cache instance. */
+    const char *err = c->prov->create(&c->socache, c->config, ptemp, pconf);
+    if (err != NULL)
+    {
+        return apr_psprintf(ptemp,
+                            "Creating cache '%s:%s' failed: %s",
+                            c->prov->name, c->config, err);
+    }
+    ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, server,
+                 "%s: Socache '%s:%s' created.",
+                 __func__, c->prov->name, c->config);
+
+    return NULL;
+}
+
+
+
+/**
+ * This function is supposed to be called during post_config to
+ * initialize mutex and socache instance associated with an
+ * mgs_cache_t.
+ *
+ * @param cache the mod_gnutls cache structure
+ *
+ * @param cache_name name for socache initialization
+ *
+ * @param mutex_name name to pass to ap_global_mutex_create(), must
+ * have been registered during pre_config.
+ *
+ * @param server server for logging purposes
+ *
+ * @param pconf memory pool for server configuration
+ */
+static apr_status_t mgs_cache_inst_init(mgs_cache_t cache,
+                                        const char *cache_name,
+                                        const char *mutex_name,
+                                        server_rec *server,
+                                        apr_pool_t *pconf)
+{
+    apr_status_t rv = APR_SUCCESS;
+
+    if (cache->mutex == NULL)
+    {
+        rv = ap_global_mutex_create(&cache->mutex, NULL,
+                                    mutex_name,
+                                    NULL, server, pconf, 0);
+        ap_log_error(APLOG_MARK, APLOG_TRACE1, rv, server,
+                     "%s: create mutex", __func__);
+        if (rv != APR_SUCCESS)
+            return rv;
+    }
+
+    rv = cache->prov->init(cache->socache, cache_name, NULL, server, pconf);
+    if (rv != APR_SUCCESS)
+        ap_log_error(APLOG_MARK, APLOG_CRIT, rv, server,
+                     "Initializing cache '%s:%s' failed!",
+                     cache->prov->name, cache->config);
+    else
+        ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, server,
+                     "%s: socache '%s:%s' initialized.", __func__,
+                     cache->prov->name, cache->config);
+    return rv;
+}
+
+
+
 static apr_status_t cleanup_socache(void *data)
 {
     server_rec *s = data;
@@ -319,7 +419,8 @@ static apr_status_t cleanup_socache(void *data)
 
 
 
-int mgs_cache_post_config(apr_pool_t *pconf, apr_pool_t *ptemp,
+int mgs_cache_post_config(apr_pool_t *pconf,
+                          apr_pool_t *ptemp __attribute__((unused)),
                           server_rec *s, mgs_srvconf_rec *sc)
 {
     apr_status_t rv = APR_SUCCESS;
@@ -335,61 +436,10 @@ int mgs_cache_post_config(apr_pool_t *pconf, apr_pool_t *ptemp,
     if (sc->cache_timeout == MGS_TIMEOUT_UNSET)
         sc->cache_timeout = apr_time_from_sec(MGS_DEFAULT_CACHE_TIMEOUT);
 
-    /* initialize cache structure and mutex if needed */
-    if (sc->cache == NULL)
-    {
-        sc->cache = apr_pcalloc(pconf, sizeof(struct mgs_cache));
-        rv = ap_global_mutex_create(&sc->cache->mutex, NULL,
-                                    MGS_CACHE_MUTEX_NAME,
-                                    NULL, s, pconf, 0);
-        if (rv != APR_SUCCESS)
-            return rv;
-    }
-
-    /* Find the right socache provider */
-    sc->cache->prov = ap_lookup_provider(AP_SOCACHE_PROVIDER_GROUP,
-                                         sc->cache_type,
-                                         AP_SOCACHE_PROVIDER_VERSION);
-    if (sc->cache->prov)
-    {
-        /* Create and configure the cache instance. */
-        sc->cache->config = sc->cache_config;
-        const char *err = sc->cache->prov->create(&sc->cache->socache,
-                                                  sc->cache->config,
-                                                  ptemp, pconf);
-        if (err != NULL)
-        {
-            ap_log_error(APLOG_MARK, APLOG_EMERG, APR_EGENERAL, s,
-                         "Creating cache '%s:%s' failed: %s",
-                         sc->cache_type, sc->cache->config, err);
-            return HTTP_INSUFFICIENT_STORAGE;
-        }
-        ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
-                     "%s: Socache '%s' created.", __func__, sc->cache_type);
-
-        // TODO: provide hints
-        rv = sc->cache->prov->init(sc->cache->socache,
-                                   "mod_gnutls-session", NULL, s, pconf);
-        if (rv != APR_SUCCESS)
-        {
-            ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
-                         "Initializing cache '%s:%s' failed!",
-                         sc->cache_type, sc->cache->config);
-            return HTTP_INSUFFICIENT_STORAGE;
-        }
-        ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
-                     "%s: socache '%s:%s' created.", __func__,
-                     sc->cache_type, sc->cache->config);
-    }
-    else
-    {
-        ap_log_error(APLOG_MARK, APLOG_EMERG, APR_EGENERAL, s,
-                     "Could not find socache provider '%s', please make sure "
-                     "that the provider name is valid and the "
-                     "appropriate mod_socache submodule is loaded.",
-                     sc->cache_type);
-        return HTTP_NOT_FOUND;
-    }
+    rv = mgs_cache_inst_init(sc->cache, "mod_gnutls-session",
+                             MGS_CACHE_MUTEX_NAME, s, pconf);
+    if (rv != APR_SUCCESS)
+        return HTTP_INSUFFICIENT_STORAGE;
 
     apr_pool_pre_cleanup_register(pconf, s, cleanup_socache);
 
