@@ -2,7 +2,7 @@ EXTRA_DIST = \
 	00_basic/apache.conf 00_basic/gnutls-cli.args 00_basic/input 00_basic/output \
 	01_serverwide_priorities/apache.conf 01_serverwide_priorities/gnutls-cli.args 01_serverwide_priorities/input 01_serverwide_priorities/output \
 	02_cache_in_vhost/apache.conf 02_cache_in_vhost/fail.server 02_cache_in_vhost/gnutls-cli.args 02_cache_in_vhost/input \
-	03_cachetimeout_in_vhost/apache.conf 03_cachetimeout_in_vhost/fail.server 03_cachetimeout_in_vhost/gnutls-cli.args 03_cachetimeout_in_vhost/input \
+	03_cachetimeout_in_vhost/apache.conf 03_cachetimeout_in_vhost/gnutls-cli.args 03_cachetimeout_in_vhost/input 03_cachetimeout_in_vhost/output \
 	04_basic_nosni/apache.conf 04_basic_nosni/gnutls-cli.args 04_basic_nosni/input 04_basic_nosni/output \
 	05_mismatched-priorities/apache.conf 05_mismatched-priorities/fail.client 05_mismatched-priorities/gnutls-cli.args 05_mismatched-priorities/input \
 	06_verify_sni_a/apache.conf 06_verify_sni_a/gnutls-cli.args 06_verify_sni_a/input 06_verify_sni_a/output \
