@@ -1250,8 +1250,13 @@ int mgs_hook_fixups(request_rec * r) {
                                          gnutls_cipher_get(ctxt->session),
                                          gnutls_mac_get(ctxt->session)));
 
+#if GNUTLS_VERSION_NUMBER >= 0x030600
+    /* Compression support has been removed since GnuTLS 3.6.0 */
+    apr_table_setn(env, "SSL_COMPRESS_METHOD", "NULL");
+#else
     apr_table_setn(env, "SSL_COMPRESS_METHOD",
             gnutls_compression_get_name(gnutls_compression_get(ctxt->session)));
+#endif
 
 #ifdef ENABLE_SRP
     if (ctxt->sc->srp_tpasswd_conf_file != NULL && ctxt->sc->srp_tpasswd_file != NULL) {
