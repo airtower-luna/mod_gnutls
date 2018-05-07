@@ -38,6 +38,9 @@
 /** Default session cache timeout */
 #define MGS_DEFAULT_CACHE_TIMEOUT 300
 
+/** Session cache name */
+#define MGS_SESSION_CACHE_NAME "gnutls_session"
+
 /** Maximum length of the hex string representation of a GnuTLS
  * session ID: two characters per byte, plus one more for `\0` */
 #if GNUTLS_VERSION_NUMBER >= 0x030400
@@ -436,7 +439,7 @@ int mgs_cache_post_config(apr_pool_t *pconf,
     if (sc->cache_timeout == MGS_TIMEOUT_UNSET)
         sc->cache_timeout = apr_time_from_sec(MGS_DEFAULT_CACHE_TIMEOUT);
 
-    rv = mgs_cache_inst_init(sc->cache, "mod_gnutls-session",
+    rv = mgs_cache_inst_init(sc->cache, MGS_SESSION_CACHE_NAME,
                              MGS_CACHE_MUTEX_NAME, s, pconf);
     if (rv != APR_SUCCESS)
         return HTTP_INSUFFICIENT_STORAGE;
