@@ -591,14 +591,10 @@ const char *mgs_set_cache(cmd_parms * parms,
     if ((err = ap_check_cmd_context(parms, GLOBAL_ONLY)))
         return err;
 
+    unsigned char enable = GNUTLS_ENABLED_TRUE;
     /* none: disable cache */
     if (strcasecmp("none", type) == 0)
-    {
-        sc->cache_enable = GNUTLS_ENABLED_FALSE;
-        return NULL;
-    }
-
-    sc->cache_enable = GNUTLS_ENABLED_TRUE;
+        enable = GNUTLS_ENABLED_FALSE;
 
     /* Try to split socache "type:config" style configuration */
     const char* sep = ap_strchr_c(type, ':');
@@ -614,7 +610,29 @@ const char *mgs_set_cache(cmd_parms * parms,
         arg = ++sep;
     }
 
-    return mgs_cache_inst_config(&sc->cache, parms->server,
+    mgs_cache_t *cache = NULL;
+    /* parms->directive->directive contains the directive string */
+    if (!strcasecmp(parms->directive->directive, "GnuTLSCache"))
+    {
+        if (enable == GNUTLS_ENABLED_FALSE)
+        {
+            sc->cache_enable = GNUTLS_ENABLED_FALSE;
+            return NULL;
+        }
+        sc->cache_enable = GNUTLS_ENABLED_TRUE;
+        cache = &sc->cache;
+    }
+    else if (!strcasecmp(parms->directive->directive, "GnuTLSOCSPCache"))
+    {
+        // TODO
+        return NULL;
+    }
+    else
+        return apr_psprintf(parms->temp_pool, "Internal Error: %s "
+                            "called for unknown directive %s",
+                            __func__, parms->directive->directive);
+
+    return mgs_cache_inst_config(cache, parms->server,
                                  type, arg,
                                  parms->pool, parms->temp_pool);
 }
