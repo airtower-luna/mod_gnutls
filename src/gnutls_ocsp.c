@@ -630,7 +630,7 @@ static apr_status_t mgs_cache_ocsp_response(server_rec *s,
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
 
-    if (sc->cache == NULL)
+    if (sc->ocsp_cache == NULL)
     {
         /* OCSP caching requires a cache. */
         return APR_ENOTIMPL;
@@ -722,7 +722,8 @@ static apr_status_t mgs_cache_ocsp_response(server_rec *s,
         expiry = next_update;
     }
 
-    int r = mgs_cache_store(sc->cache, s, sc->ocsp->fingerprint, resp, expiry);
+    int r = mgs_cache_store(sc->ocsp_cache, s,
+                            sc->ocsp->fingerprint, resp, expiry);
     /* destroy pool, and original copy of the OCSP response with it */
     apr_pool_destroy(tmp);
     if (r != 0)
@@ -762,7 +763,8 @@ static void mgs_cache_ocsp_failure(server_rec *s, apr_interval_time_t timeout)
     };
     apr_time_t expiry = apr_time_now() + timeout;
 
-    int r = mgs_cache_store(sc->cache, s, sc->ocsp->fingerprint, dummy, expiry);
+    int r = mgs_cache_store(sc->ocsp_cache, s,
+                            sc->ocsp->fingerprint, dummy, expiry);
     if (r != 0)
         ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
                      "Caching OCSP failure failed.");
@@ -777,13 +779,13 @@ int mgs_get_ocsp_response(gnutls_session_t session,
     mgs_handle_t *ctxt = gnutls_session_get_ptr(session);
     mgs_srvconf_rec *sc = ctxt->sc;
 
-    if (!sc->ocsp_staple || sc->cache == NULL)
+    if (!sc->ocsp_staple || sc->ocsp_cache == NULL)
     {
         /* OCSP must be enabled and caching requires a cache. */
         return GNUTLS_E_NO_CERTIFICATE_STATUS;
     }
 
-    *ocsp_response = mgs_cache_fetch(ctxt->sc->cache,
+    *ocsp_response = mgs_cache_fetch(ctxt->sc->ocsp_cache,
                                      ctxt->c->base_server,
                                      ctxt->sc->ocsp->fingerprint,
                                      ctxt->c->pool);
@@ -821,7 +823,7 @@ int mgs_get_ocsp_response(gnutls_session_t session,
          * would be better to have a vhost specific mutex, but at the
          * moment there's no good way to integrate that with the
          * Apache Mutex directive. */
-        *ocsp_response = mgs_cache_fetch(ctxt->sc->cache,
+        *ocsp_response = mgs_cache_fetch(ctxt->sc->ocsp_cache,
                                          ctxt->c->base_server,
                                          ctxt->sc->ocsp->fingerprint,
                                          ctxt->c->pool);
@@ -852,7 +854,7 @@ int mgs_get_ocsp_response(gnutls_session_t session,
     apr_global_mutex_unlock(sc->ocsp_mutex);
 
     /* retry reading from cache */
-    *ocsp_response = mgs_cache_fetch(ctxt->sc->cache,
+    *ocsp_response = mgs_cache_fetch(ctxt->sc->ocsp_cache,
                                      ctxt->c->base_server,
                                      ctxt->sc->ocsp->fingerprint,
                                      ctxt->c->pool);
@@ -1059,7 +1061,8 @@ static apr_status_t mgs_async_ocsp_update(int state,
     if (rv != APR_SUCCESS)
     {
         const gnutls_datum_t ocsp_response =
-            mgs_cache_fetch(sc->cache, server, sc->ocsp->fingerprint, pool);
+            mgs_cache_fetch(sc->ocsp_cache, server,
+                            sc->ocsp->fingerprint, pool);
 
         if (ocsp_response.size == 0 ||
             ((ocsp_response.size == sizeof(unsigned char)) &&
@@ -1105,7 +1108,7 @@ int mgs_ocsp_post_config_server(apr_pool_t *pconf,
         return HTTP_NOT_FOUND;
     }
 
-    if (sc->cache == NULL)
+    if (sc->ocsp_cache == NULL)
     {
         ap_log_error(APLOG_MARK, APLOG_STARTUP, APR_EINVAL, server,
                      "OCSP stapling is enabled but no cache configured!");
