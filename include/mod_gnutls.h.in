@@ -181,6 +181,10 @@ typedef struct {
     mgs_ocsp_data_t ocsp;
     /* Mutex to prevent parallel OCSP requests */
     apr_global_mutex_t *ocsp_mutex;
+    /* Enable OCSP cache */
+    unsigned char ocsp_cache_enable : 2;
+    /* Internal OCSP cache data */
+    mgs_cache_t ocsp_cache;
     /* Cache timeout for OCSP responses. Note that the nextUpdate
      * field of the response takes precedence if shorter. */
     apr_interval_time_t ocsp_cache_time;

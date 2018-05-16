@@ -129,6 +129,8 @@ int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog, apr_pool_t * ptem
 
     ap_mutex_register(pconf, MGS_CACHE_MUTEX_NAME, NULL, APR_LOCK_DEFAULT, 0);
     ap_mutex_register(pconf, MGS_OCSP_MUTEX_NAME, NULL, APR_LOCK_DEFAULT, 0);
+    ap_mutex_register(pconf, MGS_OCSP_CACHE_MUTEX_NAME, NULL,
+                      APR_LOCK_DEFAULT, 0);
 
     /* Register a pool clean-up function */
     apr_pool_cleanup_register(pconf, NULL, mgs_cleanup_pre_config, apr_pool_cleanup_null);
@@ -632,6 +634,8 @@ int mgs_hook_post_config(apr_pool_t *pconf,
         sc->cache = sc_base->cache;
         if (sc->cache_timeout == MGS_TIMEOUT_UNSET)
             sc->cache_timeout = sc_base->cache_timeout;
+        sc->ocsp_cache_enable = sc_base->ocsp_cache_enable;
+        sc->ocsp_cache = sc_base->ocsp_cache;
 
         sc->singleton_wd = sc_base->singleton_wd;
 
@@ -774,15 +778,24 @@ void mgs_hook_child_init(apr_pool_t *p, server_rec *s)
 	    exit(-1);
     }
 
-    if (sc->cache_enable) {
-        rv = mgs_cache_child_init(p, s, sc);
-        if (rv != APR_SUCCESS) {
+    if (sc->cache_enable == GNUTLS_ENABLED_TRUE)
+    {
+        rv = mgs_cache_child_init(p, s, sc->cache, MGS_CACHE_MUTEX_NAME);
+        if (rv != APR_SUCCESS)
             ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
-                    "GnuTLS: Failed to run Cache Init");
-        }
+                    "Child init for session cache failed!");
     }
 
-    /* reinit OCSP mutex */
+    if (sc->ocsp_cache_enable == GNUTLS_ENABLED_TRUE)
+    {
+        rv = mgs_cache_child_init(p, s, sc->ocsp_cache,
+                                  MGS_OCSP_CACHE_MUTEX_NAME);
+        if (rv != APR_SUCCESS)
+            ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
+                    "Child init for OCSP cache failed!");
+    }
+
+    /* reinit OCSP request mutex */
     const char *lockfile = apr_global_mutex_lockfile(sc->ocsp_mutex);
     rv = apr_global_mutex_child_init(&sc->ocsp_mutex, lockfile, p);
     if (rv != APR_SUCCESS)

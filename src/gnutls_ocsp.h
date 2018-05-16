@@ -23,6 +23,8 @@
 #include "http_config.h"
 
 #define MGS_OCSP_MUTEX_NAME "gnutls-ocsp"
+#define MGS_OCSP_CACHE_MUTEX_NAME "gnutls-ocsp-cache"
+#define MGS_OCSP_CACHE_NAME "gnutls_ocsp"
 
 /** Default OCSP response cache timeout in seconds */
 #define MGS_OCSP_CACHE_TIMEOUT 3600

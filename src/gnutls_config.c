@@ -624,8 +624,16 @@ const char *mgs_set_cache(cmd_parms * parms,
     }
     else if (!strcasecmp(parms->directive->directive, "GnuTLSOCSPCache"))
     {
-        // TODO
-        return NULL;
+        if (enable == GNUTLS_ENABLED_FALSE)
+        {
+            /* TODO: Should this return an error like "use
+             * GnuTLSOCSPStapling off if you want to disable OCSP
+             * stapling"? */
+            sc->ocsp_cache_enable = GNUTLS_ENABLED_FALSE;
+            return NULL;
+        }
+        sc->ocsp_cache_enable = GNUTLS_ENABLED_TRUE;
+        cache = &sc->ocsp_cache;
     }
     else
         return apr_psprintf(parms->temp_pool, "Internal Error: %s "
@@ -898,6 +906,8 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
     sc->ocsp_check_nonce = GNUTLS_ENABLED_UNSET;
     sc->ocsp_response_file = NULL;
     sc->ocsp_mutex = NULL;
+    sc->ocsp_cache_enable = GNUTLS_ENABLED_UNSET;
+    sc->ocsp_cache = NULL;
     sc->ocsp_cache_time = MGS_TIMEOUT_UNSET;
     sc->ocsp_failure_timeout = MGS_TIMEOUT_UNSET;
     sc->ocsp_fuzz_time = MGS_TIMEOUT_UNSET;

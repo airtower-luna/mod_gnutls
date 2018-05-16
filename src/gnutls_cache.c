@@ -30,6 +30,7 @@
 #include "gnutls_cache.h"
 #include "mod_gnutls.h"
 #include "gnutls_config.h"
+#include "gnutls_ocsp.h"
 
 #include <ap_socache.h>
 #include <apr_escape.h>
@@ -413,10 +414,20 @@ static apr_status_t cleanup_socache(void *data)
     server_rec *s = data;
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
-    ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
-                 "Cleaning up socache '%s:%s'",
-                 sc->cache->prov->name, sc->cache->config);
-    sc->cache->prov->destroy(sc->cache->socache, s);
+    if (sc->cache)
+    {
+        ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
+                     "Cleaning up session cache '%s:%s'",
+                     sc->cache->prov->name, sc->cache->config);
+        sc->cache->prov->destroy(sc->cache->socache, s);
+    }
+    if (sc->ocsp_cache)
+    {
+        ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
+                     "Cleaning up OCSP cache '%s:%s'",
+                     sc->ocsp_cache->prov->name, sc->ocsp_cache->config);
+        sc->ocsp_cache->prov->destroy(sc->ocsp_cache->socache, s);
+    }
     return APR_SUCCESS;
 }
 
@@ -427,6 +438,19 @@ int mgs_cache_post_config(apr_pool_t *pconf,
                           server_rec *s, mgs_srvconf_rec *sc)
 {
     apr_status_t rv = APR_SUCCESS;
+
+    /* Initialize the OCSP cache first so it's not skipped if the
+     * session cache is disabled. */
+    if (sc->ocsp_cache != NULL)
+    {
+        /* TODO: Maybe initialize only if explicitly enabled OR at
+         * least one (virtual) host has OCSP enabled? */
+        rv = mgs_cache_inst_init(sc->ocsp_cache, MGS_OCSP_CACHE_NAME,
+                                 MGS_OCSP_CACHE_MUTEX_NAME, s, pconf);
+        if (rv != APR_SUCCESS)
+            return HTTP_INSUFFICIENT_STORAGE;
+    }
+
     /* GnuTLSCache was never explicitly set or is disabled: */
     if (sc->cache_enable == GNUTLS_ENABLED_UNSET
         || sc->cache_enable == GNUTLS_ENABLED_FALSE)
@@ -449,19 +473,18 @@ int mgs_cache_post_config(apr_pool_t *pconf,
     return APR_SUCCESS;
 }
 
-int mgs_cache_child_init(apr_pool_t * p,
-                         server_rec * s,
-                         mgs_srvconf_rec * sc)
+int mgs_cache_child_init(apr_pool_t *p, server_rec *server,
+                         mgs_cache_t cache, const char *mutex_name)
 {
     /* reinit cache mutex */
-    const char *lockfile = apr_global_mutex_lockfile(sc->cache->mutex);
-    apr_status_t rv = apr_global_mutex_child_init(&sc->cache->mutex,
+    const char *lockfile = apr_global_mutex_lockfile(cache->mutex);
+    apr_status_t rv = apr_global_mutex_child_init(&cache->mutex,
                                                   lockfile, p);
     if (rv != APR_SUCCESS)
-        ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
-                     "Failed to reinit mutex '%s'", MGS_CACHE_MUTEX_NAME);
+        ap_log_error(APLOG_MARK, APLOG_EMERG, rv, server,
+                     "Failed to reinit mutex '%s'", mutex_name);
 
-    return 0;
+    return rv;
 }
 
 int mgs_cache_session_init(mgs_handle_t * ctxt)

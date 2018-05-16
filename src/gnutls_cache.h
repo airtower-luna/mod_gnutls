@@ -80,9 +80,12 @@ int mgs_cache_post_config(apr_pool_t *pconf, apr_pool_t *ptemp,
  * @param p child memory pool provided by Apache
  * @param s default server of the Apache configuration, head of the
  * server list
- * @param sc mod_gnutls data associated with `s`
+ * @param cache the cache to reinit
+ * @param mutex_name name of the mutex associated with the cache for
+ * logging purposes
  */
-int mgs_cache_child_init(apr_pool_t *p, server_rec *s, mgs_srvconf_rec *sc);
+int mgs_cache_child_init(apr_pool_t *p, server_rec *server,
+                         mgs_cache_t cache, const char *mutex_name);
 
 /**
  * Set up caching for the given TLS session.
