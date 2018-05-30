@@ -42,8 +42,8 @@
  * that the socache instance is only created, not initialized, which
  * is supposed to happen during post_config.
  *
- * @param cache pointer to the mgs_cache_t, memory will be allocated
- * if currently NULL.
+ * @param cache pointer to the mgs_cache_t, will be assigned only if
+ * configuration succeeds
  *
  * @param server associated server for logging purposes
  *
@@ -52,7 +52,8 @@
  * @param config configuration string for the socache provider, may be
  * `NULL` if the provider accepts an empty configuration
  *
- * @param pconf configuration memory pool
+ * @param pconf configuration memory pool, used to store cache
+ * configuration
  *
  * @param ptemp temporary memory pool
  */

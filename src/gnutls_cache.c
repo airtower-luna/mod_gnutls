@@ -313,14 +313,11 @@ const char *mgs_cache_inst_config(mgs_cache_t *cache, server_rec *server,
                                   const char* type, const char* config,
                                   apr_pool_t *pconf, apr_pool_t *ptemp)
 {
-    /* allocate cache structure if needed */
-    if (*cache == NULL)
-    {
-        *cache = apr_pcalloc(pconf, sizeof(struct mgs_cache));
-        if (*cache == NULL)
-            return "Could not allocate memory for cache configuration!";
-    }
-    mgs_cache_t c = *cache;
+    /* Allocate cache structure, will be assigned to *cache after
+     * successful configuration. */
+    mgs_cache_t c = apr_pcalloc(pconf, sizeof(struct mgs_cache));
+    if (c == NULL)
+        return "Could not allocate memory for cache configuration!";
 
     /* Find the right socache provider */
     c->prov = ap_lookup_provider(AP_SOCACHE_PROVIDER_GROUP,
@@ -354,6 +351,9 @@ const char *mgs_cache_inst_config(mgs_cache_t *cache, server_rec *server,
     ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, server,
                  "%s: Socache '%s:%s' created.",
                  __func__, c->prov->name, c->config);
+
+    /* assign configured cache structure to server */
+    *cache = c;
 
     return NULL;
 }
