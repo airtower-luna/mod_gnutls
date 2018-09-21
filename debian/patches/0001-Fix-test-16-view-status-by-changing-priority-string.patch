@@ -1,0 +1,38 @@
+From: Sunil Mohan Adapa <sunil@medhas.org>
+Date: Tue, 18 Sep 2018 09:41:47 -0700
+Subject: Fix test 16-view-status by changing priority string
+
+From gnutls 3.5.19 release notes:
+
+"The ciphers utilizing HMAC-SHA384 and SHA256 have been removed from the default
+priority strings. They are not necessary for compatibility or other purpose and
+provide no advantage over their SHA1 counter-parts, as they all depend on the
+legacy TLS CBC block mode."
+
+Pick a new priority string such that the cipher suite matches the default
+negotiated by gnutls 3.5.19 server and client without explicitly setting a
+priority string.
+---
+ test/tests/16_view-status/gnutls-cli.args | 2 +-
+ test/tests/16_view-status/output          | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/test/tests/16_view-status/gnutls-cli.args b/test/tests/16_view-status/gnutls-cli.args
+index aca8ac0..470925b 100644
+--- a/test/tests/16_view-status/gnutls-cli.args
++++ b/test/tests/16_view-status/gnutls-cli.args
+@@ -1,2 +1,2 @@
+ --x509cafile=authority/x509.pem
+---priority=NONE:+VERS-TLS1.2:+AES-128-CBC:+SHA256:+RSA:+COMP-NULL:+SIGN-RSA-SHA256
++--priority=NONE:+VERS-TLS1.2:+ECDHE-RSA:+CURVE-SECP256R1:+AES-256-GCM:+AEAD:+COMP-NULL:+SIGN-RSA-SHA1
+diff --git a/test/tests/16_view-status/output b/test/tests/16_view-status/output
+index 7786244..8bfb45a 100644
+--- a/test/tests/16_view-status/output
++++ b/test/tests/16_view-status/output
+@@ -1,5 +1,5 @@
+ <dt>Using TLS:</dt><dd>yes</dd>
+-<dt>Current TLS session:</dt><dd>(TLS1.2)-(RSA)-(AES-128-CBC)-(SHA256)</dd>
++<dt>Current TLS session:</dt><dd>(TLS1.2)-(ECDHE-RSA-SECP256R1)-(AES-256-GCM)</dd>
+ </dl>
+ </body></html>
+ - Peer has closed the GnuTLS connection
