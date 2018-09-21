@@ -22,7 +22,7 @@ Build-Depends:
  pkg-config,
  procps <!nocheck>,
  softhsm2 <!nocheck> | softhsm <!nocheck>,
-Standards-Version: 4.1.4
+Standards-Version: 4.2.1
 Homepage: https://mod.gnutls.org/
 Vcs-Git: https://mod.gnutls.org/git/mod_gnutls -b debian/master
 Vcs-Browser: https://mod.gnutls.org/browser/mod_gnutls
