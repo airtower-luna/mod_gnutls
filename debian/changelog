@@ -1,3 +1,13 @@
+mod-gnutls (0.8.4-2) unstable; urgency=medium
+
+  [ Sunil Mohan Adapa ]
+  * Avoid deprecated ciphersuites in test suite (Closes: #907008)
+
+  [ Daniel Kahn Gillmor ]
+  * Standards-Version: bump to 4.2.1 (no changes needed)
+
+ -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Fri, 21 Sep 2018 09:42:29 -0400
+
 mod-gnutls (0.8.4-1) unstable; urgency=medium
 
   [ Daniel Kahn Gillmor ]
