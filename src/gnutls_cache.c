@@ -42,6 +42,11 @@
 /** Session cache name */
 #define MGS_SESSION_CACHE_NAME "gnutls_session"
 
+/** Default type for OCSP cache */
+#define DEFAULT_OCSP_CACHE_TYPE "shmcb"
+/** Default config string for OCSP cache */
+#define DEFAULT_OCSP_CACHE_CONF ""
+
 /** Maximum length of the hex string representation of a GnuTLS
  * session ID: two characters per byte, plus one more for `\0` */
 #if GNUTLS_VERSION_NUMBER >= 0x030400
@@ -433,11 +438,29 @@ static apr_status_t cleanup_socache(void *data)
 
 
 
-int mgs_cache_post_config(apr_pool_t *pconf,
-                          apr_pool_t *ptemp __attribute__((unused)),
+int mgs_cache_post_config(apr_pool_t *pconf, apr_pool_t *ptemp,
                           server_rec *s, mgs_srvconf_rec *sc)
 {
     apr_status_t rv = APR_SUCCESS;
+
+    /* If the OCSP cache is unconfigured initialize it with
+     * defaults. */
+    if (sc->ocsp_cache == NULL)
+    {
+        ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, s,
+                     "%s: OCSP cache unconfigured, using '%s:%s'.", __func__,
+                     DEFAULT_OCSP_CACHE_TYPE, DEFAULT_OCSP_CACHE_CONF);
+        const char *err = mgs_cache_inst_config(&sc->ocsp_cache, s,
+                                                DEFAULT_OCSP_CACHE_TYPE,
+                                                DEFAULT_OCSP_CACHE_CONF,
+                                                pconf, ptemp);
+        if (err != NULL)
+            ap_log_error(APLOG_MARK, APLOG_WARNING, rv, s,
+                         "%s: Configuring default OCSP cache '%s:%s' failed, "
+                         "make sure that mod_socache_%s is loaded.", __func__,
+                         DEFAULT_OCSP_CACHE_TYPE, DEFAULT_OCSP_CACHE_CONF,
+                         DEFAULT_OCSP_CACHE_TYPE);
+    }
 
     /* Initialize the OCSP cache first so it's not skipped if the
      * session cache is disabled. */
