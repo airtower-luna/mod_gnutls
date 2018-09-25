@@ -1086,33 +1086,53 @@ static apr_status_t mgs_async_ocsp_update(int state,
 
 
 
-/*
- * Like in the general post_config hook the HTTP status codes for
- * errors are just for fun. What matters is "neither OK nor DECLINED"
- * to denote an error.
- */
-int mgs_ocsp_post_config_server(apr_pool_t *pconf,
-                                apr_pool_t *ptemp __attribute__((unused)),
-                                server_rec *server)
+const char* mgs_ocsp_configure_stapling(apr_pool_t *pconf,
+                                        apr_pool_t *ptemp __attribute__((unused)),
+                                        server_rec *server)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(server->module_config, &gnutls_module);
 
     if (sc->certs_x509_chain_num < 2)
-    {
-        ap_log_error(APLOG_MARK, APLOG_STARTUP, APR_EINVAL, server,
-                     "OCSP stapling is enabled but no CA certificate "
-                     "available for %s:%d, make sure it is included in "
-                     "GnuTLSCertificateFile!",
-                     server->server_hostname, server->addrs->host_port);
-        return HTTP_NOT_FOUND;
-    }
+        return "No issuer (CA) certificate available, cannot enable "
+            "stapling. Please add it to the GnuTLSCertificateFile.";
+
+    mgs_ocsp_data_t ocsp = apr_palloc(pconf, sizeof(struct mgs_ocsp_data));
+
+    ocsp->uri = mgs_cert_get_ocsp_uri(pconf,
+                                      sc->certs_x509_crt_chain[0]);
+    if (ocsp->uri == NULL && sc->ocsp_response_file == NULL)
+        return "No OCSP URI in the certificate nor a GnuTLSOCSPResponseFile "
+            "setting, cannot configure OCSP stapling.";
 
     if (sc->ocsp_cache == NULL)
+        return "No OCSP response cache available, please check "
+            "the GnuTLSOCSPCache setting.";
+
+    sc->ocsp = ocsp;
+    return NULL;
+}
+
+
+
+/*
+ * Like in the general post_config hook the HTTP status codes for
+ * errors are just for fun. What matters is "neither OK nor DECLINED"
+ * to denote an error.
+ */
+int mgs_ocsp_enable_stapling(apr_pool_t *pconf,
+                             apr_pool_t *ptemp __attribute__((unused)),
+                             server_rec *server)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(server->module_config, &gnutls_module);
+    if (sc->ocsp == NULL)
     {
-        ap_log_error(APLOG_MARK, APLOG_STARTUP, APR_EINVAL, server,
-                     "OCSP stapling is enabled but no cache configured!");
-        return HTTP_NOT_FOUND;
+        ap_log_error(APLOG_MARK, APLOG_STARTUP, APR_EGENERAL, server,
+                     "CRITICAL ERROR: %s called with uninitialized OCSP "
+                     "data structure. This indicates a bug in mod_gnutls.",
+                     __func__);
+        return HTTP_INTERNAL_SERVER_ERROR;
     }
 
     /* set default values for unset parameters */
@@ -1151,24 +1171,10 @@ int mgs_ocsp_post_config_server(apr_pool_t *pconf,
         return HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    sc->ocsp = apr_palloc(pconf, sizeof(struct mgs_ocsp_data));
-
     sc->ocsp->fingerprint =
         mgs_get_cert_fingerprint(pconf, sc->certs_x509_crt_chain[0]);
     if (sc->ocsp->fingerprint.data == NULL)
         return HTTP_INTERNAL_SERVER_ERROR;
-
-    sc->ocsp->uri = mgs_cert_get_ocsp_uri(pconf,
-                                          sc->certs_x509_crt_chain[0]);
-    if (sc->ocsp->uri == NULL && sc->ocsp_response_file == NULL)
-    {
-        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
-                     "OCSP stapling is enabled for for %s:%d, but there is "
-                     "neither an OCSP URI in the certificate nor a "
-                     "GnuTLSOCSPResponseFile setting for this host!",
-                     server->server_hostname, server->addrs->host_port);
-        return HTTP_NOT_FOUND;
-    }
 
     sc->ocsp->trust = apr_palloc(pconf,
                                  sizeof(gnutls_x509_trust_list_t));

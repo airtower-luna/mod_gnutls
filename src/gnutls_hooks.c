@@ -658,13 +658,24 @@ int mgs_hook_post_config(apr_pool_t *pconf,
         if (sc->client_verify_method == mgs_cvm_unset)
             sc->client_verify_method = mgs_cvm_cartel;
         if (sc->ocsp_staple == GNUTLS_ENABLED_UNSET)
+            // TODO: Check result of mgs_ocsp_configure_stapling()
+            // below instead, staple if possible.
             sc->ocsp_staple = GNUTLS_ENABLED_FALSE;
 
         sc->ocsp_mutex = sc_base->ocsp_mutex;
         /* init OCSP configuration if OCSP is enabled for this host */
         if (sc->enabled && sc->ocsp_staple)
         {
-            rv = mgs_ocsp_post_config_server(pconf, ptemp, s);
+            const char *err = mgs_ocsp_configure_stapling(pconf, ptemp, s);
+            if (err != NULL)
+            {
+                ap_log_error(APLOG_MARK, APLOG_STARTUP, APR_EINVAL, s,
+                             "OCSP stapling configuration failed for "
+                             "host '%s:%d': %s",
+                             s->server_hostname, s->addrs->host_port, err);
+                return HTTP_INTERNAL_SERVER_ERROR;
+            }
+            rv = mgs_ocsp_enable_stapling(pconf, ptemp, s);
             if (rv != OK && rv != DECLINED)
                 return rv;
         }
