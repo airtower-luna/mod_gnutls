@@ -78,8 +78,6 @@ typedef struct mgs_ocsp_data* mgs_ocsp_data_t;
 
 /* The maximum number of certificates to send in a chain */
 #define MAX_CHAIN_SIZE 8
-/* The maximum number of SANs to read from a x509 certificate */
-#define MAX_CERT_SAN 5
 
 /** Server Configuration Record */
 typedef struct {
@@ -140,10 +138,6 @@ typedef struct {
     /* Anonymous Client Certificate Structure, used for proxy
      * connections */
     gnutls_anon_client_credentials_t anon_client_creds;
-	/* Current x509 Certificate CN [Common Name] */
-    char* cert_cn;
-	/* Current x509 Certificate SAN [Subject Alternate Name]s*/
-    char* cert_san[MAX_CERT_SAN];
 	/* An x509 Certificate Chain */
     gnutls_pcert_st *certs_x509_chain;
     gnutls_x509_crt_t *certs_x509_crt_chain;

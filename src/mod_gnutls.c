@@ -218,7 +218,9 @@ int ssl_engine_set(conn_rec *c,
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
                       "%s: mod_proxy requested TLS proxy, but not enabled "
-                      "for %s", __func__, ctxt->sc->cert_cn);
+                      "for %s:%d", __func__,
+                      ctxt->c->base_server->server_hostname,
+                      ctxt->c->base_server->addrs->host_port);
         return 0;
     }
 

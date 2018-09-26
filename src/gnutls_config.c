@@ -930,7 +930,6 @@ void *mgs_config_server_create(apr_pool_t * p,
 
 void *mgs_config_server_merge(apr_pool_t * p, void *BASE, void *ADD)
 {
-    int i;
     char *err = NULL;
     mgs_srvconf_rec *base = (mgs_srvconf_rec *) BASE;
     mgs_srvconf_rec *add = (mgs_srvconf_rec *) ADD;
@@ -980,12 +979,6 @@ void *mgs_config_server_merge(apr_pool_t * p, void *BASE, void *ADD)
     gnutls_srvconf_assign(certs_x509_chain);
     gnutls_srvconf_assign(certs_x509_crt_chain);
     gnutls_srvconf_assign(certs_x509_chain_num);
-
-    /* how do these get transferred cleanly before the data from ADD
-     * goes away? */
-    gnutls_srvconf_assign(cert_cn);
-    for (i = 0; i < MAX_CERT_SAN; i++)
-	gnutls_srvconf_assign(cert_san[i]);
 
     return sc;
 }

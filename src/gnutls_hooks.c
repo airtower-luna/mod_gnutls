@@ -359,63 +359,6 @@ static int cert_retrieve_fn(gnutls_session_t session,
 	}
 }
 
-/* Read the common name or the alternative name of the certificate.
- * We only support a single name per certificate.
- *
- * Returns negative on error.
- */
-static int read_crt_cn(server_rec * s, apr_pool_t * p, gnutls_x509_crt_t cert, char **cert_cn) {
-
-    int rv = 0;
-    size_t data_len;
-
-
-    _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
-    *cert_cn = NULL;
-
-    data_len = 0;
-    rv = gnutls_x509_crt_get_dn_by_oid(cert, GNUTLS_OID_X520_COMMON_NAME, 0, 0, NULL, &data_len);
-
-    if (rv == GNUTLS_E_SHORT_MEMORY_BUFFER && data_len > 1) {
-        *cert_cn = apr_palloc(p, data_len);
-        rv = gnutls_x509_crt_get_dn_by_oid(cert,
-                GNUTLS_OID_X520_COMMON_NAME,
-                0, 0, *cert_cn,
-                &data_len);
-    } else { /* No CN return subject alternative name */
-        ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
-                "No common name found in certificate for '%s:%d'. Looking for subject alternative name...",
-                s->server_hostname, s->port);
-        rv = 0;
-        /* read subject alternative name */
-        for (int i = 0; !(rv < 0); i++)
-        {
-            data_len = 0;
-            rv = gnutls_x509_crt_get_subject_alt_name(cert, i,
-                    NULL,
-                    &data_len,
-                    NULL);
-
-            if (rv == GNUTLS_E_SHORT_MEMORY_BUFFER
-                    && data_len > 1) {
-                /* FIXME: not very efficient. What if we have several alt names
-                 * before DNSName?
-                 */
-                *cert_cn = apr_palloc(p, data_len + 1);
-
-                rv = gnutls_x509_crt_get_subject_alt_name
-                        (cert, i, *cert_cn, &data_len, NULL);
-                (*cert_cn)[data_len] = 0;
-
-                if (rv == GNUTLS_SAN_DNSNAME)
-                    break;
-            }
-        }
-    }
-
-    return rv;
-}
-
 
 
 #if GNUTLS_VERSION_NUMBER >= 0x030506
@@ -751,21 +694,6 @@ int mgs_hook_post_config(apr_pool_t *pconf,
             return HTTP_UNAUTHORIZED;
         }
 
-        if (sc->enabled == GNUTLS_ENABLED_TRUE) {
-            rv = -1;
-            if (sc->certs_x509_chain_num > 0) {
-                rv = read_crt_cn(s, pconf, sc->certs_x509_crt_chain[0], &sc->cert_cn);
-            }
-
-            if (rv < 0) {
-                ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-							"GnuTLS: Cannot find a certificate for host '%s:%d'!",
-							s->server_hostname, s->port);
-                sc->cert_cn = NULL;
-                continue;
-            }
-        }
-
         if (sc->enabled == GNUTLS_ENABLED_TRUE
             && sc->proxy_enabled == GNUTLS_ENABLED_TRUE
             && load_proxy_x509_credentials(pconf, ptemp, s) != APR_SUCCESS)
@@ -955,7 +883,7 @@ static int vhost_cb(void *baton, conn_rec *conn, server_rec * s)
     tsc = (mgs_srvconf_rec *) ap_get_module_config(s->module_config,
             &gnutls_module);
 
-    if (tsc->enabled != GNUTLS_ENABLED_TRUE || tsc->cert_cn == NULL) {
+    if (tsc->enabled != GNUTLS_ENABLED_TRUE) {
         return 0;
     }
 
