@@ -657,27 +657,49 @@ int mgs_hook_post_config(apr_pool_t *pconf,
             sc->client_verify_mode = GNUTLS_CERT_IGNORE;
         if (sc->client_verify_method == mgs_cvm_unset)
             sc->client_verify_method = mgs_cvm_cartel;
-        if (sc->ocsp_staple == GNUTLS_ENABLED_UNSET)
-            // TODO: Check result of mgs_ocsp_configure_stapling()
-            // below instead, staple if possible.
-            sc->ocsp_staple = GNUTLS_ENABLED_FALSE;
+
+        // TODO: None of the stuff below (and neither some above)
+        // makes sense if sc->enabled == GNUTLS_ENABLED_FALSE, we
+        // should just continue to the next host. All code below could
+        // then safely assume sc->enabled == GNUTLS_ENABLED_TRUE.
 
         sc->ocsp_mutex = sc_base->ocsp_mutex;
-        /* init OCSP configuration if OCSP is enabled for this host */
-        if (sc->enabled && sc->ocsp_staple)
+        /* init OCSP configuration unless explicitly disabled */
+        if (sc->enabled && sc->ocsp_staple != GNUTLS_ENABLED_FALSE)
         {
             const char *err = mgs_ocsp_configure_stapling(pconf, ptemp, s);
             if (err != NULL)
             {
-                ap_log_error(APLOG_MARK, APLOG_STARTUP, APR_EINVAL, s,
-                             "OCSP stapling configuration failed for "
-                             "host '%s:%d': %s",
-                             s->server_hostname, s->addrs->host_port, err);
-                return HTTP_INTERNAL_SERVER_ERROR;
+                /* If OCSP stapling is enabled only by default ignore
+                 * error and disable stapling */
+                if (sc->ocsp_staple == GNUTLS_ENABLED_UNSET)
+                {
+                    ap_log_error(APLOG_MARK, APLOG_INFO, APR_SUCCESS, s,
+                                 "Cannnot enable OCSP stapling for "
+                                 "host '%s:%d': %s",
+                                 s->server_hostname, s->addrs->host_port, err);
+                    sc->ocsp_staple = GNUTLS_ENABLED_FALSE;
+                }
+                /* If OCSP stapling is explicitly enabled this is a
+                 * critical error. */
+                else
+                {
+                    ap_log_error(APLOG_MARK, APLOG_STARTUP, APR_EINVAL, s,
+                                 "OCSP stapling configuration failed for "
+                                 "host '%s:%d': %s",
+                                 s->server_hostname, s->addrs->host_port, err);
+                    return HTTP_INTERNAL_SERVER_ERROR;
+                }
             }
-            rv = mgs_ocsp_enable_stapling(pconf, ptemp, s);
-            if (rv != OK && rv != DECLINED)
-                return rv;
+            else
+            {
+                /* Might already be set */
+                sc->ocsp_staple = GNUTLS_ENABLED_TRUE;
+                /* Set up stapling */
+                rv = mgs_ocsp_enable_stapling(pconf, ptemp, s);
+                if (rv != OK && rv != DECLINED)
+                    return rv;
+            }
         }
 
         /* Check if the priorities have been set */
