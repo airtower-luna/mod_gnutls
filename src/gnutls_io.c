@@ -562,10 +562,15 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
                           __func__, IS_PROXY_STR(ctxt));
     }
 
-    if (ctxt->status < 0) {
-        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
-                      "%s %s: ap_get_brigade", __func__, IS_PROXY_STR(ctxt));
-        return ap_get_brigade(f->next, bb, mode, block, readbytes);
+    if (ctxt->status < 0)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_TRACE1, 0, ctxt->c,
+                      "%s: %sconnection failed, cannot provide data!",
+                      __func__, IS_PROXY_STR(ctxt));
+        apr_bucket *bucket =
+                apr_bucket_eos_create(f->c->bucket_alloc);
+        APR_BRIGADE_INSERT_TAIL(bb, bucket);
+        return APR_ECONNABORTED;
     }
 
     /* XXX: we don't currently support anything other than these modes. */
@@ -705,8 +710,24 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
                           __func__, IS_PROXY_STR(ctxt));
     }
 
-    if (ctxt->status < 0) {
-        return ap_pass_brigade(f->next, bb);
+    if (ctxt->status < 0)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_TRACE1, 0, ctxt->c,
+                      "%s: %sconnection failed, refusing to send.",
+                      __func__, IS_PROXY_STR(ctxt));
+        if (ctxt->is_proxy)
+        {
+            /* If mod_proxy receives an error while trying to send its
+             * request it sends an "invalid request" error to the
+             * client. By pretending we could send the request
+             * mod_proxy continues its processing and sends a proper
+             * "proxy error" message when there's no response to read. */
+            apr_bucket *bucket = apr_bucket_eos_create(f->c->bucket_alloc);
+            APR_BRIGADE_INSERT_TAIL(bb, bucket);
+            return APR_SUCCESS;
+        }
+        else
+            return APR_ECONNABORTED;
     }
 
     while (!APR_BRIGADE_EMPTY(bb)) {
