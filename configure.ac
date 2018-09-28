@@ -30,6 +30,21 @@ CHECK_APACHE(,$AP_VERSION,
     AC_MSG_ERROR([*** Apache version $AP_VERSION not found!])
 )
 
+dnl Maybe use the binaries for tests, too?
+AC_ARG_WITH([gnutls-dev],
+	AS_HELP_STRING([--with-gnutls-dev=DIR],
+		[Use GnuTLS libraries from a development (git) tree. Use \
+		this if you want to test mod_gnutls with the latest \
+		GnuTLS code.]),
+	[
+		AS_IF([test -d "${with_gnutls_dev}" ],
+		[
+			LIBGNUTLS_CFLAGS="-I${with_gnutls_dev}/lib/includes"
+			LIBGNUTLS_LIBS="-lgnutls -L${with_gnutls_dev}/lib/.libs -R${with_gnutls_dev}/lib/.libs"
+		],
+		[AC_MSG_ERROR([--with-gnutls-dev=DIR requires a directory!])])
+	], [])
+
 PKG_CHECK_MODULES([LIBGNUTLS], [gnutls >= 3.3.0])
 
 LIBGNUTLS_VERSION=`pkg-config --modversion gnutls`
