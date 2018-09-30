@@ -45,7 +45,7 @@
 /** Default type for OCSP cache */
 #define DEFAULT_OCSP_CACHE_TYPE "shmcb"
 /** Default config string for OCSP cache */
-#define DEFAULT_OCSP_CACHE_CONF ""
+#define DEFAULT_OCSP_CACHE_CONF "gnutls_ocsp_cache"
 
 /** Maximum length of the hex string representation of a GnuTLS
  * session ID: two characters per byte, plus one more for `\0` */
