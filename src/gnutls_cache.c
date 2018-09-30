@@ -108,9 +108,6 @@ int mgs_cache_store(mgs_cache_t cache, server_rec *server,
                     gnutls_datum_t key, gnutls_datum_t data,
                     apr_time_t expiry)
 {
-    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
-        ap_get_module_config(server->module_config, &gnutls_module);
-
     apr_pool_t *spool;
     apr_pool_create(&spool, NULL);
 
@@ -128,7 +125,7 @@ int mgs_cache_store(mgs_cache_t cache, server_rec *server,
     {
         ap_log_error(APLOG_MARK, APLOG_DEBUG, rv, server,
                      "error storing in cache '%s:%s'",
-                     cache->prov->name, sc->cache->config);
+                     cache->prov->name, cache->config);
         apr_pool_destroy(spool);
         return -1;
     }
@@ -136,7 +133,7 @@ int mgs_cache_store(mgs_cache_t cache, server_rec *server,
     ap_log_error(APLOG_MARK, APLOG_TRACE1, rv, server,
                  "stored %u bytes of data (%u byte key) in cache '%s:%s'",
                  data.size, key.size,
-                 cache->prov->name, sc->cache->config);
+                 cache->prov->name, cache->config);
     apr_pool_destroy(spool);
     return 0;
 }
@@ -182,9 +179,6 @@ static int socache_store_session(void *baton, gnutls_datum_t key,
 gnutls_datum_t mgs_cache_fetch(mgs_cache_t cache, server_rec *server,
                                gnutls_datum_t key, apr_pool_t *pool)
 {
-    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
-        ap_get_module_config(server->module_config, &gnutls_module);
-
     gnutls_datum_t data = {NULL, 0};
     data.data = gnutls_malloc(SOCACHE_FETCH_BUF_SIZE);
     if (data.data == NULL)
@@ -209,11 +203,11 @@ gnutls_datum_t mgs_cache_fetch(mgs_cache_t cache, server_rec *server,
         if (rv == APR_NOTFOUND)
             ap_log_error(APLOG_MARK, APLOG_TRACE1, rv, server,
                          "requested entry not found in cache '%s:%s'.",
-                         cache->prov->name, sc->cache->config);
+                         cache->prov->name, cache->config);
         else
             ap_log_error(APLOG_MARK, APLOG_WARNING, rv, server,
                          "error fetching from cache '%s:%s'",
-                         cache->prov->name, sc->cache->config);
+                         cache->prov->name, cache->config);
         /* free unused buffer */
         gnutls_free(data.data);
         data.data = NULL;
@@ -223,7 +217,7 @@ gnutls_datum_t mgs_cache_fetch(mgs_cache_t cache, server_rec *server,
     {
         ap_log_error(APLOG_MARK, APLOG_TRACE1, rv, server,
                      "fetched %u bytes from cache '%s:%s'",
-                     data.size, cache->prov->name, sc->cache->config);
+                     data.size, cache->prov->name, cache->config);
 
         /* Realloc buffer to data.size. Data size must be less than or
          * equal to the initial buffer size, so this REALLY should not
