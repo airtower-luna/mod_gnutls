@@ -138,23 +138,26 @@ Enable Session Tickets for the server
 
     GnuTLSSessionTickets [on|off]
 
-Default: `off`\
+Default: `on` with GnuTLS 3.6.4 and newer, `off` otherwise\
 Context: server config, virtual host
 
-To avoid storing data for TLS session resumption the server can
-provide clients with tickets, to use on return. Tickets are an
-alternative to using a session cache, mostly used for busy servers
-with limited storage. For a pool of servers this option is not
-recommended since the tickets are bound to the issuing server only.
+Session tickets allow TLS session resumption without session state
+stored on the server, using encrypted tickets provided to the clients
+instead. Tickets are an alternative to using a session cache, and
+currently the only session resumption mechanism in TLS 1.3. For a pool
+of servers this option is not recommended since the tickets are bound
+to the issuing server only.
 
 If this option is set in the global configuration, virtual hosts
 without a `GnuTLSSessionTickets` setting will use the global setting.
 
-*Warning:* Currently the master key that protects the tickets is
-generated only on server start, and there is no mechanism to roll over
-the key. If session tickets are enabled it is highly recommened to
-restart the server regularly to protect past sessions in case an
-attacker gains access to server memory.
+*Warning:* With GnuTLS version before 3.6.4 the master key that
+protects the tickets is generated only on server start, and there is
+no mechanism to roll over the key. If session tickets are enabled it
+is highly recommended to restart the server regularly to protect past
+sessions in case an attacker gains access to server memory. GnuTLS
+3.6.4 introduced an automatic TOTP-based key rollover, so this warning
+does not apply any more and tickets are enabled by default.
 
 ### GnuTLSClientVerify
 
