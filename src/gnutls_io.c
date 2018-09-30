@@ -241,12 +241,8 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
 
     while (1)
     {
+        /* Note: The pull function sets ctxt->input_rc */
         rc = gnutls_record_recv(ctxt->session, buf + bytes, wanted - bytes);
-
-        if (rc == GNUTLS_E_INTERRUPTED)
-            ctxt->input_rc = APR_EINTR;
-        else if (rc == GNUTLS_E_AGAIN)
-            ctxt->input_rc = APR_EAGAIN;
 
         if (rc > 0) {
             *len += rc;
@@ -257,33 +253,25 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
             }
             return ctxt->input_rc;
         } else if (rc == 0) {
-            /* If EAGAIN, we will loop given a blocking read,
-             * otherwise consider ourselves at EOF.
-             */
-            if (APR_STATUS_IS_EAGAIN(ctxt->input_rc)
-                    || APR_STATUS_IS_EINTR(ctxt->input_rc)) {
-                /* Already read something, return APR_SUCCESS instead.
-                 * On win32 in particular, but perhaps on other kernels,
-                 * a blocking call isn't 'always' blocking.
-                 */
-                if (*len > 0) {
-                    ctxt->input_rc = APR_SUCCESS;
-                    break;
-                }
-                if (ctxt->input_block == APR_NONBLOCK_READ) {
-                    break;
-                }
+            /* EOF, return code depends on whether we still have data
+             * to return. */
+            if (*len > 0) {
+                ctxt->input_rc = APR_SUCCESS;
             } else {
-                if (*len > 0) {
-                    ctxt->input_rc = APR_SUCCESS;
-                } else {
-                    ctxt->input_rc = APR_EOF;
-                }
-                break;
+                ctxt->input_rc = APR_EOF;
             }
+            break;
         } else { /* (rc < 0) */
 
-            if (rc == GNUTLS_E_REHANDSHAKE) {
+            if (rc == GNUTLS_E_INTERRUPTED || rc == GNUTLS_E_AGAIN)
+            {
+                ap_log_cerror(APLOG_MARK, APLOG_TRACE2, ctxt->input_rc, ctxt->c,
+                              "%s: looping recv after '%s' (%d)",
+                              __func__, gnutls_strerror(rc), rc);
+                /* For a blocking read: Loop and try again immediately. */
+                if (ctxt->input_block != APR_NONBLOCK_READ)
+                    continue;
+            } else if (rc == GNUTLS_E_REHANDSHAKE) {
                 /* A client has asked for a new Hankshake. Currently, we don't do it */
                 ap_log_cerror(APLOG_MARK, APLOG_INFO,
                         ctxt->input_rc,
@@ -880,16 +868,13 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
             || (rc == APR_SUCCESS
                 && APR_BRIGADE_EMPTY(ctxt->input_bb)))
         {
-            if (APR_STATUS_IS_EOF(ctxt->input_rc))
-            {
-                return 0;
-            }
-            else
-            {
-                gnutls_transport_set_errno(ctxt->session,
-                                           EAI_APR_TO_RAW(ctxt->input_rc));
-                return -1;
-            }
+            /* Turning APR_SUCCESS into APR_EINTR isn't ideal, but
+             * it's the best matching error code for "didn't get data,
+             * but read didn't permanently fail either." */
+            ctxt->input_rc = (rc != APR_SUCCESS ? rc : APR_EINTR);
+            gnutls_transport_set_errno(ctxt->session,
+                                       EAI_APR_TO_RAW(ctxt->input_rc));
+            return -1;
         }
 
         if (rc != APR_SUCCESS)
