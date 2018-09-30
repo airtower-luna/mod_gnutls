@@ -212,41 +212,15 @@ MACs and compression methods
 
     GnuTLSPriorities NORMAL:+CIPHER_0:+CIPHER_1:...:+CIPHER_N
 
-Default: *none*\
+Default: `NORMAL`\
 Context: server config, virtual host
 
-Takes a colon separated list of protocol version, ciphers, key
-exchange methods message authentication codes, and compression methods
-to enable. The allowed keywords are specified in the
-`gnutls_priority_init()` function of GnuTLS.
+Sets the allowed protocol version(s), ciphers, key exchange methods,
+message authentication codes, and other TLS parameters for the server.
+The parameter is a GnuTLS priority string as described in the
+[the GnuTLS documentation](https://gnutls.org/manual/html_node/Priority-Strings.html).
 
-Please refer to [the GnuTLS documentation](https://gnutls.org/manual/html_node/Priority-Strings.html#Priority-Strings)
-for details. A few commonly used sets are listed below, note that
-their exact meaning may change with GnuTLS versions.
-
-`PERFORMANCE`
-:   A list with all the secure cipher combinations sorted in terms of
-    performance.
-
-`NORMAL`
-:   A list with all the secure cipher combinations sorted
-    with respect to security margin (subjective term).
-
-`SECURE128`
-:   A list with all the secure cipher suites that offer a security level
-    of 128-bit or more.
-
-`PFS`
-:   Only cipher suites offering perfect forward secrecy (ECDHE and DHE),
-    sorted by security margin.
-
-You can add or remove algorithms using the `+` and `!` prefixes
-respectively. For example, in order to use the `NORMAL` set but
-disable TLS 1.0 and 1.1 you can use the string
-`NORMAL:!VERS-TLS1.0:!VERS-TLS1.1`.
-
-You can find a list of all supported Ciphers, Versions, MACs, etc.  by
-running `gnutls-cli --list`.
+For example, to disable TLS 1.0 use `NORMAL:-VERS-TLS1.0`.
 
 ### GnuTLSP11Module
 
@@ -489,13 +463,14 @@ methods for proxy connections
 
     GnuTLSProxyPriorities NORMAL:+CIPHER_0:+CIPHER_1:...:+CIPHER_N
 
-Default: *none*\
+Default: `NORMAL`\
 Context: server config, virtual host
 
-This option is used to set the allowed ciphers, key exchange
-algorithms, MACs and compression methods for proxy connections. It
-takes the same parameters as `GnuTLSPriorities`. Required if
-`GnuTLSProxyEngine` is `On`.
+Sets the allowed protocol version(s), ciphers, key exchange methods,
+message authentication codes, and other TLS parameters for TLS proxy
+connections. Like for `GnuTLSPriorities` the parameter is a GnuTLS
+priority string as described in the
+[the GnuTLS documentation](https://gnutls.org/manual/html_node/Priority-Strings.html).
 
 OCSP Stapling Configuration
 ---------------------------
@@ -753,7 +728,6 @@ browsers support this standard. Here is an example using SNI:
      <VirtualHost _default_:443>
          GnuTLSEnable on
          GnuTLSSessionTickets on
-         GnuTLSPriorities NORMAL
          DocumentRoot /www/site1.example.com/html
          ServerName site1.example.com:443
          GnuTLSCertificateFile conf/tls/site1.crt
@@ -762,7 +736,6 @@ browsers support this standard. Here is an example using SNI:
 
      <VirtualHost _default_:443>
          GnuTLSEnable on
-         GnuTLSPriorities NORMAL
          DocumentRoot /www/site2.example.com/html
          ServerName site2.example.com:443
          GnuTLSCertificateFile conf/tls/site2.crt
@@ -771,7 +744,6 @@ browsers support this standard. Here is an example using SNI:
 
      <VirtualHost _default_:443>
          GnuTLSEnable on
-         GnuTLSPriorities NORMAL
          DocumentRoot /www/site3.example.com/html
          ServerName site3.example.com:443
          GnuTLSCertificateFile conf/tls/site3.crt
@@ -780,7 +752,6 @@ browsers support this standard. Here is an example using SNI:
 
      <VirtualHost _default_:443>
          GnuTLSEnable on
-         GnuTLSPriorities NORMAL
          DocumentRoot /www/site4.example.com/html
          ServerName site4.example.com:443
          GnuTLSCertificateFile conf/tls/site4.crt
@@ -803,12 +774,10 @@ them im a memcached cache shared with another server.
 
      <VirtualHost _default_:443>
          GnuTLSEnable          On
-         GnuTLSPriorities      NORMAL
          DocumentRoot          /www/site1.example.com/html
          ServerName            site1.example.com:443
          GnuTLSCertificateFile conf/tls/site1.crt
          GnuTLSKeyFile         conf/tls/site1.key
-         GnuTLSPriorities      NORMAL
          GnuTLSOCSPStapling    On
      </VirtualHost>
 

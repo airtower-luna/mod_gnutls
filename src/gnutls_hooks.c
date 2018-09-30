@@ -52,6 +52,14 @@ static apr_file_t *debug_log_fp;
  * regular key rotation. */
 static gnutls_datum_t session_ticket_key = {NULL, 0};
 
+
+/** Default GnuTLS priority string for mod_gnutls */
+#define MGS_DEFAULT_PRIORITY "NORMAL"
+/** Compiled version of MGS_DEFAULT_PRIORITY (initialized in the
+ * pre_config hook) */
+static gnutls_priority_t default_prio;
+
+
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt);
 /* use side==0 for server and side==1 for client */
 static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, int side, size_t export_cert_size);
@@ -72,6 +80,9 @@ apr_status_t mgs_cleanup_pre_config(void *data __attribute__((unused)))
     gnutls_free(session_ticket_key.data);
     session_ticket_key.data = NULL;
     session_ticket_key.size = 0;
+
+    /* Deinit default priority setting */
+    gnutls_priority_deinit(default_prio);
     return APR_SUCCESS;
 }
 
@@ -123,6 +134,16 @@ int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog, apr_pool_t * ptem
     if (ret < 0) {
 		ap_log_perror(APLOG_MARK, APLOG_EMERG, 0, plog, "gnutls_session_ticket_key_generate: %s", gnutls_strerror(ret));
 		return DONE;
+    }
+
+    /* Initialize default priority setting */
+    ret = gnutls_priority_init(&default_prio, MGS_DEFAULT_PRIORITY, NULL);
+    if (ret < 0)
+    {
+        ap_log_perror(APLOG_MARK, APLOG_EMERG, 0, plog,
+                      "gnutls_priority_init failed for default '%s': %s (%d)",
+                      MGS_DEFAULT_PRIORITY, gnutls_strerror(ret), ret);
+        return DONE;
     }
 
     AP_OPTIONAL_HOOK(status_hook, mgs_status_hook, NULL, NULL, APR_HOOK_MIDDLE);
@@ -647,10 +668,12 @@ int mgs_hook_post_config(apr_pool_t *pconf,
 
         /* Check if the priorities have been set */
         if (sc->priorities == NULL && sc->enabled == GNUTLS_ENABLED_TRUE) {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                    "GnuTLS: Host '%s:%d' is missing the GnuTLSPriorities directive!",
-                    s->server_hostname, s->port);
-            return HTTP_NOT_ACCEPTABLE;
+            ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
+                         "No GnuTLSPriorities directive for host '%s:%d', "
+                         "using default '%s'.",
+                         s->server_hostname, s->addrs->host_port,
+                         MGS_DEFAULT_PRIORITY);
+            sc->priorities = default_prio;
         }
 
         /* Set host DH params from user configuration or defaults */
@@ -1080,9 +1103,10 @@ static void create_gnutls_handle(conn_rec * c)
     apr_pool_pre_cleanup_register(c->pool, ctxt, cleanup_gnutls_session);
 
     /* Set Default Priority */
-	err = gnutls_priority_set_direct(ctxt->session, "NORMAL", NULL);
+	err = gnutls_priority_set(ctxt->session, default_prio);
     if (err != GNUTLS_E_SUCCESS)
-        ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c, "gnutls_priority_set_direct failed!");
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
+                      "gnutls_priority_set failed!");
     /* Set Handshake function */
     gnutls_handshake_set_post_client_hello_function(ctxt->session,
             mgs_select_virtual_server_cb);
@@ -1998,7 +2022,11 @@ static apr_status_t cleanup_proxy_x509_credentials(void *arg)
         sc->anon_client_creds = NULL;
     }
 
-    if (sc->proxy_priorities)
+    /* Deinit proxy priorities only if set from
+     * sc->proxy_priorities_str. Otherwise the server is using the
+     * default global priority cache, which must not be deinitialized
+     * here. */
+    if (sc->proxy_priorities_str && sc->proxy_priorities)
     {
         gnutls_priority_deinit(sc->proxy_priorities);
         sc->proxy_priorities = NULL;
@@ -2058,28 +2086,32 @@ static apr_status_t load_proxy_x509_credentials(apr_pool_t *pconf,
      * if not */
     if (sc->proxy_priorities_str == NULL)
     {
-        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                     "Host '%s:%d' is missing the GnuTLSProxyPriorities "
-                     "directive!",
-                     s->server_hostname, s->port);
-        return APR_EGENERAL;
+        ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
+                     "No GnuTLSProxyPriorities directive for host '%s:%d', "
+                     "using default '%s'.",
+                     s->server_hostname, s->addrs->host_port,
+                     MGS_DEFAULT_PRIORITY);
+        sc->proxy_priorities = default_prio;
     }
-    /* parse proxy priorities */
-    const char *err_pos = NULL;
-    err = gnutls_priority_init(&sc->proxy_priorities,
-                               sc->proxy_priorities_str, &err_pos);
-    if (err != GNUTLS_E_SUCCESS)
+    else
     {
-        if (ret == GNUTLS_E_INVALID_REQUEST)
-            ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
-                         "%s: Syntax error parsing proxy priorities "
-                         "string at: %s",
-                         __func__, err_pos);
-        else
-            ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
-                         "Error setting proxy priorities: %s (%d)",
-                         gnutls_strerror(err), err);
-        ret = APR_EGENERAL;
+        /* parse proxy priorities */
+        const char *err_pos = NULL;
+        err = gnutls_priority_init(&sc->proxy_priorities,
+                                   sc->proxy_priorities_str, &err_pos);
+        if (err != GNUTLS_E_SUCCESS)
+        {
+            if (ret == GNUTLS_E_INVALID_REQUEST)
+                ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+                             "%s: Syntax error parsing proxy priorities "
+                             "string at: %s",
+                             __func__, err_pos);
+            else
+                ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+                             "Error setting proxy priorities: %s (%d)",
+                             gnutls_strerror(err), err);
+            ret = APR_EGENERAL;
+        }
     }
 
     /* load certificate and key for client auth, if configured */

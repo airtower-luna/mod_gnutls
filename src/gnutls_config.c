@@ -142,7 +142,10 @@ static apr_status_t mgs_pool_free_credentials(void *arg)
         sc->ca_list = NULL;
     }
 
-    if (sc->priorities)
+    /* Deinit server priorities only if set from
+     * sc->priorities_str. Otherwise the server is using the default
+     * global priority cache, which must not be deinitialized here. */
+    if (sc->priorities_str && sc->priorities)
     {
         gnutls_priority_deinit(sc->priorities);
         sc->priorities = NULL;
