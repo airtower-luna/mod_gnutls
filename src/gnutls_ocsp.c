@@ -1178,8 +1178,8 @@ int mgs_ocsp_enable_stapling(apr_pool_t *pconf,
 
     sc->ocsp->trust = apr_palloc(pconf,
                                  sizeof(gnutls_x509_trust_list_t));
-     /* Only the direct issuer may sign the OCSP response or an OCSP
-      * signer. */
+    /* Only the direct issuer may sign the OCSP response or an OCSP
+     * signer. */
     int ret = mgs_create_ocsp_trust_list(sc->ocsp->trust,
                                          &(sc->certs_x509_crt_chain[1]),
                                          1);

@@ -602,14 +602,6 @@ int mgs_hook_post_config(apr_pool_t *pconf,
 
         sc->singleton_wd = sc_base->singleton_wd;
 
-        rv = mgs_load_files(pconf, ptemp, s);
-        if (rv != 0) {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                "GnuTLS: Loading required files failed."
-                " Shutting Down.");
-            return HTTP_NOT_FOUND;
-        }
-
         /* defaults for unset values: */
         if (sc->enabled == GNUTLS_ENABLED_UNSET)
             sc->enabled = GNUTLS_ENABLED_FALSE;
@@ -628,10 +620,17 @@ int mgs_hook_post_config(apr_pool_t *pconf,
         if (sc->client_verify_method == mgs_cvm_unset)
             sc->client_verify_method = mgs_cvm_cartel;
 
-        // TODO: None of the stuff below (and neither some above)
-        // makes sense if sc->enabled == GNUTLS_ENABLED_FALSE, we
-        // should just continue to the next host. All code below could
-        // then safely assume sc->enabled == GNUTLS_ENABLED_TRUE.
+        // TODO: None of the stuff below needs to be done if
+        // sc->enabled == GNUTLS_ENABLED_FALSE, we could just continue
+        // to the next host.
+
+        /* Load certificates and stuff (includes parsing priority) */
+        rv = mgs_load_files(pconf, ptemp, s);
+        if (rv != 0) {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                         "%s: Loading credentials failed!", __func__);
+            return HTTP_NOT_FOUND;
+        }
 
         sc->ocsp_mutex = sc_base->ocsp_mutex;
         /* init OCSP configuration unless explicitly disabled */
