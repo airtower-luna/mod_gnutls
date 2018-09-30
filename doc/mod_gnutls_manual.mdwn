@@ -297,14 +297,14 @@ Context: server config, virtual host
 This directive configures exporting the full certificates of the
 server and the client to CGI scripts via the `SSL_SERVER_CERT` and
 `SSL_CLIENT_CERT` environment variables. The exported certificates
-will be PEM-encoded (if X.509) or ASCII-armored (if OpenPGP) up to the
-size given.  The type of the certificate will be exported in
-`SSL_SERVER_CERT_TYPE` and `SSL_CLIENT_CERT_TYPE`.
+will be PEM-encoded, limited to the given size. The type of the
+certificate will be exported in `SSL_SERVER_CERT_TYPE` and
+`SSL_CLIENT_CERT_TYPE`.
 
 SIZE should be an integer number of bytes, or may be written with a
 trailing `K` to indicate kibibytes.  `off` means the same thing as
 `0`, in which case the certificates will not be exported to the
-environment.  `on` is an alias for `16K`.  If a non-zero size is
+environment. `on` is an alias for `16K`. If a non-zero size is
 specified for this directive, but a certificate is too large to fit in
 the buffer, then the corresponding environment variable will contain
 the fixed string `GNUTLS_CERTIFICATE_SIZE_LIMIT_EXCEEDED`.
@@ -365,56 +365,6 @@ Context: server config, virtual host
 Takes an absolute or relative path to a PEM Encoded Certificate to use
 as a Certificate Authority with Client Certificate Authentication.
 This file may contain a list of trusted authorities.
-
-OpenPGP Certificate Authentication
-----------------------------------
-
-*Warning:* OpenPGP support has been deprecated in GnuTLS since version
-3.5.9 and will be removed completely. Consequently, OpenPGP support in
-`mod_gnutls` is deprecated as well and will be removed in a future
-release.
-
-### GnuTLSPGPCertificateFile
-
-Set to a base64 Encoded Server OpenPGP Certificate
-
-    GnuTLSPGPCertificateFile FILEPATH
-
-Default: *none*\
-Context: server config, virtual host
-
-Takes an absolute or relative path to a base64 Encoded OpenPGP
-Certificate to use as this Server's Certificate.
-
-### GnuTLSPGPKeyFile
-
-Set to the Server OpenPGP Secret Key
-
-    GnuTLSPGPKeyFile FILEPATH
-
-Default: *none*\
-Context: server config, virtual host
-
-Takes an absolute or relative path to the Server Private Key. This key
-cannot currently be password protected.
-
-**Security Warning:**\
- This private key must be protected. It is read while Apache is still
-running as root, and does not need to be readable by the nobody or
-apache user.
-
-### GnuTLSPGPKeyringFile
-
-Set to a base64 Encoded key ring
-
-    GnuTLSPGPKeyringFile FILEPATH
-
-Default: *none*\
-Context: server config, virtual host
-
-Takes an absolute or relative path to a base64 Encoded Certificate
-list (key ring) to use as a means of verification of Client
-Certificates.  This file should contain a list of trusted signers.
 
 SRP Authentication
 ------------------
@@ -760,16 +710,14 @@ Addresses for each virtual host.
      </VirtualHost>
 
      <VirtualHost 192.0.2.3:443>
-         # This server enables SRP, OpenPGP and X.509 authentication.
+         # This server enables SRP and X.509 authentication.
          GnuTLSEnable on
-         GnuTLSPriorities NORMAL:+SRP:+SRP-RSA:+SRP-DSS:+CTYPE-OPENPGP
+         GnuTLSPriorities NORMAL:+SRP:+SRP-RSA:+SRP-DSS
          DocumentRoot /www/site3.example.com/html
          ServerName site3.example.com:443
          GnuTLSCertificateFile conf/tls/site3.crt
          GnuTLSKeyFile conf/tls/site3.key
          GnuTLSClientVerify ignore
-         GnuTLSPGPCertificateFile conf/tls/site3.pub.asc
-         GnuTLSPGPKeyFile conf/tls/site3.sec.asc
          GnuTLSSRPPasswdFile conf/tls/tpasswd.site3
          GnuTLSSRPPasswdConfFile conf/tls/tpasswd.site3.conf
      </VirtualHost>
@@ -995,21 +943,21 @@ The public key algorithm in server's certificate.
 `SSL_SERVER_CERT`
 ------------------
 
-The PEM-encoded (X.509) or ASCII-armored (OpenPGP) server certificate
-(see the `GnuTLSExportCertificates` directive).
+The PEM-encoded (X.509) server certificate (see the
+`GnuTLSExportCertificates` directive).
 
 `SSL_SERVER_CERT_TYPE`
 ----------------------
 
-The certificate type can be `X.509` or `OPENPGP`.
+The certificate type will be `X.509`.
 
 `SSL_CLIENT_CERT`
 ------------------
 
-The PEM-encoded (X.509) or ASCII-armored (OpenPGP) client certificate
-(see the `GnuTLSExportCertificates` directive).
+PEM-encoded (X.509) client certificate, if any (see the
+`GnuTLSExportCertificates` directive).
 
 `SSL_CLIENT_CERT_TYPE`
 ----------------------
 
-The certificate type can be `X.509` or `OPENPGP`.
+The certificate type will be `X.509`, if any.
