@@ -294,21 +294,30 @@ X.509 Certificate Authentication
 
 ### GnuTLSCertificateFile
 
-Set to the PEM Encoded Server Certificate
+Set the PEM encoded server certificate or certificate chain
 
     GnuTLSCertificateFile FILEPATH
 
 Default: *none*\
 Context: server config, virtual host
 
-Takes an absolute or relative path to a PEM-encoded X.509 certificate to
-use as this Server's End Entity (EE) certificate. If you need to supply
-certificates for intermediate Certificate Authorities (iCAs), they
-should be listed in sequence in the file, from EE to the iCA closest to
-the root CA. Optionally, you can also include the root CA's certificate
-as the last certificate in the list.
+FILEPATH is an absolute or relative path to a file containing the
+PEM-encoded X.509 certificate to use as this Server's End Entity (EE)
+certificate, and optionally those of the issuing Certificate
+Authorities (CAs). If the file contains multiple certificates they
+should be ordered from EE to the CA closest to the root CA (or the
+root CA itself).
 
-Since version 0.7 this can be a PKCS #11 URL.
+Including at least the immediately issuing CA is highly recommended
+because it is required for OCSP stapling.
+
+Since version 0.7 this can be a PKCS #11 URL instead of a file.
+
+On Linux and other Unix-like systems you can create the file with a
+command like this (assuming "CA 1" issued the server certificate and
+has been issued by "Root CA" itself):
+
+	$ cat server.pem ca-1.pem root-ca.pem >server-chain.pem
 
 ### GnuTLSKeyFile
 
@@ -484,25 +493,55 @@ Enable OCSP stapling for this (virtual) host.
 
     GnuTLSOCSPStapling [On|Off]
 
-Default: *off*\
+Default: *on* if requirements are met, *off* otherwise\
 Context: server config, virtual host
 
 OCSP stapling, formally known as the TLS Certificate Status Request
-extension, allows the server to provide the client with an OCSP
-response for its certificate during the handshake. This way the client
-does not have to send an OCSP request to the CA to check the
-certificate status, which offers privacy and performance advantages.
+extension, allows the server to provide the client with a cached OCSP
+response for its certificate during the handshake. With OCSP stapling
+the client does not have to send an OCSP request to the issuer CA to
+check the certificate status, which offers privacy and performance
+advantages, and avoids the security issue of how to handle errors that
+prevent the client from getting a response.
 
 Using OCSP stapling has a few requirements:
 
-* Caching OCSP responses requires a cache, so `GnuTLSCache` must not
-  be `none`.
 * `GnuTLSCertificateFile` must contain the issuer CA certificate in
   addition to the server certificate so responses can be verified.
-* The certificate must either contain an OCSP access URI using HTTP,
-  or `GnuTLSOCSPResponseFile` must be set.
+* The server certificate must either contain an OCSP access URI using
+  HTTP, or `GnuTLSOCSPResponseFile` must be set.
+* Caching OCSP responses requires a cache to store responses. If
+  `mod_socache_shmcb` is loaded `mod_gnutls` can set up the cache
+  automatically without additional configuration, see
+  `GnuTLSOCSPCache`.
+
+Stapling is activated by default if these requirements are met. If
+`GnuTLSOCSPStapling` is explicitly set to `on` unmet requirements are
+an error.
 
 OCSP cache updates are serialized using the `gnutls-ocsp` mutex.
+
+### GnuTLSOCSPCache
+
+OCSP stapling cache configuration
+
+	GnuTLSOCSPCache (shmcb|memcache|...|none)[:PARAMETERS]
+
+Default: `shmcb:gnutls_ocsp_cache`\
+Context: server config
+
+This directive configures the OCSP stapling cache, and uses the same
+syntax as `GnuTLSOCSPCache`. Please check there for details.
+
+The default should be reasonable for most servers and requires
+`mod_socache_shmcb` to be loaded. Servers with very many virtual hosts
+may need to increase the default cache size via the parameters string,
+those with few virtual hosts and constrains could save a few KB by
+reducing it. Note that `mod_socache_dbm` has a size constraint for
+entries that is generally too small for OCSP responses.
+
+If the selected cache implementation is not thread-safe, access
+is serialized using the `gnutls-ocsp-cache` mutex.
 
 ### GnuTLSOCSPAutoRefresh
 
