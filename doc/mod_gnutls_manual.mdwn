@@ -534,11 +534,12 @@ This directive configures the OCSP stapling cache, and uses the same
 syntax as `GnuTLSOCSPCache`. Please check there for details.
 
 The default should be reasonable for most servers and requires
-`mod_socache_shmcb` to be loaded. Servers with very many virtual hosts
-may need to increase the default cache size via the parameters string,
-those with few virtual hosts and constrains could save a few KB by
-reducing it. Note that `mod_socache_dbm` has a size constraint for
-entries that is generally too small for OCSP responses.
+[mod\_socache\_shmcb](http://httpd.apache.org/docs/current/en/mod/mod_socache_shmcb.html)
+to be loaded. Servers with very many virtual hosts may need to
+increase the default cache size via the parameters string, those with
+few virtual hosts and memory constraints could save a few KB by reducing
+it. Note that `mod_socache_dbm` has a size constraint for entries that
+is generally too small for OCSP responses.
 
 If the selected cache implementation is not thread-safe, access
 is serialized using the `gnutls-ocsp-cache` mutex.
@@ -690,22 +691,99 @@ time.
 Configuration Examples
 ======================
 
-Simple Standard TLS Example
----------------------------
+Minimal Example
+---------------
 
-The following is an example of simple TLS hosting, using one IP
-Addresses for each virtual host.
+A minimal server configuration using mod_gnutls might look like this
+(other than the default setup):
+
+     # Load mod_gnutls into Apache.
+     LoadModule gnutls_module modules/mod_gnutls.so
+
+	 Listen 192.0.2.1:443
+
+     <VirtualHost _default_:443>
+	     # Standard virtual host stuff
+         DocumentRoot /www/site1.example.com/html
+         ServerName site1.example.com:443
+         
+		 # Minimal mod_gnutls setup: enable, and set credentials
+		 GnuTLSEnable on
+         GnuTLSCertificateFile conf/tls/site1_cert_chain.pem
+         GnuTLSKeyFile conf/tls/site1_key.pem
+     </VirtualHost>
+
+This gives you an HTTPS site using the GnuTLS `NORMAL` set of
+ciphersuites. OCSP stapling will be enabled if the server certificate
+contains an OCSP URI, `conf/tls/site1_cert_chain.pem` contains the
+issuer certificate in addition to the server's, and
+[mod\_socache\_shmcb](http://httpd.apache.org/docs/current/en/mod/mod_socache_shmcb.html)
+is loaded. With Gnutls 3.6.4 or newer session tickets are enabled,
+too.
+
+Virtual Hosts with Server Name Indication
+-----------------------------------------
+
+`mod_gnutls` supports "Server Name Indication", as specified in [RFC
+6066, Section 3](https://tools.ietf.org/html/rfc6066#section-3). This
+allows hosting many TLS websites with a single IP address, you can
+just add the virtual host conigurations. All recent browsers support
+this standard. Here is an example using SNI:
 
      # Load the module into Apache.
      LoadModule gnutls_module modules/mod_gnutls.so
-     GnuTLSCache dbm:/var/cache/www-tls-cache
-     GnuTLSCacheTimeout 500
+	 # This example server uses session tickets, no cache.
+     GnuTLSSessionTickets on
 
-     # Without SNI you need one IP Address per-site.
+     # SNI allows hosting multiple sites using one IP address. This
+     # could also be 'Listen *:443', just like '*:80' is common for
+     # non-HTTPS
+     Listen 198.51.100.1:443
+
+     <VirtualHost _default_:443>
+         GnuTLSEnable on
+         DocumentRoot /www/site1.example.com/html
+         ServerName site1.example.com:443
+         GnuTLSCertificateFile conf/tls/site1.crt
+         GnuTLSKeyFile conf/tls/site1.key
+     </VirtualHost>
+
+     <VirtualHost _default_:443>
+         GnuTLSEnable on
+         DocumentRoot /www/site2.example.com/html
+         ServerName site2.example.com:443
+         GnuTLSCertificateFile conf/tls/site2.crt
+         GnuTLSKeyFile conf/tls/site2.key
+     </VirtualHost>
+
+     <VirtualHost _default_:443>
+         GnuTLSEnable on
+         DocumentRoot /www/site3.example.com/html
+         ServerName site3.example.com:443
+         GnuTLSCertificateFile conf/tls/site3.crt
+         GnuTLSKeyFile conf/tls/site3.key
+     </VirtualHost>
+
+Virtual Hosts without SNI
+-------------------------
+
+If you need to support clients that do not use SNI, you have to use a
+unique IP address/port combination for each virtual host. In this
+example all virtual hosts use the default port for HTTPS (443) and
+different IP addresses.
+
+     # Load the module into Apache.
+     LoadModule gnutls_module modules/mod_gnutls.so
+	 # This example server uses a session cache.
+     GnuTLSCache dbm:/var/cache/www-tls-cache
+     GnuTLSCacheTimeout 1200
+
+     # Without SNI you need one IP Address per site. The IP addresses
+	 # are listed separately for clarity, you could also use "Listen 443"
+	 # to use that port on all available IP addresses.
      Listen 192.0.2.1:443
      Listen 192.0.2.2:443
      Listen 192.0.2.3:443
-     Listen 192.0.2.4:443
 
      <VirtualHost 192.0.2.1:443>
          GnuTLSEnable on
@@ -739,88 +817,33 @@ Addresses for each virtual host.
          GnuTLSSRPPasswdConfFile conf/tls/tpasswd.site3.conf
      </VirtualHost>
 
-     <VirtualHost 192.0.2.4:443>
-         GnuTLSEnable on
-         # %COMPAT disables some security features to enable maximum
-         # compatibility with clients. Don't use this if you need strong
-         # security.
-         GnuTLSPriorities NORMAL:%COMPAT
-         DocumentRoot /www/site4.example.com/html
-         ServerName site4.example.com:443
-         GnuTLSCertificateFile conf/tls/site4.crt
-         GnuTLSKeyFile conf/tls/site4.key
-     </VirtualHost>
-
-Server Name Indication Example
-------------------------------
-
-`mod_gnutls` supports "Server Name Indication", as specified in
-[RFC 6066, Section 3](https://tools.ietf.org/html/rfc6066#section-3). This
-allows hosting many TLS websites with a single IP address. All recent
-browsers support this standard. Here is an example using SNI:
-
-     # Load the module into Apache.
-     LoadModule gnutls_module modules/mod_gnutls.so
-
-     # SNI allows hosting multiple sites using one IP address. This
-     # could also be 'Listen *:443', just like '*:80' is common for
-     # non-HTTPS
-     Listen 198.51.100.1:443
-
-     <VirtualHost _default_:443>
-         GnuTLSEnable on
-         GnuTLSSessionTickets on
-         DocumentRoot /www/site1.example.com/html
-         ServerName site1.example.com:443
-         GnuTLSCertificateFile conf/tls/site1.crt
-         GnuTLSKeyFile conf/tls/site1.key
-     </VirtualHost>
-
-     <VirtualHost _default_:443>
-         GnuTLSEnable on
-         DocumentRoot /www/site2.example.com/html
-         ServerName site2.example.com:443
-         GnuTLSCertificateFile conf/tls/site2.crt
-         GnuTLSKeyFile conf/tls/site2.key
-     </VirtualHost>
-
-     <VirtualHost _default_:443>
-         GnuTLSEnable on
-         DocumentRoot /www/site3.example.com/html
-         ServerName site3.example.com:443
-         GnuTLSCertificateFile conf/tls/site3.crt
-         GnuTLSKeyFile conf/tls/site3.key
-     </VirtualHost>
-
-     <VirtualHost _default_:443>
-         GnuTLSEnable on
-         DocumentRoot /www/site4.example.com/html
-         ServerName site4.example.com:443
-         GnuTLSCertificateFile conf/tls/site4.crt
-         GnuTLSKeyFile conf/tls/site4.key
-     </VirtualHost>
-
 OCSP Stapling Example
 ---------------------
 
-This example uses an X.509 server certificate. The server will fetch
-OCSP responses from the responder listed in the certificate and store
-them im a memcached cache shared with another server.
+This is an example with a customized OCSP stapling configuration. What
+is a resonable cache timeout varies depending on how long your CA's
+OCSP responses are valid. Some CAs provide responses that are valid
+for multiple days, in that case timeout and fuzz time could be
+significantly larger.
 
      # Load the module into Apache.
      LoadModule gnutls_module modules/mod_gnutls.so
-     GnuTLSCache memcache:192.0.2.1:11211,192.0.2.2:11211
-     GnuTLSCacheTimeout 600
+	 # A 64K cache is more than enough for one response
+     GnuTLSOCSPCache shmcb:ocsp_cache(65536)
 
      Listen 192.0.2.1:443
 
      <VirtualHost _default_:443>
-         GnuTLSEnable          On
-         DocumentRoot          /www/site1.example.com/html
-         ServerName            site1.example.com:443
-         GnuTLSCertificateFile conf/tls/site1.crt
-         GnuTLSKeyFile         conf/tls/site1.key
-         GnuTLSOCSPStapling    On
+         GnuTLSEnable           On
+         DocumentRoot           /www/site1.example.com/html
+         ServerName             site1.example.com:443
+         GnuTLSCertificateFile  conf/tls/site1_cert_chain.pem
+         GnuTLSKeyFile          conf/tls/site1_key.pem
+         GnuTLSOCSPStapling     On
+		 # The cached OCSP response is kept for up to 4 hours,
+		 # with updates scheduled every 3 to 3.5 hours.
+         GnuTLSOCSPCacheTimeout 21600
+		 GnuTLSOCSPFuzzTime     3600
      </VirtualHost>
 
 * * * * *
