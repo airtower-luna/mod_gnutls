@@ -335,6 +335,17 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session)
     }
 #endif
 
+    /* Enable session tickets */
+    if (session_ticket_key.data != NULL &&
+        ctxt->sc->tickets == GNUTLS_ENABLED_TRUE)
+    {
+        ret = gnutls_session_ticket_enable_server(ctxt->session, &session_ticket_key);
+        if (ret != GNUTLS_E_SUCCESS)
+            ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
+                          "gnutls_session_ticket_enable_server failed: %s (%d)",
+                          gnutls_strerror(ret), ret);
+    }
+
     ret = process_alpn_result(ctxt);
     if (ret != GNUTLS_E_SUCCESS)
         return ret;
@@ -1091,16 +1102,6 @@ static void create_gnutls_handle(conn_rec * c)
             ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
                           "gnutls_init for server side failed: %s (%d)",
                           gnutls_strerror(err), err);
-        /* Initialize Session Tickets */
-        if (session_ticket_key.data != NULL &&
-            ctxt->sc->tickets == GNUTLS_ENABLED_TRUE)
-        {
-            err = gnutls_session_ticket_enable_server(ctxt->session, &session_ticket_key);
-            if (err != GNUTLS_E_SUCCESS)
-                ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
-                              "gnutls_session_ticket_enable_server failed: %s (%d)",
-                              gnutls_strerror(err), err);
-        }
     }
 
     /* Ensure TLS session resources are released when the connection
