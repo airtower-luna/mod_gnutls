@@ -721,7 +721,7 @@ int mgs_hook_post_config(apr_pool_t *pconf,
             sc->enabled == GNUTLS_ENABLED_TRUE) {
 			ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
 						"GnuTLS: Host '%s:%d' is missing a Certificate File!",
-						s->server_hostname, s->port);
+						s->server_hostname, s->addrs->host_port);
             return HTTP_UNAUTHORIZED;
         }
         if (sc->enabled == GNUTLS_ENABLED_TRUE &&
@@ -729,7 +729,7 @@ int mgs_hook_post_config(apr_pool_t *pconf,
         {
 			ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
 						"GnuTLS: Host '%s:%d' is missing a Private Key File!",
-						s->server_hostname, s->port);
+						s->server_hostname, s->addrs->host_port);
             return HTTP_UNAUTHORIZED;
         }
 
@@ -740,7 +740,7 @@ int mgs_hook_post_config(apr_pool_t *pconf,
             ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
                          "%s: loading proxy credentials for host "
                          "'%s:%d' failed, exiting!",
-                         __func__, s->server_hostname, s->port);
+                         __func__, s->server_hostname, s->addrs->host_port);
             return HTTP_PROXY_AUTHENTICATION_REQUIRED;
         }
     }
