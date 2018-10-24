@@ -30,10 +30,14 @@ dist_check_SCRIPTS += test-16_view-status.bash \
 	test-25_Disable_TLS_1.0.bash \
 	test-26_redirect_HTTP_to_HTTPS.bash \
 	test-27_OCSP_server.bash \
-	test-28_HTTP2_support.bash
+	test-28_HTTP2_support.bash \
+	test-29_force_handshake_vhost.bash
 
 TEST_EXTENSIONS = .bash
 TESTS = $(dist_check_SCRIPTS)
+
+# Check is not yet implemented
+XFAIL_TESTS = test-29_force_handshake_vhost.bash
 
 check_PROGRAMS = pgpcrc
 pgpcrc_SOURCES = pgpcrc.c
