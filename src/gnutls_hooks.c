@@ -591,10 +591,14 @@ int mgs_hook_post_config(apr_pool_t *pconf,
                     APR_ARRAY_IDX(sc_base->p11_modules, i, char *);
                 rv = gnutls_pkcs11_add_provider(p11_module, NULL);
                 if (rv != GNUTLS_E_SUCCESS)
-                    ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+                    ap_log_error(APLOG_MARK, APLOG_STARTUP, APR_EGENERAL, s,
                                  "GnuTLS: Loading PKCS #11 provider module %s "
                                  "failed: %s (%d).",
                                  p11_module, gnutls_strerror(rv), rv);
+                else
+                    ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, s,
+                                 "%s: PKCS #11 provider module %s loaded.",
+                                 __func__, p11_module);
             }
         }
     }
