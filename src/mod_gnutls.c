@@ -68,6 +68,9 @@ static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
     /* Fixups Hook */
     ap_hook_fixups(mgs_hook_fixups, NULL, NULL, APR_HOOK_REALLY_FIRST);
 
+    /* Request hook: Check if TLS connection and request host match */
+    ap_hook_post_read_request(mgs_req_vhost_check, NULL, NULL, APR_HOOK_MIDDLE);
+
     /* TODO: HTTP Upgrade Filter */
     /* ap_register_output_filter ("UPGRADE_FILTER",
      *          ssl_io_filter_Upgrade, NULL, AP_FTYPE_PROTOCOL + 5);

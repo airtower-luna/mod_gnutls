@@ -1220,6 +1220,31 @@ int mgs_hook_process_connection(conn_rec* c)
 
 
 
+/* Post request hook, checks if TLS connection and vhost match */
+int mgs_req_vhost_check(request_rec *r)
+{
+    /* mod_gnutls server record for the request vhost */
+    mgs_srvconf_rec *r_sc = (mgs_srvconf_rec *)
+        ap_get_module_config(r->server->module_config, &gnutls_module);
+    mgs_handle_t *ctxt = get_effective_gnutls_ctxt(r->connection);
+
+    /* Nothing to check for non-TLS and outgoing proxy connections */
+    if (ctxt == NULL || !ctxt->enabled || ctxt->is_proxy)
+        return DECLINED;
+
+    if (ctxt->sc != r_sc)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_SUCCESS, ctxt->c,
+                      "%s: Mismatch between handshake and request servers!",
+                      __func__);
+        return HTTP_MISDIRECTED_REQUEST;
+    }
+
+    return DECLINED;
+}
+
+
+
 int mgs_hook_fixups(request_rec * r) {
     unsigned char sbuf[GNUTLS_MAX_SESSION_ID];
     const char *tmp;

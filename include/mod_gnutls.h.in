@@ -430,6 +430,9 @@ int mgs_hook_process_connection(conn_rec* c);
 
 int mgs_hook_fixups(request_rec *r);
 
+/** Post request hook, checks if TLS connection and vhost match */
+int mgs_req_vhost_check(request_rec *r);
+
 int mgs_hook_authz(request_rec *r);
 
 #endif /*  __mod_gnutls_h_inc */
