@@ -36,9 +36,6 @@ dist_check_SCRIPTS += test-16_view-status.bash \
 TEST_EXTENSIONS = .bash
 TESTS = $(dist_check_SCRIPTS)
 
-# Check is not yet implemented
-XFAIL_TESTS = test-29_force_handshake_vhost.bash
-
 check_PROGRAMS = pgpcrc
 pgpcrc_SOURCES = pgpcrc.c
 
