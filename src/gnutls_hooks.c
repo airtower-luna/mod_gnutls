@@ -1241,6 +1241,30 @@ int mgs_req_vhost_check(request_rec *r)
         return HTTP_MISDIRECTED_REQUEST;
     }
 
+    if (!ctxt->sni_name)
+        return DECLINED;
+
+    /* Got an SNI name, so verify it matches. */
+    ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, ctxt->c,
+                  "%s: Checking request hostname against SNI name '%s'.",
+                  __func__, ctxt->sni_name);
+
+    if (!r->hostname)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, r->connection,
+                      "Client requested '%s' via SNI, but provided "
+                      "no hostname in HTTP request!", ctxt->sni_name);
+        return HTTP_MISDIRECTED_REQUEST;
+    }
+
+    if (strcasecmp(r->hostname, ctxt->sni_name) != 0)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, r->connection,
+                      "Client requested '%s' via SNI, but '%s' in "
+                      "the HTTP request!", ctxt->sni_name, r->hostname);
+        return HTTP_MISDIRECTED_REQUEST;
+    }
+
     return DECLINED;
 }
 
