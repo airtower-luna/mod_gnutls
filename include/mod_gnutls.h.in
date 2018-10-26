@@ -215,6 +215,8 @@ typedef struct {
     int is_proxy;
 	/* GnuTLS Session handle */
     gnutls_session_t session;
+    /** Server name requested via SNI if any, or NULL. */
+    const char *sni_name;
 	/* module input status */
     apr_status_t input_rc;
 	/* Input filter */

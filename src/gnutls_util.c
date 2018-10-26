@@ -147,6 +147,8 @@ mgs_handle_t *init_gnutls_ctxt(conn_rec *c)
         ctxt->sc = sc;
         /* Default, unconditionally changed in proxy setup functions */
         ctxt->is_proxy = GNUTLS_ENABLED_FALSE;
+        /* Other default values */
+        ctxt->sni_name = NULL;
     }
     return ctxt;
 }

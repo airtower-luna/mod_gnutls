@@ -1011,6 +1011,7 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
     ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, ctxt->c,
                   "%s: client requested server '%s'.",
                   __func__, sni_name);
+    ctxt->sni_name = sni_name;
 
     /* Search for vhosts matching connection parameters and the
      * SNI. If a match is found, cbx.sc will contain the mod_gnutls
