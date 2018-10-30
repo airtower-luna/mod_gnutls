@@ -1,0 +1,19 @@
+HTTP/1.1 200 OK
+Connection: close
+Transfer-Encoding: chunked
+Content-Type: text/plain
+
+54
+----Certificate:----
+
+
+----Verification Status:----
+NONE
+
+----SubjectAltName:----
+
+
+
+0
+
+- Peer has closed the GnuTLS connection

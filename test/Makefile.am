@@ -31,7 +31,8 @@ dist_check_SCRIPTS += test-16_view-status.bash \
 	test-26_redirect_HTTP_to_HTTPS.bash \
 	test-27_OCSP_server.bash \
 	test-28_HTTP2_support.bash \
-	test-29_force_handshake_vhost.bash
+	test-29_force_handshake_vhost.bash \
+	test-30_ip_based_vhosts.bash
 
 TEST_EXTENSIONS = .bash
 TESTS = $(dist_check_SCRIPTS)
