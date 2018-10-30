@@ -141,18 +141,17 @@ AM_CONDITIONAL([ENABLE_OCSP_TEST], [test "${OPENSSL}" != "no" && test "${gnutls_
 
 dnl Enable test namespaces? Default is "yes".
 AC_ARG_ENABLE(test-namespaces,
-	AS_HELP_STRING([--disable-test-namespaces], [Disable use of network \
-	namespaces to run tests in parallel (some architectures might not \
-	support it)]),
+	AS_HELP_STRING([--disable-test-namespaces], [Disable use of \
+	namespaces for tests (limits parallelization)]),
 	[use_netns=$enableval], [use_netns=yes])
 
-# Check if "unshare" is available and has permission to create network
-# and user namespaces
+# Check if "unshare" is available and has permission to create
+# network, IPC, and user namespaces
 AC_PATH_PROG([UNSHARE], [unshare], [no])
 AS_IF([test "${UNSHARE}" != "no"],
       [
-	AC_MSG_CHECKING([for permission to create network and user namespaces])
-	AS_IF([${UNSHARE} --net -r /bin/sh -c \
+	AC_MSG_CHECKING([for permission to use namespaces])
+	AS_IF([${UNSHARE} --net --ipc -r /bin/sh -c \
 		"ip link set up lo && ip addr show" >&AS_MESSAGE_LOG_FD 2>&1],
 	      [unshare_works="yes"], [unshare_works="no"])
 	AC_MSG_RESULT([$unshare_works])

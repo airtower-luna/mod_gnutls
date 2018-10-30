@@ -95,7 +95,7 @@ function wait_ready
 function netns_reexec
 {
     if [ -n "${USE_TEST_NAMESPACE}" ] && [ -z "${MGS_NETNS_ACTIVE}" ]; then
-	exec "${UNSHARE}" --net -r /bin/bash -c \
+	exec "${UNSHARE}" --net --ipc -r /bin/bash -c \
 	     "export MGS_NETNS_ACTIVE=1; ip link set up lo; exec ${UNSHARE} --user ${0} ${@}"
     fi
     return 0
