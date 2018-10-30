@@ -216,6 +216,12 @@ if [ -n "${CHECK_OCSP_SERVER}" ]; then
     echo "---- OCSP test done ----"
 fi
 
+if [ -n "${TARGET_IP}" ]; then
+    TARGET="${TARGET_IP}"
+else
+    TARGET="${TEST_HOST}"
+fi
+
 # PID file for sleep command (explanation below)
 sleep_pidfile="$(mktemp mod_gnutls_test-XXXXXX.pid)"
 
@@ -231,7 +237,7 @@ sleep_pidfile="$(mktemp mod_gnutls_test-XXXXXX.pid)"
 # the line ends in the input file.
 if (sed -r "s/__HOSTNAME__/${TEST_HOST}/;s/\r?$/\r/" <${testdir}/input && \
 	   run_with_pidfile "${sleep_pidfile}" sleep "${TEST_QUERY_TIMEOUT}" &) | \
-       gnutls-cli -p "${TEST_PORT}" $(cat ${testdir}/gnutls-cli.args) "${TEST_HOST}" \
+       gnutls-cli -p "${TEST_PORT}" $(cat ${testdir}/gnutls-cli.args) "${TARGET}" \
        | tee "$output" && test "${PIPESTATUS[1]}" -eq 0;
 then
     if [ -e ${testdir}/fail* ]; then

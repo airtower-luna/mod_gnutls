@@ -12,6 +12,11 @@
 		sed -i -e 's/^### ocsp/ocsp/' \
 			-e s/__OCSP_PORT__/$(OCSP_PORT)/ $@; \
 	fi
+	for i in $$(echo $(TEST_IP)); do \
+		i="$${i%\]}"; \
+		IP_ADDRS="$${IP_ADDRS}\nip_address = $${i#\[}"; \
+	done; \
+	sed -i -e "s,__IP_ADDRESSES__,$${IP_ADDRS}," $@
 
 %.uid: $(srcdir)/%.uid.in
 	sed s/__HOSTNAME__/$(TEST_HOST)/ < $< > $@

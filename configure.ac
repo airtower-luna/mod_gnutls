@@ -251,7 +251,6 @@ AC_ARG_VAR([TEST_IP], [List of IP addresses to use for server instances \
 		      started by "make check". The default is \
 		      "[::1] 127.0.0.1". Note that IPv6 addresses must be \
 		      enclosed in square brackets.])
-AM_SUBST_NOTMAKE(TEST_IP)
 
 : ${TEST_LOCK_WAIT:="30"}
 : ${TEST_QUERY_TIMEOUT:="30"}
