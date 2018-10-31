@@ -27,7 +27,7 @@
 
 #include "http_vhost.h"
 #include "ap_mpm.h"
-#include "mod_status.h"
+#include <mod_status.h>
 #include <util_mutex.h>
 #include <apr_escape.h>
 
@@ -1993,6 +1993,11 @@ static int mgs_status_hook(request_rec *r, int flags)
 
     if (!(flags & AP_STATUS_SHORT))
         ap_rputs("</dl>\n", r);
+
+    if (sc->ocsp_cache)
+        mgs_cache_status(sc->ocsp_cache, "GnuTLS OCSP Cache", r, flags);
+    if (sc->cache_enable)
+        mgs_cache_status(sc->cache, "GnuTLS Session Cache", r, flags);
 
     return OK;
 }

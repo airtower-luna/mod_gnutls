@@ -162,4 +162,21 @@ struct mgs_cache {
     apr_global_mutex_t *mutex;
 };
 
+/**
+ * Write cache status to a mod_status report
+ *
+ * @param cache the cache to report on
+ *
+ * @param header_title string to prefix the report with to distinguish
+ * caches
+ *
+ * @param r status output is added to the response for this request
+ *
+ * @param flags request flags, used to toggle "short status" mode
+ *
+ * @return request status, currently always `OK`
+ */
+int mgs_cache_status(mgs_cache_t cache, const char *header_title,
+                     request_rec *r, int flags);
+
 #endif /** __MOD_GNUTLS_CACHE_H__ */

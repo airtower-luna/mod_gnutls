@@ -33,6 +33,7 @@
 #include "gnutls_ocsp.h"
 
 #include <ap_socache.h>
+#include <mod_status.h>
 #include <apr_escape.h>
 #include <util_mutex.h>
 
@@ -517,4 +518,23 @@ int mgs_cache_session_init(mgs_handle_t * ctxt)
         gnutls_db_set_ptr(ctxt->session, ctxt);
     }
     return 0;
+}
+
+
+
+int mgs_cache_status(mgs_cache_t cache, const char *header_title,
+                     request_rec *r, int flags)
+{
+    if (!(flags & AP_STATUS_SHORT))
+        ap_rprintf(r, "<h3>%s:</h3>\n", header_title);
+    else
+        ap_rprintf(r, "%s:\n", header_title);
+
+    if (cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
+        apr_global_mutex_lock(cache->mutex);
+    cache->prov->status(cache->socache, r, flags);
+    if (cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
+        apr_global_mutex_unlock(cache->mutex);
+
+    return OK;
 }
