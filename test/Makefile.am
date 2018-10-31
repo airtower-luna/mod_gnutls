@@ -244,6 +244,7 @@ BACKEND_PORT ?= 9934
 # port for the OCSP responder
 if ENABLE_OCSP_TEST
 OCSP_PORT ?= 9936
+OCSP_URI_TEMPLATE = ocsp_uri = http://$(TEST_HOST):$(OCSP_PORT)/ocsp/
 endif
 # maximum time to wait for MSVA startup (milliseconds)
 TEST_SERVICE_MAX_WAIT ?= 10000

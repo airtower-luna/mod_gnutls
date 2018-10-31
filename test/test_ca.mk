@@ -8,15 +8,11 @@
 
 %.template: $(srcdir)/%.template.in
 	sed s/__HOSTNAME__/$(TEST_HOST)/ < $< > $@
-	if test -n "$(OCSP_PORT)"; then \
-		sed -i -e 's/^### ocsp/ocsp/' \
-			-e s/__OCSP_PORT__/$(OCSP_PORT)/ $@; \
-	fi
-	for i in $$(echo $(TEST_IP)); do \
-		i="$${i%\]}"; \
-		IP_ADDRS="$${IP_ADDRS}\nip_address = $${i#\[}"; \
+	sed -i -e "s,__OCSP_URI__,$(OCSP_URI_TEMPLATE)," $@
+	for i in $(patsubst [%],%,$(TEST_IP)); do \
+		IP_ADDRS="$${IP_ADDRS}\nip_address = $${i}"; \
 	done; \
-	sed -i -e "s,__IP_ADDRESSES__,$${IP_ADDRS}," $@
+	sed -i -e "s,__IP_ADDRESSES__,$${IP_ADDRS#\\n}," $@
 
 %.uid: $(srcdir)/%.uid.in
 	sed s/__HOSTNAME__/$(TEST_HOST)/ < $< > $@
