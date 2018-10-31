@@ -1,4 +1,4 @@
-EXTRA_DIST = mod_gnutls_manual.mdwn
+EXTRA_DIST = mod_gnutls_manual.mdwn mod_gnutls_manual.yaml.in
 
 if USE_PANDOC
 html_DATA = mod_gnutls_manual.html
@@ -16,9 +16,13 @@ endif
 
 MOSTLYCLEANFILES = $(html_DATA) $(pdf_DATA) $(man3_MANS)
 
+%.yaml: %.yaml.in
+	sed -e s/__MOD_GNUTLS_VERSION__/@MOD_GNUTLS_VERSION@/ \
+		-e s/__DATE__/$$(date -I)/ < $< > $@
+
 if USE_PANDOC
-%.man: %.mdwn
-	$(PANDOC) --standalone --variable section=3 -f markdown -t man -o $@ $<
+%.man: %.mdwn %.yaml
+	$(PANDOC) --standalone -f markdown -t man -o $@ $^
 
 if USE_PDFLATEX
 %.pdf: %.mdwn
