@@ -1,3 +1,34 @@
+** Version 0.9.0 UNRELEASED
+- Security fix: Refuse to send or receive any data over a failed TLS
+  connection (commit 72b669eae8c45dda1850e8e5b30a97c918357b51). This
+  could lead to requests on reverse proxy TLS connections being sent
+  in plain text, and might allow faking requests in plain text.
+- Security fix: Reject HTTP requests if they try to access virtual
+  hosts that do not match their TLS connections (commit
+  de3fad3c12f53cdbf082ad675e4b10f521a02811). Additionally check if SNI
+  and Host header match.
+- OCSP stapling is now enabled by default, if possible. OCSP responses
+  are updated regularly and stored in a cache separate from the
+  session cache. The OCSP cache uses mod_socache_shmcb by default
+  (if the module is loaded, no other configuration required).
+- Session tickets are now enabled by default if using GnuTLS 3.6.4 or
+  newer. GnuTLS 3.6.4 introduced automatic rotation for the used key,
+  and TLS 1.3 takes care of other reasons not to use tickets while
+  requiring them for session resumption. Note that there is currently
+  no mechanism to synchronize ticket keys across a cluster of servers.
+- The internal cache implementation has been replaced with
+  mod_socache. Users may need to update their GnuTLSCache settings and
+  load the appropriate socache modules.
+- Known issue: ALPN (required for HTTP/2) works correctly only if all
+  virtual hosts using mod_gnutls share the same Protocols setting,
+  reported by Vincent Tamet.
+- GnuTLSPriorities is optional now and defaults to "NORMAL" if
+  missing. The same applies to GnuTLSProxyPriorities (if TLS proxy is
+  enabled).
+- The manual is now built as a manual page, too, if pandoc is
+  available.
+- OpenPGP support has been removed.
+
 ** Version 0.8.4 (2018-04-13)
 - Support Apache HTTPD 2.4.33 API for proxy TLS connections
 - Support TLS for HTTP/2 connections with mod_http2
