@@ -47,6 +47,20 @@ and restart Apache:
 
     LoadModule gnutls_module modules/mod_gnutls.so
 
+Note on HTTP/2
+--------------
+
+HTTP/2 is supported with `mod_gnutls` but works correctly only if all
+virtual hosts using `mod_gnutls` share the same `Protocols`
+setting. This will be fixed in a future release, but will likely
+require GnuTLS 3.6 or later.
+
+The technical reason is that using HTTP/2 requires ALPN (Application
+Layer Protocol Negotiation) to be set up before GnuTLS parses the TLS
+ClientHello message, but earlier hooks cannot use
+`gnutls_server_name_get()` to retrieve SNI data for virtual host
+selection.
+
 * * * * *
 
 Configuration Directives
