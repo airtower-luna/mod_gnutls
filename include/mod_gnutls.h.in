@@ -27,7 +27,6 @@
 #include "apr_buckets.h"
 #include "apr_tables.h"
 #include "ap_release.h"
-#include "apr_fnmatch.h"
 /* GnuTLS Library Headers */
 #include <gnutls/gnutls.h>
 #include <gnutls/abstract.h>

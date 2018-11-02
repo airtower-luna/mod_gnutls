@@ -896,18 +896,16 @@ int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc)
                 rv = 1;
             }
         }
-        /* Wild any ServerAlias Directives */
+        /* ServerAlias directives may contain wildcards, check those last. */
     } else if(s->wild_names->nelts) {
         names = s->wild_names;
-        name = (char **)names->elts;
+        name = (char **) names->elts;
         for (int i = 0; i < names->nelts; ++i)
         {
-            if (!name[i]) { continue; }
-            if(apr_fnmatch(name[i], x->sni_name ,
-                           APR_FNM_CASE_BLIND|
-                           APR_FNM_PERIOD|
-                           APR_FNM_PATHNAME|
-                           APR_FNM_NOESCAPE) == APR_SUCCESS) {
+            if (!name[i])
+                continue;
+            if (ap_strcasecmp_match(x->sni_name, name[i]) == 0)
+            {
                 x->sc = tsc;
                 rv = 1;
             }
