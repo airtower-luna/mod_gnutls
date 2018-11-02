@@ -25,7 +25,6 @@
 #include "http_core.h"
 #include "http_log.h"
 #include "apr_buckets.h"
-#include "apr_strings.h"
 #include "apr_tables.h"
 #include "ap_release.h"
 #include "apr_fnmatch.h"

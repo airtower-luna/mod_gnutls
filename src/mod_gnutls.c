@@ -22,6 +22,8 @@
 #include "gnutls_ocsp.h"
 #include "gnutls_util.h"
 
+#include <apr_strings.h>
+
 #ifdef APLOG_USE_MODULE
 APLOG_USE_MODULE(gnutls);
 #endif

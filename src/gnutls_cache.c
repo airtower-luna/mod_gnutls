@@ -33,6 +33,7 @@
 #include "gnutls_ocsp.h"
 
 #include <ap_socache.h>
+#include <apr_strings.h>
 #include <mod_status.h>
 #include <apr_escape.h>
 #include <util_mutex.h>

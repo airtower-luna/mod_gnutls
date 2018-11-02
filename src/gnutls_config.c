@@ -21,7 +21,9 @@
 #include "gnutls_config.h"
 #include "mod_gnutls.h"
 #include "gnutls_ocsp.h"
+
 #include "apr_lib.h"
+#include <apr_strings.h>
 #include <gnutls/abstract.h>
 
 #define INIT_CA_SIZE 128
