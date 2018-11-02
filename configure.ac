@@ -197,9 +197,9 @@ AC_PATH_PROG([PANDOC], [pandoc], [no])
 if test "$PANDOC" != "no"; then
 	AC_PATH_PROG([PDFLATEX], [pdflatex], [no])
 	if test "$PDFLATEX" != "no"; then
-		build_doc=yes
+		build_doc="html, manual page, pdf"
 	else
-		build_doc="html only"
+		build_doc="html, manual page"
 	fi
 else
 	AC_PATH_PROG([MARKDOWN], [markdown], [no])
