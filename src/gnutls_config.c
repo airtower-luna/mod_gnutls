@@ -658,19 +658,19 @@ const char *mgs_set_timeout(cmd_parms * parms,
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(parms->server->module_config, &gnutls_module);
 
-    if (!apr_strnatcasecmp(parms->directive->directive, "GnuTLSCacheTimeout"))
+    if (!strcasecmp(parms->directive->directive, "GnuTLSCacheTimeout"))
         sc->cache_timeout = apr_time_from_sec(argint);
-    else if (!apr_strnatcasecmp(parms->directive->directive,
-                                "GnuTLSOCSPCacheTimeout"))
+    else if (!strcasecmp(parms->directive->directive,
+                         "GnuTLSOCSPCacheTimeout"))
         sc->ocsp_cache_time = apr_time_from_sec(argint);
-    else if (!apr_strnatcasecmp(parms->directive->directive,
-                                "GnuTLSOCSPFailureTimeout"))
+    else if (!strcasecmp(parms->directive->directive,
+                         "GnuTLSOCSPFailureTimeout"))
         sc->ocsp_failure_timeout = apr_time_from_sec(argint);
-    else if (!apr_strnatcasecmp(parms->directive->directive,
-                                "GnuTLSOCSPFuzzTime"))
+    else if (!strcasecmp(parms->directive->directive,
+                         "GnuTLSOCSPFuzzTime"))
         sc->ocsp_fuzz_time = apr_time_from_sec(argint);
-    else if (!apr_strnatcasecmp(parms->directive->directive,
-                                "GnuTLSOCSPSocketTimeout"))
+    else if (!strcasecmp(parms->directive->directive,
+                         "GnuTLSOCSPSocketTimeout"))
         sc->ocsp_socket_timeout = apr_time_from_sec(argint);
     else
         /* Can't happen unless there's a serious bug in mod_gnutls or Apache */

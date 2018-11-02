@@ -30,6 +30,9 @@
 #include <mod_status.h>
 #include <util_mutex.h>
 #include <apr_escape.h>
+/* This provides strcmp and related functions */
+#define APR_WANT_STRFUNC
+#include <apr_want.h>
 
 #ifdef ENABLE_MSVA
 #include <msv/msv.h>
@@ -879,18 +882,20 @@ int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc)
     char ** name;
 
     /* Check ServerName First! */
-    if(apr_strnatcasecmp(x->sni_name, s->server_hostname) == 0) {
+    if (strcasecmp(x->sni_name, s->server_hostname) == 0) {
         // We have a match, save this server configuration
         x->sc = tsc;
         rv = 1;
         /* Check any ServerAlias directives */
     } else if(s->names->nelts) {
         names = s->names;
-        name = (char **)names->elts;
+        name = (char **) names->elts;
         for (int i = 0; i < names->nelts; ++i)
         {
-            if (!name[i]) { continue; }
-            if (apr_strnatcasecmp(x->sni_name, name[i]) == 0) {
+            if (!name[i])
+                continue;
+            if (strcasecmp(x->sni_name, name[i]) == 0)
+            {
                 // We have a match, save this server configuration
                 x->sc = tsc;
                 rv = 1;
