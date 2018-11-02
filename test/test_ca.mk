@@ -22,6 +22,8 @@
 	chmod 0700 $(dir $@)
 	certtool --outfile $@ --generate-privkey
 
+.PRECIOUS: %/secret.key
+
 %/secret.pgp.raw: %.uid %/secret.key
 	PEM2OPENPGP_USAGE_FLAGS=authenticate,certify,sign pem2openpgp "$$(cat $<)" < $(dir $@)secret.key > $@
 
