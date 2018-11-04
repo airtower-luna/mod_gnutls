@@ -66,9 +66,16 @@ AC_ARG_ENABLE(srp,
 # check if the available GnuTLS library supports SRP
 AC_SEARCH_LIBS([gnutls_srp_server_get_username], [gnutls], [], [use_srp="no"])
 
-SRP_CFLAGS=""
+GNUTLS_FEAT_CFLAGS=""
 if test "$use_srp" != "no"; then
-	SRP_CFLAGS="-DENABLE_SRP=1"
+	GNUTLS_FEAT_CFLAGS="-DENABLE_SRP=1"
+fi
+
+# check if the available GnuTLS library supports raw extension parsing
+AC_SEARCH_LIBS([gnutls_ext_raw_parse], [gnutls], [early_sni="yes"],
+	[early_sni="no"])
+if test "$early_sni" != "no"; then
+	GNUTLS_FEAT_CFLAGS="${GNUTLS_FEAT_CFLAGS} -DENABLE_EARLY_SNI"
 fi
 
 AC_ARG_ENABLE(strict,
@@ -222,7 +229,7 @@ fi
 
 AC_PATH_PROGS([HTTP_CLI], [curl wget], [no])
 
-MODULE_CFLAGS="${LIBGNUTLS_CFLAGS} ${SRP_CFLAGS} ${MSVA_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES} ${STRICT_CFLAGS}"
+MODULE_CFLAGS="${LIBGNUTLS_CFLAGS} ${GNUTLS_FEAT_CFLAGS} ${MSVA_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES} ${STRICT_CFLAGS}"
 MODULE_LIBS="${LIBGNUTLS_LIBS}"
 
 AC_PATH_PROGS([SOFTHSM], [softhsm2-util softhsm], [no])
@@ -314,6 +321,7 @@ echo "   * CFLAGS for GnuTLS:		${LIBGNUTLS_CFLAGS}"
 echo "   * LDFLAGS for GnuTLS:	${LIBGNUTLS_LIBS}"
 echo "   * SRP Authentication:	${use_srp}"
 echo "   * MSVA Client Verification:	${use_msva}"
+echo "   * Early SNI (experimental):	${early_sni}"
 echo "   * Build documentation:	${build_doc}"
 echo ""
 echo "---"

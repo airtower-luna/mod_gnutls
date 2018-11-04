@@ -22,6 +22,7 @@
 #include "gnutls_cache.h"
 #include "gnutls_config.h"
 #include "gnutls_ocsp.h"
+#include "gnutls_sni.h"
 #include "gnutls_util.h"
 #include "gnutls_watchdog.h"
 
@@ -1031,6 +1032,37 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
     return NULL;
 }
 
+
+
+#ifdef ENABLE_EARLY_SNI
+static int early_sni_hook(gnutls_session_t session,
+                          unsigned int htype __attribute__((unused)),
+                          unsigned when __attribute__((unused)),
+                          unsigned int incoming,
+                          const gnutls_datum_t *msg)
+{
+    //assert(htype == GNUTLS_HANDSHAKE_CLIENT_HELLO);
+    //assert(when == GNUTLS_HOOK_PRE);
+    if (!incoming)
+        return 0;
+
+    mgs_handle_t *ctxt = (mgs_handle_t *) gnutls_session_get_ptr(session);
+    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                  "%s: Trying early SNI.",
+                  __func__);
+
+    int ret = gnutls_ext_raw_parse(session, mgs_sni_ext_hook, msg,
+                                   GNUTLS_EXT_RAW_FLAG_TLS_CLIENT_HELLO);
+    if (ret == 0 && ctxt->sni_name != NULL)
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                      "%s: Early SNI result: %s",
+                      __func__, ctxt->sni_name);
+    return ret;
+}
+#endif
+
+
+
 /**
  * This function is intended as a cleanup handler for connections
  * using GnuTLS. If attached to the connection pool, it ensures that
@@ -1121,6 +1153,12 @@ static void create_gnutls_handle(conn_rec * c)
     if (err != GNUTLS_E_SUCCESS)
         ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
                       "gnutls_priority_set failed!");
+#ifdef ENABLE_EARLY_SNI
+    /* Pre-handshake hook, EXPERIMENTAL */
+    gnutls_handshake_set_hook_function(ctxt->session,
+                                       GNUTLS_HANDSHAKE_CLIENT_HELLO,
+                                       GNUTLS_HOOK_PRE, early_sni_hook);
+#endif
     /* Set Handshake function */
     gnutls_handshake_set_post_client_hello_function(ctxt->session,
             mgs_select_virtual_server_cb);
