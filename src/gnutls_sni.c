@@ -137,3 +137,64 @@ int mgs_sni_ext_hook(void *ctx, unsigned tls_id,
     }
     return 0;
 }
+
+
+
+/**
+ * Default buffer size for SNI data, including the terminating NULL
+ * byte. The size matches what gnutls-cli uses initially.
+ */
+#define DEFAULT_SNI_HOST_LEN 256
+
+const char* mgs_server_name_get(mgs_handle_t *ctxt)
+{
+    char *sni_name = apr_palloc(ctxt->c->pool, DEFAULT_SNI_HOST_LEN);
+    size_t sni_len = DEFAULT_SNI_HOST_LEN;
+    unsigned int sni_type;
+
+    /* Search for a DNS SNI element. Note that RFC 6066 prohibits more
+     * than one server name per type. */
+    int sni_index = -1;
+    int rv = 0;
+    do {
+        /* The sni_index is incremented before each use, so if the
+         * loop terminates with a type match we will have the right
+         * one stored. */
+        rv = gnutls_server_name_get(ctxt->session, sni_name,
+                                    &sni_len, &sni_type, ++sni_index);
+        if (rv == GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE)
+        {
+            ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_EGENERAL, ctxt->c,
+                          "%s: no DNS SNI found (last index: %d).",
+                          __func__, sni_index);
+            return NULL;
+        }
+    } while (sni_type != GNUTLS_NAME_DNS);
+    /* The (rv == GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE) path inside
+     * the loop above returns, so if we reach this point we have a DNS
+     * SNI at the current index. */
+
+    if (rv == GNUTLS_E_SHORT_MEMORY_BUFFER)
+    {
+        /* Allocate a new buffer of the right size and retry */
+        sni_name = apr_palloc(ctxt->c->pool, sni_len);
+        ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, ctxt->c,
+                      "%s: reallocated SNI data buffer for %" APR_SIZE_T_FMT
+                      " bytes.", __func__, sni_len);
+        rv = gnutls_server_name_get(ctxt->session, sni_name,
+                                    &sni_len, &sni_type, sni_index);
+    }
+
+    /* Unless there's a bug in the GnuTLS API only GNUTLS_E_IDNA_ERROR
+     * can occur here, but a catch all is safer and no more
+     * complicated. */
+    if (rv != GNUTLS_E_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_INFO, APR_EGENERAL, ctxt->c,
+                      "%s: error while getting SNI DNS data: '%s' (%d).",
+                      __func__, gnutls_strerror(rv), rv);
+        return NULL;
+    }
+
+    return sni_name;
+}

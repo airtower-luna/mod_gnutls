@@ -65,8 +65,9 @@ static gnutls_priority_t default_prio;
 
 
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt);
-/* use side==0 for server and side==1 for client */
+/** use side==0 for server and side==1 for client */
 static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, int side, size_t export_cert_size);
+mgs_srvconf_rec* mgs_find_sni_server(mgs_handle_t *ctxt);
 static int mgs_status_hook(request_rec *r, int flags);
 #ifdef ENABLE_MSVA
 static const char* mgs_x509_construct_uid(request_rec * pool, gnutls_x509_crt_t cert);
@@ -302,6 +303,54 @@ static int process_alpn_result(mgs_handle_t *ctxt)
 
 
 /**
+ * (Re-)Load credentials and priorities for the connection. This is
+ * meant to be called after virtual host selection in the pre or post
+ * client hello hook.
+ */
+static int reload_session_credentials(mgs_handle_t *ctxt)
+{
+    int ret = 0;
+
+    gnutls_certificate_server_set_request(ctxt->session,
+                                          ctxt->sc->client_verify_mode);
+
+    /* Set x509 credentials */
+    gnutls_credentials_set(ctxt->session,
+                           GNUTLS_CRD_CERTIFICATE, ctxt->sc->certs);
+    /* Set Anon credentials */
+    gnutls_credentials_set(ctxt->session, GNUTLS_CRD_ANON,
+                           ctxt->sc->anon_creds);
+
+#ifdef ENABLE_SRP
+	/* Set SRP credentials */
+    if (ctxt->sc->srp_tpasswd_conf_file != NULL && ctxt->sc->srp_tpasswd_file != NULL) {
+        gnutls_credentials_set(ctxt->session, GNUTLS_CRD_SRP,
+                               ctxt->sc->srp_creds);
+    }
+#endif
+
+    /* Enable session tickets */
+    if (session_ticket_key.data != NULL &&
+        ctxt->sc->tickets == GNUTLS_ENABLED_TRUE)
+    {
+        ret = gnutls_session_ticket_enable_server(ctxt->session, &session_ticket_key);
+        if (ret != GNUTLS_E_SUCCESS)
+            ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
+                          "gnutls_session_ticket_enable_server failed: %s (%d)",
+                          gnutls_strerror(ret), ret);
+    }
+
+    /* Update the priorities - to avoid negotiating a ciphersuite that is not
+     * enabled on this virtual server. Note that here we ignore the version
+     * negotiation. */
+    ret = gnutls_priority_set(ctxt->session, ctxt->sc->priorities);
+
+    return ret;
+}
+
+
+
+/**
  * Post client hello function for GnuTLS, used to configure the TLS
  * server based on virtual host configuration. Uses SNI to select the
  * virtual host if available.
@@ -317,7 +366,7 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session)
     mgs_handle_t *ctxt = gnutls_session_get_ptr(session);
 
     /* try to find a virtual host */
-    mgs_srvconf_rec *tsc = mgs_find_sni_server(session);
+    mgs_srvconf_rec *tsc = mgs_find_sni_server(ctxt);
     if (tsc != NULL)
     {
         /* Found a TLS vhost based on the SNI, configure the
@@ -325,39 +374,11 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session)
         ctxt->sc = tsc;
 	}
 
-    gnutls_certificate_server_set_request(session, ctxt->sc->client_verify_mode);
-
-    /* Set x509 credentials */
-    gnutls_credentials_set(session, GNUTLS_CRD_CERTIFICATE, ctxt->sc->certs);
-    /* Set Anon credentials */
-    gnutls_credentials_set(session, GNUTLS_CRD_ANON, ctxt->sc->anon_creds);
-
-#ifdef ENABLE_SRP
-	/* Set SRP credentials */
-    if (ctxt->sc->srp_tpasswd_conf_file != NULL && ctxt->sc->srp_tpasswd_file != NULL) {
-        gnutls_credentials_set(session, GNUTLS_CRD_SRP, ctxt->sc->srp_creds);
-    }
-#endif
-
-    /* Enable session tickets */
-    if (session_ticket_key.data != NULL &&
-        ctxt->sc->tickets == GNUTLS_ENABLED_TRUE)
-    {
-        ret = gnutls_session_ticket_enable_server(ctxt->session, &session_ticket_key);
-        if (ret != GNUTLS_E_SUCCESS)
-            ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
-                          "gnutls_session_ticket_enable_server failed: %s (%d)",
-                          gnutls_strerror(ret), ret);
-    }
+    reload_session_credentials(ctxt);
 
     ret = process_alpn_result(ctxt);
     if (ret != GNUTLS_E_SUCCESS)
         return ret;
-
-    /* Update the priorities - to avoid negotiating a ciphersuite that is not
-     * enabled on this virtual server. Note that here we ignore the version
-     * negotiation. */
-    ret = gnutls_priority_set(session, ctxt->sc->priorities);
 
     /* actually it shouldn't fail since we have checked at startup */
     return ret;
@@ -854,11 +875,7 @@ apr_port_t mgs_hook_default_port(const request_rec * r) {
     return 443;
 }
 
-/**
- * Default buffer size for SNI data, including the terminating NULL
- * byte. The size matches what gnutls-cli uses initially.
- */
-#define DEFAULT_SNI_HOST_LEN 256
+
 
 typedef struct {
     mgs_handle_t *ctxt;
@@ -956,66 +973,23 @@ static int vhost_cb(void *baton, conn_rec *conn, server_rec * s)
  * host configuration. This method is called from the post client
  * hello function.
  *
- * @param session the GnuTLS session
+ * @param ctxt the mod_gnutls connection handle
  *
  * @return either the matching mod_gnutls server config, or `NULL`
  */
-mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
+mgs_srvconf_rec *mgs_find_sni_server(mgs_handle_t *ctxt)
 {
-    mgs_handle_t *ctxt = gnutls_session_get_ptr(session);
-
-    char *sni_name = apr_palloc(ctxt->c->pool, DEFAULT_SNI_HOST_LEN);
-    size_t sni_len = DEFAULT_SNI_HOST_LEN;
-    unsigned int sni_type;
-
-    /* Search for a DNS SNI element. Note that RFC 6066 prohibits more
-     * than one server name per type. */
-    int sni_index = -1;
-    int rv = 0;
-    do {
-        /* The sni_index is incremented before each use, so if the
-         * loop terminates with a type match we will have the right
-         * one stored. */
-        rv = gnutls_server_name_get(session, sni_name,
-                                    &sni_len, &sni_type, ++sni_index);
-        if (rv == GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE)
-        {
-            ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_EGENERAL, ctxt->c,
-                          "%s: no DNS SNI found (last index: %d).",
-                          __func__, sni_index);
-            return NULL;
-        }
-    } while (sni_type != GNUTLS_NAME_DNS);
-    /* The (rv == GNUTLS_E_REQUESTED_DATA_NOT_AVAILABLE) path inside
-     * the loop above returns, so if we reach this point we have a DNS
-     * SNI at the current index. */
-
-    if (rv == GNUTLS_E_SHORT_MEMORY_BUFFER)
+    if (ctxt->sni_name == NULL)
     {
-        /* Allocate a new buffer of the right size and retry */
-        sni_name = apr_palloc(ctxt->c->pool, sni_len);
-        ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, ctxt->c,
-                      "%s: reallocated SNI data buffer for %" APR_SIZE_T_FMT
-                      " bytes.", __func__, sni_len);
-        rv = gnutls_server_name_get(session, sni_name,
-                                    &sni_len, &sni_type, sni_index);
-    }
-
-    /* Unless there's a bug in the GnuTLS API only GNUTLS_E_IDNA_ERROR
-     * can occur here, but a catch all is safer and no more
-     * complicated. */
-    if (rv != GNUTLS_E_SUCCESS)
-    {
-        ap_log_cerror(APLOG_MARK, APLOG_INFO, APR_EGENERAL, ctxt->c,
-                      "%s: error while getting SNI DNS data: '%s' (%d).",
-                      __func__, gnutls_strerror(rv), rv);
+        const char *sni_name = mgs_server_name_get(ctxt);
+        if (sni_name != NULL)
+            ctxt->sni_name = sni_name;
         return NULL;
     }
 
     ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, ctxt->c,
                   "%s: client requested server '%s'.",
-                  __func__, sni_name);
-    ctxt->sni_name = sni_name;
+                  __func__, ctxt->sni_name);
 
     /* Search for vhosts matching connection parameters and the
      * SNI. If a match is found, cbx.sc will contain the mod_gnutls
@@ -1023,9 +997,9 @@ mgs_srvconf_rec *mgs_find_sni_server(gnutls_session_t session)
     vhost_cb_rec cbx = {
         .ctxt = ctxt,
         .sc = NULL,
-        .sni_name = sni_name
+        .sni_name = ctxt->sni_name
     };
-    rv = ap_vhost_iterate_given_conn(ctxt->c, vhost_cb, &cbx);
+    int rv = ap_vhost_iterate_given_conn(ctxt->c, vhost_cb, &cbx);
     if (rv == 1) {
         return cbx.sc;
     }

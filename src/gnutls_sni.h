@@ -20,4 +20,18 @@
 int mgs_sni_ext_hook(void *ctx, unsigned tls_id,
                      const unsigned char *data, unsigned size);
 
+
+/**
+ * Wrapper for gnutls_server_name_get(): Retrieve SNI data from the
+ * TLS session associated with the connection, store it in a string
+ * allocated from the connection pool.
+ *
+ * Note that `ctxt->sni_name` is not automatically updated.
+ *
+ * @param ctxt the connection to read from
+ *
+ * @return the requested server name, or NULL.
+ */
+const char* mgs_server_name_get(mgs_handle_t *ctxt);
+
 #endif /* __MOD_GNUTLS_SNI_H__ */
