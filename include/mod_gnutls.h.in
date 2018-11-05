@@ -79,6 +79,9 @@ typedef struct mgs_ocsp_data* mgs_ocsp_data_t;
 
 /** Server Configuration Record */
 typedef struct {
+    /** Server this mod_gnutls configuration is for */
+    server_rec* s;
+
     /* --- Configuration values --- */
 	/* Is the module enabled? */
     int enabled;
