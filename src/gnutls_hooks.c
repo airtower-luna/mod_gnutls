@@ -364,16 +364,27 @@ static int mgs_select_virtual_server_cb(gnutls_session_t session)
     int ret = 0;
     mgs_handle_t *ctxt = gnutls_session_get_ptr(session);
 
-    /* try to find a virtual host */
-    mgs_srvconf_rec *tsc = mgs_find_sni_server(ctxt);
-    if (tsc != NULL)
+    /* If ctxt->sni_name is set at this point the early_sni_hook()
+     * function ran, found an SNI server name, selected a virtual
+     * host, and set up credentials, so we don't need to do that
+     * again. Otherwise try again, to cover GnuTLS versions < 3.6.3
+     * and pick up future extensions to gnutls_server_name_get(). */
+    if (ctxt->sni_name == NULL)
     {
-        /* Found a TLS vhost based on the SNI, configure the
-         * connection context. */
-        ctxt->sc = tsc;
-	}
+        /* try to find a virtual host */
+        mgs_srvconf_rec *tsc = mgs_find_sni_server(ctxt);
+        if (tsc != NULL)
+        {
+            /* Found a TLS vhost based on the SNI, configure the
+             * connection context. */
+            ctxt->sc = tsc;
+        }
 
-    reload_session_credentials(ctxt);
+        ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, ctxt->c,
+                      "%s: Loading credentials in post client hello hook",
+                      __func__);
+        reload_session_credentials(ctxt);
+    }
 
     ret = process_alpn_result(ctxt);
     if (ret != GNUTLS_E_SUCCESS)
@@ -1031,16 +1042,31 @@ static int early_sni_hook(gnutls_session_t session,
         return GNUTLS_E_SELF_TEST_ERROR;
     }
 
-    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
-                  "%s: Trying early SNI.",
-                  __func__);
-
     int ret = gnutls_ext_raw_parse(session, mgs_sni_ext_hook, msg,
                                    GNUTLS_EXT_RAW_FLAG_TLS_CLIENT_HELLO);
     if (ret == 0 && ctxt->sni_name != NULL)
         ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
-                      "%s: Early SNI result: %s",
+                      "%s found SNI name: '%s'",
                       __func__, ctxt->sni_name);
+
+    /* try to find a virtual host for that name */
+    mgs_srvconf_rec *tsc = mgs_find_sni_server(ctxt);
+    if (tsc != NULL)
+    {
+        /* Found a TLS vhost based on the SNI, configure the
+         * connection context. */
+        ctxt->sc = tsc;
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                      "%s: Selected virtual host %s from early SNI, "
+                      "connection server is still %s.",
+                      __func__, ctxt->sc->s->server_hostname,
+                      ctxt->c->base_server->server_hostname);
+    }
+
+    reload_session_credentials(ctxt);
+
+    prepare_alpn_proposals(ctxt);
+
     return ret;
 }
 #endif
@@ -1137,13 +1163,17 @@ static void create_gnutls_handle(conn_rec * c)
     if (err != GNUTLS_E_SUCCESS)
         ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
                       "gnutls_priority_set failed!");
+
 #ifdef ENABLE_EARLY_SNI
     /* Pre-handshake hook, EXPERIMENTAL */
     gnutls_handshake_set_hook_function(ctxt->session,
                                        GNUTLS_HANDSHAKE_CLIENT_HELLO,
                                        GNUTLS_HOOK_PRE, early_sni_hook);
+#else
+    prepare_alpn_proposals(ctxt);
 #endif
-    /* Set Handshake function */
+
+    /* Post client hello hook (called after GnuTLS has parsed it) */
     gnutls_handshake_set_post_client_hello_function(ctxt->session,
             mgs_select_virtual_server_cb);
 
@@ -1171,8 +1201,6 @@ static void create_gnutls_handle(conn_rec * c)
                           "failed: %s (%d)",
                           __func__, gnutls_strerror(err), err);
     }
-
-    prepare_alpn_proposals(ctxt);
 
     /* Initialize Session Cache */
     mgs_cache_session_init(ctxt);
