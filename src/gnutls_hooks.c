@@ -1015,12 +1015,21 @@ static int early_sni_hook(gnutls_session_t session,
                           unsigned int incoming,
                           const gnutls_datum_t *msg)
 {
-    //assert(htype == GNUTLS_HANDSHAKE_CLIENT_HELLO);
-    //assert(when == GNUTLS_HOOK_PRE);
     if (!incoming)
         return 0;
 
     mgs_handle_t *ctxt = (mgs_handle_t *) gnutls_session_get_ptr(session);
+
+    /* This is a hook for pre client hello ONLY! */
+    if (htype != GNUTLS_HANDSHAKE_CLIENT_HELLO || when != GNUTLS_HOOK_PRE)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EINVAL, ctxt->c,
+                      "%s called outside pre client hello hook, this "
+                      "indicates a programming error!",
+                      __func__);
+        return GNUTLS_E_SELF_TEST_ERROR;
+    }
+
     ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
                   "%s: Trying early SNI.",
                   __func__);
