@@ -50,6 +50,11 @@ extern module AP_MODULE_DECLARE_DATA gnutls_module;
 /* Module Debug Mode */
 #define MOD_GNUTLS_DEBUG @OOO_MAINTAIN@
 
+/* Compile support for early SNI? */
+#if @ENABLE_EARLY_SNI@ == 1
+#define ENABLE_EARLY_SNI
+#endif
+
 /** Name of the module-wide singleton watchdog */
 #define MGS_SINGLETON_WATCHDOG "_mod_gnutls_singleton_"
 
