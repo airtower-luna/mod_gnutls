@@ -182,7 +182,7 @@ static void prepare_alpn_proposals(mgs_handle_t *ctxt)
      * less preferred protocol. */
     const apr_array_header_t *pupgrades = NULL;
     apr_status_t ret =
-        ap_get_protocol_upgrades(ctxt->c, NULL, ctxt->c->base_server,
+        ap_get_protocol_upgrades(ctxt->c, NULL, ctxt->sc->s,
                                  /*report_all*/ 0, &pupgrades);
     if (ret != APR_SUCCESS)
     {
@@ -253,8 +253,7 @@ static int process_alpn_result(mgs_handle_t *ctxt)
     APR_ARRAY_PUSH(client_protos, char *) =
         apr_pstrndup(ctxt->c->pool, (char*) alpn_proto.data, alpn_proto.size);
     const char *selected =
-        ap_select_protocol(ctxt->c, NULL, ctxt->c->base_server,
-                           client_protos);
+        ap_select_protocol(ctxt->c, NULL, ctxt->sc->s, client_protos);
 
     /* ap_select_protocol() will return NULL if none of the ALPN
      * proposals matched. GnuTLS negotiated alpn_proto based on the
@@ -287,7 +286,7 @@ static int process_alpn_result(mgs_handle_t *ctxt)
                   "%s: Switching protocol to '%s' based on ALPN.",
                   __func__, selected);
     apr_status_t status = ap_switch_protocol(ctxt->c, NULL,
-                                             ctxt->c->base_server,
+                                             ctxt->sc->s,
                                              selected);
     if (status != APR_SUCCESS)
     {
