@@ -984,7 +984,8 @@ mgs_srvconf_rec *mgs_find_sni_server(mgs_handle_t *ctxt)
         const char *sni_name = mgs_server_name_get(ctxt);
         if (sni_name != NULL)
             ctxt->sni_name = sni_name;
-        return NULL;
+        else
+            return NULL;
     }
 
     ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, ctxt->c,
