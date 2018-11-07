@@ -50,16 +50,20 @@ and restart Apache:
 Note on HTTP/2
 --------------
 
-HTTP/2 is supported with `mod_gnutls` but works correctly only if all
-virtual hosts using `mod_gnutls` share the same `Protocols`
-setting. This will be fixed in a future release, but will likely
-require GnuTLS 3.6 or later.
+HTTP/2 is supported with `mod_gnutls`. However, full support requires
+compiling with GnuTLS 3.6.3 or later. When using lower versions all
+virtual hosts using `mod_gnutls` with overlapping IP/port combinations
+need to use identical `Protocols` directives for protocol negotiation
+to work correctly.
 
 The technical reason is that using HTTP/2 requires ALPN (Application
 Layer Protocol Negotiation) to be set up before GnuTLS parses the TLS
 ClientHello message, but earlier hooks cannot use
-`gnutls_server_name_get()` to retrieve SNI data for virtual host
-selection.
+`gnutls_server_name_get()` to retrieve SNI (Server Name Indication)
+data for virtual host selection. Because of this `mod_gnutls` provides
+its own early SNI parser, which requires the `gnutls_ext_raw_parse()`
+function introduced in GnuTLS 3.6.3 to retrieve the extension data in
+a *pre* client hello hook.
 
 * * * * *
 
@@ -738,10 +742,10 @@ too.
 Virtual Hosts with Server Name Indication
 -----------------------------------------
 
-`mod_gnutls` supports "Server Name Indication", as specified in [RFC
-6066, Section 3](https://tools.ietf.org/html/rfc6066#section-3). This
-allows hosting many TLS websites with a single IP address, you can
-just add the virtual host conigurations. All recent browsers support
+`mod_gnutls` supports Server Name Indication (SNI), as specified in
+[RFC 6066, Section 3](https://tools.ietf.org/html/rfc6066#section-3).
+This allows hosting many TLS websites with a single IP address, you
+can just add virtual host configurations. All recent browsers support
 this standard. Here is an example using SNI:
 
      # Load the module into Apache.
@@ -776,6 +780,10 @@ this standard. Here is an example using SNI:
          ServerName site3.example.com:443
          GnuTLSCertificateFile conf/tls/site3.crt
          GnuTLSKeyFile conf/tls/site3.key
+         # Enable HTTP/2. With GnuTLS before version 3.6.3 all
+         # virtual hosts in this example would have to share this
+         # directive to work correctly.
+         Protocols h2 http/1.1
      </VirtualHost>
 
 Virtual Hosts without SNI

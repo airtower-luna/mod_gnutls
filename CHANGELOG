@@ -19,9 +19,11 @@
 - The internal cache implementation has been replaced with
   mod_socache. Users may need to update their GnuTLSCache settings and
   load the appropriate socache modules.
-- Known issue: ALPN (required for HTTP/2) works correctly only if all
-  virtual hosts using mod_gnutls share the same Protocols setting,
-  reported by Vincent Tamet.
+- ALPN (required for HTTP/2) now works correctly with different
+  "Protocols" directives between virtual hosts if building with GnuTLS
+  3.6.3 or newer. Older versions require identical "Protocols"
+  directives for overlapping virtual hosts. Thanks to Vincent Tamet
+  for the bug report!
 - GnuTLSPriorities is optional now and defaults to "NORMAL" if
   missing. The same applies to GnuTLSProxyPriorities (if TLS proxy is
   enabled).
