@@ -350,16 +350,17 @@ static int reload_session_credentials(mgs_handle_t *ctxt)
 
 
 /**
- * Post client hello function for GnuTLS, used to configure the TLS
- * server based on virtual host configuration. Uses SNI to select the
- * virtual host if available.
+ * Post client hello hook function for GnuTLS. This function has two
+ * purposes: Firstly, it acts as a fallback for early_sni_hook(), by
+ * parsing SNI and selecting a virtual host based on it if
+ * necessary. Secondly, it calls ALPN processing.
  *
  * @param session the TLS session
  *
  * @return zero or a GnuTLS error code, as required by GnuTLS hook
  * definition
  */
-static int mgs_select_virtual_server_cb(gnutls_session_t session)
+static int post_client_hello_hook(gnutls_session_t session)
 {
     int ret = 0;
     mgs_handle_t *ctxt = gnutls_session_get_ptr(session);
@@ -1021,9 +1022,29 @@ mgs_srvconf_rec *mgs_find_sni_server(mgs_handle_t *ctxt)
 
 
 #ifdef ENABLE_EARLY_SNI
+/**
+ * Pre client hello hook function for GnuTLS that implements early SNI
+ * processing using `gnutls_ext_raw_parse()` (available since GnuTLS
+ * 3.6.3). Reading the SNI (if any) before GnuTLS processes the client
+ * hello allows loading virtual host settings that cannot be changed
+ * in the post client hello hook, including ALPN proposals (required
+ * for HTTP/2 support using the `Protocols` directive). In addition to
+ * ALPN this function configures the server credentials.
+ *
+ * The function signature is required by the GnuTLS API.
+ *
+ * @param session the current session
+ * @param htype handshake message type
+ * @param when hook position relative to GnuTLS processing
+ * @param incoming true if the message is incoming, for client hello
+ * that means the hook is running on the server
+ * @param msg raw message data
+ *
+ * @return `GNUTLS_E_SUCCESS` or a GnuTLS error code
+ */
 static int early_sni_hook(gnutls_session_t session,
-                          unsigned int htype __attribute__((unused)),
-                          unsigned when __attribute__((unused)),
+                          unsigned int htype,
+                          unsigned when,
                           unsigned int incoming,
                           const gnutls_datum_t *msg)
 {
@@ -1175,14 +1196,15 @@ static void create_gnutls_handle(conn_rec * c)
 
     /* Post client hello hook (called after GnuTLS has parsed it) */
     gnutls_handshake_set_post_client_hello_function(ctxt->session,
-            mgs_select_virtual_server_cb);
+            post_client_hello_hook);
 
     /* Set GnuTLS user pointer, so we can access the module session
      * context in GnuTLS callbacks */
     gnutls_session_set_ptr(ctxt->session, ctxt);
 
-    /* If mod_gnutls is the TLS server, mgs_select_virtual_server_cb
-     * will load appropriate credentials during handshake. However,
+    /* If mod_gnutls is the TLS server, early_sni_hook (or
+     * post_client_hello_hook, if early SNI is not available) will
+     * load appropriate credentials during the handshake. However,
      * when handling a proxy backend connection, mod_gnutls acts as
      * TLS client and credentials must be loaded here. */
     if (ctxt->is_proxy == GNUTLS_ENABLED_TRUE)

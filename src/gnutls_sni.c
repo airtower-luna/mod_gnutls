@@ -31,6 +31,10 @@
  * https://tools.ietf.org/html/rfc6066#section-3 */
 #define SERVER_NAME_HDR_SIZE (sizeof(uint16_t) + sizeof(uint8_t))
 
+/**
+ * Read a 16 bit unsigned int in network byte order from the data,
+ * and return the value in host byte order.
+ */
 static inline uint16_t read_uint16(const unsigned char *data)
 {
     uint16_t u;
@@ -42,7 +46,15 @@ static inline uint16_t read_uint16(const unsigned char *data)
 }
 
 /**
- * APR port of GnuTLS' _gnutls_dnsname_is_valid() (from lib/str.h)
+ * Check if the string contains only alphanumeric characters, `-`, and
+ * `.`. APR port of GnuTLS' _gnutls_dnsname_is_valid() (from
+ * lib/str.h).
+ *
+ * @param str the string to check
+ * @param size length of the input string (must not include any
+ * terminating null byte)
+ *
+ * @return `1` if the string is a valid DNS name, `0` otherwise
  */
 static inline int is_valid_dnsname(const unsigned char *str, unsigned int size)
 {
@@ -55,10 +67,22 @@ static inline int is_valid_dnsname(const unsigned char *str, unsigned int size)
 }
 
 /**
- * Callback for gnutls_ext_raw_parse(), called for each
- * extension. Check if the extension is a Server Name Indication,
- * parse if so. The SNI data structure is defined in [RFC 6066
- * Sec. 3](https://tools.ietf.org/html/rfc6066#section-3)
+ * Callback for gnutls_ext_raw_parse(), checks if the extension is a
+ * Server Name Indication, and tries to parse it if so. In case of
+ * success the requested hostname is stored in the mod_gnutls session
+ * context.
+ *
+ * See [RFC 6066 Sec. 3](https://tools.ietf.org/html/rfc6066#section-3)
+ * for the definition of the SNI data structure. The function
+ * signature is defined by the GnuTLS API.
+ *
+ * @param ctx must be the `gnutls_session_t` for the current
+ * connection
+ * @param tls_id TLS extension ID
+ * @param data the extension data
+ * @param size length of the extension data (bytes)
+ *
+ * @return `GNUTLS_E_SUCCESS` or a GnuTLS error code
  */
 int mgs_sni_ext_hook(void *ctx, unsigned tls_id,
                      const unsigned char *data, unsigned size)
@@ -135,7 +159,7 @@ int mgs_sni_ext_hook(void *ctx, unsigned tls_id,
         /* Assign to session context */
         ctxt->sni_name = name;
     }
-    return 0;
+    return GNUTLS_E_SUCCESS;
 }
 
 
