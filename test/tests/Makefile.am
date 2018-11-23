@@ -29,4 +29,7 @@ EXTRA_DIST = \
 	27_OCSP_server/apache.conf 27_OCSP_server/gnutls-cli.args 27_OCSP_server/input 27_OCSP_server/ocsp.conf 27_OCSP_server/output \
 	28_HTTP2_support/apache.conf \
 	29_force_handshake_vhost/apache.conf 29_force_handshake_vhost/gnutls-cli.args 29_force_handshake_vhost/input 29_force_handshake_vhost/output \
-	30_ip_based_vhosts/apache.conf 30_ip_based_vhosts/gnutls-cli.args 30_ip_based_vhosts/input 30_ip_based_vhosts/output
+	30_ip_based_vhosts/apache.conf 30_ip_based_vhosts/gnutls-cli.args 30_ip_based_vhosts/input 30_ip_based_vhosts/output 31_vhost_SNI_serveralias_match \
+	31_vhost_SNI_serveralias_match/gnutls-cli.args 31_vhost_SNI_serveralias_match/input 31_vhost_SNI_serveralias_match/apache.conf 31_vhost_SNI_serveralias_match/output \
+	32_vhost_SNI_serveralias_mismatch/gnutls-cli.args 32_vhost_SNI_serveralias_mismatch/input 32_vhost_SNI_serveralias_mismatch/apache.conf 32_vhost_SNI_serveralias_mismatch/output \
+	33_vhost_SNI_serveralias_missinghost/gnutls-cli.args 33_vhost_SNI_serveralias_missinghost/input 33_vhost_SNI_serveralias_missinghost/apache.conf 33_vhost_SNI_serveralias_missinghost/output
