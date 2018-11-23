@@ -17,8 +17,7 @@ endif
 MOSTLYCLEANFILES = $(html_DATA) $(pdf_DATA) $(man3_MANS)
 
 %.yaml: %.yaml.in
-	sed -e s/__MOD_GNUTLS_VERSION__/@MOD_GNUTLS_VERSION@/ \
-		-e s/__DATE__/$$(date -I)/ < $< > $@
+	sed -e s/__MOD_GNUTLS_VERSION__/@MOD_GNUTLS_VERSION@/ < $< > $@
 
 if USE_PANDOC
 %.man: %.mdwn %.yaml
