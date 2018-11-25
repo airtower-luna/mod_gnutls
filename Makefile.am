@@ -6,7 +6,8 @@ EXTRA_DIST = m4/outoforder.m4 m4/apache.m4 \
 		README CHANGELOG \
 		NOTICE LICENSE
 
-AM_DISTCHECK_CONFIGURE_FLAGS = "--enable-vpath-install"
+AM_DISTCHECK_CONFIGURE_FLAGS = "--enable-vpath-install" \
+	"SOFTHSM_LIB='$(SOFTHSM_LIB)'"
 DISTCLEANFILES = config.nice
 MOSTLYCLEANFILES = $(DX_CLEANFILES)
 
