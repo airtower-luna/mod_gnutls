@@ -100,3 +100,28 @@ function netns_reexec
     fi
     return 0
 }
+
+# Usage: require_gnutls_cli ${REQUIRED_VERSION_NUMBER} || exit ${ERROR_CODE}
+# Require the gnutls-cli binary to be of a given version or newer.
+# Return error code 1 if older, 2 if not found.
+function require_gnutls_cli
+{
+    local required_version=(${1//./ })
+
+    if [[ $(gnutls-cli --version) =~ gnutls-cli[[:space:]]([[:digit:]]+)\.([[:digit:]]+)\.([[:digit:]]+) ]]
+    then
+        for i in {0..2}
+        do
+            if [ ${BASH_REMATCH[i+1]} -gt ${required_version[i]} ]
+            then
+                break;
+            elif [ ${BASH_REMATCH[i+1]} -lt ${required_version[i]} ]
+            then
+                return 1
+            fi
+        done
+        return 0
+    else
+        return 2
+    fi
+}
