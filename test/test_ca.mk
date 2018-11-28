@@ -84,6 +84,7 @@ rogue%/x509.pem: rogue%.template rogue%/cert-request rogueca/x509.pem
 	echo "directories.tokendir = $(dir $@)softhsm2.db" >> $@
 
 %/softhsm2.db: %/x509.pem %/secret.key %/softhsm2.conf
+	rm -rf $@
 	mkdir -p $@
 	SOFTHSM="$(SOFTHSM)" \
 	SOFTHSM2_CONF="$(dir $@)softhsm2.conf" \
