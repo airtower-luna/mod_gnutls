@@ -35,7 +35,8 @@ dist_check_SCRIPTS += test-16_view-status.bash \
 	test-30_ip_based_vhosts.bash \
 	test-31_vhost_SNI_serveralias_match.bash \
 	test-32_vhost_SNI_serveralias_mismatch.bash \
-	test-33_vhost_SNI_serveralias_missinghost.bash
+	test-33_vhost_SNI_serveralias_missinghost.bash \
+	test-34_TLS_reverse_proxy_h2.bash
 
 TEST_EXTENSIONS = .bash
 TESTS = $(dist_check_SCRIPTS)

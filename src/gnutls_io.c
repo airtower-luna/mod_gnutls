@@ -18,6 +18,7 @@
  */
 
 #include "mod_gnutls.h"
+#include <apr_strings.h>
 
 #ifdef APLOG_USE_MODULE
 APLOG_USE_MODULE(gnutls);
@@ -403,6 +404,32 @@ static int gnutls_do_handshake(mgs_handle_t * ctxt) {
                               "Could not set SNI '%s' for proxy connection: "
                               "%s (%d)",
                               peer_hostname, gnutls_strerror(ret), ret);
+        }
+
+        const char *proxy_alpn =
+            apr_table_get(ctxt->c->notes, "proxy-request-alpn-protos");
+        if (proxy_alpn != NULL)
+        {
+            // TODO: mod_ssl ssl_engine_io.c does some tokenization of
+            // the input string, so it looks like the API allows
+            // multiple protocols.
+            gnutls_datum_t alpn_proto = {
+                .data = (unsigned char *) apr_pstrdup(ctxt->c->pool, proxy_alpn),
+                .size = strlen(proxy_alpn)
+            };
+            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                          "%s: proxy module requests ALPN proto '%s', "
+                          "length %" APR_SIZE_T_FMT ".",
+                          __func__, proxy_alpn, strlen(proxy_alpn));
+            ret = gnutls_alpn_set_protocols(ctxt->session,
+                                            &alpn_proto,
+                                            1 /* number of proposals */,
+                                            0 /* flags */);
+            if (ret != GNUTLS_E_SUCCESS)
+                ap_log_cerror(APLOG_MARK, APLOG_ERR, ret, ctxt->c,
+                              "Could not set ALPN proposal '%s' for proxy "
+                              "connection: %s (%d)",
+                              proxy_alpn, gnutls_strerror(ret), ret);
         }
     }
 
