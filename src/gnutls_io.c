@@ -268,9 +268,13 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
                 ap_log_cerror(APLOG_MARK, APLOG_TRACE2, ctxt->input_rc, ctxt->c,
                               "%s: looping recv after '%s' (%d)",
                               __func__, gnutls_strerror(rc), rc);
-                /* For a blocking read: Loop and try again immediately. */
+                /* For a blocking read, loop and try again
+                 * immediately. Otherwise just notify the caller. */
                 if (ctxt->input_block != APR_NONBLOCK_READ)
                     continue;
+                else
+                    ctxt->input_rc =
+                        (rc == GNUTLS_E_AGAIN ? APR_EAGAIN : APR_EINTR);
             } else if (rc == GNUTLS_E_REHANDSHAKE) {
                 /* A client has asked for a new Hankshake. Currently, we don't do it */
                 ap_log_cerror(APLOG_MARK, APLOG_INFO,
