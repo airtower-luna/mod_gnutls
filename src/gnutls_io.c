@@ -877,9 +877,23 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
             return -1;
         }
 
+        /* Blocking ap_get_brigade() can return a timeout status,
+         * sometimes after a very short time. "Don't give up, just
+         * return the timeout" is what mod_ssl does. */
+        if (ctxt->input_block == APR_BLOCK_READ
+            && APR_STATUS_IS_TIMEUP(rc)
+            && APR_BRIGADE_EMPTY(ctxt->input_bb))
+        {
+            ctxt->input_rc = rc;
+            gnutls_transport_set_errno(ctxt->session, EAGAIN);
+            return -1;
+        }
+
         if (rc != APR_SUCCESS)
         {
             /* Unexpected errors discard the brigade */
+            ap_log_cerror(APLOG_MARK, APLOG_INFO, rc, ctxt->c,
+                          "%s: Unexpected error!", __func__);
             apr_brigade_cleanup(ctxt->input_bb);
             ctxt->input_bb = NULL;
             gnutls_transport_set_errno(ctxt->session, EIO);
