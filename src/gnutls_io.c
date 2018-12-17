@@ -18,6 +18,7 @@
  */
 
 #include "mod_gnutls.h"
+#include "gnutls_proxy.h"
 #include <apr_strings.h>
 
 #ifdef APLOG_USE_MODULE
@@ -407,7 +408,7 @@ static int gnutls_do_handshake(mgs_handle_t * ctxt) {
         }
 
         const char *proxy_alpn =
-            apr_table_get(ctxt->c->notes, "proxy-request-alpn-protos");
+            apr_table_get(ctxt->c->notes, PROXY_ALPN_NOTE);
         if (proxy_alpn != NULL)
         {
             // TODO: mod_ssl ssl_engine_io.c does some tokenization of

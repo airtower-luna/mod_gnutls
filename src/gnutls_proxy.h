@@ -21,6 +21,15 @@
 #include <apr_pools.h>
 #include <httpd.h>
 
+/** proxy modules may add a note with this key to the
+ * connection->notes table for client connections to indicate the
+ * server hostname */
+#define PROXY_SNI_NOTE "proxy-request-hostname"
+
+/** proxy modules may add a note with this key to the connection->notes
+ * table for client connections to indicate supported protocols */
+#define PROXY_ALPN_NOTE "proxy-request-alpn-protos"
+
 apr_status_t load_proxy_x509_credentials(apr_pool_t *pconf,
                                          apr_pool_t *ptemp,
                                          server_rec *s)
