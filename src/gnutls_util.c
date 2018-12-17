@@ -20,6 +20,14 @@
 #include <gnutls/gnutls.h>
 
 
+
+/** Compiled version of MGS_DEFAULT_PRIORITY, must be initialized
+ * using mgs_default_priority_init() in the pre_config hook and
+ * deinitialized in the matching pool cleanup hook. */
+static gnutls_priority_t default_prio;
+
+
+
 const char* http_post_header(apr_pool_t *p, apr_uri_t *uri,
                              const char *content_type, const char *accept,
                              apr_size_t size)
@@ -151,4 +159,25 @@ mgs_handle_t *init_gnutls_ctxt(conn_rec *c)
         ctxt->sni_name = NULL;
     }
     return ctxt;
+}
+
+
+
+int mgs_default_priority_init()
+{
+    return gnutls_priority_init(&default_prio, MGS_DEFAULT_PRIORITY, NULL);
+}
+
+
+
+gnutls_priority_t mgs_get_default_prio()
+{
+    return default_prio;
+}
+
+
+
+void mgs_default_priority_deinit()
+{
+    gnutls_priority_deinit(default_prio);
 }

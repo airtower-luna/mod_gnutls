@@ -25,6 +25,9 @@
 #ifndef __MOD_GNUTLS_UTIL_H__
 #define __MOD_GNUTLS_UTIL_H__
 
+/** Default GnuTLS priority string for mod_gnutls */
+#define MGS_DEFAULT_PRIORITY "NORMAL"
+
 /** maximum allowed length of one header line */
 #define HTTP_HDR_LINE_MAX 1024
 
@@ -72,5 +75,24 @@ apr_status_t datum_from_file(apr_pool_t *p, const char* filename,
  * some defaults.
  */
 mgs_handle_t *init_gnutls_ctxt(conn_rec *c);
+
+/**
+ * Initialize the global default priorities, must be called by the
+ * pre_config hook
+ *
+ * @return `GNUTLS_E_SUCCESS` or a GnuTLS error code
+ */
+int mgs_default_priority_init();
+
+/**
+ * Get the global default priorities
+ */
+gnutls_priority_t mgs_get_default_prio();
+
+/**
+ * Deinitialize the global default priorities, must be in the cleanup
+ * hook of the pre_config pool.
+ */
+void mgs_default_priority_deinit();
 
 #endif /* __MOD_GNUTLS_UTIL_H__ */

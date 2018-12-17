@@ -57,12 +57,6 @@ static apr_file_t *debug_log_fp;
 static gnutls_datum_t session_ticket_key = {NULL, 0};
 
 
-/** Default GnuTLS priority string for mod_gnutls */
-#define MGS_DEFAULT_PRIORITY "NORMAL"
-/** Compiled version of MGS_DEFAULT_PRIORITY (initialized in the
- * pre_config hook) */
-static gnutls_priority_t default_prio;
-
 
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt);
 /** use side==0 for server and side==1 for client */
@@ -87,7 +81,7 @@ apr_status_t mgs_cleanup_pre_config(void *data __attribute__((unused)))
     session_ticket_key.size = 0;
 
     /* Deinit default priority setting */
-    gnutls_priority_deinit(default_prio);
+    mgs_default_priority_deinit();
     return APR_SUCCESS;
 }
 
@@ -142,7 +136,7 @@ int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog, apr_pool_t * ptem
     }
 
     /* Initialize default priority setting */
-    ret = gnutls_priority_init(&default_prio, MGS_DEFAULT_PRIORITY, NULL);
+    ret = mgs_default_priority_init();
     if (ret < 0)
     {
         ap_log_perror(APLOG_MARK, APLOG_EMERG, 0, plog,
@@ -730,7 +724,7 @@ int mgs_hook_post_config(apr_pool_t *pconf,
                          "using default '%s'.",
                          s->server_hostname, s->addrs->host_port,
                          MGS_DEFAULT_PRIORITY);
-            sc->priorities = default_prio;
+            sc->priorities = mgs_get_default_prio();
         }
 
         /* Set host DH params from user configuration or defaults */
@@ -1180,7 +1174,7 @@ static void create_gnutls_handle(conn_rec * c)
     apr_pool_pre_cleanup_register(c->pool, ctxt, cleanup_gnutls_session);
 
     /* Set Default Priority */
-	err = gnutls_priority_set(ctxt->session, default_prio);
+	err = gnutls_priority_set(ctxt->session, mgs_get_default_prio());
     if (err != GNUTLS_E_SUCCESS)
         ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
                       "gnutls_priority_set failed!");
@@ -2231,7 +2225,7 @@ static apr_status_t load_proxy_x509_credentials(apr_pool_t *pconf,
                      "using default '%s'.",
                      s->server_hostname, s->addrs->host_port,
                      MGS_DEFAULT_PRIORITY);
-        sc->proxy_priorities = default_prio;
+        sc->proxy_priorities = mgs_get_default_prio();
     }
     else
     {
