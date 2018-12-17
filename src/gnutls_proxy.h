@@ -35,4 +35,10 @@ apr_status_t load_proxy_x509_credentials(apr_pool_t *pconf,
                                          server_rec *s)
     __attribute__((nonnull));
 
+/**
+ * Configure extensions for the TLS handshake on proxy connections,
+ * currently SNI and ALPN.
+ */
+void mgs_set_proxy_handshake_ext(mgs_handle_t * ctxt);
+
 #endif /* __MOD_GNUTLS_PROXY_H__ */

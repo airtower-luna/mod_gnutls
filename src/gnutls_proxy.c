@@ -18,6 +18,7 @@
 #include "gnutls_proxy.h"
 #include "gnutls_util.h"
 
+#include <apr_strings.h>
 #include <gnutls/gnutls.h>
 
 /*
@@ -288,4 +289,68 @@ apr_status_t load_proxy_x509_credentials(apr_pool_t *pconf,
                                            gtls_check_server_cert);
     apr_pool_destroy(pool);
     return ret;
+}
+
+
+
+static void proxy_conn_set_sni(mgs_handle_t *ctxt)
+{
+    /* Get peer hostname from note left by mod_proxy */
+    const char *peer_hostname =
+        apr_table_get(ctxt->c->notes, PROXY_SNI_NOTE);
+    /* Used only as target for apr_ipsubnet_create() */
+    apr_ipsubnet_t *probe;
+    /* Check if the note is present (!= NULL) and NOT an IP
+     * address */
+    if ((peer_hostname) != NULL
+        && (apr_ipsubnet_create(&probe, peer_hostname, NULL, ctxt->c->pool)
+            != APR_SUCCESS))
+    {
+        int ret = gnutls_server_name_set(ctxt->session, GNUTLS_NAME_DNS,
+                                         peer_hostname, strlen(peer_hostname));
+        if (ret != GNUTLS_E_SUCCESS)
+            ap_log_cerror(APLOG_MARK, APLOG_ERR, ret, ctxt->c,
+                          "Could not set SNI '%s' for proxy connection: "
+                          "%s (%d)",
+                          peer_hostname, gnutls_strerror(ret), ret);
+    }
+}
+
+
+
+static void proxy_conn_set_alpn(mgs_handle_t *ctxt)
+{
+    const char *proxy_alpn =
+        apr_table_get(ctxt->c->notes, PROXY_ALPN_NOTE);
+    if (proxy_alpn != NULL)
+    {
+        // TODO: mod_ssl ssl_engine_io.c does some tokenization of
+        // the input string, so it looks like the API allows
+        // multiple protocols.
+        gnutls_datum_t alpn_proto = {
+            .data = (unsigned char *) apr_pstrdup(ctxt->c->pool, proxy_alpn),
+            .size = strlen(proxy_alpn)
+        };
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                      "%s: proxy module requests ALPN proto '%s', "
+                      "length %" APR_SIZE_T_FMT ".",
+                      __func__, proxy_alpn, strlen(proxy_alpn));
+        int ret = gnutls_alpn_set_protocols(ctxt->session,
+                                            &alpn_proto,
+                                            1 /* number of proposals */,
+                                            0 /* flags */);
+        if (ret != GNUTLS_E_SUCCESS)
+            ap_log_cerror(APLOG_MARK, APLOG_ERR, ret, ctxt->c,
+                          "Could not set ALPN proposal '%s' for proxy "
+                          "connection: %s (%d)",
+                          proxy_alpn, gnutls_strerror(ret), ret);
+    }
+}
+
+
+
+void mgs_set_proxy_handshake_ext(mgs_handle_t *ctxt)
+{
+    proxy_conn_set_sni(ctxt);
+    proxy_conn_set_alpn(ctxt);
 }
