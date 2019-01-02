@@ -197,15 +197,9 @@ static void prepare_alpn_proposals(mgs_handle_t *ctxt)
                   __func__, pupgrades->nelts,
                   apr_array_pstrcat(ctxt->c->pool, pupgrades, ','));
     gnutls_datum_t *alpn_protos =
-        apr_palloc(ctxt->c->pool,
-                   (pupgrades->nelts + 1) * sizeof(gnutls_datum_t));
-    for (int i = 0; i < pupgrades->nelts; i++)
-    {
-        alpn_protos[i].data = (void *) APR_ARRAY_IDX(pupgrades, i, char *);
-        alpn_protos[i].size =
-            strnlen(APR_ARRAY_IDX(pupgrades, i, char *),
-                    pupgrades->elt_size);
-    }
+        mgs_str_array_to_datum_array(pupgrades,
+                                     ctxt->c->pool,
+                                     pupgrades->nelts + 1);
 
     /* Add the current (default) protocol at the end of the list */
     alpn_protos[pupgrades->nelts].data =

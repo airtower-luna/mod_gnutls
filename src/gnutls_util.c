@@ -181,3 +181,19 @@ void mgs_default_priority_deinit()
 {
     gnutls_priority_deinit(default_prio);
 }
+
+
+
+gnutls_datum_t * mgs_str_array_to_datum_array(const apr_array_header_t *src,
+                                              apr_pool_t *pool,
+                                              const int min_elements)
+{
+    int num = min_elements > src->nelts ? min_elements : src->nelts;
+    gnutls_datum_t *dest = apr_palloc(pool, num * sizeof(gnutls_datum_t));
+    for (int i = 0; i < src->nelts; i++)
+    {
+        dest[i].data = (void *) APR_ARRAY_IDX(src, i, char *);
+        dest[i].size = strlen(APR_ARRAY_IDX(src, i, char *));
+    }
+    return dest;
+}

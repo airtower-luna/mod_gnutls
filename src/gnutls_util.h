@@ -95,4 +95,20 @@ gnutls_priority_t mgs_get_default_prio();
  */
 void mgs_default_priority_deinit();
 
+/**
+ * Create a shallow copy of an APR array of `char *` into a new array
+ * of gnutls_datum_t, filling `size` via `strlen()`. "Shallow copy"
+ * means that the strings themselves are not copied, just the pointers
+ * to them.
+ *
+ * @param src array to copy
+ * @param pool allocate memory for the new array
+ * @param min_elements allocate room for at least this many elements
+ *
+ * @return pointer to the first element of the new array
+ */
+gnutls_datum_t * mgs_str_array_to_datum_array(const apr_array_header_t *src,
+                                              apr_pool_t *pool,
+                                              const int min_elements);
+
 #endif /* __MOD_GNUTLS_UTIL_H__ */
