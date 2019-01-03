@@ -318,33 +318,64 @@ static void proxy_conn_set_sni(mgs_handle_t *ctxt)
 
 
 
+/** Initial size for the APR array storing ALPN protocol
+ * names. Currently only mod_proxy_http2 uses ALPN for proxy
+ * connections and proposes "h2" exclusively. This provides enough
+ * room without additional allocation even if an HTTP/1.1 fallback
+ * should be added while still being small. */
+#define INIT_ALPN_ARR_SIZE 2
+
+/**
+ * Set ALPN proposals for a proxy handshake based on the note from the
+ * proxy module (see `PROXY_SNI_NOTE`). The note is expected to
+ * contain a string, multiple protocol names can be separated by ","
+ * or " ", or a combination of them.
+ *
+ * @param ctxt the mod_gnutls connection handle
+ */
 static void proxy_conn_set_alpn(mgs_handle_t *ctxt)
 {
     const char *proxy_alpn =
         apr_table_get(ctxt->c->notes, PROXY_ALPN_NOTE);
     if (proxy_alpn == NULL)
         return;
-
-    // TODO: mod_ssl ssl_engine_io.c does some tokenization of
-    // the input string, so it looks like the API allows
-    // multiple protocols.
-    gnutls_datum_t alpn_proto = {
-        .data = (unsigned char *) apr_pstrdup(ctxt->c->pool, proxy_alpn),
-        .size = strlen(proxy_alpn)
-    };
-    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
-                  "%s: proxy module requests ALPN proto '%s', "
+    ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, ctxt->c,
+                  "%s: proxy module ALPN note is '%s', "
                   "length %" APR_SIZE_T_FMT ".",
                   __func__, proxy_alpn, strlen(proxy_alpn));
+
+    apr_array_header_t* protocols =
+        apr_array_make(ctxt->c->pool, INIT_ALPN_ARR_SIZE,
+                       sizeof(const char *));
+
+    /* mod_ssl tokenizes the note by "," or " " to allow multiple
+     * protocols. We need to copy the note because apr_strtok()
+     * modifies the string to make each token NULL terminated. On the
+     * plus side that means we do not need to copy individual
+     * tokens. */
+    char *tok = apr_pstrdup(ctxt->c->pool, proxy_alpn);
+    /* state for apr_strtok, pointer to character following current
+     * token */
+    char *last = NULL;
+    while ((tok = apr_strtok(tok, ", ", &last)))
+    {
+        APR_ARRAY_PUSH(protocols, const char *) = tok;
+        tok = NULL;
+    }
+
+    gnutls_datum_t* alpn_protos =
+        mgs_str_array_to_datum_array(protocols,
+                                     ctxt->c->pool,
+                                     protocols->nelts);
     int ret = gnutls_alpn_set_protocols(ctxt->session,
-                                        &alpn_proto,
-                                        1 /* number of proposals */,
+                                        alpn_protos,
+                                        protocols->nelts,
                                         0 /* flags */);
     if (ret != GNUTLS_E_SUCCESS)
         ap_log_cerror(APLOG_MARK, APLOG_ERR, ret, ctxt->c,
-                      "Could not set ALPN proposal '%s' for proxy "
+                      "Could not set ALPN proposals for proxy "
                       "connection: %s (%d)",
-                      proxy_alpn, gnutls_strerror(ret), ret);
+                      gnutls_strerror(ret), ret);
 }
 
 

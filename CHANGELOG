@@ -24,6 +24,8 @@
   3.6.3 or newer. Older versions require identical "Protocols"
   directives for overlapping virtual hosts. Thanks to Vincent Tamet
   for the bug report!
+- ALPN is now supported for proxy connections, making HTTP/2 proxy
+  connections using mod_proxy_http2 possible.
 - GnuTLSPriorities is optional now and defaults to "NORMAL" if
   missing. The same applies to GnuTLSProxyPriorities (if TLS proxy is
   enabled).
