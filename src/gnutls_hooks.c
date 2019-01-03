@@ -3,7 +3,7 @@
  *  Copyright 2008, 2014 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
  *  Copyright 2013-2014 Daniel Kahn Gillmor
- *  Copyright 2015-2018 Fiona Klute
+ *  Copyright 2015-2019 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
