@@ -681,14 +681,7 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
             ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
                           "%s: TLS %sconnection opened.",
                           __func__, IS_PROXY_STR(ctxt));
-    }
-
-    if (ctxt->status < 0)
-    {
-        ap_log_cerror(APLOG_MARK, APLOG_TRACE1, 0, ctxt->c,
-                      "%s: %sconnection failed, refusing to send.",
-                      __func__, IS_PROXY_STR(ctxt));
-        if (ctxt->is_proxy)
+        else if (ctxt->is_proxy)
         {
             /* If mod_proxy receives an error while trying to send its
              * request it sends an "invalid request" error to the
@@ -699,8 +692,16 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
             APR_BRIGADE_INSERT_TAIL(bb, bucket);
             return APR_SUCCESS;
         }
-        else
-            return APR_ECONNABORTED;
+        /* No final else here, the "ctxt->status < 0" check below will
+         * catch that. */
+    }
+
+    if (ctxt->status < 0)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_TRACE1, 0, ctxt->c,
+                      "%s: %sconnection failed, refusing to send.",
+                      __func__, IS_PROXY_STR(ctxt));
+        return APR_ECONNABORTED;
     }
 
     while (!APR_BRIGADE_EMPTY(bb)) {
