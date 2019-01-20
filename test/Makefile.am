@@ -70,7 +70,10 @@ pgp_tokens = $(pgp_identities:=/cert.pgp) \
 x509_keys = $(x509_identities:=/secret.key)
 x509_certs = $(x509_identities:=/x509.pem)
 x509_tokens = $(x509_certs) $(x509_keys)
-tokens = $(x509_tokens) $(pgp_tokens)
+tokens = $(x509_tokens)
+if USE_MSVA
+tokens += $(pgp_tokens)
+endif
 
 if !DISABLE_FLOCK
 # flock command for write access to the authority keyring

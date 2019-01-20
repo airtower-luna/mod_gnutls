@@ -32,6 +32,8 @@
 - The manual is now built as a manual page, too, if pandoc is
   available.
 - OpenPGP support has been removed.
+- Don't require pem2openpgp for tests when building without MSVA
+  support.
 
 ** Version 0.8.4 (2018-04-13)
 - Support Apache HTTPD 2.4.33 API for proxy TLS connections
