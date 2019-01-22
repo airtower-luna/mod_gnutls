@@ -65,6 +65,9 @@ its own early SNI parser, which requires the `gnutls_ext_raw_parse()`
 function introduced in GnuTLS 3.6.3 to retrieve the extension data in
 a *pre* client hello hook.
 
+During build `./configure` will report "Early SNI: yes" if your
+version of GnuTLS is new enough.
+
 * * * * *
 
 Configuration Directives
