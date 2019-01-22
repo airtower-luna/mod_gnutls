@@ -192,7 +192,7 @@ static void prepare_alpn_proposals(mgs_handle_t *ctxt)
         return;
     }
 
-    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
+    ap_log_cerror(APLOG_MARK, APLOG_TRACE1, 0, ctxt->c,
                   "%s: Found %d protocol upgrade(s) for ALPN: %s",
                   __func__, pupgrades->nelts,
                   apr_array_pstrcat(ctxt->c->pool, pupgrades, ','));
@@ -1053,22 +1053,24 @@ static int early_sni_hook(gnutls_session_t session,
     int ret = gnutls_ext_raw_parse(session, mgs_sni_ext_hook, msg,
                                    GNUTLS_EXT_RAW_FLAG_TLS_CLIENT_HELLO);
     if (ret == 0 && ctxt->sni_name != NULL)
-        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, ctxt->c,
                       "%s found SNI name: '%s'",
                       __func__, ctxt->sni_name);
 
-    /* try to find a virtual host for that name */
-    mgs_srvconf_rec *tsc = mgs_find_sni_server(ctxt);
-    if (tsc != NULL)
-    {
-        /* Found a TLS vhost based on the SNI, configure the
-         * connection context. */
-        ctxt->sc = tsc;
-        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
-                      "%s: Selected virtual host %s from early SNI, "
-                      "connection server is still %s.",
-                      __func__, ctxt->sc->s->server_hostname,
-                      ctxt->c->base_server->server_hostname);
+        /* try to find a virtual host for that name */
+        mgs_srvconf_rec *tsc = mgs_find_sni_server(ctxt);
+        if (tsc != NULL)
+        {
+            /* Found a TLS vhost based on the SNI, configure the
+             * connection context. */
+            ctxt->sc = tsc;
+            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                          "%s: Selected virtual host %s from early SNI, "
+                          "connection server is %s.",
+                          __func__, ctxt->sc->s->server_hostname,
+                          ctxt->c->base_server->server_hostname);
+        }
     }
 
     reload_session_credentials(ctxt);
