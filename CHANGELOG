@@ -1,12 +1,14 @@
-** Version 0.9.0 UNRELEASED
+** Version 0.9.0 (2019-01-23)
 - Security fix: Refuse to send or receive any data over a failed TLS
-  connection (commit 72b669eae8c45dda1850e8e5b30a97c918357b51). This
-  could lead to requests on reverse proxy TLS connections being sent
-  in plain text, and might allow faking requests in plain text.
+  connection (commit 72b669eae8c45dda1850e8e5b30a97c918357b51). The
+  previous behavior could lead to requests on reverse proxy TLS
+  connections being sent in plain text, and might have allowed faking
+  requests in plain text.
 - Security fix: Reject HTTP requests if they try to access virtual
   hosts that do not match their TLS connections (commit
   de3fad3c12f53cdbf082ad675e4b10f521a02811). Additionally check if SNI
-  and Host header match.
+  and Host header match. Thanks to Krista Karppinen for contributing
+  tests!
 - OCSP stapling is now enabled by default, if possible. OCSP responses
   are updated regularly and stored in a cache separate from the
   session cache. The OCSP cache uses mod_socache_shmcb by default
