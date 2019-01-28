@@ -2,7 +2,7 @@ EXTRA_DIST = \
 	00_basic/apache.conf 00_basic/gnutls-cli.args 00_basic/input 00_basic/output \
 	01_serverwide_priorities/apache.conf 01_serverwide_priorities/gnutls-cli.args 01_serverwide_priorities/input 01_serverwide_priorities/output \
 	02_cache_in_vhost/apache.conf 02_cache_in_vhost/fail.server 02_cache_in_vhost/gnutls-cli.args 02_cache_in_vhost/input \
-	03_cachetimeout_in_vhost/apache.conf 03_cachetimeout_in_vhost/fail.server 03_cachetimeout_in_vhost/gnutls-cli.args 03_cachetimeout_in_vhost/input \
+	03_cachetimeout_in_vhost/apache.conf 03_cachetimeout_in_vhost/gnutls-cli.args 03_cachetimeout_in_vhost/input 03_cachetimeout_in_vhost/output \
 	04_basic_nosni/apache.conf 04_basic_nosni/gnutls-cli.args 04_basic_nosni/input 04_basic_nosni/output \
 	05_mismatched-priorities/apache.conf 05_mismatched-priorities/fail.client 05_mismatched-priorities/gnutls-cli.args 05_mismatched-priorities/input \
 	06_verify_sni_a/apache.conf 06_verify_sni_a/gnutls-cli.args 06_verify_sni_a/input 06_verify_sni_a/output \
@@ -13,9 +13,9 @@ EXTRA_DIST = \
 	11_basic_client_verification_fail/apache.conf 11_basic_client_verification_fail/fail.client 11_basic_client_verification_fail/gnutls-cli.args 11_basic_client_verification_fail/input \
 	12_cgi_variables/apache.conf 12_cgi_variables/gnutls-cli.args 12_cgi_variables/input 12_cgi_variables/output \
 	13_cgi_variables_no_client_cert/apache.conf 13_cgi_variables_no_client_cert/gnutls-cli.args 13_cgi_variables_no_client_cert/input 13_cgi_variables_no_client_cert/output \
-	14_basic_openpgp/apache.conf 14_basic_openpgp/gnutls-cli.args 14_basic_openpgp/input 14_basic_openpgp/output \
+	14_resume_session/apache.conf 14_resume_session/gnutls-cli.args 14_resume_session/input 14_resume_session/output \
 	15_basic_msva/apache.conf 15_basic_msva/gnutls-cli.args 15_basic_msva/input 15_basic_msva/output \
-	16_view-status/apache.conf 16_view-status/gnutls-cli.args 16_view-status/input 16_view-status/output \
+	16_view-status/apache.conf 16_view-status/gnutls-cli.args 16_view-status/input \
 	17_cgi_vars_large_cert/apache.conf 17_cgi_vars_large_cert/gnutls-cli.args 17_cgi_vars_large_cert/input 17_cgi_vars_large_cert/output \
 	18_client_verification_wrong_cert/apache.conf 18_client_verification_wrong_cert/gnutls-cli.args 18_client_verification_wrong_cert/input 18_client_verification_wrong_cert/output \
 	19_TLS_reverse_proxy/apache.conf 19_TLS_reverse_proxy/backend.conf 19_TLS_reverse_proxy/gnutls-cli.args 19_TLS_reverse_proxy/input 19_TLS_reverse_proxy/output \
@@ -25,4 +25,12 @@ EXTRA_DIST = \
 	23_TLS_reverse_proxy_mismatched_priorities/apache.conf 23_TLS_reverse_proxy_mismatched_priorities/backend.conf 23_TLS_reverse_proxy_mismatched_priorities/gnutls-cli.args 23_TLS_reverse_proxy_mismatched_priorities/input 23_TLS_reverse_proxy_mismatched_priorities/output \
 	24_pkcs11_cert/apache.conf 24_pkcs11_cert/gnutls-cli.args 24_pkcs11_cert/input 24_pkcs11_cert/output \
 	25_Disable_TLS_1.0/apache.conf 25_Disable_TLS_1.0/fail.client 25_Disable_TLS_1.0/gnutls-cli.args 25_Disable_TLS_1.0/input \
-	26_redirect_HTTP_to_HTTPS/apache.conf
+	26_redirect_HTTP_to_HTTPS/apache.conf \
+	27_OCSP_server/apache.conf 27_OCSP_server/gnutls-cli.args 27_OCSP_server/input 27_OCSP_server/ocsp.conf 27_OCSP_server/output \
+	28_HTTP2_support/apache.conf \
+	29_force_handshake_vhost/apache.conf 29_force_handshake_vhost/gnutls-cli.args 29_force_handshake_vhost/input 29_force_handshake_vhost/output \
+	30_ip_based_vhosts/apache.conf 30_ip_based_vhosts/gnutls-cli.args 30_ip_based_vhosts/input 30_ip_based_vhosts/output 31_vhost_SNI_serveralias_match \
+	31_vhost_SNI_serveralias_match/gnutls-cli.args 31_vhost_SNI_serveralias_match/input 31_vhost_SNI_serveralias_match/apache.conf 31_vhost_SNI_serveralias_match/output \
+	32_vhost_SNI_serveralias_mismatch/gnutls-cli.args 32_vhost_SNI_serveralias_mismatch/input 32_vhost_SNI_serveralias_mismatch/apache.conf 32_vhost_SNI_serveralias_mismatch/output \
+	33_vhost_SNI_serveralias_missinghost/gnutls-cli.args 33_vhost_SNI_serveralias_missinghost/input 33_vhost_SNI_serveralias_missinghost/apache.conf 33_vhost_SNI_serveralias_missinghost/output \
+	34_TLS_reverse_proxy_h2/apache.conf 34_TLS_reverse_proxy_h2/backend.conf 34_TLS_reverse_proxy_h2/gnutls-cli.args 34_TLS_reverse_proxy_h2/input 34_TLS_reverse_proxy_h2/output

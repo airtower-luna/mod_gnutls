@@ -10,23 +10,17 @@ netns_reexec ${@}
 
 testdir="${srcdir}/tests/26_redirect_HTTP_to_HTTPS"
 TEST_NAME="$(basename ${testdir})"
-. $(dirname ${0})/proxy_backend.bash
+. $(dirname ${0})/apache_service.bash
 
 : ${TEST_HTTP_PORT:="9935"}
 export TEST_HTTP_PORT
 
-# "Proxy backend" functions are used to start the only instance needed
-# here without "runtests". We have to override BACKEND_PID and
-# BACKEND_PORT to make them match what a runtests-based test would
-# use.
-export BACKEND_PID="apache2.pid"
-export BACKEND_PORT="${TEST_PORT}"
-function stop_backend
+function stop_server
 {
-    backend_apache "${testdir}" "apache.conf" stop
+    apache_service "${testdir}" "apache.conf" stop
 }
-backend_apache "${testdir}" "apache.conf" start "${TEST_LOCK}"
-trap stop_backend EXIT
+apache_service "${testdir}" "apache.conf" start "${TEST_LOCK}"
+trap stop_server EXIT
 
 output="outputs/${TEST_NAME}.output"
 rm -f "$output"
@@ -34,7 +28,8 @@ rm -f "$output"
 # Send status request over HTTP. This should get redirected to HTTPS.
 URL="http://${TEST_HOST}:${TEST_HTTP_PORT}/status?auto"
 if [ "$(basename ${HTTP_CLI})" = "curl" ]; then
-    ${HTTP_CLI} --location --cacert authority/x509.pem "${URL}" >"${output}"
+    ${HTTP_CLI} --location --verbose --cacert authority/x509.pem "${URL}" \
+		>"${output}"
 elif [ "$(basename ${HTTP_CLI})" = "wget" ]; then
     ${HTTP_CLI} --ca-certificate=authority/x509.pem -O "${output}" "${URL}"
 else
@@ -46,5 +41,5 @@ fi
 # used ciphersuite.
 grep "Current TLS session: (TLS" "${output}"
 
-backend_apache "${testdir}" "apache.conf" stop
+stop_server
 trap - EXIT

@@ -1,5 +1,4 @@
-dnl 
-AC_INIT(mod_gnutls, 0.7.3)
+AC_INIT(mod_gnutls, 0.9.0)
 OOO_CONFIG_NICE(config.nice)
 MOD_GNUTLS_VERSION=AC_PACKAGE_VERSION
 AC_PREREQ(2.53)
@@ -13,6 +12,8 @@ AC_CANONICAL_TARGET
 AM_INIT_AUTOMAKE([-Wno-portability])
 AM_CONFIG_HEADER(include/mod_gnutls_config.h:config.in)
 
+LT_INIT([disable-static])
+
 AC_SUBST(MOD_GNUTLS_VERSION)
 
 AC_PROG_CC
@@ -23,15 +24,39 @@ AC_PROG_LIBTOOL
 
 AC_CONFIG_MACRO_DIR([m4])
 
-AP_VERSION=2.2.0
+AP_VERSION=2.4.17
 CHECK_APACHE(,$AP_VERSION,
     :,:,
     AC_MSG_ERROR([*** Apache version $AP_VERSION not found!])
 )
 
-PKG_CHECK_MODULES([LIBGNUTLS], [gnutls >= 3.1.4])
+dnl Maybe use the binaries for tests, too?
+AC_ARG_WITH([gnutls-dev],
+	AS_HELP_STRING([--with-gnutls-dev=DIR],
+		[Use GnuTLS libraries from a development (git) tree. Use \
+		this if you want to test mod_gnutls with the latest \
+		GnuTLS code.]),
+	[
+		AS_IF([test -d "${with_gnutls_dev}" ],
+		[
+			LIBGNUTLS_CFLAGS="-I${with_gnutls_dev}/lib/includes"
+			LIBGNUTLS_LIBS="-lgnutls -L${with_gnutls_dev}/lib/.libs -R${with_gnutls_dev}/lib/.libs"
+		],
+		[AC_MSG_ERROR([--with-gnutls-dev=DIR requires a directory!])])
+	], [])
+
+PKG_CHECK_MODULES([LIBGNUTLS], [gnutls >= 3.3.0])
 
 LIBGNUTLS_VERSION=`pkg-config --modversion gnutls`
+
+AC_ARG_ENABLE(vpath-install,
+       AS_HELP_STRING([--enable-vpath-install],
+               [Modify the Apache module directory provided by apxs to \
+	       follow --prefix, if necessary. Most users will not want this, \
+	       but it is required for VPATH builds including "make \
+	       distcheck".]),
+       vpath_install=$enableval, vpath_install=no)
+AM_CONDITIONAL([ENABLE_VPATH_INSTALL], [test "$vpath_install" = "yes"])
 
 AC_ARG_ENABLE(srp,
        AS_HELP_STRING([--disable-srp],
@@ -41,10 +66,25 @@ AC_ARG_ENABLE(srp,
 # check if the available GnuTLS library supports SRP
 AC_SEARCH_LIBS([gnutls_srp_server_get_username], [gnutls], [], [use_srp="no"])
 
-SRP_CFLAGS=""
+GNUTLS_FEAT_CFLAGS=""
 if test "$use_srp" != "no"; then
-	SRP_CFLAGS="-DENABLE_SRP=1"
+	GNUTLS_FEAT_CFLAGS="-DENABLE_SRP=1"
 fi
+
+# check if the available GnuTLS library supports raw extension parsing
+AC_SEARCH_LIBS([gnutls_ext_raw_parse], [gnutls], [early_sni="yes"],
+	[early_sni="no"])
+if test "$early_sni" != "no"; then
+	ENABLE_EARLY_SNI=1
+	# This is for the test server configuration
+	EXPECT_EARLY_SNI="Define EXPECT_EARLY_SNI"
+else
+	ENABLE_EARLY_SNI=0
+	EXPECT_EARLY_SNI=""
+fi
+AC_SUBST(ENABLE_EARLY_SNI)
+AC_SUBST(EXPECT_EARLY_SNI)
+AM_SUBST_NOTMAKE(EXPECT_EARLY_SNI)
 
 AC_ARG_ENABLE(strict,
        AS_HELP_STRING([--disable-strict],
@@ -53,7 +93,7 @@ AC_ARG_ENABLE(strict,
 
 STRICT_CFLAGS=""
 if test "$use_strict" != "no"; then
-        STRICT_CFLAGS="-Wall -Werror -Wextra"
+	STRICT_CFLAGS="-Wall -Werror -Wextra -Wno-error=deprecated-declarations"
 fi
 
 AC_MSG_CHECKING([whether to enable SRP functionality])
@@ -72,28 +112,61 @@ AS_IF([test "${FLOCK}" != "no"],
 	lockfile="$(mktemp)"
 	AS_IF([${FLOCK} --timeout 1 ${lockfile} true >&AS_MESSAGE_LOG_FD 2>&1],
 	      [flock_works="yes"], [flock_works="no"])
-	rm "${lockfile}"
 	AC_MSG_RESULT([$flock_works])
+	# Old versions of flock do not support --verbose. They fail
+	# without executing the command but still return 0. Check for
+	# this behavior by testing if the rm command was executed.
+	AC_MSG_CHECKING([whether ${FLOCK} supports --verbose])
+	testfile="$(mktemp)"
+	AS_IF([${FLOCK} --verbose --timeout 1 ${lockfile} rm "${testfile}" \
+			>&AS_MESSAGE_LOG_FD 2>&1; test ! -e "${testfile}"],
+	      [flock_verbose="yes"; FLOCK="${FLOCK} --verbose"],
+	      [flock_verbose="no"; rm "${testfile}"])
+	AC_MSG_RESULT([$flock_verbose])
+	rm "${lockfile}"
       ],
       [flock_works="no"])
 # disable flock if requested by user or it doesn't support timeout
 AM_CONDITIONAL([DISABLE_FLOCK],
 	       [test "$enable_flock" = "no" || test "$flock_works" = "no"])
 
+# openssl is needed as the responder for OCSP tests
+AC_PATH_PROG([OPENSSL], [openssl], [no])
+# OCSP checks with gnutls-cli from GnuTLS versions before 3.3.23,
+# 3.4.12, or 3.5.1 (on the respective 3.x branch) fail if intermediate
+# CAs cannot be status checked, even if there are no intermediate CAs
+# like in the mod_gnutls test suite where end entity certificates are
+# directly issued by a root CA.
+AC_MSG_CHECKING([for gnutls-cli version supporting OCSP for EE under root CA])
+AC_PREPROC_IFELSE(
+	[AC_LANG_SOURCE([[#include "gnutls/gnutls.h"
+			#if GNUTLS_VERSION_NUMBER < 0x030317
+			#error
+			#elif GNUTLS_VERSION_NUMBER >= 0x030400 && GNUTLS_VERSION_NUMBER < 0x03040c
+			#error
+			#elif GNUTLS_VERSION_NUMBER == 0x030500
+			#error
+			#endif
+			]])],
+	[gnutls_ocsp_ok="yes"],
+	[gnutls_ocsp_ok="no"],
+)
+AC_MSG_RESULT([$gnutls_ocsp_ok])
+AM_CONDITIONAL([ENABLE_OCSP_TEST], [test "${OPENSSL}" != "no" && test "${gnutls_ocsp_ok}" = "yes"])
+
 dnl Enable test namespaces? Default is "yes".
 AC_ARG_ENABLE(test-namespaces,
-	AS_HELP_STRING([--disable-test-namespaces], [Disable use of network \
-	namespaces to run tests in parallel (some architectures might not \
-	support it)]),
+	AS_HELP_STRING([--disable-test-namespaces], [Disable use of \
+	namespaces for tests (limits parallelization)]),
 	[use_netns=$enableval], [use_netns=yes])
 
-# Check if "unshare" is available and has permission to create network
-# and user namespaces
+# Check if "unshare" is available and has permission to create
+# network, IPC, and user namespaces
 AC_PATH_PROG([UNSHARE], [unshare], [no])
 AS_IF([test "${UNSHARE}" != "no"],
       [
-	AC_MSG_CHECKING([for permission to create network and user namespaces])
-	AS_IF([${UNSHARE} --net -r /bin/sh -c \
+	AC_MSG_CHECKING([for permission to use namespaces])
+	AS_IF([${UNSHARE} --net --ipc -r /bin/sh -c \
 		"ip link set up lo && ip addr show" >&AS_MESSAGE_LOG_FD 2>&1],
 	      [unshare_works="yes"], [unshare_works="no"])
 	AC_MSG_RESULT([$unshare_works])
@@ -107,11 +180,11 @@ AM_CONDITIONAL([ENABLE_NETNS], [test "$use_netns" != "no"])
 # Adjust Apache configuration for tests accordingly: Use pthread mutex
 # and test specific PID files if using namespaces, defaults otherwise.
 AS_IF([test "$use_netns" = "yes"],
-      [MUTEX_TYPE="pthread"; PID_AFFIX="-\${TEST_NAME}"],
-      [MUTEX_TYPE="default"; PID_AFFIX=""])
-AC_SUBST(MUTEX_TYPE)
+      [MUTEX_CONF="Mutex pthread default"; PID_AFFIX="-\${TEST_NAME}"],
+      [MUTEX_CONF=""; PID_AFFIX=""])
+AC_SUBST(MUTEX_CONF)
 AC_SUBST(PID_AFFIX)
-AM_SUBST_NOTMAKE(MUTEX_TYPE)
+AM_SUBST_NOTMAKE(MUTEX_CONF)
 AM_SUBST_NOTMAKE(PID_AFFIX)
 
 AC_ARG_ENABLE(msva,
@@ -132,10 +205,6 @@ fi
 AC_MSG_CHECKING([whether to enable MSVA functionality])
 AC_MSG_RESULT($use_msva)
 
-have_apr_memcache=0
-CHECK_APR_MEMCACHE([have_apr_memcache=1], [have_apr_memcache=0])
-AC_SUBST(have_apr_memcache)
-
 # Building documentation requires pandoc, which in turn needs pdflatex
 # to build PDF output.
 build_doc=no
@@ -143,9 +212,9 @@ AC_PATH_PROG([PANDOC], [pandoc], [no])
 if test "$PANDOC" != "no"; then
 	AC_PATH_PROG([PDFLATEX], [pdflatex], [no])
 	if test "$PDFLATEX" != "no"; then
-		build_doc=yes
+		build_doc="html, manual page, pdf"
 	else
-		build_doc="html only"
+		build_doc="html, manual page"
 	fi
 else
 	AC_PATH_PROG([MARKDOWN], [markdown], [no])
@@ -168,8 +237,20 @@ fi
 
 AC_PATH_PROGS([HTTP_CLI], [curl wget], [no])
 
-MODULE_CFLAGS="${LIBGNUTLS_CFLAGS} ${SRP_CFLAGS} ${MSVA_CFLAGS} ${APR_MEMCACHE_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES} ${STRICT_CFLAGS}"
-MODULE_LIBS="${APR_MEMCACHE_LIBS} ${LIBGNUTLS_LIBS}"
+MODULE_CFLAGS="${LIBGNUTLS_CFLAGS} ${GNUTLS_FEAT_CFLAGS} ${MSVA_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES} ${STRICT_CFLAGS}"
+MODULE_LIBS="${LIBGNUTLS_LIBS}"
+
+AC_PATH_PROGS([SOFTHSM], [softhsm2-util softhsm], [no])
+if test "${SOFTHSM}" != "no"; then
+	softhsm_version=$(${SOFTHSM} --version)
+	AS_VERSION_COMPARE([$(${SOFTHSM} --version)], [2.0.0],
+			   [AC_SUBST(SOFTHSM_MAJOR_VERSION, [1])],
+			   [AC_SUBST(SOFTHSM_MAJOR_VERSION, [2])],
+			   [AC_SUBST(SOFTHSM_MAJOR_VERSION, [2])])
+fi
+AM_CONDITIONAL([HAVE_SOFTHSM], [test "${SOFTHSM}" != "no"])
+AM_CONDITIONAL([HAVE_SOFTHSM1], [test "${SOFTHSM_MAJOR_VERSION}" = "1"])
+AM_CONDITIONAL([HAVE_SOFTHSM2], [test "${SOFTHSM_MAJOR_VERSION}" = "2"])
 
 AC_SUBST(MODULE_CFLAGS)
 AC_SUBST(MODULE_LIBS)
@@ -184,29 +265,57 @@ AC_ARG_VAR([TEST_IP], [List of IP addresses to use for server instances \
 		      started by "make check". The default is \
 		      "[::1] 127.0.0.1". Note that IPv6 addresses must be \
 		      enclosed in square brackets.])
-AM_SUBST_NOTMAKE(TEST_IP)
+
+: ${TEST_LOCK_WAIT:="30"}
+: ${TEST_QUERY_TIMEOUT:="30"}
+AC_ARG_VAR([TEST_LOCK_WAIT], [Timeout in seconds to acquire locks for \
+			     Apache instances in the test suite, or the \
+			     previous instance to remove its PID file if \
+			     flock is not used. Default is 30.])
+AC_ARG_VAR([TEST_QUERY_TIMEOUT], [Timeout in seconds for HTTPS requests \
+				 sent using gnutls-cli in the test suite. \
+				 Default is 30.])
+
+dnl Allow user to set SoftHSM PKCS #11 module
+AC_ARG_VAR([SOFTHSM_LIB], [Absolute path of the SoftHSM PKCS @%:@11 module to \
+			  use. By default the test suite will search common \
+			  library paths.])
 
 dnl Build list of "Listen" statements for Apache
-LISTEN_LIST="# Listen addresses for the test servers"
+LISTEN_LIST="@%:@ Listen addresses for the test servers"
 for i in ${TEST_IP}; do
 	LISTEN_LIST="${LISTEN_LIST}
 Listen ${i}:\${TEST_PORT}"
 done
-dnl HTTP ports, only active if TEST_HTTP_PORT is defined
+# Available extra ports, tests can "Define" variables of the listed
+# names in their apache.conf to enable them.
+for j in TEST_HTTP_PORT; do
 LISTEN_LIST="${LISTEN_LIST}
-<IfDefine TEST_HTTP_PORT>"
+<IfDefine ${j}>"
 for i in ${TEST_IP}; do
 	LISTEN_LIST="${LISTEN_LIST}
-	Listen ${i}:\${TEST_HTTP_PORT}"
+	Listen ${i}:\${${j}}"
 done
 LISTEN_LIST="${LISTEN_LIST}
 </IfDefine>"
+done
 AC_SUBST(LISTEN_LIST)
 AM_SUBST_NOTMAKE(LISTEN_LIST)
 
+DX_DOXYGEN_FEATURE(ON)
+DX_DOT_FEATURE(ON)
+DX_HTML_FEATURE(ON)
+DX_MAN_FEATURE(OFF)
+DX_RTF_FEATURE(OFF)
+DX_XML_FEATURE(OFF)
+DX_PDF_FEATURE(OFF)
+DX_PS_FEATURE(OFF)
+DX_INIT_DOXYGEN([mod_gnutls], [doc/doxygen.conf], [doc/api])
+
 AC_CONFIG_FILES([Makefile src/Makefile test/Makefile test/tests/Makefile \
-			doc/Makefile include/mod_gnutls.h \
-			test/proxy_backend.conf \
+			doc/Makefile doc/doxygen.conf include/mod_gnutls.h \
+			test/proxy_backend.conf test/ocsp_server.conf \
+			test/apache-conf/early_sni.conf \
 			test/apache-conf/listen.conf \
 			test/apache-conf/netns.conf])
 AC_OUTPUT
@@ -217,8 +326,11 @@ echo ""
 echo "   * mod_gnutls version:	${MOD_GNUTLS_VERSION}"
 echo "   * Apache Modules directory:	${AP_LIBEXECDIR}"
 echo "   * GnuTLS Library version:	${LIBGNUTLS_VERSION}"
+echo "   * CFLAGS for GnuTLS:		${LIBGNUTLS_CFLAGS}"
+echo "   * LDFLAGS for GnuTLS:	${LIBGNUTLS_LIBS}"
 echo "   * SRP Authentication:	${use_srp}"
 echo "   * MSVA Client Verification:	${use_msva}"
+echo "   * Early SNI:			${early_sni}"
 echo "   * Build documentation:	${build_doc}"
 echo ""
 echo "---"

@@ -18,6 +18,65 @@ function wait_pid_gone
 
 
 
+# Usage: verbose_log [...]
+#
+# If VERBOSE is not empty, write a log message prefixed with the name
+# of the calling function. The function is defined to a no-op
+# otherwise.
+if [ -n "${VERBOSE}" ]; then
+    function verbose_log
+    {
+	echo "${FUNCNAME[1]}: ${@}"
+    }
+else
+    function verbose_log
+    {
+	return
+    }
+fi
+
+
+
+# Usage: wait_ready COMMAND [TIMEOUT] [STEP]
+#
+# Wait until COMMAND terminates with success (zero exit code), or
+# until the TIMEOUT (in milliseconds) expires. TIMEOUT defaults to
+# $TEST_SERVICE_MAX_WAIT if unset. A TIMEOUT of zero means to try
+# once.
+#
+# COMMAND is retried every STEP milliseconds, the default is
+# $TEST_SERVICE_WAIT. Note that the last try may happen a little after
+# TIMEOUT expires if STEP does not evenly divide it.
+function wait_ready
+{
+    local command="${1}"
+    if [ -z "${2}" ]; then
+	local -i timeout="${TEST_SERVICE_MAX_WAIT}"
+    else
+	local -i timeout="${2}"
+    fi
+    local -i step="${3}"
+    [ ${step} -gt 0 ] || step="${TEST_SERVICE_WAIT}"
+    # convert step to seconds because that's what "sleep" needs
+    local sec_step="$((${step} / 1000)).$((${step} % 1000))"
+
+    verbose_log "Waiting for \"${command}\" ..."
+    local -i waited=0
+    until eval "${command}"; do
+	if [ "${waited}" -ge "${timeout}" ]; then
+	    echo "${FUNCNAME[0]}: Timed out waiting for \"${command}\"" \
+		 "to succeed (waited ${waited} ms)." >&2
+	    return 1
+	fi
+	waited=$((waited + step));
+	sleep "${sec_step}"
+	verbose_log "waiting (${waited} ms)"
+    done
+    verbose_log "done (waited ${waited} ms)"
+}
+
+
+
 # Usage: netns_reexec ${@}
 #
 # If USE_TEST_NAMESPACE is set and MGS_NETNS_ACTIVE is not, exec the
@@ -36,8 +95,33 @@ function wait_pid_gone
 function netns_reexec
 {
     if [ -n "${USE_TEST_NAMESPACE}" ] && [ -z "${MGS_NETNS_ACTIVE}" ]; then
-	exec "${UNSHARE}" --net -r /bin/bash -c \
+	exec "${UNSHARE}" --net --ipc -r /bin/bash -c \
 	     "export MGS_NETNS_ACTIVE=1; ip link set up lo; exec ${UNSHARE} --user ${0} ${@}"
     fi
     return 0
+}
+
+# Usage: require_gnutls_cli ${REQUIRED_VERSION_NUMBER} || exit ${ERROR_CODE}
+# Require the gnutls-cli binary to be of a given version or newer.
+# Return error code 1 if older, 2 if not found.
+function require_gnutls_cli
+{
+    local required_version=(${1//./ })
+
+    if [[ $(gnutls-cli --version) =~ gnutls-cli[[:space:]]([[:digit:]]+)\.([[:digit:]]+)\.([[:digit:]]+) ]]
+    then
+        for i in {0..2}
+        do
+            if [ ${BASH_REMATCH[i+1]} -gt ${required_version[i]} ]
+            then
+                break;
+            elif [ ${BASH_REMATCH[i+1]} -lt ${required_version[i]} ]
+            then
+                return 1
+            fi
+        done
+        return 0
+    else
+        return 2
+    fi
 }

@@ -1,7 +1,8 @@
-EXTRA_DIST = mod_gnutls_manual.mdwn
+EXTRA_DIST = mod_gnutls_manual.mdwn mod_gnutls_manual.yaml.in
 
 if USE_PANDOC
 html_DATA = mod_gnutls_manual.html
+man3_MANS = mod_gnutls_manual.man
 if USE_PDFLATEX
 # pandoc && pdflatex
 pdf_DATA = mod_gnutls_manual.pdf
@@ -13,10 +14,22 @@ html_DATA = mod_gnutls_manual.html
 endif
 endif
 
-MOSTLYCLEANFILES = $(html_DATA) $(pdf_DATA)
+MOSTLYCLEANFILES = $(html_DATA) $(pdf_DATA) $(man3_MANS)
 
-# pdf_DATA will be empty if pandoc isn't available
-$(html_DATA) $(pdf_DATA): mod_gnutls_manual.mdwn
+%.yaml: %.yaml.in
+	sed -e s/__MOD_GNUTLS_VERSION__/@MOD_GNUTLS_VERSION@/ < $< > $@
+
+if USE_PANDOC
+%.man: %.mdwn %.yaml
+	$(PANDOC) --standalone -f markdown -t man -o $@ $^
+
+if USE_PDFLATEX
+%.pdf: %.mdwn
+	$(PANDOC) --toc -f markdown -o $@ $<
+endif
+endif
+
+%.html: %.mdwn
 if USE_PANDOC
 	$(PANDOC) --toc --standalone -f markdown -o $@ $<
 else

@@ -1,2 +1,2 @@
 --x509cafile=authority/x509.pem
---priority=NORMAL:-VERS-TLS1.2:-VERS-TLS1.1
+--priority=NORMAL:-VERS-TLS-ALL:+VERS-TLS1.0

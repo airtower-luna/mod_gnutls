@@ -1,8 +1,8 @@
-/**
+/*
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2008, 2014 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
- *  Copyright 2015 Thomas Klute
+ *  Copyright 2015-2018 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -15,43 +15,63 @@
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- *
  */
 
 #include "mod_gnutls.h"
+#include "gnutls_config.h"
+#include "gnutls_ocsp.h"
+#include "gnutls_util.h"
+
+#include <apr_strings.h>
 
 #ifdef APLOG_USE_MODULE
 APLOG_USE_MODULE(gnutls);
 #endif
 
+int ssl_engine_set(conn_rec *c,
+                   ap_conf_vector_t *dir_conf __attribute__((unused)),
+                   int proxy, int enable);
+
+#define MOD_HTTP2 "mod_http2.c"
+#define MOD_WATCHDOG "mod_watchdog.c"
+static const char * const mod_proxy[] = { "mod_proxy.c", NULL };
+static const char * const mod_http2[] = { MOD_HTTP2, NULL };
+static const char * const mod_watchdog[] = { MOD_WATCHDOG, NULL };
+
 static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
 {
-    /* Try Run Post-Config Hook After mod_proxy */
-    static const char * const aszPre[] = { "mod_proxy.c", NULL };
-    ap_hook_post_config(mgs_hook_post_config, aszPre, NULL,
-                        APR_HOOK_REALLY_LAST);
+    /* Watchdog callbacks must be configured before post_config of
+     * mod_watchdog runs, or the watchdog won't be started. Similarly,
+     * our child_init hook must run before mod_watchdog's because our
+     * watchdog threads are started there and need some child-specific
+     * resources. */
+    static const char * const post_conf_succ[] =
+        { MOD_HTTP2, MOD_WATCHDOG, NULL };
+    ap_hook_post_config(mgs_hook_post_config, mod_proxy, post_conf_succ,
+                        APR_HOOK_MIDDLE);
     /* HTTP Scheme Hook */
-#if USING_2_1_RECENT
     ap_hook_http_scheme(mgs_hook_http_scheme, NULL, NULL, APR_HOOK_MIDDLE);
-#else
-    ap_hook_http_method(mgs_hook_http_scheme, NULL, NULL, APR_HOOK_MIDDLE);
-#endif
     /* Default Port Hook */
     ap_hook_default_port(mgs_hook_default_port, NULL, NULL, APR_HOOK_MIDDLE);
     /* Pre-Connect Hook */
-    ap_hook_pre_connection(mgs_hook_pre_connection, NULL, NULL,
+    ap_hook_pre_connection(mgs_hook_pre_connection, mod_http2, NULL,
                            APR_HOOK_MIDDLE);
+    ap_hook_process_connection(mgs_hook_process_connection,
+                               NULL, mod_http2, APR_HOOK_MIDDLE);
     /* Pre-Config Hook */
     ap_hook_pre_config(mgs_hook_pre_config, NULL, NULL,
                        APR_HOOK_MIDDLE);
     /* Child-Init Hook */
-    ap_hook_child_init(mgs_hook_child_init, NULL, NULL,
+    ap_hook_child_init(mgs_hook_child_init, NULL, mod_watchdog,
                        APR_HOOK_MIDDLE);
     /* Authentication Hook */
     ap_hook_access_checker(mgs_hook_authz, NULL, NULL,
                            APR_HOOK_REALLY_FIRST);
     /* Fixups Hook */
     ap_hook_fixups(mgs_hook_fixups, NULL, NULL, APR_HOOK_REALLY_FIRST);
+
+    /* Request hook: Check if TLS connection and request host match */
+    ap_hook_post_read_request(mgs_req_vhost_check, NULL, NULL, APR_HOOK_MIDDLE);
 
     /* TODO: HTTP Upgrade Filter */
     /* ap_register_output_filter ("UPGRADE_FILTER",
@@ -68,23 +88,49 @@ static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
     /* mod_proxy calls these functions */
     APR_REGISTER_OPTIONAL_FN(ssl_proxy_enable);
     APR_REGISTER_OPTIONAL_FN(ssl_engine_disable);
+    APR_REGISTER_OPTIONAL_FN(ssl_engine_set);
 
     /* mod_rewrite calls this function to detect HTTPS */
     APR_REGISTER_OPTIONAL_FN(ssl_is_https);
+    /* some modules look up TLS-related variables */
+    APR_REGISTER_OPTIONAL_FN(ssl_var_lookup);
 }
 
 
 
-/*
- * mod_rewrite calls this function to fill %{HTTPS}. A non-zero return
- * value means that HTTPS is in use.
+/**
+ * Get the connection context, resolving to a master connection if
+ * any.
+ *
+ * @param c the connection handle
+ *
+ * @return mod_gnutls session context, might be `NULL`
+ */
+mgs_handle_t* get_effective_gnutls_ctxt(conn_rec *c)
+{
+    mgs_handle_t *ctxt = (mgs_handle_t *)
+        ap_get_module_config(c->conn_config, &gnutls_module);
+    if (!(ctxt != NULL && ctxt->enabled) && (c->master != NULL))
+    {
+        ctxt = (mgs_handle_t *)
+            ap_get_module_config(c->master->conn_config, &gnutls_module);
+    }
+    return ctxt;
+}
+
+
+
+/**
+ * mod_rewrite calls this function to fill %{HTTPS}.
+ *
+ * @param c the connection to check
+ * @return non-zero value if HTTPS is in use, zero if not
  */
 int ssl_is_https(conn_rec *c)
 {
+    mgs_handle_t *ctxt = get_effective_gnutls_ctxt(c);
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(c->base_server->module_config, &gnutls_module);
-    mgs_handle_t *ctxt = (mgs_handle_t *)
-        ap_get_module_config(c->conn_config, &gnutls_module);
 
     if(sc->enabled == GNUTLS_ENABLED_FALSE
        || ctxt == NULL
@@ -99,58 +145,114 @@ int ssl_is_https(conn_rec *c)
 
 
 
-int ssl_engine_disable(conn_rec *c)
+/**
+ * Return variables describing the current TLS session (if any).
+ *
+ * mod_ssl doc for this function: "This function must remain safe to
+ * use for a non-SSL connection." mod_http2 uses it to check if an
+ * acceptable TLS session is used.
+ */
+char* ssl_var_lookup(apr_pool_t *p, server_rec *s __attribute__((unused)),
+                     conn_rec *c, request_rec *r, char *var)
 {
-    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
-        ap_get_module_config(c->base_server->module_config, &gnutls_module);
-    if(sc->enabled == GNUTLS_ENABLED_FALSE) {
-        return 1;
+    /*
+     * When no pool is given try to find one
+     */
+    if (p == NULL) {
+        if (r != NULL)
+            p = r->pool;
+        else if (c != NULL)
+            p = c->pool;
+        else
+            return NULL;
     }
 
-    /* disable TLS for this connection */
-    mgs_handle_t *ctxt = (mgs_handle_t *)
-        ap_get_module_config(c->conn_config, &gnutls_module);
-    if (ctxt == NULL)
+    if (strcmp(var, "HTTPS") == 0)
     {
-        ctxt = apr_pcalloc(c->pool, sizeof (*ctxt));
-        ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
+        if (c != NULL && ssl_is_https(c))
+            return "on";
+        else
+            return "off";
     }
-    ctxt->enabled = GNUTLS_ENABLED_FALSE;
-    ctxt->is_proxy = GNUTLS_ENABLED_TRUE;
 
-    if (c->input_filters)
-        ap_remove_input_filter(c->input_filters);
-    if (c->output_filters)
-        ap_remove_output_filter(c->output_filters);
+    mgs_handle_t *ctxt = get_effective_gnutls_ctxt(c);
+
+    /* TLS parameters are empty if there is no session */
+    if (ctxt == NULL || ctxt->c == NULL)
+        return NULL;
+
+    if (strcmp(var, "SSL_PROTOCOL") == 0)
+        return apr_pstrdup(p, gnutls_protocol_get_name(gnutls_protocol_get_version(ctxt->session)));
+
+    if (strcmp(var, "SSL_CIPHER") == 0)
+        return apr_pstrdup(p, gnutls_cipher_suite_get_name(gnutls_kx_get(ctxt->session),
+                                                           gnutls_cipher_get(ctxt->session),
+                                                           gnutls_mac_get(ctxt->session)));
+
+    /* mod_ssl supports a LOT more variables */
+    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, c,
+                  "unsupported variable requested: '%s'",
+                  var);
+
+    return NULL;
+}
+
+
+
+/**
+ * In Apache versions from 2.4.33 mod_proxy uses this function to set
+ * up its client connections. Note that mod_gnutls does not (yet)
+ * implement per directory configuration for such connections.
+ *
+ * @param c the connection
+ * @param dir_conf per directory configuration, unused for now
+ * @param proxy Is this a proxy connection?
+ * @param enable Should TLS be enabled on this connection?
+ *
+ * @param `true` (1) if successful, `false` (0) otherwise
+ */
+int ssl_engine_set(conn_rec *c,
+                   ap_conf_vector_t *dir_conf __attribute__((unused)),
+                   int proxy, int enable)
+{
+    mgs_handle_t *ctxt = init_gnutls_ctxt(c);
+
+    /* If TLS proxy has been requested, check if support is enabled
+     * for the server */
+    if (proxy && (ctxt->sc->proxy_enabled != GNUTLS_ENABLED_TRUE))
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
+                      "%s: mod_proxy requested TLS proxy, but not enabled "
+                      "for %s:%d", __func__,
+                      ctxt->c->base_server->server_hostname,
+                      ctxt->c->base_server->addrs->host_port);
+        return 0;
+    }
+
+    if (proxy)
+        ctxt->is_proxy = GNUTLS_ENABLED_TRUE;
+    else
+        ctxt->is_proxy = GNUTLS_ENABLED_FALSE;
+
+    if (enable)
+        ctxt->enabled = GNUTLS_ENABLED_TRUE;
+    else
+        ctxt->enabled = GNUTLS_ENABLED_FALSE;
 
     return 1;
+}
+
+int ssl_engine_disable(conn_rec *c)
+{
+    return ssl_engine_set(c, NULL, 0, 0);
 }
 
 int ssl_proxy_enable(conn_rec *c)
 {
-    /* check if TLS proxy support is enabled */
-    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
-        ap_get_module_config(c->base_server->module_config, &gnutls_module);
-    if (sc->proxy_enabled != GNUTLS_ENABLED_TRUE)
-    {
-        ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
-                      "%s: mod_proxy requested TLS proxy, but not enabled "
-                      "for %s", __func__, sc->cert_cn);
-        return 0;
-    }
-
-    /* enable TLS for this connection */
-    mgs_handle_t *ctxt = (mgs_handle_t *)
-        ap_get_module_config(c->conn_config, &gnutls_module);
-    if (ctxt == NULL)
-    {
-        ctxt = apr_pcalloc(c->pool, sizeof (*ctxt));
-        ap_set_module_config(c->conn_config, &gnutls_module, ctxt);
-    }
-    ctxt->enabled = GNUTLS_ENABLED_TRUE;
-    ctxt->is_proxy = GNUTLS_ENABLED_TRUE;
-    return 1;
+    return ssl_engine_set(c, NULL, 1, 1);
 }
+
+#define OPENPGP_REMOVED "OpenPGP support has been removed."
 
 static const command_rec mgs_config_cmds[] = {
     AP_INIT_FLAG("GnuTLSProxyEngine", mgs_set_proxy_engine,
@@ -185,10 +287,6 @@ static const command_rec mgs_config_cmds[] = {
     NULL,
     RSRC_CONF,
     "Set the CA File to verify Client Certificates"),
-    AP_INIT_TAKE1("GnuTLSPGPKeyringFile", mgs_set_keyring_file,
-    NULL,
-    RSRC_CONF,
-    "Set the Keyring File to verify Client Certificates"),
     AP_INIT_TAKE1("GnuTLSDHFile", mgs_set_dh_file,
     NULL,
     RSRC_CONF,
@@ -209,14 +307,6 @@ static const command_rec mgs_config_cmds[] = {
     NULL,
     RSRC_CONF,
     "TLS Server X509 Private Key file"),
-    AP_INIT_TAKE1("GnuTLSPGPCertificateFile", mgs_set_pgpcert_file,
-    NULL,
-    RSRC_CONF,
-    "TLS Server PGP Certificate file"),
-    AP_INIT_TAKE1("GnuTLSPGPKeyFile", mgs_set_pgpkey_file,
-    NULL,
-    RSRC_CONF,
-    "TLS Server PGP Private key file"),
 #ifdef ENABLE_SRP
     AP_INIT_TAKE1("GnuTLSSRPPasswdFile", mgs_set_srp_tpasswd_file,
     NULL,
@@ -228,14 +318,14 @@ static const command_rec mgs_config_cmds[] = {
     RSRC_CONF,
     "TLS Server SRP Parameters file"),
 #endif
-    AP_INIT_TAKE1("GnuTLSCacheTimeout", mgs_set_cache_timeout,
+    AP_INIT_TAKE1("GnuTLSCacheTimeout", mgs_set_timeout,
     NULL,
     RSRC_CONF,
     "Cache Timeout"),
     AP_INIT_TAKE12("GnuTLSCache", mgs_set_cache,
     NULL,
     RSRC_CONF,
-    "Cache Configuration"),
+    "Session Cache Configuration"),
     AP_INIT_FLAG("GnuTLSSessionTickets", mgs_set_tickets,
     NULL,
     RSRC_CONF,
@@ -274,7 +364,52 @@ static const command_rec mgs_config_cmds[] = {
     RSRC_CONF,
     "The priorities to enable for proxy connections (ciphers, key exchange, "
     "MACs, compression)."),
+    AP_INIT_FLAG("GnuTLSOCSPStapling", mgs_ocsp_stapling_enable,
+                 NULL, RSRC_CONF,
+                 "Enable OCSP stapling"),
+    AP_INIT_FLAG("GnuTLSOCSPAutoRefresh", mgs_set_ocsp_auto_refresh,
+                 NULL, RSRC_CONF,
+                 "Regularly refresh cached OCSP response independent "
+                 "of TLS handshakes?"),
+    AP_INIT_TAKE12("GnuTLSOCSPCache", mgs_set_cache,
+                   NULL,
+                   RSRC_CONF,
+                  "OCSP Cache Configuration"),
+    AP_INIT_FLAG("GnuTLSOCSPCheckNonce", mgs_set_ocsp_check_nonce,
+                 NULL, RSRC_CONF,
+                 "Check nonce in OCSP responses?"),
+    AP_INIT_TAKE1("GnuTLSOCSPResponseFile", mgs_store_ocsp_response_path,
+                  NULL, RSRC_CONF,
+                  "Read OCSP response for stapling from this file instead "
+                  "of sending a request over HTTP (must be updated "
+                  "externally)"),
+    AP_INIT_TAKE1("GnuTLSOCSPCacheTimeout", mgs_set_timeout,
+                  NULL, RSRC_CONF,
+                  "Cache timeout for OCSP responses"),
+    AP_INIT_TAKE1("GnuTLSOCSPFailureTimeout", mgs_set_timeout,
+                  NULL, RSRC_CONF,
+                  "Wait this many seconds before retrying a failed OCSP "
+                  "request"),
+    AP_INIT_TAKE1("GnuTLSOCSPFuzzTime", mgs_set_timeout,
+                  NULL, RSRC_CONF,
+                  "Update cached OCSP response up to this many seconds "
+                  "before it expires, if GnuTLSOCSPAutoRefresh is enabled."),
+    AP_INIT_TAKE1("GnuTLSOCSPSocketTimeout", mgs_set_timeout,
+                  NULL, RSRC_CONF,
+                  "Socket timeout for OCSP requests"),
+    AP_INIT_RAW_ARGS("GnuTLSPGPKeyringFile",
+                     ap_set_deprecated, NULL, OR_ALL, OPENPGP_REMOVED),
+    AP_INIT_RAW_ARGS("GnuTLSPGPCertificateFile",
+                     ap_set_deprecated, NULL, OR_ALL, OPENPGP_REMOVED),
+    AP_INIT_RAW_ARGS("GnuTLSPGPKeyFile",
+                     ap_set_deprecated, NULL, OR_ALL, OPENPGP_REMOVED),
+#ifdef __clang__
+    /* Workaround for this clang bug:
+     * https://llvm.org/bugs/show_bug.cgi?id=21689 */
+    {},
+#else
     { NULL },
+#endif
 };
 
 module AP_MODULE_DECLARE_DATA gnutls_module = {

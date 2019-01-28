@@ -1,0 +1,3 @@
+cn="Testing Authority OCSP Responder"
+signing_key
+ocsp_signing_key

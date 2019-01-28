@@ -1,6 +1,99 @@
-**TODO:
-- Handle Unclean Shutdowns
-- make session cache use generic apache caches
+** Version 0.9.0 (2019-01-23)
+- Security fix: Refuse to send or receive any data over a failed TLS
+  connection (commit 72b669eae8c45dda1850e8e5b30a97c918357b51). The
+  previous behavior could lead to requests on reverse proxy TLS
+  connections being sent in plain text, and might have allowed faking
+  requests in plain text.
+- Security fix: Reject HTTP requests if they try to access virtual
+  hosts that do not match their TLS connections (commit
+  de3fad3c12f53cdbf082ad675e4b10f521a02811). Additionally check if SNI
+  and Host header match. Thanks to Krista Karppinen for contributing
+  tests!
+- OCSP stapling is now enabled by default, if possible. OCSP responses
+  are updated regularly and stored in a cache separate from the
+  session cache. The OCSP cache uses mod_socache_shmcb by default
+  (if the module is loaded, no other configuration required).
+- Session tickets are now enabled by default if using GnuTLS 3.6.4 or
+  newer. GnuTLS 3.6.4 introduced automatic rotation for the used key,
+  and TLS 1.3 takes care of other reasons not to use tickets while
+  requiring them for session resumption. Note that there is currently
+  no mechanism to synchronize ticket keys across a cluster of servers.
+- The internal cache implementation has been replaced with
+  mod_socache. Users may need to update their GnuTLSCache settings and
+  load the appropriate socache modules.
+- ALPN (required for HTTP/2) now works correctly with different
+  "Protocols" directives between virtual hosts if building with GnuTLS
+  3.6.3 or newer. Older versions require identical "Protocols"
+  directives for overlapping virtual hosts. Thanks to Vincent Tamet
+  for the bug report!
+- ALPN is now supported for proxy connections, making HTTP/2 proxy
+  connections using mod_proxy_http2 possible.
+- GnuTLSPriorities is optional now and defaults to "NORMAL" if
+  missing. The same applies to GnuTLSProxyPriorities (if TLS proxy is
+  enabled).
+- The manual is now built as a manual page, too, if pandoc is
+  available.
+- OpenPGP support has been removed.
+- Don't require pem2openpgp for tests when building without MSVA
+  support.
+
+** Version 0.8.4 (2018-04-13)
+- Support Apache HTTPD 2.4.33 API for proxy TLS connections
+- Support TLS for HTTP/2 connections with mod_http2
+- Fix configuration of OCSP stapling callback
+
+** Version 0.8.3 (2017-10-20)
+- Use GnuTLS' default DH parameters by default
+- Handle long Server Name Indication data and gracefully ignore
+  unknown SNI types
+- Send SNI for proxy connections
+- Deprecate OpenPGP support like GnuTLS did (will be removed
+  completely in a future release)
+- Do not announce session ticket support for proxy connections
+- Minor documentation updates (SSL_CLIENT_I_DN, reference for SNI)
+- Test suite: Simplify handling of proxy backend servers and OCSP
+  responders
+- Test suite: stability/compatibility fixes
+
+** Version 0.8.2 (2017-01-08)
+- Test suite: Ensure CRLF line ends in HTTP headers
+- Test suite, gen_ocsp_index.c: Handle serial as fixed order byte array
+
+** Version 0.8.1 (2016-12-20)
+- Bugfix: Use APR_SIZE_T_FMT for portable apr_size_t formatting
+
+** Version 0.8.0 (2016-12-11)
+- New: Support for OCSP stapling
+- Bugfix: Access to DBM cache is locked using global mutex
+  "gnutls-cache"
+- Bugfix: GnuTLSSessionTickets is now disabled by default as described
+  in the handbook
+- Fixed memory leak while checking proxy backend certificate
+- Fixed memory leaks in post_config
+- Safely delete session ticket key (requires GnuTLS >= 3.4)
+- Improved error handling in post_config hook
+- Various handbook updates
+- Internal API documentation can be generated using Doxygen
+- Unused code has been removed (conditionals for GnuTLS 2.x and Apache
+  versions before 2.2, internal Lua bytecode structure last used in
+  2011).
+- Test suite: Fixed locking for access to the PGP keyring of the test
+  certificate authority
+- mod_gnutls can be built using Clang (unsupported)
+
+** Version 0.7.5 (2016-05-28)
+- Sunil Mohan Adapa reported retry loops during session shutdown in
+  cleanup_gnutls_session() due to gnutls_bye() incorrectly returning
+  GNUTLS_E_INTERRUPTED or GNUTLS_E_AGAIN. Setting the GnuTLS session
+  errno in mgs_transport_write() fixes the problem.
+- Import Daniel Kahn Gillmor's patches for GnuPG v2 support from the
+  Debian package.
+- Build system improvements that allow VPATH builds and get "make
+  distcheck" to work
+
+** Version 0.7.4 (2016-04-13)
+- Support SoftHSM 2 for PKCS #11 testing
+- Increase verbosity of test logs
 
 ** Version 0.7.3 (2016-01-12)
 - Update test suite for compatibility with GnuTLS 3.4, which has
