@@ -8,10 +8,11 @@
 
 %.template: $(srcdir)/%.template.in
 	sed s/__HOSTNAME__/$(TEST_HOST)/ < $< > $@
-	if test -n "$(OCSP_PORT)"; then \
-		sed -i -e 's/^### ocsp/ocsp/' \
-			-e s/__OCSP_PORT__/$(OCSP_PORT)/ $@; \
-	fi
+	sed -i -e "s,__OCSP_URI__,$(OCSP_URI_TEMPLATE)," $@
+	for i in $(patsubst [%],%,$(TEST_IP)); do \
+		IP_ADDRS="$${IP_ADDRS}\nip_address = $${i}"; \
+	done; \
+	sed -i -e "s,__IP_ADDRESSES__,$${IP_ADDRS#\\n}," $@
 
 %.uid: $(srcdir)/%.uid.in
 	sed s/__HOSTNAME__/$(TEST_HOST)/ < $< > $@
@@ -21,8 +22,10 @@
 	chmod 0700 $(dir $@)
 	certtool --outfile $@ --generate-privkey
 
+.PRECIOUS: %/secret.key
+
 %/secret.pgp.raw: %.uid %/secret.key
-	PEM2OPENPGP_EXPIRATION=86400 PEM2OPENPGP_USAGE_FLAGS=authenticate,certify,sign pem2openpgp "$$(cat $<)" < $(dir $@)secret.key > $@
+	PEM2OPENPGP_USAGE_FLAGS=authenticate,certify,sign pem2openpgp "$$(cat $<)" < $(dir $@)secret.key > $@
 
 %/secret.pgp: %/secret.pgp.raw pgpcrc
 	(printf -- '-----BEGIN PGP PRIVATE KEY BLOCK-----\nVersion: test\n\n' && \
@@ -81,6 +84,7 @@ rogue%/x509.pem: rogue%.template rogue%/cert-request rogueca/x509.pem
 	echo "directories.tokendir = $(dir $@)softhsm2.db" >> $@
 
 %/softhsm2.db: %/x509.pem %/secret.key %/softhsm2.conf
+	rm -rf $@
 	mkdir -p $@
 	SOFTHSM="$(SOFTHSM)" \
 	SOFTHSM2_CONF="$(dir $@)softhsm2.conf" \

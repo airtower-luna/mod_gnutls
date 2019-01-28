@@ -2,7 +2,7 @@
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2008 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
- *  Copyright 2015-2017 Fiona Klute
+ *  Copyright 2015-2019 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@
  */
 
 #include "mod_gnutls.h"
+#include "gnutls_proxy.h"
 
 #ifdef APLOG_USE_MODULE
 APLOG_USE_MODULE(gnutls);
@@ -65,11 +66,7 @@ static apr_status_t gnutls_io_filter_error(ap_filter_t * f,
         ap_log_cerror(APLOG_MARK, APLOG_INFO, 0, f->c,
                       "GnuTLS handshake failed: HTTP spoken on HTTPS port; "
                       "trying to send HTML error page");
-        mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
-            ap_get_module_config(f->c->base_server->module_config,
-                                 &gnutls_module);
         ctxt->status = -1;
-        sc->non_ssl_request = 1;
 
         /* fake the request line */
         bucket = HTTP_ON_HTTPS_PORT_BUCKET(f->c->bucket_alloc);
@@ -245,12 +242,8 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
 
     while (1)
     {
+        /* Note: The pull function sets ctxt->input_rc */
         rc = gnutls_record_recv(ctxt->session, buf + bytes, wanted - bytes);
-
-        if (rc == GNUTLS_E_INTERRUPTED)
-            ctxt->input_rc = APR_EINTR;
-        else if (rc == GNUTLS_E_AGAIN)
-            ctxt->input_rc = APR_EAGAIN;
 
         if (rc > 0) {
             *len += rc;
@@ -261,33 +254,29 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
             }
             return ctxt->input_rc;
         } else if (rc == 0) {
-            /* If EAGAIN, we will loop given a blocking read,
-             * otherwise consider ourselves at EOF.
-             */
-            if (APR_STATUS_IS_EAGAIN(ctxt->input_rc)
-                    || APR_STATUS_IS_EINTR(ctxt->input_rc)) {
-                /* Already read something, return APR_SUCCESS instead.
-                 * On win32 in particular, but perhaps on other kernels,
-                 * a blocking call isn't 'always' blocking.
-                 */
-                if (*len > 0) {
-                    ctxt->input_rc = APR_SUCCESS;
-                    break;
-                }
-                if (ctxt->input_block == APR_NONBLOCK_READ) {
-                    break;
-                }
+            /* EOF, return code depends on whether we still have data
+             * to return. */
+            if (*len > 0) {
+                ctxt->input_rc = APR_SUCCESS;
             } else {
-                if (*len > 0) {
-                    ctxt->input_rc = APR_SUCCESS;
-                } else {
-                    ctxt->input_rc = APR_EOF;
-                }
-                break;
+                ctxt->input_rc = APR_EOF;
             }
+            break;
         } else { /* (rc < 0) */
 
-            if (rc == GNUTLS_E_REHANDSHAKE) {
+            if (rc == GNUTLS_E_INTERRUPTED || rc == GNUTLS_E_AGAIN)
+            {
+                ap_log_cerror(APLOG_MARK, APLOG_TRACE2, ctxt->input_rc, ctxt->c,
+                              "%s: looping recv after '%s' (%d)",
+                              __func__, gnutls_strerror(rc), rc);
+                /* For a blocking read, loop and try again
+                 * immediately. Otherwise just notify the caller. */
+                if (ctxt->input_block != APR_NONBLOCK_READ)
+                    continue;
+                else
+                    ctxt->input_rc =
+                        (rc == GNUTLS_E_AGAIN ? APR_EAGAIN : APR_EINTR);
+            } else if (rc == GNUTLS_E_REHANDSHAKE) {
                 /* A client has asked for a new Hankshake. Currently, we don't do it */
                 ap_log_cerror(APLOG_MARK, APLOG_INFO,
                         ctxt->input_rc,
@@ -394,29 +383,9 @@ static int gnutls_do_handshake(mgs_handle_t * ctxt) {
         return -1;
     }
 
-    /* Enable SNI for proxy connections */
+    /* Enable SNI and ALPN for proxy connections */
     if (ctxt->is_proxy == GNUTLS_ENABLED_TRUE)
-    {
-        /* Get peer hostname from note left by mod_proxy */
-        const char *peer_hostname =
-            apr_table_get(ctxt->c->notes, PROXY_SNI_NOTE);
-        /* Used only as target for apr_ipsubnet_create() */
-        apr_ipsubnet_t *probe;
-        /* Check if the note is present (!= NULL) and NOT an IP
-         * address */
-        if ((peer_hostname) != NULL
-            && (apr_ipsubnet_create(&probe, peer_hostname, NULL, ctxt->c->pool)
-                != APR_SUCCESS))
-        {
-            ret = gnutls_server_name_set(ctxt->session, GNUTLS_NAME_DNS,
-                                         peer_hostname, strlen(peer_hostname));
-            if (ret != GNUTLS_E_SUCCESS)
-                ap_log_cerror(APLOG_MARK, APLOG_ERR, ret, ctxt->c,
-                              "Could not set SNI '%s' for proxy connection: "
-                              "%s (%d)",
-                              peer_hostname, gnutls_strerror(ret), ret);
-        }
-    }
+        mgs_set_proxy_handshake_ext(ctxt);
 
 tryagain:
     do {
@@ -566,10 +535,15 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
                           __func__, IS_PROXY_STR(ctxt));
     }
 
-    if (ctxt->status < 0) {
-        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
-                      "%s %s: ap_get_brigade", __func__, IS_PROXY_STR(ctxt));
-        return ap_get_brigade(f->next, bb, mode, block, readbytes);
+    if (ctxt->status < 0)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_TRACE1, 0, ctxt->c,
+                      "%s: %sconnection failed, cannot provide data!",
+                      __func__, IS_PROXY_STR(ctxt));
+        apr_bucket *bucket =
+                apr_bucket_eos_create(f->c->bucket_alloc);
+        APR_BRIGADE_INSERT_TAIL(bb, bucket);
+        return APR_ECONNABORTED;
     }
 
     /* XXX: we don't currently support anything other than these modes. */
@@ -707,10 +681,27 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
             ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
                           "%s: TLS %sconnection opened.",
                           __func__, IS_PROXY_STR(ctxt));
+        else if (ctxt->is_proxy)
+        {
+            /* If mod_proxy receives an error while trying to send its
+             * request it sends an "invalid request" error to the
+             * client. By pretending we could send the request
+             * mod_proxy continues its processing and sends a proper
+             * "proxy error" message when there's no response to read. */
+            apr_bucket *bucket = apr_bucket_eos_create(f->c->bucket_alloc);
+            APR_BRIGADE_INSERT_TAIL(bb, bucket);
+            return APR_SUCCESS;
+        }
+        /* No final else here, the "ctxt->status < 0" check below will
+         * catch that. */
     }
 
-    if (ctxt->status < 0) {
-        return ap_pass_brigade(f->next, bb);
+    if (ctxt->status < 0)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_TRACE1, 0, ctxt->c,
+                      "%s: %sconnection failed, refusing to send.",
+                      __func__, IS_PROXY_STR(ctxt));
+        return APR_ECONNABORTED;
     }
 
     while (!APR_BRIGADE_EMPTY(bb)) {
@@ -863,21 +854,32 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
             || (rc == APR_SUCCESS
                 && APR_BRIGADE_EMPTY(ctxt->input_bb)))
         {
-            if (APR_STATUS_IS_EOF(ctxt->input_rc))
-            {
-                return 0;
-            }
-            else
-            {
-                gnutls_transport_set_errno(ctxt->session,
-                                           EAI_APR_TO_RAW(ctxt->input_rc));
-                return -1;
-            }
+            /* Turning APR_SUCCESS into APR_EINTR isn't ideal, but
+             * it's the best matching error code for "didn't get data,
+             * but read didn't permanently fail either." */
+            ctxt->input_rc = (rc != APR_SUCCESS ? rc : APR_EINTR);
+            gnutls_transport_set_errno(ctxt->session,
+                                       EAI_APR_TO_RAW(ctxt->input_rc));
+            return -1;
+        }
+
+        /* Blocking ap_get_brigade() can return a timeout status,
+         * sometimes after a very short time. "Don't give up, just
+         * return the timeout" is what mod_ssl does. */
+        if (ctxt->input_block == APR_BLOCK_READ
+            && APR_STATUS_IS_TIMEUP(rc)
+            && APR_BRIGADE_EMPTY(ctxt->input_bb))
+        {
+            ctxt->input_rc = rc;
+            gnutls_transport_set_errno(ctxt->session, EAGAIN);
+            return -1;
         }
 
         if (rc != APR_SUCCESS)
         {
             /* Unexpected errors discard the brigade */
+            ap_log_cerror(APLOG_MARK, APLOG_INFO, rc, ctxt->c,
+                          "%s: Unexpected error!", __func__);
             apr_brigade_cleanup(ctxt->input_bb);
             ctxt->input_bb = NULL;
             gnutls_transport_set_errno(ctxt->session, EIO);

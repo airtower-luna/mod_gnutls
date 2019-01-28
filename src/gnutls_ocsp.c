@@ -1,5 +1,5 @@
 /*
- *  Copyright 2016 Fiona Klute
+ *  Copyright 2016-2018 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -19,11 +19,14 @@
 #include "gnutls_cache.h"
 #include "gnutls_config.h"
 #include "gnutls_util.h"
+#include "gnutls_watchdog.h"
 
 #include <apr_escape.h>
 #include <apr_lib.h>
 #include <apr_time.h>
+#include <gnutls/crypto.h>
 #include <gnutls/ocsp.h>
+#include <mod_watchdog.h>
 #include <time.h>
 
 #ifdef APLOG_USE_MODULE
@@ -82,6 +85,23 @@ const char *mgs_ocsp_stapling_enable(cmd_parms *parms,
         sc->ocsp_staple = GNUTLS_ENABLED_TRUE;
     else
         sc->ocsp_staple = GNUTLS_ENABLED_FALSE;
+
+    return NULL;
+}
+
+
+
+const char *mgs_set_ocsp_auto_refresh(cmd_parms *parms,
+                                      void *dummy __attribute__((unused)),
+                                      const int arg)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(parms->server->module_config, &gnutls_module);
+
+    if (arg)
+        sc->ocsp_auto_refresh = GNUTLS_ENABLED_TRUE;
+    else
+        sc->ocsp_auto_refresh = GNUTLS_ENABLED_FALSE;
 
     return NULL;
 }
@@ -593,12 +613,24 @@ static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
 
 
 
-apr_status_t mgs_cache_ocsp_response(server_rec *s)
+/**
+ * Get a fresh OCSP response and put it into the cache.
+ *
+ * @param s server that needs a new response
+ *
+ * @param cache_expiry If not `NULL`, this `apr_time_t` will be set to
+ * the expiration time of the cache entry. Remains unchanged on
+ * failure.
+ *
+ * @return APR_SUCCESS or an APR error code
+ */
+static apr_status_t mgs_cache_ocsp_response(server_rec *s,
+                                            apr_time_t *cache_expiry)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
 
-    if (sc->cache == NULL)
+    if (sc->ocsp_cache == NULL)
     {
         /* OCSP caching requires a cache. */
         return APR_ENOTIMPL;
@@ -690,7 +722,8 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
         expiry = next_update;
     }
 
-    int r = sc->cache->store(s, sc->ocsp->fingerprint, resp, expiry);
+    int r = mgs_cache_store(sc->ocsp_cache, s,
+                            sc->ocsp->fingerprint, resp, expiry);
     /* destroy pool, and original copy of the OCSP response with it */
     apr_pool_destroy(tmp);
     if (r != 0)
@@ -699,18 +732,26 @@ apr_status_t mgs_cache_ocsp_response(server_rec *s)
                       "Storing OCSP response in cache failed.");
         return APR_EGENERAL;
     }
+
+    if (cache_expiry != NULL)
+        *cache_expiry = expiry;
     return APR_SUCCESS;
 }
 
 
 
-/*
+/**
  * Retries after failed OCSP requests must be rate limited. If the
  * responder is overloaded or buggy we don't want to add too much more
  * load, and if a MITM is messing with requests a repetition loop
- * might end up being a self-inflicted denial of service.
+ * might end up being a self-inflicted denial of service. This
+ * function writes a specially formed entry to the cache to indicate a
+ * recent failure.
+ *
+ * @param s the server for which an OCSP request failed
+ * @param timeout lifetime of the cache entry
  */
-void mgs_cache_ocsp_failure(server_rec *s)
+static void mgs_cache_ocsp_failure(server_rec *s, apr_interval_time_t timeout)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
@@ -720,15 +761,10 @@ void mgs_cache_ocsp_failure(server_rec *s)
         .data = &c,
         .size = sizeof(c)
     };
-    apr_time_t expiry = apr_time_now() + sc->ocsp_failure_timeout;
+    apr_time_t expiry = apr_time_now() + timeout;
 
-    char date_str[APR_RFC822_DATE_LEN];
-    apr_rfc822_date(date_str, expiry);
-    ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
-                 "OCSP request for %s failed, next try after %s.",
-                 s->server_hostname, date_str);
-
-    int r = sc->cache->store(s, sc->ocsp->fingerprint, dummy, expiry);
+    int r = mgs_cache_store(sc->ocsp_cache, s,
+                            sc->ocsp->fingerprint, dummy, expiry);
     if (r != 0)
         ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
                      "Caching OCSP failure failed.");
@@ -743,14 +779,16 @@ int mgs_get_ocsp_response(gnutls_session_t session,
     mgs_handle_t *ctxt = gnutls_session_get_ptr(session);
     mgs_srvconf_rec *sc = ctxt->sc;
 
-    if (!sc->ocsp_staple || sc->cache == NULL)
+    if (!sc->ocsp_staple || sc->ocsp_cache == NULL)
     {
         /* OCSP must be enabled and caching requires a cache. */
         return GNUTLS_E_NO_CERTIFICATE_STATUS;
     }
 
-    *ocsp_response = sc->cache->fetch(ctxt,
-                                      sc->ocsp->fingerprint);
+    *ocsp_response = mgs_cache_fetch(ctxt->sc->ocsp_cache,
+                                     ctxt->c->base_server,
+                                     ctxt->sc->ocsp->fingerprint,
+                                     ctxt->c->pool);
     if (ocsp_response->size == 0)
     {
         ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_EGENERAL, ctxt->c,
@@ -785,8 +823,10 @@ int mgs_get_ocsp_response(gnutls_session_t session,
          * would be better to have a vhost specific mutex, but at the
          * moment there's no good way to integrate that with the
          * Apache Mutex directive. */
-        *ocsp_response = sc->cache->fetch(ctxt,
-                                          sc->ocsp->fingerprint);
+        *ocsp_response = mgs_cache_fetch(ctxt->sc->ocsp_cache,
+                                         ctxt->c->base_server,
+                                         ctxt->sc->ocsp->fingerprint,
+                                         ctxt->c->pool);
         if (ocsp_response->size > 0)
         {
             /* Got a valid response now, unlock mutex and return. */
@@ -800,21 +840,24 @@ int mgs_get_ocsp_response(gnutls_session_t session,
         }
     }
 
-    rv = mgs_cache_ocsp_response(ctxt->c->base_server);
+    rv = mgs_cache_ocsp_response(ctxt->c->base_server, NULL);
     if (rv != APR_SUCCESS)
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, ctxt->c,
                       "Caching a fresh OCSP response failed");
         /* cache failure to rate limit retries */
-        mgs_cache_ocsp_failure(ctxt->c->base_server);
+        mgs_cache_ocsp_failure(ctxt->c->base_server,
+                               ctxt->sc->ocsp_failure_timeout);
         apr_global_mutex_unlock(sc->ocsp_mutex);
         goto fail_cleanup;
     }
     apr_global_mutex_unlock(sc->ocsp_mutex);
 
     /* retry reading from cache */
-    *ocsp_response = sc->cache->fetch(ctxt,
-                                      sc->ocsp->fingerprint);
+    *ocsp_response = mgs_cache_fetch(ctxt->sc->ocsp_cache,
+                                     ctxt->c->base_server,
+                                     ctxt->sc->ocsp->fingerprint,
+                                     ctxt->c->pool);
     if (ocsp_response->size == 0)
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
@@ -907,29 +950,194 @@ apr_uri_t * mgs_cert_get_ocsp_uri(apr_pool_t *p, gnutls_x509_crt_t cert)
 
 
 
-/*
- * Like in the general post_config hook the HTTP status codes for
- * errors are just for fun. What matters is "neither OK nor DECLINED"
- * to denote an error.
+/** The maximum random fuzz base (half the maximum fuzz) that will not
+ * overflow. The permitted values are limited to whatever will not
+ * make an `apr_interval_time_t` variable overflow when multiplied
+ * with `APR_UINT16_MAX`. With apr_interval_time_t being a 64 bit
+ * signed integer the maximum fuzz interval is about 4.5 years, which
+ * should be more than plenty. */
+#define MAX_FUZZ_BASE (APR_INT64_MAX / APR_UINT16_MAX)
+
+/**
+ * Perform an asynchronous OCSP cache update. This is a callback for
+ * mod_watchdog, so the API is fixed.
+ *
+ * @param state watchdog state (starting/running/stopping)
+ * @param data callback data, contains the server_rec
+ * @param pool temporary callback pool destroyed after the call
+ * @return always `APR_SUCCESS` as required by the mod_watchdog API to
+ * indicate that the callback should be called again
  */
-int mgs_ocsp_post_config_server(apr_pool_t *pconf,
-                                apr_pool_t *ptemp __attribute__((unused)),
-                                server_rec *server)
+static apr_status_t mgs_async_ocsp_update(int state,
+                                          void *data,
+                                          apr_pool_t *pool)
+{
+    /* If the server is stopping there's no need to do an OCSP
+     * update. */
+    if (state == AP_WATCHDOG_STATE_STOPPING)
+        return APR_SUCCESS;
+
+    server_rec *server = (server_rec *) data;
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(server->module_config, &gnutls_module);
+    apr_time_t expiry = 0;
+
+    /* Holding the mutex should help avoiding simultaneous synchronous
+     * and asynchronous OCSP requests in some edge cases: during
+     * startup if there's an early request, and if OCSP requests fail
+     * repeatedly until the cached response expires and a synchronous
+     * update is triggered before a failure cache entry is
+     * created. Usually there should be a good OCSP response in the
+     * cache and the mutex is never touched in
+     * mgs_get_ocsp_response. */
+    apr_global_mutex_lock(sc->ocsp_mutex);
+    apr_status_t rv = mgs_cache_ocsp_response(server, &expiry);
+
+    apr_interval_time_t next_interval;
+    if (rv != APR_SUCCESS)
+        next_interval = sc->ocsp_failure_timeout;
+    else
+    {
+        apr_uint16_t random_bytes;
+        int res = gnutls_rnd(GNUTLS_RND_NONCE, &random_bytes,
+                             sizeof(random_bytes));
+        if (__builtin_expect(res < 0, 0))
+        {
+            /* Shouldn't ever happen, because a working random number
+             * generator is required for establishing TLS sessions. */
+            random_bytes = (apr_uint16_t) apr_time_now();
+            ap_log_error(APLOG_MARK, APLOG_WARNING, APR_EGENERAL, server,
+                         "Error getting random number for fuzzy update "
+                         "interval: %s Falling back on truncated time.",
+                         gnutls_strerror(res));
+        }
+
+        /* Choose the fuzz interval for the next update between
+         * `sc->ocsp_fuzz_time` and twice that. */
+        apr_interval_time_t fuzz = sc->ocsp_fuzz_time
+            + (sc->ocsp_fuzz_time * random_bytes / APR_UINT16_MAX);
+
+        /* With an extremly short timeout or weird nextUpdate value
+         * next_interval <= 0 might happen. Use the failure timeout to
+         * avoid endlessly repeating updates. */
+        next_interval = expiry - apr_time_now();
+        if (next_interval <= 0)
+        {
+            next_interval = sc->ocsp_failure_timeout;
+            ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, server,
+                         "OCSP cache expiration time of the response for "
+                         "%s:%d is in the past, repeating after failure "
+                         "timeout (GnuTLSOCSPFailureTimeout).",
+                         server->server_hostname, server->addrs->host_port);
+        }
+
+        /* It's possible to compare maximum fuzz and configured OCSP
+         * cache timeout at configuration time, but the interval until
+         * the nextUpdate value expires (or the failure timeout
+         * fallback above) might be shorter. Make sure that we don't
+         * end up with a negative interval. */
+        while (fuzz > next_interval)
+            fuzz /= 2;
+        next_interval -= fuzz;
+    }
+
+    sc->singleton_wd->set_callback_interval(sc->singleton_wd->wd,
+                                            next_interval,
+                                            server, mgs_async_ocsp_update);
+
+    ap_log_error(APLOG_MARK, rv == APR_SUCCESS ? APLOG_DEBUG : APLOG_WARNING,
+                 rv, server,
+                 "Async OCSP update %s for %s:%d, next update in "
+                 "%" APR_TIME_T_FMT " seconds.",
+                 rv == APR_SUCCESS ? "done" : "failed",
+                 server->server_hostname, server->addrs->host_port,
+                 apr_time_sec(next_interval));
+
+    /* Check if there's still a response in the cache. If not, add a
+     * failure entry. If there already is a failure entry, refresh
+     * it. The lifetime of such entries is twice the error timeout to
+     * make sure they do not expire before the next scheduled
+     * update. */
+    if (rv != APR_SUCCESS)
+    {
+        const gnutls_datum_t ocsp_response =
+            mgs_cache_fetch(sc->ocsp_cache, server,
+                            sc->ocsp->fingerprint, pool);
+
+        if (ocsp_response.size == 0 ||
+            ((ocsp_response.size == sizeof(unsigned char)) &&
+             (*((unsigned char *) ocsp_response.data) ==
+              OCSP_FAILURE_CACHE_DATA)))
+        {
+            ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, server,
+                         "Caching OCSP request failure for %s:%d.",
+                         server->server_hostname, server->addrs->host_port);
+            mgs_cache_ocsp_failure(server, sc->ocsp_failure_timeout * 2);
+        }
+
+        /* Get rid of the response, if any */
+        if (ocsp_response.size != 0)
+            gnutls_free(ocsp_response.data);
+    }
+    apr_global_mutex_unlock(sc->ocsp_mutex);
+
+    return APR_SUCCESS;
+}
+
+
+
+const char* mgs_ocsp_configure_stapling(apr_pool_t *pconf,
+                                        apr_pool_t *ptemp __attribute__((unused)),
+                                        server_rec *server)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(server->module_config, &gnutls_module);
 
     if (sc->certs_x509_chain_num < 2)
+        return "No issuer (CA) certificate available, cannot enable "
+            "stapling. Please add it to the GnuTLSCertificateFile.";
+
+    mgs_ocsp_data_t ocsp = apr_palloc(pconf, sizeof(struct mgs_ocsp_data));
+
+    ocsp->uri = mgs_cert_get_ocsp_uri(pconf,
+                                      sc->certs_x509_crt_chain[0]);
+    if (ocsp->uri == NULL && sc->ocsp_response_file == NULL)
+        return "No OCSP URI in the certificate nor a GnuTLSOCSPResponseFile "
+            "setting, cannot configure OCSP stapling.";
+
+    if (sc->ocsp_cache == NULL)
+        return "No OCSP response cache available, please check "
+            "the GnuTLSOCSPCache setting.";
+
+    sc->ocsp = ocsp;
+    return NULL;
+}
+
+
+
+/*
+ * Like in the general post_config hook the HTTP status codes for
+ * errors are just for fun. What matters is "neither OK nor DECLINED"
+ * to denote an error.
+ */
+int mgs_ocsp_enable_stapling(apr_pool_t *pconf,
+                             apr_pool_t *ptemp __attribute__((unused)),
+                             server_rec *server)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(server->module_config, &gnutls_module);
+    if (sc->ocsp == NULL)
     {
-        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
-                     "OCSP stapling is enabled but no CA certificate "
-                     "available for %s:%d, make sure it is included in "
-                     "GnuTLSCertificateFile!",
-                     server->server_hostname, server->addrs->host_port);
-        return HTTP_NOT_FOUND;
+        ap_log_error(APLOG_MARK, APLOG_STARTUP, APR_EGENERAL, server,
+                     "CRITICAL ERROR: %s called with uninitialized OCSP "
+                     "data structure. This indicates a bug in mod_gnutls.",
+                     __func__);
+        return HTTP_INTERNAL_SERVER_ERROR;
     }
 
     /* set default values for unset parameters */
+    if (sc->ocsp_auto_refresh == GNUTLS_ENABLED_UNSET)
+        sc->ocsp_auto_refresh = GNUTLS_ENABLED_TRUE;
     if (sc->ocsp_check_nonce == GNUTLS_ENABLED_UNSET)
         sc->ocsp_check_nonce = GNUTLS_ENABLED_TRUE;
     if (sc->ocsp_cache_time == MGS_TIMEOUT_UNSET)
@@ -938,30 +1146,40 @@ int mgs_ocsp_post_config_server(apr_pool_t *pconf,
         sc->ocsp_failure_timeout = apr_time_from_sec(MGS_OCSP_FAILURE_TIMEOUT);
     if (sc->ocsp_socket_timeout == MGS_TIMEOUT_UNSET)
         sc->ocsp_socket_timeout = apr_time_from_sec(MGS_OCSP_SOCKET_TIMEOUT);
+    /* Base fuzz is half the configured maximum, the actual fuzz is
+     * between the maximum and half that. The default maximum is
+     * sc->ocsp_cache_time / 8, or twice the failure timeout,
+     * whichever is larger (so the default guarantees at least one
+     * retry before the cache entry expires).*/
+    if (sc->ocsp_fuzz_time == MGS_TIMEOUT_UNSET)
+    {
+        sc->ocsp_fuzz_time = sc->ocsp_cache_time / 16;
+        if (sc->ocsp_fuzz_time < sc->ocsp_failure_timeout)
+            sc->ocsp_fuzz_time = sc->ocsp_failure_timeout;
+    }
+    else
+        sc->ocsp_fuzz_time = sc->ocsp_fuzz_time / 2;
 
-    sc->ocsp = apr_palloc(pconf, sizeof(struct mgs_ocsp_data));
+    /* This really shouldn't happen considering MAX_FUZZ_BASE is about
+     * 4.5 years, but better safe than sorry. */
+    if (sc->ocsp_fuzz_time > MAX_FUZZ_BASE)
+    {
+        ap_log_error(APLOG_MARK, APLOG_STARTUP, APR_EINVAL, server,
+                     "%s: Maximum fuzz time is too large, maximum "
+                     "supported value is %" APR_INT64_T_FMT " seconds",
+                     __func__, apr_time_sec(MAX_FUZZ_BASE) * 2);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
 
     sc->ocsp->fingerprint =
         mgs_get_cert_fingerprint(pconf, sc->certs_x509_crt_chain[0]);
     if (sc->ocsp->fingerprint.data == NULL)
         return HTTP_INTERNAL_SERVER_ERROR;
 
-    sc->ocsp->uri = mgs_cert_get_ocsp_uri(pconf,
-                                          sc->certs_x509_crt_chain[0]);
-    if (sc->ocsp->uri == NULL && sc->ocsp_response_file == NULL)
-    {
-        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
-                     "OCSP stapling is enabled for for %s:%d, but there is "
-                     "neither an OCSP URI in the certificate nor a "
-                     "GnuTLSOCSPResponseFile setting for this host!",
-                     server->server_hostname, server->addrs->host_port);
-        return HTTP_NOT_FOUND;
-    }
-
     sc->ocsp->trust = apr_palloc(pconf,
                                  sizeof(gnutls_x509_trust_list_t));
-     /* Only the direct issuer may sign the OCSP response or an OCSP
-      * signer. */
+    /* Only the direct issuer may sign the OCSP response or an OCSP
+     * signer. */
     int ret = mgs_create_ocsp_trust_list(sc->ocsp->trust,
                                          &(sc->certs_x509_crt_chain[1]),
                                          1);
@@ -981,6 +1199,27 @@ int mgs_ocsp_post_config_server(apr_pool_t *pconf,
     gnutls_certificate_set_ocsp_status_request_function(sc->certs,
                                                         mgs_get_ocsp_response,
                                                         sc);
+
+    /* The watchdog structure may be NULL if mod_watchdog is
+     * unavailable. */
+    if (sc->singleton_wd != NULL
+        && sc->ocsp_auto_refresh == GNUTLS_ENABLED_TRUE)
+    {
+        apr_status_t rv =
+            sc->singleton_wd->register_callback(sc->singleton_wd->wd,
+                                                sc->ocsp_cache_time,
+                                                server, mgs_async_ocsp_update);
+        if (rv == APR_SUCCESS)
+            ap_log_error(APLOG_MARK, APLOG_INFO, rv, server,
+                         "Enabled async OCSP update via watchdog "
+                         "for %s:%d",
+                         server->server_hostname, server->addrs->host_port);
+        else
+            ap_log_error(APLOG_MARK, APLOG_WARNING, rv, server,
+                         "Enabling async OCSP update via watchdog "
+                         "for %s:%d failed!",
+                         server->server_hostname, server->addrs->host_port);
+    }
 
     return OK;
 }

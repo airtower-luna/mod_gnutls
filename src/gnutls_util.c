@@ -1,5 +1,5 @@
 /*
- *  Copyright 2016-2018 Fiona Klute
+ *  Copyright 2016-2019 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -18,6 +18,14 @@
 
 #include <apr_strings.h>
 #include <gnutls/gnutls.h>
+
+
+
+/** Compiled version of MGS_DEFAULT_PRIORITY, must be initialized
+ * using mgs_default_priority_init() in the pre_config hook and
+ * deinitialized in the matching pool cleanup hook. */
+static gnutls_priority_t default_prio;
+
 
 
 const char* http_post_header(apr_pool_t *p, apr_uri_t *uri,
@@ -147,6 +155,45 @@ mgs_handle_t *init_gnutls_ctxt(conn_rec *c)
         ctxt->sc = sc;
         /* Default, unconditionally changed in proxy setup functions */
         ctxt->is_proxy = GNUTLS_ENABLED_FALSE;
+        /* Other default values */
+        ctxt->sni_name = NULL;
     }
     return ctxt;
+}
+
+
+
+int mgs_default_priority_init()
+{
+    return gnutls_priority_init(&default_prio, MGS_DEFAULT_PRIORITY, NULL);
+}
+
+
+
+gnutls_priority_t mgs_get_default_prio()
+{
+    return default_prio;
+}
+
+
+
+void mgs_default_priority_deinit()
+{
+    gnutls_priority_deinit(default_prio);
+}
+
+
+
+gnutls_datum_t * mgs_str_array_to_datum_array(const apr_array_header_t *src,
+                                              apr_pool_t *pool,
+                                              const int min_elements)
+{
+    int num = min_elements > src->nelts ? min_elements : src->nelts;
+    gnutls_datum_t *dest = apr_palloc(pool, num * sizeof(gnutls_datum_t));
+    for (int i = 0; i < src->nelts; i++)
+    {
+        dest[i].data = (void *) APR_ARRAY_IDX(src, i, char *);
+        dest[i].size = strlen(APR_ARRAY_IDX(src, i, char *));
+    }
+    return dest;
 }

@@ -1,4 +1,4 @@
-AC_INIT(mod_gnutls, 0.8.4)
+AC_INIT(mod_gnutls, 0.9.0)
 OOO_CONFIG_NICE(config.nice)
 MOD_GNUTLS_VERSION=AC_PACKAGE_VERSION
 AC_PREREQ(2.53)
@@ -30,6 +30,21 @@ CHECK_APACHE(,$AP_VERSION,
     AC_MSG_ERROR([*** Apache version $AP_VERSION not found!])
 )
 
+dnl Maybe use the binaries for tests, too?
+AC_ARG_WITH([gnutls-dev],
+	AS_HELP_STRING([--with-gnutls-dev=DIR],
+		[Use GnuTLS libraries from a development (git) tree. Use \
+		this if you want to test mod_gnutls with the latest \
+		GnuTLS code.]),
+	[
+		AS_IF([test -d "${with_gnutls_dev}" ],
+		[
+			LIBGNUTLS_CFLAGS="-I${with_gnutls_dev}/lib/includes"
+			LIBGNUTLS_LIBS="-lgnutls -L${with_gnutls_dev}/lib/.libs -R${with_gnutls_dev}/lib/.libs"
+		],
+		[AC_MSG_ERROR([--with-gnutls-dev=DIR requires a directory!])])
+	], [])
+
 PKG_CHECK_MODULES([LIBGNUTLS], [gnutls >= 3.3.0])
 
 LIBGNUTLS_VERSION=`pkg-config --modversion gnutls`
@@ -51,10 +66,25 @@ AC_ARG_ENABLE(srp,
 # check if the available GnuTLS library supports SRP
 AC_SEARCH_LIBS([gnutls_srp_server_get_username], [gnutls], [], [use_srp="no"])
 
-SRP_CFLAGS=""
+GNUTLS_FEAT_CFLAGS=""
 if test "$use_srp" != "no"; then
-	SRP_CFLAGS="-DENABLE_SRP=1"
+	GNUTLS_FEAT_CFLAGS="-DENABLE_SRP=1"
 fi
+
+# check if the available GnuTLS library supports raw extension parsing
+AC_SEARCH_LIBS([gnutls_ext_raw_parse], [gnutls], [early_sni="yes"],
+	[early_sni="no"])
+if test "$early_sni" != "no"; then
+	ENABLE_EARLY_SNI=1
+	# This is for the test server configuration
+	EXPECT_EARLY_SNI="Define EXPECT_EARLY_SNI"
+else
+	ENABLE_EARLY_SNI=0
+	EXPECT_EARLY_SNI=""
+fi
+AC_SUBST(ENABLE_EARLY_SNI)
+AC_SUBST(EXPECT_EARLY_SNI)
+AM_SUBST_NOTMAKE(EXPECT_EARLY_SNI)
 
 AC_ARG_ENABLE(strict,
        AS_HELP_STRING([--disable-strict],
@@ -126,18 +156,17 @@ AM_CONDITIONAL([ENABLE_OCSP_TEST], [test "${OPENSSL}" != "no" && test "${gnutls_
 
 dnl Enable test namespaces? Default is "yes".
 AC_ARG_ENABLE(test-namespaces,
-	AS_HELP_STRING([--disable-test-namespaces], [Disable use of network \
-	namespaces to run tests in parallel (some architectures might not \
-	support it)]),
+	AS_HELP_STRING([--disable-test-namespaces], [Disable use of \
+	namespaces for tests (limits parallelization)]),
 	[use_netns=$enableval], [use_netns=yes])
 
-# Check if "unshare" is available and has permission to create network
-# and user namespaces
+# Check if "unshare" is available and has permission to create
+# network, IPC, and user namespaces
 AC_PATH_PROG([UNSHARE], [unshare], [no])
 AS_IF([test "${UNSHARE}" != "no"],
       [
-	AC_MSG_CHECKING([for permission to create network and user namespaces])
-	AS_IF([${UNSHARE} --net -r /bin/sh -c \
+	AC_MSG_CHECKING([for permission to use namespaces])
+	AS_IF([${UNSHARE} --net --ipc -r /bin/sh -c \
 		"ip link set up lo && ip addr show" >&AS_MESSAGE_LOG_FD 2>&1],
 	      [unshare_works="yes"], [unshare_works="no"])
 	AC_MSG_RESULT([$unshare_works])
@@ -176,10 +205,6 @@ fi
 AC_MSG_CHECKING([whether to enable MSVA functionality])
 AC_MSG_RESULT($use_msva)
 
-have_apr_memcache=0
-CHECK_APR_MEMCACHE([have_apr_memcache=1], [have_apr_memcache=0])
-AC_SUBST(have_apr_memcache)
-
 # Building documentation requires pandoc, which in turn needs pdflatex
 # to build PDF output.
 build_doc=no
@@ -187,9 +212,9 @@ AC_PATH_PROG([PANDOC], [pandoc], [no])
 if test "$PANDOC" != "no"; then
 	AC_PATH_PROG([PDFLATEX], [pdflatex], [no])
 	if test "$PDFLATEX" != "no"; then
-		build_doc=yes
+		build_doc="html, manual page, pdf"
 	else
-		build_doc="html only"
+		build_doc="html, manual page"
 	fi
 else
 	AC_PATH_PROG([MARKDOWN], [markdown], [no])
@@ -212,8 +237,8 @@ fi
 
 AC_PATH_PROGS([HTTP_CLI], [curl wget], [no])
 
-MODULE_CFLAGS="${LIBGNUTLS_CFLAGS} ${SRP_CFLAGS} ${MSVA_CFLAGS} ${APR_MEMCACHE_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES} ${STRICT_CFLAGS}"
-MODULE_LIBS="${APR_MEMCACHE_LIBS} ${LIBGNUTLS_LIBS}"
+MODULE_CFLAGS="${LIBGNUTLS_CFLAGS} ${GNUTLS_FEAT_CFLAGS} ${MSVA_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES} ${STRICT_CFLAGS}"
+MODULE_LIBS="${LIBGNUTLS_LIBS}"
 
 AC_PATH_PROGS([SOFTHSM], [softhsm2-util softhsm], [no])
 if test "${SOFTHSM}" != "no"; then
@@ -240,7 +265,6 @@ AC_ARG_VAR([TEST_IP], [List of IP addresses to use for server instances \
 		      started by "make check". The default is \
 		      "[::1] 127.0.0.1". Note that IPv6 addresses must be \
 		      enclosed in square brackets.])
-AM_SUBST_NOTMAKE(TEST_IP)
 
 : ${TEST_LOCK_WAIT:="30"}
 : ${TEST_QUERY_TIMEOUT:="30"}
@@ -284,13 +308,14 @@ DX_HTML_FEATURE(ON)
 DX_MAN_FEATURE(OFF)
 DX_RTF_FEATURE(OFF)
 DX_XML_FEATURE(OFF)
-DX_PDF_FEATURE(ON)
+DX_PDF_FEATURE(OFF)
 DX_PS_FEATURE(OFF)
 DX_INIT_DOXYGEN([mod_gnutls], [doc/doxygen.conf], [doc/api])
 
 AC_CONFIG_FILES([Makefile src/Makefile test/Makefile test/tests/Makefile \
 			doc/Makefile doc/doxygen.conf include/mod_gnutls.h \
 			test/proxy_backend.conf test/ocsp_server.conf \
+			test/apache-conf/early_sni.conf \
 			test/apache-conf/listen.conf \
 			test/apache-conf/netns.conf])
 AC_OUTPUT
@@ -305,6 +330,7 @@ echo "   * CFLAGS for GnuTLS:		${LIBGNUTLS_CFLAGS}"
 echo "   * LDFLAGS for GnuTLS:	${LIBGNUTLS_LIBS}"
 echo "   * SRP Authentication:	${use_srp}"
 echo "   * MSVA Client Verification:	${use_msva}"
+echo "   * Early SNI:			${early_sni}"
 echo "   * Build documentation:	${build_doc}"
 echo ""
 echo "---"

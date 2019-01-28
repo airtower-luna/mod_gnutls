@@ -1,5 +1,5 @@
 /*
- *  Copyright 2016 Fiona Klute
+ *  Copyright 2016-2018 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -23,6 +23,8 @@
 #include "http_config.h"
 
 #define MGS_OCSP_MUTEX_NAME "gnutls-ocsp"
+#define MGS_OCSP_CACHE_MUTEX_NAME "gnutls-ocsp-cache"
+#define MGS_OCSP_CACHE_NAME "gnutls_ocsp"
 
 /** Default OCSP response cache timeout in seconds */
 #define MGS_OCSP_CACHE_TIMEOUT 3600
@@ -52,6 +54,10 @@ struct mgs_ocsp_data {
 const char *mgs_ocsp_stapling_enable(cmd_parms *parms,
                                      void *dummy __attribute__((unused)),
                                      const int arg);
+
+const char *mgs_set_ocsp_auto_refresh(cmd_parms *parms,
+                                      void *dummy __attribute__((unused)),
+                                      const int arg);
 
 const char *mgs_set_ocsp_check_nonce(cmd_parms *parms,
                                      void *dummy __attribute__((unused)),
@@ -91,15 +97,29 @@ int mgs_create_ocsp_trust_list(gnutls_x509_trust_list_t *tl,
 apr_status_t mgs_cleanup_trust_list(void *data);
 
 /**
- * Initialize server config for OCSP, supposed to be called in the
- * post_config hook for each server where OCSP stapling is enabled,
- * after certificates have been loaded.
+ * Try to generate the OCSP stapling configuration for a (virtual)
+ * host. This function must be called in the post_config hook after
+ * certificates have been loaded. This method does not actually enable
+ * stapling, it only prepares the configuration. The reason for
+ * splitting these tasks is that configuration failure may be ignored
+ * if stapling is not explicitly enabled but only opportunistically.
+ *
+ * @return `NULL` on success, a string describing why configuration
+ * failed otherwise (static or allocated from ptemp)
+ */
+const char* mgs_ocsp_configure_stapling(apr_pool_t *pconf, apr_pool_t *ptemp,
+                                        server_rec *server);
+
+/**
+ * Enable OCSP stapling for a (virtual) host. Must be called in the
+ * post_config hook after mgs_ocsp_configure_stapling has returned
+ * successfully for that host.
  *
  * @return OK or DECLINED on success, any other value on error (like
- * the post_config hook itself)
+ * the post_config hook)
  */
-int mgs_ocsp_post_config_server(apr_pool_t *pconf, apr_pool_t *ptemp,
-                                server_rec *server);
+int mgs_ocsp_enable_stapling(apr_pool_t *pconf, apr_pool_t *ptemp,
+                             server_rec *server);
 
 int mgs_get_ocsp_response(gnutls_session_t session, void *ptr,
                           gnutls_datum_t *ocsp_response);

@@ -18,8 +18,11 @@
  */
 
 #include "mod_gnutls.h"
+#include "gnutls_config.h"
 #include "gnutls_ocsp.h"
 #include "gnutls_util.h"
+
+#include <apr_strings.h>
 
 #ifdef APLOG_USE_MODULE
 APLOG_USE_MODULE(gnutls);
@@ -29,13 +32,22 @@ int ssl_engine_set(conn_rec *c,
                    ap_conf_vector_t *dir_conf __attribute__((unused)),
                    int proxy, int enable);
 
+#define MOD_HTTP2 "mod_http2.c"
+#define MOD_WATCHDOG "mod_watchdog.c"
 static const char * const mod_proxy[] = { "mod_proxy.c", NULL };
-static const char * const mod_http2[] = { "mod_http2.c", NULL };
+static const char * const mod_http2[] = { MOD_HTTP2, NULL };
+static const char * const mod_watchdog[] = { MOD_WATCHDOG, NULL };
 
 static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
 {
-    /* Try Run Post-Config Hook After mod_proxy */
-    ap_hook_post_config(mgs_hook_post_config, mod_proxy, mod_http2,
+    /* Watchdog callbacks must be configured before post_config of
+     * mod_watchdog runs, or the watchdog won't be started. Similarly,
+     * our child_init hook must run before mod_watchdog's because our
+     * watchdog threads are started there and need some child-specific
+     * resources. */
+    static const char * const post_conf_succ[] =
+        { MOD_HTTP2, MOD_WATCHDOG, NULL };
+    ap_hook_post_config(mgs_hook_post_config, mod_proxy, post_conf_succ,
                         APR_HOOK_MIDDLE);
     /* HTTP Scheme Hook */
     ap_hook_http_scheme(mgs_hook_http_scheme, NULL, NULL, APR_HOOK_MIDDLE);
@@ -50,13 +62,16 @@ static void gnutls_hooks(apr_pool_t * p __attribute__((unused)))
     ap_hook_pre_config(mgs_hook_pre_config, NULL, NULL,
                        APR_HOOK_MIDDLE);
     /* Child-Init Hook */
-    ap_hook_child_init(mgs_hook_child_init, NULL, NULL,
+    ap_hook_child_init(mgs_hook_child_init, NULL, mod_watchdog,
                        APR_HOOK_MIDDLE);
     /* Authentication Hook */
     ap_hook_access_checker(mgs_hook_authz, NULL, NULL,
                            APR_HOOK_REALLY_FIRST);
     /* Fixups Hook */
     ap_hook_fixups(mgs_hook_fixups, NULL, NULL, APR_HOOK_REALLY_FIRST);
+
+    /* Request hook: Check if TLS connection and request host match */
+    ap_hook_post_read_request(mgs_req_vhost_check, NULL, NULL, APR_HOOK_MIDDLE);
 
     /* TODO: HTTP Upgrade Filter */
     /* ap_register_output_filter ("UPGRADE_FILTER",
@@ -208,7 +223,9 @@ int ssl_engine_set(conn_rec *c,
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, 0, c,
                       "%s: mod_proxy requested TLS proxy, but not enabled "
-                      "for %s", __func__, ctxt->sc->cert_cn);
+                      "for %s:%d", __func__,
+                      ctxt->c->base_server->server_hostname,
+                      ctxt->c->base_server->addrs->host_port);
         return 0;
     }
 
@@ -234,6 +251,8 @@ int ssl_proxy_enable(conn_rec *c)
 {
     return ssl_engine_set(c, NULL, 1, 1);
 }
+
+#define OPENPGP_REMOVED "OpenPGP support has been removed."
 
 static const command_rec mgs_config_cmds[] = {
     AP_INIT_FLAG("GnuTLSProxyEngine", mgs_set_proxy_engine,
@@ -268,10 +287,6 @@ static const command_rec mgs_config_cmds[] = {
     NULL,
     RSRC_CONF,
     "Set the CA File to verify Client Certificates"),
-    AP_INIT_TAKE1("GnuTLSPGPKeyringFile", mgs_set_keyring_file,
-    NULL,
-    RSRC_CONF,
-    "Set the Keyring File to verify Client Certificates"),
     AP_INIT_TAKE1("GnuTLSDHFile", mgs_set_dh_file,
     NULL,
     RSRC_CONF,
@@ -292,14 +307,6 @@ static const command_rec mgs_config_cmds[] = {
     NULL,
     RSRC_CONF,
     "TLS Server X509 Private Key file"),
-    AP_INIT_TAKE1("GnuTLSPGPCertificateFile", mgs_set_pgpcert_file,
-    NULL,
-    RSRC_CONF,
-    "TLS Server PGP Certificate file"),
-    AP_INIT_TAKE1("GnuTLSPGPKeyFile", mgs_set_pgpkey_file,
-    NULL,
-    RSRC_CONF,
-    "TLS Server PGP Private key file"),
 #ifdef ENABLE_SRP
     AP_INIT_TAKE1("GnuTLSSRPPasswdFile", mgs_set_srp_tpasswd_file,
     NULL,
@@ -318,7 +325,7 @@ static const command_rec mgs_config_cmds[] = {
     AP_INIT_TAKE12("GnuTLSCache", mgs_set_cache,
     NULL,
     RSRC_CONF,
-    "Cache Configuration"),
+    "Session Cache Configuration"),
     AP_INIT_FLAG("GnuTLSSessionTickets", mgs_set_tickets,
     NULL,
     RSRC_CONF,
@@ -360,6 +367,14 @@ static const command_rec mgs_config_cmds[] = {
     AP_INIT_FLAG("GnuTLSOCSPStapling", mgs_ocsp_stapling_enable,
                  NULL, RSRC_CONF,
                  "Enable OCSP stapling"),
+    AP_INIT_FLAG("GnuTLSOCSPAutoRefresh", mgs_set_ocsp_auto_refresh,
+                 NULL, RSRC_CONF,
+                 "Regularly refresh cached OCSP response independent "
+                 "of TLS handshakes?"),
+    AP_INIT_TAKE12("GnuTLSOCSPCache", mgs_set_cache,
+                   NULL,
+                   RSRC_CONF,
+                  "OCSP Cache Configuration"),
     AP_INIT_FLAG("GnuTLSOCSPCheckNonce", mgs_set_ocsp_check_nonce,
                  NULL, RSRC_CONF,
                  "Check nonce in OCSP responses?"),
@@ -375,9 +390,19 @@ static const command_rec mgs_config_cmds[] = {
                   NULL, RSRC_CONF,
                   "Wait this many seconds before retrying a failed OCSP "
                   "request"),
+    AP_INIT_TAKE1("GnuTLSOCSPFuzzTime", mgs_set_timeout,
+                  NULL, RSRC_CONF,
+                  "Update cached OCSP response up to this many seconds "
+                  "before it expires, if GnuTLSOCSPAutoRefresh is enabled."),
     AP_INIT_TAKE1("GnuTLSOCSPSocketTimeout", mgs_set_timeout,
                   NULL, RSRC_CONF,
                   "Socket timeout for OCSP requests"),
+    AP_INIT_RAW_ARGS("GnuTLSPGPKeyringFile",
+                     ap_set_deprecated, NULL, OR_ALL, OPENPGP_REMOVED),
+    AP_INIT_RAW_ARGS("GnuTLSPGPCertificateFile",
+                     ap_set_deprecated, NULL, OR_ALL, OPENPGP_REMOVED),
+    AP_INIT_RAW_ARGS("GnuTLSPGPKeyFile",
+                     ap_set_deprecated, NULL, OR_ALL, OPENPGP_REMOVED),
 #ifdef __clang__
     /* Workaround for this clang bug:
      * https://llvm.org/bugs/show_bug.cgi?id=21689 */

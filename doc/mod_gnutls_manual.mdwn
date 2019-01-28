@@ -3,9 +3,9 @@
 * * * * *
 
 `mod_gnutls` is a module for the Apache web server that provides HTTPS
-(HTTP over Transport Layer Security (TLS) or the older Secure Sockets
-Layer (SSL)) using the GnuTLS library.  More information about the
-module can be found at [the project's website](https://mod.gnutls.org/).
+(HTTP over Transport Layer Security (TLS)) using the GnuTLS library.
+More information about the module can be found at
+[the project's website](https://mod.gnutls.org/).
 
 * * * * *
 
@@ -47,6 +47,27 @@ and restart Apache:
 
     LoadModule gnutls_module modules/mod_gnutls.so
 
+Note on HTTP/2
+--------------
+
+HTTP/2 is supported with `mod_gnutls`. However, full support requires
+compiling with GnuTLS 3.6.3 or later. When using lower versions all
+virtual hosts using `mod_gnutls` with overlapping IP/port combinations
+need to use identical `Protocols` directives for protocol negotiation
+to work correctly.
+
+The technical reason is that using HTTP/2 requires ALPN (Application
+Layer Protocol Negotiation) to be set up before GnuTLS parses the TLS
+ClientHello message, but earlier hooks cannot use
+`gnutls_server_name_get()` to retrieve SNI (Server Name Indication)
+data for virtual host selection. Because of this `mod_gnutls` provides
+its own early SNI parser, which requires the `gnutls_ext_raw_parse()`
+function introduced in GnuTLS 3.6.3 to retrieve the extension data in
+a *pre* client hello hook.
+
+During build `./configure` will report "Early SNI: yes" if your
+version of GnuTLS is new enough.
+
 * * * * *
 
 Configuration Directives
@@ -70,45 +91,56 @@ This directive enables SSL/TLS Encryption for a Virtual Host.
 
 Configure TLS Session Cache
 
-    GnuTLSCache [dbm|gdbm|memcache|none] [PATH|SERVERLIST|-]
+    GnuTLSCache (shmcb|dbm|memcache|...|none)[:PARAMETERS]
 
 Default: `GnuTLSCache none`\
 Context: server config
 
-This directive configures the TLS Session Cache for `mod_gnutls`.
-This could be shared between machines of different architectures. If a
-DBM cache is used, access is serialized using the `gnutls-cache`
-mutex. Which DBM types are available is part of the APR (Apache
-Portable Runtime) compile time configuration.
+This directive configures the TLS Session Cache for `mod_gnutls`. This
+could be shared between machines of different architectures. If the
+selected cache implementation is not thread-safe, access is serialized
+using the `gnutls-cache` mutex.
 
-`dbm` (Requires Berkeley DBM)
-:   Uses the Berkeley DB backend of APR DBM to cache TLS Session
-	data.
+Which cache implementations are available depends on your Apache
+installation and configuration, `mod_gnutls` can use any socache
+provider. In general you will need to load a `mod_socache_PROVIDER`
+module. Common options are described below, please check the Apache
+HTTPD documentation for details on available providers and their
+configuration.
 
-	The argument is a relative or absolute path to be used as
-    the DBM Cache file. This is compatible with most operating
-    systems.
+`shmcb`
+:   Uses a shared memory segment. This is a high performance local
+    cache. The parameter is a relative or absolute path to be used if
+    the local shared memory implementation requires one, followed by
+    the cache size in bytes enclosed in parentheses.
 
-`gdbm` (Requires GDBM)
-:   Uses the GDBM backend of APR DBM to cache TLS Session data.
+    Example: `shmcb:cache/gnutls_cache(65536)`
 
-    The argument is a relative or absolute path to be used as the DBM
-    Cache file.
+`dbm`
+:   Uses a DBM cache file. The parameter is a relative or absolute
+    path to be used as the DBM cache file.
+
+    Example: `dbm:cache/gnutls_cache`
 
 `memcache`
-:   Uses memcached server(s) to cache TLS Session data.
+:   Uses memcached server(s) to cache TLS session data. The parameter
+    is a comma separated list of servers (host:port). This can be used
+    to share a session cache between all servers in a cluster.
 
-    The argument is a space separated list of servers. If no port
-    number is supplied, the default of 11211 is used.  This can be
-    used to share a session cache between all servers in a cluster.
+    Example: `memcache:memcache.example.com:12345,memcache2.example.com:12345`
 
 `none`
-:   Turns off all caching of TLS Sessions.
+:   Turns off all caching of TLS sessions.
 
-    This can significantly reduce the performance of `mod_gnutls` since
-    even followup connections by a client must renegotiate parameters
-    instead of reusing old ones.  This is the default, since it
-    requires no configuration.
+    This can significantly reduce the performance of `mod_gnutls`
+    since even followup connections by a client must renegotiate
+    parameters instead of reusing old ones. This is the default, since
+    it requires no configuration.
+
+    Session tickets are an alternative to using a session cache,
+    please see `GnuTLSSessionTickets`. Note that for TLS 1.3 GnuTLS
+    supports resumption using session tickets only as of version
+    3.6.4.
 
 ### GnuTLSCacheTimeout
 
@@ -117,11 +149,9 @@ Timeout for TLS Session Cache expiration
     GnuTLSCacheTimeout SECONDS
 
 Default: `GnuTLSCacheTimeout 300`\
-Context: server config
+Context: server config, virtual host
 
-Sets the timeout for TLS Session Cache entries expiration. This value
-is also used for OCSP responses if they do not contain a `nextUpdate`
-time.
+Sets the expiration timeout for cached TLS sessions.
 
 ### GnuTLSSessionTickets
 
@@ -129,23 +159,26 @@ Enable Session Tickets for the server
 
     GnuTLSSessionTickets [on|off]
 
-Default: `off`\
+Default: `on` with GnuTLS 3.6.4 and newer, `off` otherwise\
 Context: server config, virtual host
 
-To avoid storing data for TLS session resumption the server can
-provide clients with tickets, to use on return. Tickets are an
-alternative to using a session cache, mostly used for busy servers
-with limited storage. For a pool of servers this option is not
-recommended since the tickets are bound to the issuing server only.
+Session tickets allow TLS session resumption without session state
+stored on the server, using encrypted tickets provided to the clients
+instead. Tickets are an alternative to using a session cache, and
+currently the only session resumption mechanism in TLS 1.3. For a pool
+of servers this option is not recommended since the tickets are bound
+to the issuing server only.
 
 If this option is set in the global configuration, virtual hosts
 without a `GnuTLSSessionTickets` setting will use the global setting.
 
-*Warning:* Currently the master key that protects the tickets is
-generated only on server start, and there is no mechanism to roll over
-the key. If session tickets are enabled it is highly recommened to
-restart the server regularly to protect past sessions in case an
-attacker gains access to server memory.
+*Warning:* With GnuTLS version before 3.6.4 the master key that
+protects the tickets is generated only on server start, and there is
+no mechanism to roll over the key. If session tickets are enabled it
+is highly recommended to restart the server regularly to protect past
+sessions in case an attacker gains access to server memory. GnuTLS
+3.6.4 introduced an automatic TOTP-based key rollover, so this warning
+does not apply any more and tickets are enabled by default.
 
 ### GnuTLSClientVerify
 
@@ -203,41 +236,15 @@ MACs and compression methods
 
     GnuTLSPriorities NORMAL:+CIPHER_0:+CIPHER_1:...:+CIPHER_N
 
-Default: *none*\
+Default: `NORMAL`\
 Context: server config, virtual host
 
-Takes a colon separated list of protocol version, ciphers, key
-exchange methods message authentication codes, and compression methods
-to enable. The allowed keywords are specified in the
-`gnutls_priority_init()` function of GnuTLS.
+Sets the allowed protocol version(s), ciphers, key exchange methods,
+message authentication codes, and other TLS parameters for the server.
+The parameter is a GnuTLS priority string as described in the
+[the GnuTLS documentation](https://gnutls.org/manual/html_node/Priority-Strings.html).
 
-Please refer to [the GnuTLS documentation](https://gnutls.org/manual/html_node/Priority-Strings.html#Priority-Strings)
-for details. A few commonly used sets are listed below, note that
-their exact meaning may change with GnuTLS versions.
-
-`PERFORMANCE`
-:   A list with all the secure cipher combinations sorted in terms of
-    performance.
-
-`NORMAL`
-:   A list with all the secure cipher combinations sorted
-    with respect to security margin (subjective term).
-
-`SECURE128`
-:   A list with all the secure cipher suites that offer a security level
-    of 128-bit or more.
-
-`PFS`
-:   Only cipher suites offering perfect forward secrecy (ECDHE and DHE),
-    sorted by security margin.
-
-You can add or remove algorithms using the `+` and `!` prefixes
-respectively. For example, in order to use the `NORMAL` set but
-disable TLS 1.0 and 1.1 you can use the string
-`NORMAL:!VERS-TLS1.0:!VERS-TLS1.1`.
-
-You can find a list of all supported Ciphers, Versions, MACs, etc.  by
-running `gnutls-cli --list`.
+For example, to disable TLS 1.0 use `NORMAL:-VERS-TLS1.0`.
 
 ### GnuTLSP11Module
 
@@ -288,14 +295,14 @@ Context: server config, virtual host
 This directive configures exporting the full certificates of the
 server and the client to CGI scripts via the `SSL_SERVER_CERT` and
 `SSL_CLIENT_CERT` environment variables. The exported certificates
-will be PEM-encoded (if X.509) or ASCII-armored (if OpenPGP) up to the
-size given.  The type of the certificate will be exported in
-`SSL_SERVER_CERT_TYPE` and `SSL_CLIENT_CERT_TYPE`.
+will be PEM-encoded, limited to the given size. The type of the
+certificate will be exported in `SSL_SERVER_CERT_TYPE` and
+`SSL_CLIENT_CERT_TYPE`.
 
 SIZE should be an integer number of bytes, or may be written with a
 trailing `K` to indicate kibibytes.  `off` means the same thing as
 `0`, in which case the certificates will not be exported to the
-environment.  `on` is an alias for `16K`.  If a non-zero size is
+environment. `on` is an alias for `16K`. If a non-zero size is
 specified for this directive, but a certificate is too large to fit in
 the buffer, then the corresponding environment variable will contain
 the fixed string `GNUTLS_CERTIFICATE_SIZE_LIMIT_EXCEEDED`.
@@ -308,21 +315,30 @@ X.509 Certificate Authentication
 
 ### GnuTLSCertificateFile
 
-Set to the PEM Encoded Server Certificate
+Set the PEM encoded server certificate or certificate chain
 
     GnuTLSCertificateFile FILEPATH
 
 Default: *none*\
 Context: server config, virtual host
 
-Takes an absolute or relative path to a PEM-encoded X.509 certificate to
-use as this Server's End Entity (EE) certificate. If you need to supply
-certificates for intermediate Certificate Authorities (iCAs), they
-should be listed in sequence in the file, from EE to the iCA closest to
-the root CA. Optionally, you can also include the root CA's certificate
-as the last certificate in the list.
+FILEPATH is an absolute or relative path to a file containing the
+PEM-encoded X.509 certificate to use as this Server's End Entity (EE)
+certificate, and optionally those of the issuing Certificate
+Authorities (CAs). If the file contains multiple certificates they
+should be ordered from EE to the CA closest to the root CA (or the
+root CA itself).
 
-Since version 0.7 this can be a PKCS #11 URL.
+Including at least the immediately issuing CA is highly recommended
+because it is required for OCSP stapling.
+
+Since version 0.7 this can be a PKCS #11 URL instead of a file.
+
+On Linux and other Unix-like systems you can create the file with a
+command like this (assuming "CA 1" issued the server certificate and
+has been issued by "Root CA" itself):
+
+	$ cat server.pem ca-1.pem root-ca.pem >server-chain.pem
 
 ### GnuTLSKeyFile
 
@@ -356,56 +372,6 @@ Context: server config, virtual host
 Takes an absolute or relative path to a PEM Encoded Certificate to use
 as a Certificate Authority with Client Certificate Authentication.
 This file may contain a list of trusted authorities.
-
-OpenPGP Certificate Authentication
-----------------------------------
-
-*Warning:* OpenPGP support has been deprecated in GnuTLS since version
-3.5.9 and will be removed completely. Consequently, OpenPGP support in
-`mod_gnutls` is deprecated as well and will be removed in a future
-release.
-
-### GnuTLSPGPCertificateFile
-
-Set to a base64 Encoded Server OpenPGP Certificate
-
-    GnuTLSPGPCertificateFile FILEPATH
-
-Default: *none*\
-Context: server config, virtual host
-
-Takes an absolute or relative path to a base64 Encoded OpenPGP
-Certificate to use as this Server's Certificate.
-
-### GnuTLSPGPKeyFile
-
-Set to the Server OpenPGP Secret Key
-
-    GnuTLSPGPKeyFile FILEPATH
-
-Default: *none*\
-Context: server config, virtual host
-
-Takes an absolute or relative path to the Server Private Key. This key
-cannot currently be password protected.
-
-**Security Warning:**\
- This private key must be protected. It is read while Apache is still
-running as root, and does not need to be readable by the nobody or
-apache user.
-
-### GnuTLSPGPKeyringFile
-
-Set to a base64 Encoded key ring
-
-    GnuTLSPGPKeyringFile FILEPATH
-
-Default: *none*\
-Context: server config, virtual host
-
-Takes an absolute or relative path to a base64 Encoded Certificate
-list (key ring) to use as a means of verification of Client
-Certificates.  This file should contain a list of trusted signers.
 
 SRP Authentication
 ------------------
@@ -530,13 +496,14 @@ methods for proxy connections
 
     GnuTLSProxyPriorities NORMAL:+CIPHER_0:+CIPHER_1:...:+CIPHER_N
 
-Default: *none*\
+Default: `NORMAL`\
 Context: server config, virtual host
 
-This option is used to set the allowed ciphers, key exchange
-algorithms, MACs and compression methods for proxy connections. It
-takes the same parameters as `GnuTLSPriorities`. Required if
-`GnuTLSProxyEngine` is `On`.
+Sets the allowed protocol version(s), ciphers, key exchange methods,
+message authentication codes, and other TLS parameters for TLS proxy
+connections. Like for `GnuTLSPriorities` the parameter is a GnuTLS
+priority string as described in the
+[the GnuTLS documentation](https://gnutls.org/manual/html_node/Priority-Strings.html).
 
 OCSP Stapling Configuration
 ---------------------------
@@ -547,25 +514,91 @@ Enable OCSP stapling for this (virtual) host.
 
     GnuTLSOCSPStapling [On|Off]
 
-Default: *off*\
+Default: *on* if requirements are met, *off* otherwise\
 Context: server config, virtual host
 
 OCSP stapling, formally known as the TLS Certificate Status Request
-extension, allows the server to provide the client with an OCSP
-response for its certificate during the handshake. This way the client
-does not have to send an OCSP request to the CA to check the
-certificate status, which offers privacy and performance advantages.
+extension, allows the server to provide the client with a cached OCSP
+response for its certificate during the handshake. With OCSP stapling
+the client does not have to send an OCSP request to the issuer CA to
+check the certificate status, which offers privacy and performance
+advantages, and avoids the security issue of how to handle errors that
+prevent the client from getting a response.
 
 Using OCSP stapling has a few requirements:
 
-* Caching OCSP responses requires a cache, so `GnuTLSCache` must not
-  be `none`.
 * `GnuTLSCertificateFile` must contain the issuer CA certificate in
   addition to the server certificate so responses can be verified.
-* The certificate must either contain an OCSP access URI using HTTP,
-  or `GnuTLSOCSPResponseFile` must be set.
+* The server certificate must either contain an OCSP access URI using
+  HTTP, or `GnuTLSOCSPResponseFile` must be set.
+* Caching OCSP responses requires a cache to store responses. If
+  `mod_socache_shmcb` is loaded `mod_gnutls` can set up the cache
+  automatically without additional configuration, see
+  `GnuTLSOCSPCache`.
+
+Stapling is activated by default if these requirements are met. If
+`GnuTLSOCSPStapling` is explicitly set to `on` unmet requirements are
+an error.
 
 OCSP cache updates are serialized using the `gnutls-ocsp` mutex.
+
+### GnuTLSOCSPCache
+
+OCSP stapling cache configuration
+
+	GnuTLSOCSPCache (shmcb|memcache|...|none)[:PARAMETERS]
+
+Default: `shmcb:gnutls_ocsp_cache`\
+Context: server config
+
+This directive configures the OCSP stapling cache, and uses the same
+syntax as `GnuTLSOCSPCache`. Please check there for details.
+
+The default should be reasonable for most servers and requires
+[mod\_socache\_shmcb](http://httpd.apache.org/docs/current/en/mod/mod_socache_shmcb.html)
+to be loaded. Servers with very many virtual hosts may need to
+increase the default cache size via the parameters string, those with
+few virtual hosts and memory constraints could save a few KB by reducing
+it. Note that `mod_socache_dbm` has a size constraint for entries that
+is generally too small for OCSP responses.
+
+If the selected cache implementation is not thread-safe, access
+is serialized using the `gnutls-ocsp-cache` mutex.
+
+### GnuTLSOCSPAutoRefresh
+
+Regularly refresh cached OCSP response independent of TLS handshakes?
+
+    GnuTLSOCSPAutoRefresh [On|Off]
+
+Default: *on*\
+Context: server config, virtual host
+
+By default `mod_gnutls` will regularly refresh the cached OCSP
+response for hosts that have OCSP stapling enabled, regardless of
+whether it is used. This has advantages over updating the OCSP
+response only if a TLS handshake needs it:
+
+* Updating the cached response before it expires can hide short
+  unavailability of the OCSP responder, if a repeated request is
+  successful before the cache expires (see below).
+
+* Handshakes are not slowed down by fetching responses.
+
+The interval to the next request is determined as follows: After a
+successful OCSP request the next one is scheduled for a random period
+between `GnuTLSOCSPFuzzTime` and half of it before
+`GnuTLSOCSPCacheTimeout` expires. For example, if the cache timeout is
+3600 seconds and the fuzz time 600 seconds, the next request will be
+sent after 3000 to 3300 seconds. If the validity period of the
+response expires before then, the selected interval is halved until it
+is smaller than the time until expiry. If an OCSP request fails, it is
+retried after `GnuTLSOCSPFailureTimeout`.
+
+Regularly updating the OCSP cache requires `mod_watchdog`,
+`mod_gnutls` will fall back to updating the OCSP cache during
+handshakes if `mod_watchdog` is not available or this option is set to
+`Off`.
 
 ### GnuTLSOCSPCheckNonce
 
@@ -640,6 +673,20 @@ responder. A shorter value increases the load on both sides, a longer
 one means that stapling will remain disabled for longer after a failed
 request.
 
+### GnuTLSOCSPFuzzTime
+
+Update the cached OCSP response up to this time before the cache expires
+
+    GnuTLSOCSPFuzzTime SECONDS
+
+Default: *larger of GnuTLSOCSPCacheTimeout / 8 and GnuTLSOCSPFailureTimeout \* 2*\
+Context: server config, virtual host
+
+Refreshing the cached response before it expires hides short OCSP
+responder unavailability. See `GnuTLSOCSPAutoRefresh` for how this
+value is used, using at least twice `GnuTLSOCSPFailureTimeout` is
+recommended.
+
 ### GnuTLSOCSPSocketTimeout
 
 Timeout for TCP sockets used to send OCSP requests
@@ -665,22 +712,103 @@ time.
 Configuration Examples
 ======================
 
-Simple Standard TLS Example
----------------------------
+Minimal Example
+---------------
 
-The following is an example of simple TLS hosting, using one IP
-Addresses for each virtual host.
+A minimal server configuration using mod_gnutls might look like this
+(other than the default setup):
+
+     # Load mod_gnutls into Apache.
+     LoadModule gnutls_module modules/mod_gnutls.so
+
+	 Listen 192.0.2.1:443
+
+     <VirtualHost _default_:443>
+	     # Standard virtual host stuff
+         DocumentRoot /www/site1.example.com/html
+         ServerName site1.example.com:443
+         
+		 # Minimal mod_gnutls setup: enable, and set credentials
+		 GnuTLSEnable on
+         GnuTLSCertificateFile conf/tls/site1_cert_chain.pem
+         GnuTLSKeyFile conf/tls/site1_key.pem
+     </VirtualHost>
+
+This gives you an HTTPS site using the GnuTLS `NORMAL` set of
+ciphersuites. OCSP stapling will be enabled if the server certificate
+contains an OCSP URI, `conf/tls/site1_cert_chain.pem` contains the
+issuer certificate in addition to the server's, and
+[mod\_socache\_shmcb](http://httpd.apache.org/docs/current/en/mod/mod_socache_shmcb.html)
+is loaded. With Gnutls 3.6.4 or newer session tickets are enabled,
+too.
+
+Virtual Hosts with Server Name Indication
+-----------------------------------------
+
+`mod_gnutls` supports Server Name Indication (SNI), as specified in
+[RFC 6066, Section 3](https://tools.ietf.org/html/rfc6066#section-3).
+This allows hosting many TLS websites with a single IP address, you
+can just add virtual host configurations. All recent browsers support
+this standard. Here is an example using SNI:
 
      # Load the module into Apache.
      LoadModule gnutls_module modules/mod_gnutls.so
-     GnuTLSCache gdbm /var/cache/www-tls-cache
-     GnuTLSCacheTimeout 500
+	 # This example server uses session tickets, no cache.
+     GnuTLSSessionTickets on
 
-     # Without SNI you need one IP Address per-site.
+     # SNI allows hosting multiple sites using one IP address. This
+     # could also be 'Listen *:443', just like '*:80' is common for
+     # non-HTTPS
+     Listen 198.51.100.1:443
+
+     <VirtualHost _default_:443>
+         GnuTLSEnable on
+         DocumentRoot /www/site1.example.com/html
+         ServerName site1.example.com:443
+         GnuTLSCertificateFile conf/tls/site1.crt
+         GnuTLSKeyFile conf/tls/site1.key
+     </VirtualHost>
+
+     <VirtualHost _default_:443>
+         GnuTLSEnable on
+         DocumentRoot /www/site2.example.com/html
+         ServerName site2.example.com:443
+         GnuTLSCertificateFile conf/tls/site2.crt
+         GnuTLSKeyFile conf/tls/site2.key
+     </VirtualHost>
+
+     <VirtualHost _default_:443>
+         GnuTLSEnable on
+         DocumentRoot /www/site3.example.com/html
+         ServerName site3.example.com:443
+         GnuTLSCertificateFile conf/tls/site3.crt
+         GnuTLSKeyFile conf/tls/site3.key
+         # Enable HTTP/2. With GnuTLS before version 3.6.3 all
+         # virtual hosts in this example would have to share this
+         # directive to work correctly.
+         Protocols h2 http/1.1
+     </VirtualHost>
+
+Virtual Hosts without SNI
+-------------------------
+
+If you need to support clients that do not use SNI, you have to use a
+unique IP address/port combination for each virtual host. In this
+example all virtual hosts use the default port for HTTPS (443) and
+different IP addresses.
+
+     # Load the module into Apache.
+     LoadModule gnutls_module modules/mod_gnutls.so
+	 # This example server uses a session cache.
+     GnuTLSCache dbm:/var/cache/www-tls-cache
+     GnuTLSCacheTimeout 1200
+
+     # Without SNI you need one IP Address per site. The IP addresses
+	 # are listed separately for clarity, you could also use "Listen 443"
+	 # to use that port on all available IP addresses.
      Listen 192.0.2.1:443
      Listen 192.0.2.2:443
      Listen 192.0.2.3:443
-     Listen 192.0.2.4:443
 
      <VirtualHost 192.0.2.1:443>
          GnuTLSEnable on
@@ -702,108 +830,45 @@ Addresses for each virtual host.
      </VirtualHost>
 
      <VirtualHost 192.0.2.3:443>
-         # This server enables SRP, OpenPGP and X.509 authentication.
+         # This server enables SRP and X.509 authentication.
          GnuTLSEnable on
-         GnuTLSPriorities NORMAL:+SRP:+SRP-RSA:+SRP-DSS:+CTYPE-OPENPGP
+         GnuTLSPriorities NORMAL:+SRP:+SRP-RSA:+SRP-DSS
          DocumentRoot /www/site3.example.com/html
          ServerName site3.example.com:443
          GnuTLSCertificateFile conf/tls/site3.crt
          GnuTLSKeyFile conf/tls/site3.key
          GnuTLSClientVerify ignore
-         GnuTLSPGPCertificateFile conf/tls/site3.pub.asc
-         GnuTLSPGPKeyFile conf/tls/site3.sec.asc
          GnuTLSSRPPasswdFile conf/tls/tpasswd.site3
          GnuTLSSRPPasswdConfFile conf/tls/tpasswd.site3.conf
-     </VirtualHost>
-
-     <VirtualHost 192.0.2.4:443>
-         GnuTLSEnable on
-         # %COMPAT disables some security features to enable maximum
-         # compatibility with clients. Don't use this if you need strong
-         # security.
-         GnuTLSPriorities NORMAL:%COMPAT
-         DocumentRoot /www/site4.example.com/html
-         ServerName site4.example.com:443
-         GnuTLSCertificateFile conf/tls/site4.crt
-         GnuTLSKeyFile conf/tls/site4.key
-     </VirtualHost>
-
-Server Name Indication Example
-------------------------------
-
-`mod_gnutls` supports "Server Name Indication", as specified in
-[RFC 6066, Section 3](https://tools.ietf.org/html/rfc6066#section-3). This
-allows hosting many TLS websites with a single IP address. All recent
-browsers support this standard. Here is an example using SNI:
-
-     # Load the module into Apache.
-     LoadModule gnutls_module modules/mod_gnutls.so
-
-     # SNI allows hosting multiple sites using one IP address. This
-     # could also be 'Listen *:443', just like '*:80' is common for
-     # non-HTTPS
-     Listen 198.51.100.1:443
-
-     <VirtualHost _default_:443>
-         GnuTLSEnable on
-         GnuTLSSessionTickets on
-         GnuTLSPriorities NORMAL
-         DocumentRoot /www/site1.example.com/html
-         ServerName site1.example.com:443
-         GnuTLSCertificateFile conf/tls/site1.crt
-         GnuTLSKeyFile conf/tls/site1.key
-     </VirtualHost>
-
-     <VirtualHost _default_:443>
-         GnuTLSEnable on
-         GnuTLSPriorities NORMAL
-         DocumentRoot /www/site2.example.com/html
-         ServerName site2.example.com:443
-         GnuTLSCertificateFile conf/tls/site2.crt
-         GnuTLSKeyFile conf/tls/site2.key
-     </VirtualHost>
-
-     <VirtualHost _default_:443>
-         GnuTLSEnable on
-         GnuTLSPriorities NORMAL
-         DocumentRoot /www/site3.example.com/html
-         ServerName site3.example.com:443
-         GnuTLSCertificateFile conf/tls/site3.crt
-         GnuTLSKeyFile conf/tls/site3.key
-     </VirtualHost>
-
-     <VirtualHost _default_:443>
-         GnuTLSEnable on
-         GnuTLSPriorities NORMAL
-         DocumentRoot /www/site4.example.com/html
-         ServerName site4.example.com:443
-         GnuTLSCertificateFile conf/tls/site4.crt
-         GnuTLSKeyFile conf/tls/site4.key
      </VirtualHost>
 
 OCSP Stapling Example
 ---------------------
 
-This example uses an X.509 server certificate. The server will fetch
-OCSP responses from the responder listed in the certificate and store
-them im a memcached cache shared with another server.
+This is an example with a customized OCSP stapling configuration. What
+is a resonable cache timeout varies depending on how long your CA's
+OCSP responses are valid. Some CAs provide responses that are valid
+for multiple days, in that case timeout and fuzz time could be
+significantly larger.
 
      # Load the module into Apache.
      LoadModule gnutls_module modules/mod_gnutls.so
-     GnuTLSCache memcache "192.0.2.1:11211 192.0.2.2:11211"
-     GnuTLSCacheTimeout 600
+	 # A 64K cache is more than enough for one response
+     GnuTLSOCSPCache shmcb:ocsp_cache(65536)
 
      Listen 192.0.2.1:443
 
      <VirtualHost _default_:443>
-         GnuTLSEnable          On
-         GnuTLSPriorities      NORMAL
-         DocumentRoot          /www/site1.example.com/html
-         ServerName            site1.example.com:443
-         GnuTLSCertificateFile conf/tls/site1.crt
-         GnuTLSKeyFile         conf/tls/site1.key
-         GnuTLSPriorities      NORMAL
-         GnuTLSOCSPStapling    On
+         GnuTLSEnable           On
+         DocumentRoot           /www/site1.example.com/html
+         ServerName             site1.example.com:443
+         GnuTLSCertificateFile  conf/tls/site1_cert_chain.pem
+         GnuTLSKeyFile          conf/tls/site1_key.pem
+         GnuTLSOCSPStapling     On
+		 # The cached OCSP response is kept for up to 4 hours,
+		 # with updates scheduled every 3 to 3.5 hours.
+         GnuTLSOCSPCacheTimeout 21600
+		 GnuTLSOCSPFuzzTime     3600
      </VirtualHost>
 
 * * * * *
@@ -937,21 +1002,21 @@ The public key algorithm in server's certificate.
 `SSL_SERVER_CERT`
 ------------------
 
-The PEM-encoded (X.509) or ASCII-armored (OpenPGP) server certificate
-(see the `GnuTLSExportCertificates` directive).
+The PEM-encoded (X.509) server certificate (see the
+`GnuTLSExportCertificates` directive).
 
 `SSL_SERVER_CERT_TYPE`
 ----------------------
 
-The certificate type can be `X.509` or `OPENPGP`.
+The certificate type will be `X.509`.
 
 `SSL_CLIENT_CERT`
 ------------------
 
-The PEM-encoded (X.509) or ASCII-armored (OpenPGP) client certificate
-(see the `GnuTLSExportCertificates` directive).
+PEM-encoded (X.509) client certificate, if any (see the
+`GnuTLSExportCertificates` directive).
 
 `SSL_CLIENT_CERT_TYPE`
 ----------------------
 
-The certificate type can be `X.509` or `OPENPGP`.
+The certificate type will be `X.509`, if any.

@@ -1,5 +1,5 @@
 /*
- *  Copyright 2016 Fiona Klute
+ *  Copyright 2016-2018 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -25,5 +25,8 @@
 
 /* TODO: move configuration related function definitions from
  * mod_gnutls.h.in over here */
+
+const char *mgs_set_cache(cmd_parms * parms, void *dummy,
+                          const char *type, const char* arg);
 
 #endif /* __MOD_GNUTLS_CONFIG_H__ */

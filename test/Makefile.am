@@ -14,7 +14,7 @@ dist_check_SCRIPTS = test-00_basic.bash \
 	test-11_basic_client_verification_fail.bash \
 	test-12_cgi_variables.bash \
 	test-13_cgi_variables_no_client_cert.bash \
-	test-14_basic_openpgp.bash
+	test-14_resume_session.bash
 if USE_MSVA
 dist_check_SCRIPTS += test-15_basic_msva.bash
 endif
@@ -30,16 +30,19 @@ dist_check_SCRIPTS += test-16_view-status.bash \
 	test-25_Disable_TLS_1.0.bash \
 	test-26_redirect_HTTP_to_HTTPS.bash \
 	test-27_OCSP_server.bash \
-	test-28_HTTP2_support.bash
+	test-28_HTTP2_support.bash \
+	test-29_force_handshake_vhost.bash \
+	test-30_ip_based_vhosts.bash \
+	test-31_vhost_SNI_serveralias_match.bash \
+	test-32_vhost_SNI_serveralias_mismatch.bash \
+	test-33_vhost_SNI_serveralias_missinghost.bash \
+	test-34_TLS_reverse_proxy_h2.bash
 
 TEST_EXTENSIONS = .bash
 TESTS = $(dist_check_SCRIPTS)
 
-check_PROGRAMS = pgpcrc gnutls_openpgp_support
+check_PROGRAMS = pgpcrc
 pgpcrc_SOURCES = pgpcrc.c
-gnutls_openpgp_support_SOURCES = gnutls_openpgp_support.c
-gnutls_openpgp_support_CFLAGS = $(LIBGNUTLS_CFLAGS)
-gnutls_openpgp_support_LDFLAGS = $(LIBGNUTLS_LIBS)
 
 # build OCSP database tool
 if ENABLE_OCSP_TEST
@@ -52,9 +55,9 @@ endif
 
 # Identities in the miniature CA, server, and client environment for
 # the test suite
-shared_identities = server authority client imposter rogueca
+shared_identities = authority client
 pgp_identities = $(shared_identities)
-x509_only_identities = rogueclient
+x509_only_identities = server rogueca imposter rogueclient
 if ENABLE_OCSP_TEST
 x509_only_identities += ocsp-responder
 endif
@@ -67,7 +70,10 @@ pgp_tokens = $(pgp_identities:=/cert.pgp) \
 x509_keys = $(x509_identities:=/secret.key)
 x509_certs = $(x509_identities:=/x509.pem)
 x509_tokens = $(x509_certs) $(x509_keys)
-tokens = $(x509_tokens) $(pgp_tokens)
+tokens = $(x509_tokens)
+if USE_MSVA
+tokens += $(pgp_tokens)
+endif
 
 if !DISABLE_FLOCK
 # flock command for write access to the authority keyring
@@ -245,6 +251,7 @@ BACKEND_PORT ?= 9934
 # port for the OCSP responder
 if ENABLE_OCSP_TEST
 OCSP_PORT ?= 9936
+OCSP_URI_TEMPLATE = ocsp_uri = http://$(TEST_HOST):$(OCSP_PORT)/ocsp/
 endif
 # maximum time to wait for MSVA startup (milliseconds)
 TEST_SERVICE_MAX_WAIT ?= 10000
@@ -254,6 +261,7 @@ TEST_SERVICE_WAIT ?= 400
 AM_TESTS_ENVIRONMENT = export APACHE2=@APACHE2@; \
 	export AP_LIBEXECDIR=@AP_LIBEXECDIR@; \
 	export TEST_LOCK_WAIT="@TEST_LOCK_WAIT@"; \
+	export TEST_IP="@TEST_IP@"; \
 	export TEST_HOST="@TEST_HOST@"; \
 	export TEST_PORT="$(TEST_PORT)"; \
 	export MSVA_PORT="$(MSVA_PORT)"; \

@@ -1,5 +1,5 @@
 /*
- *  Copyright 2016-2018 Fiona Klute
+ *  Copyright 2016-2019 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -24,6 +24,9 @@
 
 #ifndef __MOD_GNUTLS_UTIL_H__
 #define __MOD_GNUTLS_UTIL_H__
+
+/** Default GnuTLS priority string for mod_gnutls */
+#define MGS_DEFAULT_PRIORITY "NORMAL"
 
 /** maximum allowed length of one header line */
 #define HTTP_HDR_LINE_MAX 1024
@@ -72,5 +75,40 @@ apr_status_t datum_from_file(apr_pool_t *p, const char* filename,
  * some defaults.
  */
 mgs_handle_t *init_gnutls_ctxt(conn_rec *c);
+
+/**
+ * Initialize the global default priorities, must be called by the
+ * pre_config hook
+ *
+ * @return `GNUTLS_E_SUCCESS` or a GnuTLS error code
+ */
+int mgs_default_priority_init();
+
+/**
+ * Get the global default priorities
+ */
+gnutls_priority_t mgs_get_default_prio();
+
+/**
+ * Deinitialize the global default priorities, must be in the cleanup
+ * hook of the pre_config pool.
+ */
+void mgs_default_priority_deinit();
+
+/**
+ * Create a shallow copy of an APR array of `char *` into a new array
+ * of gnutls_datum_t, filling `size` via `strlen()`. "Shallow copy"
+ * means that the strings themselves are not copied, just the pointers
+ * to them.
+ *
+ * @param src array to copy
+ * @param pool allocate memory for the new array
+ * @param min_elements allocate room for at least this many elements
+ *
+ * @return pointer to the first element of the new array
+ */
+gnutls_datum_t * mgs_str_array_to_datum_array(const apr_array_header_t *src,
+                                              apr_pool_t *pool,
+                                              const int min_elements);
 
 #endif /* __MOD_GNUTLS_UTIL_H__ */
