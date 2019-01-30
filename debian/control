@@ -22,7 +22,7 @@ Build-Depends:
  pkg-config,
  procps <!nocheck>,
  softhsm2 <!nocheck> | softhsm <!nocheck>,
-Standards-Version: 4.2.1
+Standards-Version: 4.3.0
 Homepage: https://mod.gnutls.org/
 Vcs-Git: https://mod.gnutls.org/git/mod_gnutls -b debian/master
 Vcs-Browser: https://mod.gnutls.org/browser/mod_gnutls
@@ -33,10 +33,10 @@ Architecture: any
 Depends:
  ${misc:Depends},
  ${shlibs:Depends},
-Description: Apache module for SSL and TLS encryption with GnuTLS
+Description: Apache module for TLS encryption with GnuTLS
  mod_gnutls provides TLS encryption using the GnuTLS library. It's
  similar in purpose to mod_ssl, but doesn't use OpenSSL, and provides
  some additional features:
+  * Background OCSP stapling,
   * PKCS #11 access to server keys and certificates,
-  * OpenPGP authentication, and
   * using Monkeysphere for client certificate validation.
