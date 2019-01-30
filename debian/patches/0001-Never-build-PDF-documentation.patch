@@ -1,0 +1,23 @@
+From: Fiona Klute <fiona.klute@gmx.de>
+Date: Wed, 30 Jan 2019 08:33:30 +0100
+Subject: Never build PDF documentation
+
+It's not installed anyway, and breaks the build if pdflatex is
+available but fonts used by pandoc are missing.
+---
+ configure.ac | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/configure.ac b/configure.ac
+index 48febcf..4082777 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -210,7 +210,7 @@ AC_MSG_RESULT($use_msva)
+ build_doc=no
+ AC_PATH_PROG([PANDOC], [pandoc], [no])
+ if test "$PANDOC" != "no"; then
+-	AC_PATH_PROG([PDFLATEX], [pdflatex], [no])
++	PDFLATEX="no"
+ 	if test "$PDFLATEX" != "no"; then
+ 		build_doc="html, manual page, pdf"
+ 	else
