@@ -1,3 +1,15 @@
+mod-gnutls (0.9.0-1) unstable; urgency=medium
+
+  [ Fiona Klute ]
+  * New upstream version
+    - drops OpenPGP support (Closes: #917584)
+    - background OCSP stapling
+  * Drop 0001-Fix-test-16-view-status-by-changing-priority-string.patch
+  * Update Standards-Version and Description fields
+  * Disable building PDF documentation (Closes: #917582)
+
+ -- Daniel Kahn Gillmor <dkg@fifthhorseman.net>  Fri, 08 Feb 2019 16:27:06 -0500
+
 mod-gnutls (0.8.4-2) unstable; urgency=medium
 
   [ Sunil Mohan Adapa ]
