@@ -14,7 +14,7 @@
 	done; \
 	sed -i -e "s,__IP_ADDRESSES__,$${IP_ADDRS#\\n}," $@
 
-%.uid: $(srcdir)/%.uid.in
+%/uid: $(srcdir)/%/uid.in
 	sed s/__HOSTNAME__/$(TEST_HOST)/ < $< > $@
 
 %/secret.key:
@@ -24,7 +24,7 @@
 
 .PRECIOUS: %/secret.key
 
-%/secret.pgp.raw: %.uid %/secret.key
+%/secret.pgp.raw: %/uid %/secret.key
 	PEM2OPENPGP_USAGE_FLAGS=authenticate,certify,sign pem2openpgp "$$(cat $<)" < $(dir $@)secret.key > $@
 
 %/secret.pgp: %/secret.pgp.raw pgpcrc

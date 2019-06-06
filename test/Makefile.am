@@ -112,7 +112,7 @@ CLEANFILES = $(x509_keys)
 # pairs, and regenerating them makes it possible to change identities
 # (e.g. host names) without wasting time on new keys (which would
 # happen after "clean").
-MOSTLYCLEANFILES += */x509.pem $(generated_templates) *.uid
+MOSTLYCLEANFILES += */x509.pem $(generated_templates) */uid
 
 
 # Delete PGP keyrings on "mostlyclean" target. They are created from
@@ -144,7 +144,7 @@ MOSTLYCLEANFILES += *.lock
 # rule to build MSVA trust database
 if USE_MSVA
 msva_home = msva.gnupghome
-check_DATA += $(msva_home)/trustdb.gpg client.uid
+check_DATA += $(msva_home)/trustdb.gpg client/uid
 MOSTLYCLEANFILES += $(msva_home)/trustdb.gpg
 $(msva_home)/trustdb.gpg: authority/minimal.pgp client/cert.pgp
 	mkdir -p -m 0700 $(dir $@)
@@ -214,7 +214,6 @@ endif
 # avoids this issue, and the timeout will expose actually unclean
 # stops.
 clean-local:
-	-rmdir $(identities) || true
 	-rmdir $(extra_dirs) || true
 if USE_MSVA
 	-rmdir $(msva_home) || true
@@ -231,7 +230,7 @@ apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/ocsp.cgi \
 	data/secret.txt data/test.txt ffdhe3072.pem mime.types \
 	proxy_mods.conf
 
-EXTRA_DIST = $(apache_data) $(cert_templates) $(shared_identities:=.uid.in) \
+EXTRA_DIST = $(apache_data) $(cert_templates) $(shared_identities:=/uid.in) \
 	apache_service.bash common.bash runtests server-crl.template \
 	softhsm.bash
 
