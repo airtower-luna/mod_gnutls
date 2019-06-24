@@ -96,11 +96,11 @@ check_DATA = $(tokens) server/crl.pem
 
 MOSTLYCLEANFILES = cache/* logs/* outputs/* server/crl.pem
 
-cert_templates = authority.template.in client.template.in \
-	imposter.template.in ocsp-responder.template rogueca.template \
-	rogueclient.template.in server.template.in
-generated_templates = authority.template client.template \
-	imposter.template rogueclient.template server.template
+cert_templates = authority/template.in client/template.in \
+	imposter/template.in ocsp-responder/template rogueca/template \
+	rogueclient/template.in server/template.in
+generated_templates = authority/template client/template \
+	imposter/template rogueclient/template server/template
 
 # Delete X.509 private keys on full clean. Note that unless you need
 # to generate fresh keys, the "mostlyclean" target should be
@@ -231,7 +231,7 @@ apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/ocsp.cgi \
 	proxy_mods.conf
 
 EXTRA_DIST = $(apache_data) $(cert_templates) $(shared_identities:=/uid.in) \
-	apache_service.bash common.bash runtests server-crl.template \
+	apache_service.bash common.bash runtests server/crl.template \
 	softhsm.bash
 
 # Lockfile for the main Apache process
