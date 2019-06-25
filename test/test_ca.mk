@@ -6,7 +6,7 @@
 # General rules to set up a miniature CA & server & client environment
 # for the test suite
 
-%/template: $(srcdir)/%/template.in %
+%/template: $(srcdir)/%/template.in
 	@mkdir -m 0700 -p $(@D)
 	sed s/__HOSTNAME__/$(TEST_HOST)/ < $< > $@
 	sed -i -e "s,__OCSP_URI__,$(OCSP_URI_TEMPLATE)," $@
@@ -15,11 +15,11 @@
 	done; \
 	sed -i -e "s,__IP_ADDRESSES__,$${IP_ADDRS#\\n}," $@
 
-%/uid: $(srcdir)/%/uid.in %
+%/uid: $(srcdir)/%/uid.in
 	@mkdir -m 0700 -p $(@D)
 	sed s/__HOSTNAME__/$(TEST_HOST)/ < $< > $@
 
-%/secret.key: %
+%/secret.key:
 	@mkdir -m 0700 -p $(@D)
 	certtool --outfile $@ --generate-privkey
 
@@ -92,10 +92,10 @@ rogue%/x509.pem: rogue%/template rogue%/secret.key rogueca/x509.pem
 # revoke the server certificate and check if setting the CRL as
 # GnuTLSProxyCRLFile causes the connection to the back end server to
 # fail.
-%/crl.pem: %/x509.pem ${srcdir}/%/crl.template
+%/crl.pem: %/x509.pem $(srcdir)/%/crl.template
 	certtool --generate-crl \
 		--outfile $@ \
 		--load-ca-privkey authority/secret.key \
 		--load-ca-certificate authority/x509.pem \
 		--load-certificate $< \
-		--template "${srcdir}/$(*)/crl.template"
+		--template "$(srcdir)/$(*)/crl.template"
