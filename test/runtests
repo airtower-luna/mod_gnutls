@@ -138,7 +138,7 @@ if [ -n "${USE_MSVA}" ]; then
     printf "TESTING: initial MSVA verification\n"
     export MONKEYSPHERE_VALIDATION_AGENT_SOCKET="http://127.0.0.1:$MSVA_PORT"
 
-    msva_test_cmd="msva-query-agent https \"$(cat client/uid)\" x509pem client < client/x509.pem"
+    msva_test_cmd="msva-query-agent https \"$(cat authority/client/uid)\" x509pem client < authority/client/x509.pem"
     # check if MSVA is up, fail if not
     if wait_ready "${msva_test_cmd}"; then
 	printf "\nSUCCESS: initial MSVA verification\n"

@@ -55,7 +55,7 @@ endif
 
 # Identities in the miniature CA, server, and client environment for
 # the test suite
-shared_identities = authority client
+shared_identities = authority authority/client
 pgp_identities = $(shared_identities)
 x509_only_identities = server rogueca imposter rogueclient
 if ENABLE_OCSP_TEST
@@ -96,10 +96,10 @@ check_DATA = $(tokens) server/crl.pem
 
 MOSTLYCLEANFILES = cache/* logs/* outputs/* server/crl.pem
 
-cert_templates = authority/template.in client/template.in \
+cert_templates = authority/template.in authority/client/template.in \
 	imposter/template.in ocsp-responder/template rogueca/template \
 	rogueclient/template.in server/template.in
-generated_templates = authority/template client/template \
+generated_templates = authority/template authority/client/template \
 	imposter/template rogueclient/template server/template
 
 # Delete X.509 private keys on full clean. Note that unless you need
@@ -112,16 +112,17 @@ CLEANFILES = $(x509_keys)
 # pairs, and regenerating them makes it possible to change identities
 # (e.g. host names) without wasting time on new keys (which would
 # happen after "clean").
-MOSTLYCLEANFILES += */x509.pem $(generated_templates) */uid
+MOSTLYCLEANFILES += $(x509_certs) $(generated_templates) $(identities:=/uid)
 
 
 # Delete PGP keyrings on "mostlyclean" target. They are created from
 # the X.509 private keys and certificates with an expiration time of
 # one day, so regenerating them is both fast and frequently
 # necessary.
-MOSTLYCLEANFILES += */*.pgp */*.pgp.raw */*.gpg */*.gpg~ */gpg.conf \
-	authority/lock */*.kbx */*.kbx~ */S.gpg-agent */private-keys-v1.d/* \
-	authority/tofu.db
+pgp_patterns = /*.pgp /*.pgp.raw /*.gpg /*.gpg~ /gpg.conf \
+	/*.kbx /*.kbx~ /S.gpg-agent /private-keys-v1.d/*
+MOSTLYCLEANFILES += $(foreach pat,$(pgp_patterns),$(pgp_identities:=$(pat))) \
+	authority/lock authority/tofu.db
 # GnuPG random pool, no need to regenerate on every build
 CLEANFILES += authority/random_seed
 
@@ -144,13 +145,13 @@ MOSTLYCLEANFILES += *.lock
 # rule to build MSVA trust database
 if USE_MSVA
 msva_home = msva.gnupghome
-check_DATA += $(msva_home)/trustdb.gpg client/uid
-MOSTLYCLEANFILES += $(msva_home)/trustdb.gpg
-$(msva_home)/trustdb.gpg: authority/minimal.pgp client/cert.pgp
+check_DATA += $(msva_home)/trustdb.gpg authority/client/uid
+MOSTLYCLEANFILES += $(foreach pat,$(pgp_patterns),$(msva_home)$(pat))
+$(msva_home)/trustdb.gpg: authority/minimal.pgp authority/client/cert.pgp
 	mkdir -p -m 0700 $(dir $@)
 	GNUPGHOME=$(dir $@) gpg --import < $<
 	printf "%s:6:\n" "$$(GNUPGHOME=authority/ gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" | GNUPGHOME=$(dir $@) gpg --import-ownertrust
-	GNUPGHOME=$(dir $@) gpg --import < client/cert.pgp
+	GNUPGHOME=$(dir $@) gpg --import < authority/client/cert.pgp
 	printf "keyserver does-not-exist.example\n" > $(msva_home)/gpg.conf
 endif
 
@@ -159,7 +160,7 @@ if ENABLE_OCSP_TEST
 check_DATA += authority/ocsp_index.txt
 MOSTLYCLEANFILES += authority/ocsp_index.txt authority/ocsp_index.txt.attr
 authority/ocsp_index.txt: $(x509_tokens) gen_ocsp_index authority/ocsp_index.txt.attr
-	./gen_ocsp_index server/x509.pem client/x509.pem > $@
+	./gen_ocsp_index server/x509.pem authority/client/x509.pem > $@
 
 authority/ocsp_index.txt.attr: authority/secret.key
 	echo "unique_subject = no" > $@
