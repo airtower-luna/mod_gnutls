@@ -57,7 +57,7 @@ endif
 # the test suite
 shared_identities = authority authority/client
 pgp_identities = $(shared_identities)
-x509_only_identities = server rogueca imposter rogueclient
+x509_only_identities = authority/server rogueca imposter rogueclient
 if ENABLE_OCSP_TEST
 x509_only_identities += ocsp-responder
 endif
@@ -92,15 +92,15 @@ include $(srcdir)/test_ca.mk
 # one Apache instance (possibly plus a proxy back end instance) is
 # running at any time, so test cases actually have to wait for each
 # other - just not in any particular order.
-check_DATA = $(tokens) server/crl.pem
+check_DATA = $(tokens) authority/server/crl.pem
 
-MOSTLYCLEANFILES = cache/* logs/* outputs/* server/crl.pem
+MOSTLYCLEANFILES = cache/* logs/* outputs/* authority/server/crl.pem
 
 cert_templates = authority/template.in authority/client/template.in \
 	imposter/template.in ocsp-responder/template rogueca/template \
-	rogueclient/template.in server/template.in
+	rogueclient/template.in authority/server/template.in
 generated_templates = authority/template authority/client/template \
-	imposter/template rogueclient/template server/template
+	imposter/template rogueclient/template authority/server/template
 
 # Delete X.509 private keys on full clean. Note that unless you need
 # to generate fresh keys, the "mostlyclean" target should be
@@ -160,22 +160,22 @@ if ENABLE_OCSP_TEST
 check_DATA += authority/ocsp_index.txt
 MOSTLYCLEANFILES += authority/ocsp_index.txt authority/ocsp_index.txt.attr
 authority/ocsp_index.txt: $(x509_tokens) gen_ocsp_index authority/ocsp_index.txt.attr
-	./gen_ocsp_index server/x509.pem authority/client/x509.pem > $@
+	./gen_ocsp_index authority/server/x509.pem authority/client/x509.pem > $@
 
 authority/ocsp_index.txt.attr: authority/secret.key
 	echo "unique_subject = no" > $@
 
 # build certificate chain file for server
-check_DATA += server/x509-chain.pem
-MOSTLYCLEANFILES += server/x509-chain.pem
+check_DATA += authority/server/x509-chain.pem
+MOSTLYCLEANFILES += authority/server/x509-chain.pem
 %/x509-chain.pem: %/x509.pem authority/x509.pem
 	cat $< authority/x509.pem > $@
 endif
 
 # SoftHSM tokens. Note that the SoftHSM 2 token is a directory and
 # hence has to be treated slightly differently.
-SOFTHSM_TOKEN = server/softhsm.db
-SOFTHSM2_TOKEN = server/softhsm2.db
+SOFTHSM_TOKEN = authority/server/softhsm.db
+SOFTHSM2_TOKEN = authority/server/softhsm2.db
 
 # Tokens should be cleaned whether or not the matching SoftHSM version
 # was detected on the last ./configure run.
@@ -232,7 +232,7 @@ apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/ocsp.cgi \
 	proxy_mods.conf
 
 EXTRA_DIST = $(apache_data) $(cert_templates) $(shared_identities:=/uid.in) \
-	apache_service.bash common.bash runtests server/crl.template \
+	apache_service.bash common.bash runtests authority/server/crl.template \
 	softhsm.bash
 
 # Lockfile for the main Apache process

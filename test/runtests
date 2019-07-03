@@ -212,7 +212,7 @@ if [ -n "${CHECK_OCSP_SERVER}" ]; then
 	store_ocsp="--outfile ${OCSP_RESPONSE_FILE}"
     fi
     echo "---- Testing OCSP server ----"
-    wait_ready "ocsptool --ask --nonce --load-issuer authority/x509.pem --load-cert server/x509.pem ${store_ocsp}"
+    wait_ready "ocsptool --ask --nonce --load-issuer authority/x509.pem --load-cert authority/server/x509.pem ${store_ocsp}"
     echo "---- OCSP test done ----"
 fi
 

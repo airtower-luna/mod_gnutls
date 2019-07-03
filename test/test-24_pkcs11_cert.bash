@@ -21,7 +21,7 @@ EOF
 elif [ "${SOFTHSM_MAJOR_VERSION}" = "2" ]; then
     cat - >"${tmp_softhsm_conf}" <<EOF
 objectstore.backend = file
-directories.tokendir = $(realpath $(pwd))/server/softhsm2.db
+directories.tokendir = $(realpath $(pwd))/authority/server/softhsm2.db
 EOF
     export SOFTHSM2_CONF="${tmp_softhsm_conf}"
 fi
