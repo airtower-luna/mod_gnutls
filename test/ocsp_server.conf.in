@@ -28,8 +28,8 @@ PidFile		ocsp@PID_AFFIX@.pid
 		# certificates and key for ocsp.cgi
 		SetEnv	CA_CERT		${PWD}/authority/x509.pem
 		SetEnv	OCSP_INDEX	${OCSP_INDEX}
-		SetEnv	OCSP_CERT	${PWD}/ocsp-responder/x509.pem
-		SetEnv	OCSP_KEY	${PWD}/ocsp-responder/secret.key
+		SetEnv	OCSP_CERT	${PWD}/authority/ocsp-responder/x509.pem
+		SetEnv	OCSP_KEY	${PWD}/authority/ocsp-responder/secret.key
 		<If "-n osenv('OPENSSL')">
 			# Pass OPENSSL variable to CGI script if set
 			SetEnv	OPENSSL		${OPENSSL}

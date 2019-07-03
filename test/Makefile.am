@@ -59,7 +59,7 @@ shared_identities = authority authority/client
 pgp_identities = $(shared_identities)
 x509_only_identities = authority/server authority/imposter rogueca rogueclient
 if ENABLE_OCSP_TEST
-x509_only_identities += ocsp-responder
+x509_only_identities += authority/ocsp-responder
 endif
 x509_identities = $(shared_identities) $(x509_only_identities)
 identities = $(shared_identities) $(x509_only_identities)
@@ -97,7 +97,7 @@ check_DATA = $(tokens) authority/server/crl.pem
 MOSTLYCLEANFILES = cache/* logs/* outputs/* authority/server/crl.pem
 
 cert_templates = authority/template.in authority/client/template.in \
-	authority/imposter/template.in ocsp-responder/template \
+	authority/imposter/template.in authority/ocsp-responder/template \
 	rogueca/template rogueclient/template.in authority/server/template.in
 generated_templates = authority/template authority/client/template \
 	authority/imposter/template rogueclient/template \
