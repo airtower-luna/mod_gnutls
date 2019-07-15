@@ -68,6 +68,10 @@ cert_rule = certtool --outfile $@ --generate-certificate --load-ca-certificate $
 %/x509.pem: %/template %/secret.key authority/secret.key authority/x509.pem
 	$(cert_rule)
 
+# certificates signed by the test sub CA
+authority/subca/%/x509.pem: authority/subca/%/template authority/subca/%/secret.key authority/subca/x509.pem
+	$(cert_rule)
+
 # certificates signed by rogue CA (for error cases)
 rogueca/%/x509.pem: rogueca/%/template rogueca/%/secret.key rogueca/x509.pem
 	$(cert_rule)

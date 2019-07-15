@@ -57,8 +57,9 @@ endif
 # the test suite
 shared_identities = authority authority/client
 pgp_identities = $(shared_identities)
-x509_only_identities = authority/server authority/imposter rogueca \
-	rogueca/rogueclient
+x509_only_identities = authority/server authority/imposter \
+	authority/subca authority/subca/server \
+	rogueca rogueca/rogueclient
 if ENABLE_OCSP_TEST
 x509_only_identities += authority/ocsp-responder
 endif
@@ -100,6 +101,7 @@ MOSTLYCLEANFILES = cache/* logs/* outputs/* authority/server/crl.pem
 cert_templates = authority/template.in authority/client/template.in \
 	authority/imposter/template.in authority/ocsp-responder/template \
 	authority/server/template.in \
+	authority/subca/template.in authority/subca/server/template.in \
 	rogueca/template rogueca/rogueclient/template.in
 generated_templates = authority/template authority/client/template \
 	authority/imposter/template rogueca/rogueclient/template \

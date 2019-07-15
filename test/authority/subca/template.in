@@ -1,0 +1,6 @@
+serial=798498682
+cn="Sub CA"
+ca
+cert_signing_key
+crl_signing_key
+__OCSP_URI__
