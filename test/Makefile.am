@@ -170,11 +170,14 @@ authority/ocsp_index.txt: $(x509_tokens) gen_ocsp_index authority/ocsp_index.txt
 authority/ocsp_index.txt.attr: authority/secret.key
 	echo "unique_subject = no" > $@
 
-# build certificate chain file for server
-check_DATA += authority/server/x509-chain.pem
-MOSTLYCLEANFILES += authority/server/x509-chain.pem
-%/x509-chain.pem: %/x509.pem authority/x509.pem
-	cat $< authority/x509.pem > $@
+# Build certificate chain files. Note that intermediate tokens must be
+# listed explicitly, or the dependency chain will be broken because
+# the higher level pattern matches, too.
+chain_tokens = authority/server/x509-chain.pem \
+	authority/subca/x509-chain.pem \
+	authority/subca/server/x509-chain.pem
+check_DATA += $(chain_tokens)
+MOSTLYCLEANFILES += $(chain_tokens)
 endif
 
 # SoftHSM tokens. Note that the SoftHSM 2 token is a directory and
