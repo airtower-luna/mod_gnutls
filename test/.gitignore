@@ -1,27 +1,38 @@
+*~
 cache
 proxy_backend.conf
 ocsp_server.conf
-*~
-logs
-outputs
-server
-client
-authority
-imposter
-ocsp-responder
-rogueca
-rogueclient
-client.uid
-server.uid
-server.template
-client.template
-authority.template
-imposter.template
-rogueclient.template
-msva.gnupghome
+authority/template
+authority/client/uid
+authority/tofu.db
+
+# generated X.509 data
+x509.pem
+x509-chain.pem
+secret.key
+crl.pem
+softhsm2.db/
+ocsp_index.txt
+ocsp_index.txt.attr
+
+# generated PGP data
+pubring.kbx
+*.gpg
+*.pgp
+private-keys-v1.d/
+msva.gnupghome/
+
+# lock files
+*.lock
+authority/lock
+
+# test output
 *.log
 *.trs
-*.lock
+logs/
+outputs/
+
+# test programs
 gen_ocsp_index
 pgpcrc
 gnutls_openpgp_support
