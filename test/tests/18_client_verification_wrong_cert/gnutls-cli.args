@@ -1,4 +1,4 @@
---x509certfile=rogueclient/x509.pem
---x509keyfile=rogueclient/secret.key
+--x509certfile=rogueca/rogueclient/x509.pem
+--x509keyfile=rogueca/rogueclient/secret.key
 --x509cafile=authority/x509.pem
 --priority=NORMAL

@@ -57,7 +57,8 @@ endif
 # the test suite
 shared_identities = authority authority/client
 pgp_identities = $(shared_identities)
-x509_only_identities = authority/server authority/imposter rogueca rogueclient
+x509_only_identities = authority/server authority/imposter rogueca \
+	rogueca/rogueclient
 if ENABLE_OCSP_TEST
 x509_only_identities += authority/ocsp-responder
 endif
@@ -98,9 +99,10 @@ MOSTLYCLEANFILES = cache/* logs/* outputs/* authority/server/crl.pem
 
 cert_templates = authority/template.in authority/client/template.in \
 	authority/imposter/template.in authority/ocsp-responder/template \
-	rogueca/template rogueclient/template.in authority/server/template.in
+	authority/server/template.in \
+	rogueca/template rogueca/rogueclient/template.in
 generated_templates = authority/template authority/client/template \
-	authority/imposter/template rogueclient/template \
+	authority/imposter/template rogueca/rogueclient/template \
 	authority/server/template
 
 # Delete X.509 private keys on full clean. Note that unless you need
