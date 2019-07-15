@@ -56,14 +56,15 @@
 	GNUPGHOME=authority/ $(GPG_FLOCK) gpg --output $@ --armor --export "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)"
 
 # special cases for the authorities' root certs:
-authority/x509.pem: authority/template authority/secret.key
-	certtool --outfile $@ --generate-self-signed --load-privkey authority/secret.key --template authority/template
-rogueca/x509.pem: $(srcdir)/rogueca/template rogueca/secret.key
-	certtool --outfile $@ --generate-self-signed --load-privkey rogueca/secret.key --template $(srcdir)/rogueca/template
+root_cert_rule = certtool --outfile $@ --generate-self-signed --load-privkey $(dir $@)secret.key --template $<
+authority/x509.pem rogueca/x509.pem: %/x509.pem: %/template %/secret.key
+	$(root_cert_rule)
 
 # normal case: certificates signed by test CA
+cert_rule = certtool --outfile $@ --generate-certificate --load-ca-certificate $(dir $@)../x509.pem --load-ca-privkey $(dir $@)../secret.key --load-privkey $(dir $@)secret.key --template $<
+
 %/x509.pem: %/template %/secret.key authority/secret.key authority/x509.pem
-	certtool --outfile $@ --generate-certificate --load-ca-certificate authority/x509.pem --load-ca-privkey authority/secret.key --load-privkey $(dir $@)secret.key --template $<
+	$(cert_rule)
 
 # error case: certificates signed by rogue CA
 rogue%/x509.pem: rogue%/template rogue%/secret.key rogueca/x509.pem
