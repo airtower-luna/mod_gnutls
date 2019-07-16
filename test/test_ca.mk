@@ -9,7 +9,7 @@
 %/template: $(srcdir)/%/template.in
 	@mkdir -m 0700 -p $(@D)
 	sed s/__HOSTNAME__/$(TEST_HOST)/ < $< > $@
-	sed -i -e "s,__OCSP_URI__,$(OCSP_URI_TEMPLATE)," $@
+	sed -i -e "s,__OCSP_URI__,$(OCSP_URI_TEMPLATE)$(dir $(*))," $@
 	for i in $(patsubst [%],%,$(TEST_IP)); do \
 		IP_ADDRS="$${IP_ADDRS}\nip_address = $${i}"; \
 	done; \

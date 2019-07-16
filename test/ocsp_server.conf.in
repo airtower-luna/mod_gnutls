@@ -21,19 +21,29 @@ PidFile		ocsp@PID_AFFIX@.pid
 <VirtualHost _default_:${OCSP_PORT}>
 	RewriteEngine	On
 	RewriteRule	^/ocsp(.*)	/ocsp.cgi$1	[L]
+	# General rules for all OCSP handling
 	<Location /ocsp/>
 		# Some clients seem to have trouble with chunked
 		# encoding, so force HTTP/1.0 for now.
 		SetEnv	downgrade-1.0
+		<If "-n osenv('OPENSSL')">
+			# Pass OPENSSL variable to CGI script if set
+			SetEnv	OPENSSL		${OPENSSL}
+		</If>
+	</Location>
+	<Location /ocsp/authority/>
 		# certificates and key for ocsp.cgi
 		SetEnv	CA_CERT		${PWD}/authority/x509.pem
 		SetEnv	OCSP_INDEX	${OCSP_INDEX}
 		SetEnv	OCSP_CERT	${PWD}/authority/ocsp-responder/x509.pem
 		SetEnv	OCSP_KEY	${PWD}/authority/ocsp-responder/secret.key
-		<If "-n osenv('OPENSSL')">
-			# Pass OPENSSL variable to CGI script if set
-			SetEnv	OPENSSL		${OPENSSL}
-		</If>
+	</Location>
+	<Location /ocsp/authority/subca/>
+		# certificates and key for ocsp.cgi
+		SetEnv	CA_CERT		${PWD}/authority/subca/x509.pem
+		SetEnv	OCSP_INDEX	${PWD}/authority/subca/ocsp_index.txt
+		SetEnv	OCSP_CERT	${PWD}/authority/subca/ocsp-responder/x509.pem
+		SetEnv	OCSP_KEY	${PWD}/authority/subca/ocsp-responder/secret.key
 	</Location>
 	<Directory ${srcdir}/data>
 		Options	+ExecCGI
