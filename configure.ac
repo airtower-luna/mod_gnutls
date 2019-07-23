@@ -132,27 +132,7 @@ AM_CONDITIONAL([DISABLE_FLOCK],
 
 # openssl is needed as the responder for OCSP tests
 AC_PATH_PROG([OPENSSL], [openssl], [no])
-# OCSP checks with gnutls-cli from GnuTLS versions before 3.3.23,
-# 3.4.12, or 3.5.1 (on the respective 3.x branch) fail if intermediate
-# CAs cannot be status checked, even if there are no intermediate CAs
-# like in the mod_gnutls test suite where end entity certificates are
-# directly issued by a root CA.
-AC_MSG_CHECKING([for gnutls-cli version supporting OCSP for EE under root CA])
-AC_PREPROC_IFELSE(
-	[AC_LANG_SOURCE([[#include "gnutls/gnutls.h"
-			#if GNUTLS_VERSION_NUMBER < 0x030317
-			#error
-			#elif GNUTLS_VERSION_NUMBER >= 0x030400 && GNUTLS_VERSION_NUMBER < 0x03040c
-			#error
-			#elif GNUTLS_VERSION_NUMBER == 0x030500
-			#error
-			#endif
-			]])],
-	[gnutls_ocsp_ok="yes"],
-	[gnutls_ocsp_ok="no"],
-)
-AC_MSG_RESULT([$gnutls_ocsp_ok])
-AM_CONDITIONAL([ENABLE_OCSP_TEST], [test "${OPENSSL}" != "no" && test "${gnutls_ocsp_ok}" = "yes"])
+AM_CONDITIONAL([ENABLE_OCSP_TEST], [test "${OPENSSL}" != "no"])
 
 dnl Enable test namespaces? Default is "yes".
 AC_ARG_ENABLE(test-namespaces,

@@ -72,9 +72,7 @@ static const char* mgs_x509_construct_uid(request_rec * pool, gnutls_x509_crt_t 
 apr_status_t mgs_cleanup_pre_config(void *data __attribute__((unused)))
 {
     /* Free session ticket master key */
-#if GNUTLS_VERSION_NUMBER >= 0x030400
     gnutls_memset(session_ticket_key.data, 0, session_ticket_key.size);
-#endif
     gnutls_free(session_ticket_key.data);
     session_ticket_key.data = NULL;
     session_ticket_key.size = 0;
@@ -419,10 +417,6 @@ static int cert_retrieve_fn(gnutls_session_t session,
 
 
 
-#if GNUTLS_VERSION_NUMBER >= 0x030506
-#define HAVE_KNOWN_DH_GROUPS 1
-#endif
-#ifdef HAVE_KNOWN_DH_GROUPS
 /**
  * Try to estimate a GnuTLS security parameter based on the given
  * private key. Any errors are logged.
@@ -449,25 +443,6 @@ static gnutls_sec_param_t sec_param_from_privkey(server_rec *server,
     }
     return gnutls_pk_bits_to_sec_param(pk_algo, bits);
 }
-#else
-/** ffdhe2048 DH group as defined in RFC 7919, Appendix A.1. This is
- * the default DH group if mod_gnutls is compiled agains a GnuTLS
- * version that does not provide known DH groups based on security
- * parameters (before 3.5.6). */
-static const char FFDHE2048_PKCS3[] =
-    "-----BEGIN DH PARAMETERS-----\n"
-    "MIIBDAKCAQEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz\n"
-    "+8yTnc4kmz75fS/jY2MMddj2gbICrsRhetPfHtXV/WVhJDP1H18GbtCFY2VVPe0a\n"
-    "87VXE15/V8k1mE8McODmi3fipona8+/och3xWKE2rec1MKzKT0g6eXq8CrGCsyT7\n"
-    "YdEIqUuyyOP7uWrat2DX9GgdT0Kj3jlN9K5W7edjcrsZCwenyO4KbXCeAvzhzffi\n"
-    "7MA0BM0oNC9hkXL+nOmFg/+OTxIy7vKBg8P+OxtMb61zO7X8vC7CIAXFjvGDfRaD\n"
-    "ssbzSibBsu/6iGtCOGEoXJf//////////wIBAgICAQA=\n"
-    "-----END DH PARAMETERS-----\n";
-const gnutls_datum_t default_dh_params = {
-    (void *) FFDHE2048_PKCS3,
-    sizeof(FFDHE2048_PKCS3)
-};
-#endif
 
 
 
@@ -487,7 +462,6 @@ static int set_default_dh_param(server_rec *server)
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(server->module_config, &gnutls_module);
 
-#ifdef HAVE_KNOWN_DH_GROUPS
     gnutls_sec_param_t seclevel = GNUTLS_SEC_PARAM_UNKNOWN;
     if (sc->privkey_x509)
     {
@@ -521,28 +495,6 @@ static int set_default_dh_param(server_rec *server)
                      __func__, gnutls_strerror(ret), ret);
         return HTTP_UNAUTHORIZED;
     }
-#else
-    int ret = gnutls_dh_params_init(&sc->dh_params);
-    if (ret < 0)
-    {
-        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
-                     "%s: Failed to initialize DH params structure: "
-                     "%s (%d)", __func__, gnutls_strerror(ret), ret);
-        return HTTP_UNAUTHORIZED;
-    }
-    ret = gnutls_dh_params_import_pkcs3(sc->dh_params, &default_dh_params,
-                                        GNUTLS_X509_FMT_PEM);
-    if (ret < 0)
-    {
-        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
-                     "%s: Failed to import default DH params: %s (%d)",
-                     __func__, gnutls_strerror(ret), ret);
-        return HTTP_UNAUTHORIZED;
-    }
-
-    gnutls_certificate_set_dh_params(sc->certs, sc->dh_params);
-    gnutls_anon_set_server_dh_params(sc->anon_creds, sc->dh_params);
-#endif
 
     return OK;
 }
@@ -1361,13 +1313,8 @@ int mgs_hook_fixups(request_rec * r) {
                                          gnutls_cipher_get(ctxt->session),
                                          gnutls_mac_get(ctxt->session)));
 
-#if GNUTLS_VERSION_NUMBER >= 0x030600
     /* Compression support has been removed since GnuTLS 3.6.0 */
     apr_table_setn(env, "SSL_COMPRESS_METHOD", "NULL");
-#else
-    apr_table_setn(env, "SSL_COMPRESS_METHOD",
-            gnutls_compression_get_name(gnutls_compression_get(ctxt->session)));
-#endif
 
 #ifdef ENABLE_SRP
     if (ctxt->sc->srp_tpasswd_conf_file != NULL && ctxt->sc->srp_tpasswd_file != NULL) {
