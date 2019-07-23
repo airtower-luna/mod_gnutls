@@ -21,7 +21,7 @@ Past maintainers and other contributors:
 Prerequisites
 -------------
 
- * GnuTLS          >= 3.3 <https://www.gnutls.org/> (3.4 or newer recommended)
+ * GnuTLS          >= 3.6.3 <https://www.gnutls.org/>
  * Apache HTTPD    >= 2.4.17 <https://httpd.apache.org/>
  * autotools, GNU make, & GCC
  * libmsv          >= 0.1 (Optional, enable with ./configure --enable-msva)

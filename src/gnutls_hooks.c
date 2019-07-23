@@ -383,13 +383,13 @@ static int post_client_hello_hook(gnutls_session_t session)
 }
 
 static int cert_retrieve_fn(gnutls_session_t session,
-                            const gnutls_datum_t * req_ca_rdn __attribute__((unused)),
-                            int nreqs __attribute__((unused)),
-                            const gnutls_pk_algorithm_t * pk_algos __attribute__((unused)),
-                            int pk_algos_length __attribute__((unused)),
+                            const struct gnutls_cert_retr_st *info __attribute__((unused)),
                             gnutls_pcert_st **pcerts,
                             unsigned int *pcert_length,
-                            gnutls_privkey_t *privkey)
+                            gnutls_ocsp_data_st **ocsp,
+                            unsigned int *ocsp_length,
+                            gnutls_privkey_t *privkey,
+                            unsigned int *flags)
 {
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
 
@@ -406,7 +406,10 @@ static int cert_retrieve_fn(gnutls_session_t session,
 		// X509 CERTIFICATE
         *pcerts = ctxt->sc->certs_x509_chain;
         *pcert_length = ctxt->sc->certs_x509_chain_num;
+        *ocsp = NULL;
+        *ocsp_length = 0;
         *privkey = ctxt->sc->privkey_x509;
+        *flags = 0;
         return 0;
     } else {
 		// UNKNOWN CERTIFICATE
@@ -730,20 +733,7 @@ int mgs_hook_post_config(apr_pool_t *pconf,
                 return rv;
         }
 
-        /* The call after this comment is a workaround for bug in
-         * gnutls_certificate_set_retrieve_function2 that ignores
-         * supported certificate types. Should be fixed in GnuTLS
-         * 3.3.12.
-         *
-         * Details:
-         * https://lists.gnupg.org/pipermail/gnutls-devel/2015-January/007377.html
-         * Workaround from:
-         * https://github.com/vanrein/tlspool/commit/4938102d3d1b086491d147e6c8e4e2a02825fc12 */
-#if GNUTLS_VERSION_NUMBER < 0x030312
-        gnutls_certificate_set_retrieve_function(sc->certs, (void *) exit);
-#endif
-
-        gnutls_certificate_set_retrieve_function2(sc->certs, cert_retrieve_fn);
+        gnutls_certificate_set_retrieve_function3(sc->certs, cert_retrieve_fn);
 
         if ((sc->certs_x509_chain == NULL || sc->certs_x509_chain_num < 1) &&
             sc->enabled == GNUTLS_ENABLED_TRUE) {

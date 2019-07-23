@@ -45,7 +45,7 @@ AC_ARG_WITH([gnutls-dev],
 		[AC_MSG_ERROR([--with-gnutls-dev=DIR requires a directory!])])
 	], [])
 
-PKG_CHECK_MODULES([LIBGNUTLS], [gnutls >= 3.3.0])
+PKG_CHECK_MODULES([LIBGNUTLS], [gnutls >= 3.6.3])
 
 LIBGNUTLS_VERSION=`pkg-config --modversion gnutls`
 
