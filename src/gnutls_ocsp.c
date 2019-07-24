@@ -40,6 +40,11 @@ APLOG_USE_MODULE(gnutls);
 
 /** Dummy data for failure cache entries (one byte). */
 #define OCSP_FAILURE_CACHE_DATA 0x0f
+/** Macro to check if an OCSP reponse pointer contains a cached
+ * failure */
+#define IS_FAILURE_RESPONSE(resp) \
+    (((resp)->size == sizeof(unsigned char)) &&                     \
+     (*((unsigned char *) (resp)->data) == OCSP_FAILURE_CACHE_DATA))
 
 
 #define _log_one_ocsp_fail(str, srv)                                    \
@@ -785,17 +790,21 @@ int mgs_get_ocsp_response(gnutls_session_t session,
         return GNUTLS_E_NO_CERTIFICATE_STATUS;
     }
 
-    *ocsp_response = mgs_cache_fetch(ctxt->sc->ocsp_cache,
-                                     ctxt->c->base_server,
-                                     ctxt->sc->ocsp->fingerprint,
-                                     ctxt->c->pool);
-    if (ocsp_response->size == 0)
+    // TODO: Large allocation, and the pool system doesn't offer realloc
+    ocsp_response->data = apr_palloc(ctxt->c->pool, OCSP_RESP_SIZE_MAX);
+    ocsp_response->size = OCSP_RESP_SIZE_MAX;
+
+    apr_status_t rv = mgs_cache_fetch(ctxt->sc->ocsp_cache,
+                                      ctxt->c->base_server,
+                                      ctxt->sc->ocsp->fingerprint,
+                                      ocsp_response,
+                                      ctxt->c->pool);
+    if (rv != APR_SUCCESS)
     {
         ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_EGENERAL, ctxt->c,
                       "Fetching OCSP response from cache failed.");
     }
-    else if ((ocsp_response->size == sizeof(unsigned char)) &&
-             (*((unsigned char *) ocsp_response->data) == OCSP_FAILURE_CACHE_DATA))
+    else if (IS_FAILURE_RESPONSE(ocsp_response))
     {
         ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_EGENERAL, ctxt->c,
                       "Cached OCSP failure found for %s.",
@@ -806,15 +815,14 @@ int mgs_get_ocsp_response(gnutls_session_t session,
     {
         return GNUTLS_E_SUCCESS;
     }
-    /* get rid of invalid response (if any) */
-    gnutls_free(ocsp_response->data);
-    ocsp_response->data = NULL;
+    /* keep response buffer, reset size for reuse */
+    ocsp_response->size = OCSP_RESP_SIZE_MAX;
 
     /* If the cache had no response or an invalid one, try to update. */
     ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
                   "No valid OCSP response in cache, trying to update.");
 
-    apr_status_t rv = apr_global_mutex_trylock(sc->ocsp_mutex);
+    rv = apr_global_mutex_trylock(sc->ocsp_mutex);
     if (APR_STATUS_IS_EBUSY(rv))
     {
         /* Another thread is currently holding the mutex, wait. */
@@ -823,20 +831,29 @@ int mgs_get_ocsp_response(gnutls_session_t session,
          * would be better to have a vhost specific mutex, but at the
          * moment there's no good way to integrate that with the
          * Apache Mutex directive. */
-        *ocsp_response = mgs_cache_fetch(ctxt->sc->ocsp_cache,
-                                         ctxt->c->base_server,
-                                         ctxt->sc->ocsp->fingerprint,
-                                         ctxt->c->pool);
-        if (ocsp_response->size > 0)
+        rv = mgs_cache_fetch(ctxt->sc->ocsp_cache,
+                             ctxt->c->base_server,
+                             ctxt->sc->ocsp->fingerprint,
+                             ocsp_response,
+                             ctxt->c->pool);
+        if (rv == APR_SUCCESS)
         {
-            /* Got a valid response now, unlock mutex and return. */
             apr_global_mutex_unlock(sc->ocsp_mutex);
-            return GNUTLS_E_SUCCESS;
+            /* Check if the response is valid. */
+            if (IS_FAILURE_RESPONSE(ocsp_response))
+            {
+                ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_EGENERAL, ctxt->c,
+                              "Cached OCSP failure found for %s.",
+                              ctxt->c->base_server->server_hostname);
+                goto fail_cleanup;
+            }
+            else
+                return GNUTLS_E_SUCCESS;
         }
         else
         {
-            gnutls_free(ocsp_response->data);
-            ocsp_response->data = NULL;
+            /* keep response buffer, reset size for reuse */
+            ocsp_response->size = OCSP_RESP_SIZE_MAX;
         }
     }
 
@@ -854,11 +871,12 @@ int mgs_get_ocsp_response(gnutls_session_t session,
     apr_global_mutex_unlock(sc->ocsp_mutex);
 
     /* retry reading from cache */
-    *ocsp_response = mgs_cache_fetch(ctxt->sc->ocsp_cache,
-                                     ctxt->c->base_server,
-                                     ctxt->sc->ocsp->fingerprint,
-                                     ctxt->c->pool);
-    if (ocsp_response->size == 0)
+    rv = mgs_cache_fetch(ctxt->sc->ocsp_cache,
+                         ctxt->c->base_server,
+                         ctxt->sc->ocsp->fingerprint,
+                         ocsp_response,
+                         ctxt->c->pool);
+    if (rv != APR_SUCCESS)
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
                       "Fetching OCSP response from cache failed on retry.");
@@ -868,9 +886,9 @@ int mgs_get_ocsp_response(gnutls_session_t session,
         return GNUTLS_E_SUCCESS;
     }
 
-    /* failure, clean up response data */
+    /* failure, reset struct, buffer will be released with the
+     * connection pool */
  fail_cleanup:
-    gnutls_free(ocsp_response->data);
     ocsp_response->size = 0;
     ocsp_response->data = NULL;
     return GNUTLS_E_NO_CERTIFICATE_STATUS;
@@ -1060,24 +1078,22 @@ static apr_status_t mgs_async_ocsp_update(int state,
      * update. */
     if (rv != APR_SUCCESS)
     {
-        const gnutls_datum_t ocsp_response =
-            mgs_cache_fetch(sc->ocsp_cache, server,
-                            sc->ocsp->fingerprint, pool);
+        gnutls_datum_t ocsp_response;
+        ocsp_response.data = apr_palloc(pool, OCSP_RESP_SIZE_MAX);
+        ocsp_response.size = OCSP_RESP_SIZE_MAX;
 
-        if (ocsp_response.size == 0 ||
-            ((ocsp_response.size == sizeof(unsigned char)) &&
-             (*((unsigned char *) ocsp_response.data) ==
-              OCSP_FAILURE_CACHE_DATA)))
+        apr_status_t rv = mgs_cache_fetch(sc->ocsp_cache, server,
+                                          sc->ocsp->fingerprint,
+                                          &ocsp_response,
+                                          pool);
+
+        if (rv != APR_SUCCESS || (IS_FAILURE_RESPONSE(&ocsp_response)))
         {
             ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, server,
                          "Caching OCSP request failure for %s:%d.",
                          server->server_hostname, server->addrs->host_port);
             mgs_cache_ocsp_failure(server, sc->ocsp_failure_timeout * 2);
         }
-
-        /* Get rid of the response, if any */
-        if (ocsp_response.size != 0)
-            gnutls_free(ocsp_response.data);
     }
     apr_global_mutex_unlock(sc->ocsp_mutex);
 
@@ -1194,11 +1210,6 @@ int mgs_ocsp_enable_stapling(apr_pool_t *pconf,
     apr_pool_cleanup_register(pconf, sc->ocsp->trust,
                               mgs_cleanup_trust_list,
                               apr_pool_cleanup_null);
-
-    /* enable status request callback */
-    gnutls_certificate_set_ocsp_status_request_function(sc->certs,
-                                                        mgs_get_ocsp_response,
-                                                        sc);
 
     /* The watchdog structure may be NULL if mod_watchdog is
      * unavailable. */

@@ -408,6 +408,22 @@ static int cert_retrieve_fn(gnutls_session_t session,
         *ocsp_length = 0;
         *privkey = ctxt->sc->privkey_x509;
         *flags = 0;
+
+        if (ctxt->sc->ocsp_staple == GNUTLS_ENABLED_TRUE)
+        {
+            gnutls_ocsp_data_st *resp =
+                apr_palloc(ctxt->c->pool, sizeof(gnutls_ocsp_data_st));
+            resp->version = 0;
+            resp->exptime = 0;
+
+            int ret = mgs_get_ocsp_response(session, NULL, &resp->response);
+            if (ret == GNUTLS_E_SUCCESS)
+            {
+                *ocsp = resp;
+                *ocsp_length = 1;
+            }
+        }
+
         return 0;
     } else {
 		// UNKNOWN CERTIFICATE
