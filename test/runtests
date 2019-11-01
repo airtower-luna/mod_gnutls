@@ -49,8 +49,8 @@ function stop_msva()
 
 # Compare expected/actual outputs, filtering out headers from actual
 # output that are expected to change between runs or builds (currently
-# "Date" and "Server"). The headers must be excluded in the expected
-# output.
+# "Date", "Server" and "Content-Length"). The headers must be excluded
+# in the expected output.
 #
 # Parameters:
 # $1: path to expected output
@@ -63,6 +63,7 @@ function diff_output_filter_headers()
     diff $3 -u "${expected}" <( cat "${actual}" | \
 	grep -v -P '^Date:\s.*GMT\s?$' | \
 	grep -v -P '^Server:\sApache'  | \
+	grep -v -P '^Content-Length:\s\d+\s?$' | \
 	tail -n "$(wc -l < ${expected})" )
 }
 

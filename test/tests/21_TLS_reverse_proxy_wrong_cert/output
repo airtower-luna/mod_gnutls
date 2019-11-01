@@ -1,5 +1,4 @@
 HTTP/1.1 502 Proxy Error
-Content-Length: 341
 Connection: close
 Content-Type: text/html; charset=iso-8859-1
 
