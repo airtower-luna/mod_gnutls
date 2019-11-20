@@ -24,14 +24,14 @@ if USE_PANDOC
 	$(PANDOC) --standalone -f markdown -t man -o $@ $^
 
 if USE_PDFLATEX
-%.pdf: %.mdwn
-	$(PANDOC) --toc -f markdown -o $@ $<
+%.pdf: %.mdwn %.yaml
+	$(PANDOC) --toc -f markdown -o $@ $^
 endif
 endif
 
-%.html: %.mdwn
+%.html: %.mdwn %.yaml
 if USE_PANDOC
-	$(PANDOC) --toc --standalone -f markdown -o $@ $<
+	$(PANDOC) --toc --standalone -f markdown -o $@ $^
 else
 if USE_MARKDOWN
 	$(MARKDOWN) $< > $@
