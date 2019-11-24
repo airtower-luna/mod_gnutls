@@ -45,6 +45,22 @@ and restart Apache:
 
     LoadModule gnutls_module modules/mod_gnutls.so
 
+Module Dependencies
+-------------------
+
+`mod_gnutls` uses the Apache HTTPD [Shared Object
+Cache](http://httpd.apache.org/docs/current/en/socache.html) to cache
+[OCSP responses for OCSP stapling](#gnutlsocspcache) and [TLS
+sessions](#gnutlscache). To use either cache you need to load a
+suitable `mod_socache_PROVIDER` module, which should be provided by
+your Apache installation.
+
+It is recommended to load at least `mod_socache_shmcb`. If that module
+is loaded `mod_gnutls` will [enable OCSP stapling by
+default](#gnutlsocspstapling), without needing any further
+configuration other than a [certificate chain](#gnutlscertificatefile)
+with OCSP support.
+
 Note on HTTP/2
 --------------
 
@@ -324,8 +340,8 @@ FILEPATH is an absolute or relative path to a file containing the
 PEM-encoded X.509 certificate to use as this Server's End Entity (EE)
 certificate, and optionally those of the issuing Certificate
 Authorities (CAs). If the file contains multiple certificates they
-should be ordered from EE to the CA closest to the root CA (or the
-root CA itself).
+must be ordered from EE to the CA closest to the root CA (or the root
+CA itself).
 
 Including at least the immediately issuing CA is highly recommended
 because it is required for OCSP stapling.
