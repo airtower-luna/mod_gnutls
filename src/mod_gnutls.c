@@ -2,7 +2,7 @@
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2008, 2014 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
- *  Copyright 2015-2018 Fiona Klute
+ *  Copyright 2015-2019 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -178,7 +178,7 @@ char* ssl_var_lookup(apr_pool_t *p, server_rec *s __attribute__((unused)),
     mgs_handle_t *ctxt = get_effective_gnutls_ctxt(c);
 
     /* TLS parameters are empty if there is no session */
-    if (ctxt == NULL || ctxt->c == NULL)
+    if (ctxt == NULL || ctxt->c == NULL || ctxt->session == NULL)
         return NULL;
 
     if (strcmp(var, "SSL_PROTOCOL") == 0)
