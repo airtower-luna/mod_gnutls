@@ -1,3 +1,20 @@
+** Version 0.9.1 (2019-11-29)
+- Fix possible segfault (NULL pointer dereference) on failed TLS
+  handshake. Calling ssl_var_lookup() after a failed handshake could
+  lead to GnuTLS session information functions being called on a NULL
+  session pointer, leading to segfault.
+- Remove URLs from expected error responses in the test suite. Apache
+  HTTPD removed request URLs from canned error messages to prevent
+  misleading text/links being displayed via crafted links
+  (CVE-2019-10092). Adjust the expected error responses in our tests
+  so they can pass again.
+- Test suite: Ignore "Content-Length" header of responses. Thanks to
+  Krista Karppinen!
+- Add a section about module dependencies on socache to the handbook
+- Restructure the manpage build and move it to section 5 (config
+  files)
+- Test suite: Restructure certificate directories
+
 ** Version 0.9.0 (2019-01-23)
 - Security fix: Refuse to send or receive any data over a failed TLS
   connection (commit 72b669eae8c45dda1850e8e5b30a97c918357b51). The
