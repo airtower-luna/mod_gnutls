@@ -72,9 +72,7 @@ static const char* mgs_x509_construct_uid(request_rec * pool, gnutls_x509_crt_t 
 apr_status_t mgs_cleanup_pre_config(void *data __attribute__((unused)))
 {
     /* Free session ticket master key */
-#if GNUTLS_VERSION_NUMBER >= 0x030400
     gnutls_memset(session_ticket_key.data, 0, session_ticket_key.size);
-#endif
     gnutls_free(session_ticket_key.data);
     session_ticket_key.data = NULL;
     session_ticket_key.size = 0;
@@ -383,13 +381,13 @@ static int post_client_hello_hook(gnutls_session_t session)
 }
 
 static int cert_retrieve_fn(gnutls_session_t session,
-                            const gnutls_datum_t * req_ca_rdn __attribute__((unused)),
-                            int nreqs __attribute__((unused)),
-                            const gnutls_pk_algorithm_t * pk_algos __attribute__((unused)),
-                            int pk_algos_length __attribute__((unused)),
+                            const struct gnutls_cert_retr_st *info __attribute__((unused)),
                             gnutls_pcert_st **pcerts,
                             unsigned int *pcert_length,
-                            gnutls_privkey_t *privkey)
+                            gnutls_ocsp_data_st **ocsp,
+                            unsigned int *ocsp_length,
+                            gnutls_privkey_t *privkey,
+                            unsigned int *flags)
 {
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
 
@@ -406,7 +404,26 @@ static int cert_retrieve_fn(gnutls_session_t session,
 		// X509 CERTIFICATE
         *pcerts = ctxt->sc->certs_x509_chain;
         *pcert_length = ctxt->sc->certs_x509_chain_num;
+        *ocsp = NULL;
+        *ocsp_length = 0;
         *privkey = ctxt->sc->privkey_x509;
+        *flags = 0;
+
+        if (ctxt->sc->ocsp_staple == GNUTLS_ENABLED_TRUE)
+        {
+            gnutls_ocsp_data_st *resp =
+                apr_palloc(ctxt->c->pool, sizeof(gnutls_ocsp_data_st));
+            resp->version = 0;
+            resp->exptime = 0;
+
+            int ret = mgs_get_ocsp_response(session, NULL, &resp->response);
+            if (ret == GNUTLS_E_SUCCESS)
+            {
+                *ocsp = resp;
+                *ocsp_length = 1;
+            }
+        }
+
         return 0;
     } else {
 		// UNKNOWN CERTIFICATE
@@ -416,10 +433,6 @@ static int cert_retrieve_fn(gnutls_session_t session,
 
 
 
-#if GNUTLS_VERSION_NUMBER >= 0x030506
-#define HAVE_KNOWN_DH_GROUPS 1
-#endif
-#ifdef HAVE_KNOWN_DH_GROUPS
 /**
  * Try to estimate a GnuTLS security parameter based on the given
  * private key. Any errors are logged.
@@ -446,25 +459,6 @@ static gnutls_sec_param_t sec_param_from_privkey(server_rec *server,
     }
     return gnutls_pk_bits_to_sec_param(pk_algo, bits);
 }
-#else
-/** ffdhe2048 DH group as defined in RFC 7919, Appendix A.1. This is
- * the default DH group if mod_gnutls is compiled agains a GnuTLS
- * version that does not provide known DH groups based on security
- * parameters (before 3.5.6). */
-static const char FFDHE2048_PKCS3[] =
-    "-----BEGIN DH PARAMETERS-----\n"
-    "MIIBDAKCAQEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz\n"
-    "+8yTnc4kmz75fS/jY2MMddj2gbICrsRhetPfHtXV/WVhJDP1H18GbtCFY2VVPe0a\n"
-    "87VXE15/V8k1mE8McODmi3fipona8+/och3xWKE2rec1MKzKT0g6eXq8CrGCsyT7\n"
-    "YdEIqUuyyOP7uWrat2DX9GgdT0Kj3jlN9K5W7edjcrsZCwenyO4KbXCeAvzhzffi\n"
-    "7MA0BM0oNC9hkXL+nOmFg/+OTxIy7vKBg8P+OxtMb61zO7X8vC7CIAXFjvGDfRaD\n"
-    "ssbzSibBsu/6iGtCOGEoXJf//////////wIBAgICAQA=\n"
-    "-----END DH PARAMETERS-----\n";
-const gnutls_datum_t default_dh_params = {
-    (void *) FFDHE2048_PKCS3,
-    sizeof(FFDHE2048_PKCS3)
-};
-#endif
 
 
 
@@ -484,7 +478,6 @@ static int set_default_dh_param(server_rec *server)
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(server->module_config, &gnutls_module);
 
-#ifdef HAVE_KNOWN_DH_GROUPS
     gnutls_sec_param_t seclevel = GNUTLS_SEC_PARAM_UNKNOWN;
     if (sc->privkey_x509)
     {
@@ -518,28 +511,6 @@ static int set_default_dh_param(server_rec *server)
                      __func__, gnutls_strerror(ret), ret);
         return HTTP_UNAUTHORIZED;
     }
-#else
-    int ret = gnutls_dh_params_init(&sc->dh_params);
-    if (ret < 0)
-    {
-        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
-                     "%s: Failed to initialize DH params structure: "
-                     "%s (%d)", __func__, gnutls_strerror(ret), ret);
-        return HTTP_UNAUTHORIZED;
-    }
-    ret = gnutls_dh_params_import_pkcs3(sc->dh_params, &default_dh_params,
-                                        GNUTLS_X509_FMT_PEM);
-    if (ret < 0)
-    {
-        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
-                     "%s: Failed to import default DH params: %s (%d)",
-                     __func__, gnutls_strerror(ret), ret);
-        return HTTP_UNAUTHORIZED;
-    }
-
-    gnutls_certificate_set_dh_params(sc->certs, sc->dh_params);
-    gnutls_anon_set_server_dh_params(sc->anon_creds, sc->dh_params);
-#endif
 
     return OK;
 }
@@ -730,20 +701,7 @@ int mgs_hook_post_config(apr_pool_t *pconf,
                 return rv;
         }
 
-        /* The call after this comment is a workaround for bug in
-         * gnutls_certificate_set_retrieve_function2 that ignores
-         * supported certificate types. Should be fixed in GnuTLS
-         * 3.3.12.
-         *
-         * Details:
-         * https://lists.gnupg.org/pipermail/gnutls-devel/2015-January/007377.html
-         * Workaround from:
-         * https://github.com/vanrein/tlspool/commit/4938102d3d1b086491d147e6c8e4e2a02825fc12 */
-#if GNUTLS_VERSION_NUMBER < 0x030312
-        gnutls_certificate_set_retrieve_function(sc->certs, (void *) exit);
-#endif
-
-        gnutls_certificate_set_retrieve_function2(sc->certs, cert_retrieve_fn);
+        gnutls_certificate_set_retrieve_function3(sc->certs, cert_retrieve_fn);
 
         if ((sc->certs_x509_chain == NULL || sc->certs_x509_chain_num < 1) &&
             sc->enabled == GNUTLS_ENABLED_TRUE) {
@@ -1371,13 +1329,8 @@ int mgs_hook_fixups(request_rec * r) {
                                          gnutls_cipher_get(ctxt->session),
                                          gnutls_mac_get(ctxt->session)));
 
-#if GNUTLS_VERSION_NUMBER >= 0x030600
     /* Compression support has been removed since GnuTLS 3.6.0 */
     apr_table_setn(env, "SSL_COMPRESS_METHOD", "NULL");
-#else
-    apr_table_setn(env, "SSL_COMPRESS_METHOD",
-            gnutls_compression_get_name(gnutls_compression_get(ctxt->session)));
-#endif
 
 #ifdef ENABLE_SRP
     if (ctxt->sc->srp_tpasswd_conf_file != NULL && ctxt->sc->srp_tpasswd_file != NULL) {

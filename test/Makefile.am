@@ -57,10 +57,11 @@ endif
 # the test suite
 shared_identities = authority authority/client
 pgp_identities = $(shared_identities)
-x509_only_identities = authority/server authority/imposter rogueca \
-	rogueca/rogueclient
+x509_only_identities = authority/server authority/imposter \
+	authority/subca authority/subca/server \
+	rogueca rogueca/rogueclient
 if ENABLE_OCSP_TEST
-x509_only_identities += authority/ocsp-responder
+x509_only_identities += authority/ocsp-responder authority/subca/ocsp-responder
 endif
 x509_identities = $(shared_identities) $(x509_only_identities)
 identities = $(shared_identities) $(x509_only_identities)
@@ -100,6 +101,8 @@ MOSTLYCLEANFILES = cache/* logs/* outputs/* authority/server/crl.pem
 cert_templates = authority/template.in authority/client/template.in \
 	authority/imposter/template.in authority/ocsp-responder/template \
 	authority/server/template.in \
+	authority/subca/template.in authority/subca/server/template.in \
+	authority/subca/ocsp-responder/template \
 	rogueca/template rogueca/rogueclient/template.in
 generated_templates = authority/template authority/client/template \
 	authority/imposter/template rogueca/rogueclient/template \
@@ -160,19 +163,28 @@ endif
 
 if ENABLE_OCSP_TEST
 # rules to build OCSP database
-check_DATA += authority/ocsp_index.txt
-MOSTLYCLEANFILES += authority/ocsp_index.txt authority/ocsp_index.txt.attr
-authority/ocsp_index.txt: $(x509_tokens) gen_ocsp_index authority/ocsp_index.txt.attr
-	./gen_ocsp_index authority/server/x509.pem authority/client/x509.pem > $@
+ocsp_index_data = authority/ocsp_index.txt authority/ocsp_index.txt.attr \
+	authority/subca/ocsp_index.txt authority/subca/ocsp_index.txt.attr
+check_DATA += $(ocsp_index_data)
+MOSTLYCLEANFILES += $(ocsp_index_data)
 
-authority/ocsp_index.txt.attr: authority/secret.key
+# The "find" command builds a list of all certificates directly below
+# the CA that aren't for the ocsp-responder.
+%/ocsp_index.txt: $(x509_tokens) gen_ocsp_index
+	./gen_ocsp_index $$(find $(*) -mindepth 2 -maxdepth 2 ! -path '*/ocsp-responder/*' -name x509.pem) > $@
+
+%/ocsp_index.txt.attr:
+	@mkdir -m 0700 -p $(dir $@)
 	echo "unique_subject = no" > $@
 
-# build certificate chain file for server
-check_DATA += authority/server/x509-chain.pem
-MOSTLYCLEANFILES += authority/server/x509-chain.pem
-%/x509-chain.pem: %/x509.pem authority/x509.pem
-	cat $< authority/x509.pem > $@
+# Build certificate chain files. Note that intermediate tokens must be
+# listed explicitly, or the dependency chain will be broken because
+# the higher level pattern matches, too.
+chain_tokens = authority/server/x509-chain.pem \
+	authority/subca/x509-chain.pem \
+	authority/subca/server/x509-chain.pem
+check_DATA += $(chain_tokens)
+MOSTLYCLEANFILES += $(chain_tokens) authority/x509-chain.pem
 endif
 
 # SoftHSM tokens. Note that the SoftHSM 2 token is a directory and

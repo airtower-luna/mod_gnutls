@@ -9,7 +9,7 @@
 %/template: $(srcdir)/%/template.in
 	@mkdir -m 0700 -p $(@D)
 	sed s/__HOSTNAME__/$(TEST_HOST)/ < $< > $@
-	sed -i -e "s,__OCSP_URI__,$(OCSP_URI_TEMPLATE)," $@
+	sed -i -e "s,__OCSP_URI__,$(OCSP_URI_TEMPLATE)$(dir $(*))," $@
 	for i in $(patsubst [%],%,$(TEST_IP)); do \
 		IP_ADDRS="$${IP_ADDRS}\nip_address = $${i}"; \
 	done; \
@@ -57,16 +57,28 @@
 
 # special rule for root CAs
 root_cert_rule = certtool --outfile $@ --generate-self-signed --load-privkey $(dir $@)secret.key --template $<
+root_chain_rule = cp $< $@
 authority/x509.pem rogueca/x509.pem: %/x509.pem: %/template %/secret.key
 	$(root_cert_rule)
+authority/x509-chain.pem rogueca/x509-chain.pem: %/x509-chain.pem: %/x509.pem
+	$(root_chain_rule)
 
 # generic rule for building non-root certificates, with the CA in the
 # parent directory
 cert_rule = certtool --outfile $@ --generate-certificate --load-ca-certificate $(dir $@)../x509.pem --load-ca-privkey $(dir $@)../secret.key --load-privkey $(dir $@)secret.key --template $<
+chain_rule = cat $< $(dir $@)../x509-chain.pem > $@
 
 # certificates signed by the test root CA
 %/x509.pem: %/template %/secret.key authority/secret.key authority/x509.pem
 	$(cert_rule)
+%/x509-chain.pem: %/x509.pem authority/x509-chain.pem
+	$(chain_rule)
+
+# certificates signed by the test sub CA
+authority/subca/%/x509.pem: authority/subca/%/template authority/subca/%/secret.key authority/subca/x509.pem
+	$(cert_rule)
+authority/subca/%/x509-chain.pem: authority/subca/%/x509.pem authority/subca/x509-chain.pem
+	$(chain_rule)
 
 # certificates signed by rogue CA (for error cases)
 rogueca/%/x509.pem: rogueca/%/template rogueca/%/secret.key rogueca/x509.pem
