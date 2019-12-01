@@ -1,0 +1,8 @@
+!connection
+gnutls_params:
+  - x509cafile=rogueca/x509.pem
+actions:
+  - !request
+    path: /
+    expect:
+      reset: yes

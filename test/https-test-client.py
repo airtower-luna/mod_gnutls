@@ -112,12 +112,20 @@ class TestRequest(yaml.YAMLObject):
                         f'{s!r}')
 
     def check_response(self, response, body):
+        if self.expects_conn_reset():
+            raise TestExpectationFailed(
+                'Got a response, but connection should have failed!')
         if response.status != self.expect['status']:
             raise TestExpectationFailed(
                 f'Unexpected status: {response.status} != '
                 f'{self.expect["status"]}')
         if 'body' in self.expect:
             self._check_body(body)
+
+    def expects_conn_reset(self):
+        if 'reset' in self.expect:
+            return self.expect['reset']
+        return False
 
     @classmethod
     def _from_yaml(cls, loader, node):
@@ -226,10 +234,15 @@ if __name__ == "__main__":
     try:
         for act in test_actions:
             if type(act) is TestRequest:
-                # Add headers={'Host': 'test.host'} to provoke "421
-                # Misdirected
-                conn.request(act.method, act.path, headers=act.headers)
-                resp = conn.getresponse()
+                try:
+                    conn.request(act.method, act.path, headers=act.headers)
+                    resp = conn.getresponse()
+                except ConnectionResetError as err:
+                    if act.expects_conn_reset():
+                        print('connection reset as expected.')
+                        break
+                    else:
+                        raise err
                 body = resp.read().decode()
                 print(format_response(resp, body))
                 act.check_response(resp, body)
