@@ -17,6 +17,7 @@
 
 import socket
 import subprocess
+import yaml
 
 from http.client import HTTPConnection
 from time import sleep
@@ -64,12 +65,70 @@ class HTTPSubprocessConnection(HTTPConnection):
 
 
 
-def format_response(resp):
-    print('{} {}'.format(resp.status, resp.reason))
-    for name, value in resp.getheaders():
-        print('{}: {}'.format(name, value))
-    print()
-    print(resp.read().decode())
+class TestRequest(yaml.YAMLObject):
+    yaml_tag = '!request'
+    def __init__(self, path, expect=dict(status=200), method='GET'):
+        self.method = method
+        self.path = path
+        self.expect = expect
+
+    def __repr__(self):
+        return (f'{self.__class__.__name__!s}(path={self.path!r}, '
+                f'expect={self.expect!r}, method={self.method!r})')
+
+    def check_response(self, response, body):
+        if response.status != self.expect['status']:
+            raise TestExpectationFailed(
+                f'Unexpected status: {response.status} != '
+                f'{self.expect["status"]}')
+        if 'body' in self.expect and self.expect['body'] != body:
+            raise TestExpectationFailed(
+                f'Unexpected body: {body!r} != {self.expect["body"]!r}')
+
+    @classmethod
+    def _from_yaml(cls, loader, node):
+        fields = loader.construct_mapping(node)
+        req = TestRequest(**fields)
+        return req
+
+class TestConnection(yaml.YAMLObject):
+    yaml_tag = '!connection'
+
+    def __init__(self, actions, gnutls_params=[], protocol='https'):
+        self.gnutls_params = gnutls_params
+        self.actions = actions
+        self.protocol = protocol
+
+    def __repr__(self):
+        return (f'{self.__class__.__name__!s}'
+                f'(gnutls_params={self.gnutls_params!r}, '
+                f'actions={self.actions!r}, protocol={self.protocol!r})')
+
+    @classmethod
+    def _from_yaml(cls, loader, node):
+        fields = loader.construct_mapping(node)
+        conn = TestConnection(**fields)
+        return conn
+
+# Override the default constructors. Pyyaml ignores default parameters
+# otherwise.
+yaml.add_constructor('!request', TestRequest._from_yaml, yaml.Loader)
+yaml.add_constructor('!connection', TestConnection._from_yaml, yaml.Loader)
+
+
+
+class TestExpectationFailed(Exception):
+    """Raise if a test failed. The constructor should be called with a
+    string describing the problem."""
+    pass
+
+
+
+def format_response(resp, body):
+    s = f'{resp.status} {resp.reason}\n'
+    s = s + '\n'.join(f'{name}: {value}' for name, value in resp.getheaders())
+    s = s + '\n\n' + body
+    return s
 
 
 
@@ -87,6 +146,8 @@ if __name__ == "__main__":
     parser.add_argument('--x509cafile', type=str,
                         help='Use the specified CA to validate the '
                         'server certificate')
+    parser.add_argument('--test-config', type=argparse.FileType('r'),
+                        help='load YAML test configuration')
 
     # enable bash completion if argcomplete is available
     try:
@@ -97,6 +158,22 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    test_conn = None
+    test_actions = None
+
+    if args.test_config:
+        config = yaml.load(args.test_config, Loader=yaml.Loader)
+        if type(config) is TestConnection:
+            test_conn = config
+            print(test_conn)
+            test_actions = test_conn.actions
+    else:
+        # simple default request
+        test_actions = [TestRequest(path='/test.txt',
+                                    expect={'status': 200, 'body': 'test\n'},
+                                    method='GET')]
+
+
     # note: "--logfile" option requires GnuTLS version >= 3.6.7
     command = ['gnutls-cli', '--logfile=/dev/stderr']
     if args.insecure:
@@ -104,25 +181,25 @@ if __name__ == "__main__":
     if args.x509cafile:
         command.append('--x509cafile')
         command.append(args.x509cafile)
+    if test_conn != None:
+        for s in test_conn.gnutls_params:
+            command.append('--' + s)
     command = command + ['-p', str(args.port), args.host]
 
     conn = HTTPSubprocessConnection(command, args.host, port=args.port,
                                     timeout=6.0)
-    # Maybe call connect() here to detect handshake errors before
-    # sending the request?
 
-    # Add headers={'Host': 'test.host'} to provoke "421 Misdirected
-    # Request"
-    conn.request('GET', '/')
-    resp = conn.getresponse()
-    format_response(resp)
-
-    # This could be used to test keepalive behavior
-    #sleep(2)
-
-    conn.request('GET', '/test.txt')
-    resp = conn.getresponse()
-    format_response(resp)
-
-    conn.close()
-    exit(conn.returncode)
+    try:
+        for act in test_actions:
+            if type(act) is TestRequest:
+                # Add headers={'Host': 'test.host'} to provoke "421
+                # Misdirected
+                conn.request(act.method, act.path)
+                resp = conn.getresponse()
+                body = resp.read().decode()
+                print(format_response(resp, body))
+                act.check_response(resp, body)
+            else:
+                raise TypeError(f'Unsupported action requested: {act!r}')
+    finally:
+        conn.close()
