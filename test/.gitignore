@@ -5,6 +5,7 @@ ocsp_server.conf
 authority/template
 authority/client/uid
 authority/tofu.db
+/__pycache__/
 
 # generated X.509 data
 x509.pem

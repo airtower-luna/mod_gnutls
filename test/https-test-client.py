@@ -76,17 +76,48 @@ class TestRequest(yaml.YAMLObject):
 
     def __repr__(self):
         return (f'{self.__class__.__name__!s}(path={self.path!r}, '
-                f'method={self.method!r}), headers={self.headers!r}, '
-                f'expect={self.expect!r}')
+                f'method={self.method!r}, headers={self.headers!r}, '
+                f'expect={self.expect!r})')
+
+    def _check_body(self, body):
+        """
+        >>> r1 = TestRequest(path='/test.txt', method='GET', headers={}, expect={'status': 200, 'body': {'exactly': 'test\\n'}})
+        >>> r1._check_body('test\\n')
+        >>> r1._check_body('xyz\\n')
+        Traceback (most recent call last):
+        ...
+        https-test-client.TestExpectationFailed: Unexpected body: 'xyz\\n' != 'test\\n'
+        >>> r2 = TestRequest(path='/test.txt', method='GET', headers={}, expect={'status': 200, 'body': {'contains': ['tes', 'est']}})
+        >>> r2._check_body('test\\n')
+        >>> r2._check_body('est\\n')
+        Traceback (most recent call last):
+        ...
+        https-test-client.TestExpectationFailed: Unexpected body: 'est\\n' does not contain 'tes'
+        >>> r3 = TestRequest(path='/test.txt', method='GET', headers={}, expect={'status': 200, 'body': {'contains': 'test'}})
+        >>> r3._check_body('test\\n')
+        """
+        if 'exactly' in self.expect['body'] \
+           and body != self.expect['body']['exactly']:
+            raise TestExpectationFailed(
+                f'Unexpected body: {body!r} != '
+                f'{self.expect["body"]["exactly"]!r}')
+        if 'contains' in self.expect['body']:
+            if type(self.expect['body']['contains']) is str:
+                self.expect['body']['contains'] = [
+                    self.expect['body']['contains']]
+            for s in self.expect['body']['contains']:
+                if not s in body:
+                    raise TestExpectationFailed(
+                        f'Unexpected body: {body!r} does not contain '
+                        f'{s!r}')
 
     def check_response(self, response, body):
         if response.status != self.expect['status']:
             raise TestExpectationFailed(
                 f'Unexpected status: {response.status} != '
                 f'{self.expect["status"]}')
-        if 'body' in self.expect and self.expect['body'] != body:
-            raise TestExpectationFailed(
-                f'Unexpected body: {body!r} != {self.expect["body"]!r}')
+        if 'body' in self.expect:
+            self._check_body(body)
 
     @classmethod
     def _from_yaml(cls, loader, node):

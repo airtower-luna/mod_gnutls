@@ -13,5 +13,14 @@ actions:
     path: /test.txt
     expect:
       status: 200
-      body: |
-        test
+      body:
+        exactly: |
+          test
+  - !request
+    path: /test.txt
+    expect:
+      status: 200
+      body:
+        contains:
+          - 'tes'
+          - 'est'
