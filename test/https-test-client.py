@@ -67,14 +67,17 @@ class HTTPSubprocessConnection(HTTPConnection):
 
 class TestRequest(yaml.YAMLObject):
     yaml_tag = '!request'
-    def __init__(self, path, expect=dict(status=200), method='GET'):
+    def __init__(self, path, method='GET', headers=dict(),
+                 expect=dict(status=200)):
         self.method = method
         self.path = path
+        self.headers = headers
         self.expect = expect
 
     def __repr__(self):
         return (f'{self.__class__.__name__!s}(path={self.path!r}, '
-                f'expect={self.expect!r}, method={self.method!r})')
+                f'method={self.method!r}), headers={self.headers!r}, '
+                f'expect={self.expect!r}')
 
     def check_response(self, response, body):
         if response.status != self.expect['status']:
@@ -194,7 +197,7 @@ if __name__ == "__main__":
             if type(act) is TestRequest:
                 # Add headers={'Host': 'test.host'} to provoke "421
                 # Misdirected
-                conn.request(act.method, act.path)
+                conn.request(act.method, act.path, headers=act.headers)
                 resp = conn.getresponse()
                 body = resp.read().decode()
                 print(format_response(resp, body))

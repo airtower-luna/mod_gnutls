@@ -4,6 +4,8 @@ gnutls_params:
 actions:
   - !request
     path: /
+    headers:
+      Host: localhost
     expect:
       status: 404
   - !request
