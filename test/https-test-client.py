@@ -15,11 +15,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import select
 import socket
 import subprocess
+import sys
+import traceback
 import yaml
 
 from http.client import HTTPConnection
+from multiprocessing import Process
 from time import sleep
 
 class HTTPSubprocessConnection(HTTPConnection):
@@ -39,6 +43,49 @@ class HTTPSubprocessConnection(HTTPConnection):
         # The set_tunnel method of the super class is not supported
         # (see exception doc)
         self.set_tunnel = None
+        self._fproc = None
+
+    @classmethod
+    def _filter(cls, in_stream, out_stream):
+        import fcntl
+        import os
+        # This filters out a log line about loading client
+        # certificates that is mistakenly sent to stdout. My fix has
+        # been merged, but buggy binaries will probably be around for
+        # a while.
+        # https://gitlab.com/gnutls/gnutls/merge_requests/1125
+        cert_log = b'Processed 1 client X.509 certificates...\n'
+
+        fd = in_stream.fileno()
+        fl = fcntl.fcntl(fd, fcntl.F_GETFL)
+        fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+        poller = select.poll()
+        poller.register(fd)
+
+        run_loop = True
+        while run_loop:
+            # Critical: "event" is a bitwise OR of the POLL* constants
+            for x, event in poller.poll():
+                print(f'fd {x}: {event}')
+                if event & select.POLLIN or event & select.POLLPRI:
+                    data = in_stream.read()
+                    print(f'read {len(data)} bytes')
+                    if cert_log in data:
+                        data = data.replace(cert_log, b'')
+                        print('skip')
+                    out_stream.send(data)
+                if event & select.POLLHUP or event & select.POLLRDHUP:
+                    # Stop the loop, but process any other events that
+                    # might be in the list returned by poll() first.
+                    run_loop = False
+                    print('received HUP')
+                sys.stdout.flush()
+
+        print('filter process cleanin up')
+        sys.stdout.flush()
+
+        in_stream.close()
+        out_stream.close()
 
     def connect(self):
         s_local, s_remote = socket.socketpair(socket.AF_UNIX,
@@ -46,22 +93,32 @@ class HTTPSubprocessConnection(HTTPConnection):
         s_local.settimeout(self.timeout)
 
         # TODO: Maybe capture stderr?
-        self._sproc = subprocess.Popen(self.command, stdout=s_remote,
-                                       stdin=s_remote, close_fds=True)
+        self._sproc = subprocess.Popen(self.command, stdout=subprocess.PIPE,
+                                       stdin=s_remote, close_fds=True,
+                                       bufsize=0)
+        self._fproc = Process(target=HTTPSubprocessConnection._filter,
+                              args=(self._sproc.stdout, s_remote))
+        self._fproc.start()
         s_remote.close()
         self.sock = s_local
+        print(f'socket created {self.sock}')
+        sys.stdout.flush()
 
     def close(self):
-        super().close()
-        # Wait for the process to stop, send SIGTERM/SIGKILL if
-        # necessary
+        traceback.print_stack()
+        # Wait for the process to stop, send SIGKILL if necessary
+        self._sproc.terminate()
         self.returncode = self._sproc.wait(self.timeout)
         if self.returncode == None:
-            self._sproc.terminate()
+            self._sproc.kill()
             self.returncode = self._sproc.wait(self.timeout)
-            if self.returncode == None:
-                self._sproc.kill()
-                self.returncode = self._sproc.wait(self.timeout)
+
+        # filter process receives HUP on socket when the subprocess
+        # terminates
+        self._fproc.join()
+
+        print(f'socket closing {self.sock}')
+        super().close()
 
 
 
