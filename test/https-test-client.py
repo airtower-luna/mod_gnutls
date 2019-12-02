@@ -218,6 +218,7 @@ def filter_cert_log(in_stream, out_stream):
     poller = select.poll()
     poller.register(fd)
 
+    init_done = False
     run_loop = True
     while run_loop:
         # The returned tuples are file descriptor and event, but
@@ -227,8 +228,13 @@ def filter_cert_log(in_stream, out_stream):
             # Critical: "event" is a bitwise OR of the POLL* constants
             if event & select.POLLIN or event & select.POLLPRI:
                 data = in_stream.read()
-                if cert_log in data:
-                    data = data.replace(cert_log, b'')
+                if not init_done:
+                    # If the erroneous log line shows up it's the
+                    # first piece of data we receive. Just copy
+                    # everything after.
+                    init_done = True
+                    if cert_log in data:
+                        data = data.replace(cert_log, b'')
                 out_stream.send(data)
             if event & select.POLLHUP or event & select.POLLRDHUP:
                 # Stop the loop, but process any other events that
