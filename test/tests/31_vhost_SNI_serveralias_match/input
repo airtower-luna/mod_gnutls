@@ -1,3 +1,4 @@
 GET /test.txt HTTP/1.1
 Host: example.virtual.host
+Connection: close
 

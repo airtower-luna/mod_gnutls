@@ -1,3 +1,4 @@
 GET /dump.cgi HTTP/1.0
 Host: __HOSTNAME__
+Connection: close
 
