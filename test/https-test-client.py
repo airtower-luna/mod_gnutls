@@ -25,6 +25,7 @@ from time import sleep
 
 class HTTPSubprocessConnection(HTTPConnection):
     def __init__(self, command, host, port=None,
+                 output_filter=None,
                  timeout=socket._GLOBAL_DEFAULT_TIMEOUT,
                  blocksize=8192):
         super(HTTPSubprocessConnection, self).__init__(host, port, timeout,
@@ -40,6 +41,11 @@ class HTTPSubprocessConnection(HTTPConnection):
         # The set_tunnel method of the super class is not supported
         # (see exception doc)
         self.set_tunnel = None
+        # This method will be run in a separate process and filter the
+        # stdout of self._sproc. Its arguments are self._sproc.stdout
+        # and the socket back to the HTTP connection (write-only).
+        self._output_filter = output_filter
+        # output filter process
         self._fproc = None
 
     def connect(self):
@@ -48,12 +54,17 @@ class HTTPSubprocessConnection(HTTPConnection):
         s_local.settimeout(self.timeout)
 
         # TODO: Maybe capture stderr?
-        self._sproc = subprocess.Popen(self.command, stdout=subprocess.PIPE,
-                                       stdin=s_remote, close_fds=True,
-                                       bufsize=0)
-        self._fproc = Process(target=filter_cert_log,
-                              args=(self._sproc.stdout, s_remote))
-        self._fproc.start()
+        if self._output_filter:
+            self._sproc = subprocess.Popen(self.command, stdout=subprocess.PIPE,
+                                           stdin=s_remote, close_fds=True,
+                                           bufsize=0)
+            self._fproc = Process(target=self._output_filter,
+                                  args=(self._sproc.stdout, s_remote))
+            self._fproc.start()
+        else:
+            self._sproc = subprocess.Popen(self.command, stdout=s_remote,
+                                           stdin=s_remote, close_fds=True,
+                                           bufsize=0)
         s_remote.close()
         self.sock = s_local
 
@@ -76,7 +87,8 @@ class HTTPSubprocessConnection(HTTPConnection):
 
         # filter process receives HUP on pipe when the subprocess
         # terminates
-        self._fproc.join()
+        if self._fproc:
+            self._fproc.join()
 
         # close the connection in the super class, which also calls
         # self.sock.close()
@@ -291,6 +303,7 @@ if __name__ == "__main__":
     command = command + ['-p', str(args.port), args.host]
 
     conn = HTTPSubprocessConnection(command, args.host, port=args.port,
+                                    output_filter=filter_cert_log,
                                     timeout=6.0)
 
     try:
