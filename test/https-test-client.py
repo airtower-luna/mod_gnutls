@@ -56,16 +56,23 @@ class HTTPSubprocessConnection(HTTPConnection):
         # https://gitlab.com/gnutls/gnutls/merge_requests/1125
         cert_log = b'Processed 1 client X.509 certificates...\n'
 
+        # Set the input to non-blocking mode
         fd = in_stream.fileno()
         fl = fcntl.fcntl(fd, fcntl.F_GETFL)
         fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+
+        # The poll object allows waiting for events on non-blocking IO
+        # channels.
         poller = select.poll()
         poller.register(fd)
 
         run_loop = True
         while run_loop:
-            # Critical: "event" is a bitwise OR of the POLL* constants
+            # The returned tuples are file descriptor and event, but
+            # we're only listening on one stream anyway, so we don't
+            # need to check it here.
             for x, event in poller.poll():
+                # Critical: "event" is a bitwise OR of the POLL* constants
                 if event & select.POLLIN or event & select.POLLPRI:
                     data = in_stream.read()
                     if cert_log in data:
