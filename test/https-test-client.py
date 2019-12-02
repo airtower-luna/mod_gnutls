@@ -66,23 +66,15 @@ class HTTPSubprocessConnection(HTTPConnection):
         while run_loop:
             # Critical: "event" is a bitwise OR of the POLL* constants
             for x, event in poller.poll():
-                print(f'fd {x}: {event}')
                 if event & select.POLLIN or event & select.POLLPRI:
                     data = in_stream.read()
-                    print(f'read {len(data)} bytes')
                     if cert_log in data:
                         data = data.replace(cert_log, b'')
-                        print('skip')
                     out_stream.send(data)
                 if event & select.POLLHUP or event & select.POLLRDHUP:
                     # Stop the loop, but process any other events that
                     # might be in the list returned by poll() first.
                     run_loop = False
-                    print('received HUP')
-                sys.stdout.flush()
-
-        print('filter process cleanin up')
-        sys.stdout.flush()
 
         in_stream.close()
         out_stream.close()
@@ -101,23 +93,30 @@ class HTTPSubprocessConnection(HTTPConnection):
         self._fproc.start()
         s_remote.close()
         self.sock = s_local
-        print(f'socket created {self.sock}')
-        sys.stdout.flush()
 
     def close(self):
-        traceback.print_stack()
-        # Wait for the process to stop, send SIGKILL if necessary
-        self._sproc.terminate()
-        self.returncode = self._sproc.wait(self.timeout)
-        if self.returncode == None:
-            self._sproc.kill()
-            self.returncode = self._sproc.wait(self.timeout)
+        # close socket to subprocess for writing
+        if self.sock:
+            self.sock.shutdown(socket.SHUT_WR)
 
-        # filter process receives HUP on socket when the subprocess
+        # Wait for the process to stop, send SIGTERM/SIGKILL if
+        # necessary
+        try:
+            self.returncode = self._sproc.wait(self.timeout)
+        except subprocess.TimeoutExpired:
+            try:
+                self._sproc.terminate()
+                self.returncode = self._sproc.wait(self.timeout)
+            except subprocess.TimeoutExpired:
+                self._sproc.kill()
+                self.returncode = self._sproc.wait(self.timeout)
+
+        # filter process receives HUP on pipe when the subprocess
         # terminates
         self._fproc.join()
 
-        print(f'socket closing {self.sock}')
+        # close the connection in the super class, which also calls
+        # self.sock.close()
         super().close()
 
 
