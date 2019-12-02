@@ -15,11 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import select
 import socket
 import subprocess
-import sys
-import traceback
 import yaml
 
 from http.client import HTTPConnection
@@ -45,47 +42,6 @@ class HTTPSubprocessConnection(HTTPConnection):
         self.set_tunnel = None
         self._fproc = None
 
-    @classmethod
-    def _filter(cls, in_stream, out_stream):
-        import fcntl
-        import os
-        # This filters out a log line about loading client
-        # certificates that is mistakenly sent to stdout. My fix has
-        # been merged, but buggy binaries will probably be around for
-        # a while.
-        # https://gitlab.com/gnutls/gnutls/merge_requests/1125
-        cert_log = b'Processed 1 client X.509 certificates...\n'
-
-        # Set the input to non-blocking mode
-        fd = in_stream.fileno()
-        fl = fcntl.fcntl(fd, fcntl.F_GETFL)
-        fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
-
-        # The poll object allows waiting for events on non-blocking IO
-        # channels.
-        poller = select.poll()
-        poller.register(fd)
-
-        run_loop = True
-        while run_loop:
-            # The returned tuples are file descriptor and event, but
-            # we're only listening on one stream anyway, so we don't
-            # need to check it here.
-            for x, event in poller.poll():
-                # Critical: "event" is a bitwise OR of the POLL* constants
-                if event & select.POLLIN or event & select.POLLPRI:
-                    data = in_stream.read()
-                    if cert_log in data:
-                        data = data.replace(cert_log, b'')
-                    out_stream.send(data)
-                if event & select.POLLHUP or event & select.POLLRDHUP:
-                    # Stop the loop, but process any other events that
-                    # might be in the list returned by poll() first.
-                    run_loop = False
-
-        in_stream.close()
-        out_stream.close()
-
     def connect(self):
         s_local, s_remote = socket.socketpair(socket.AF_UNIX,
                                               socket.SOCK_STREAM)
@@ -95,7 +51,7 @@ class HTTPSubprocessConnection(HTTPConnection):
         self._sproc = subprocess.Popen(self.command, stdout=subprocess.PIPE,
                                        stdin=s_remote, close_fds=True,
                                        bufsize=0)
-        self._fproc = Process(target=HTTPSubprocessConnection._filter,
+        self._fproc = Process(target=filter_cert_log,
                               args=(self._sproc.stdout, s_remote))
         self._fproc.start()
         s_remote.close()
@@ -226,6 +182,49 @@ class TestExpectationFailed(Exception):
     """Raise if a test failed. The constructor should be called with a
     string describing the problem."""
     pass
+
+
+
+def filter_cert_log(in_stream, out_stream):
+    import fcntl
+    import os
+    import select
+    # This filters out a log line about loading client
+    # certificates that is mistakenly sent to stdout. My fix has
+    # been merged, but buggy binaries will probably be around for
+    # a while.
+    # https://gitlab.com/gnutls/gnutls/merge_requests/1125
+    cert_log = b'Processed 1 client X.509 certificates...\n'
+
+    # Set the input to non-blocking mode
+    fd = in_stream.fileno()
+    fl = fcntl.fcntl(fd, fcntl.F_GETFL)
+    fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+
+    # The poll object allows waiting for events on non-blocking IO
+    # channels.
+    poller = select.poll()
+    poller.register(fd)
+
+    run_loop = True
+    while run_loop:
+        # The returned tuples are file descriptor and event, but
+        # we're only listening on one stream anyway, so we don't
+        # need to check it here.
+        for x, event in poller.poll():
+            # Critical: "event" is a bitwise OR of the POLL* constants
+            if event & select.POLLIN or event & select.POLLPRI:
+                data = in_stream.read()
+                if cert_log in data:
+                    data = data.replace(cert_log, b'')
+                out_stream.send(data)
+            if event & select.POLLHUP or event & select.POLLRDHUP:
+                # Stop the loop, but process any other events that
+                # might be in the list returned by poll() first.
+                run_loop = False
+
+    in_stream.close()
+    out_stream.close()
 
 
 
