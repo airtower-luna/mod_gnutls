@@ -335,15 +335,10 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('host', nargs='?', help='Access the specified host',
                         default='localhost')
-    parser.add_argument('--insecure', action='store_true',
-                        help='do not validate the server certificate')
     parser.add_argument('-p', '--port', type=int,
                         help='Access the specified port', default='8000')
-    parser.add_argument('--x509cafile', type=str,
-                        help='Use the specified CA to validate the '
-                        'server certificate')
     parser.add_argument('--test-config', type=argparse.FileType('r'),
-                        help='load YAML test configuration')
+                        required=True, help='load YAML test configuration')
 
     # enable bash completion if argcomplete is available
     try:
@@ -355,31 +350,18 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     test_conn = None
-    test_actions = None
 
-    if args.test_config:
-        config = yaml.load(args.test_config, Loader=yaml.Loader)
-        if type(config) is TestConnection:
-            test_conn = config
-            print(test_conn)
-            test_actions = test_conn.actions
+    config = yaml.load(args.test_config, Loader=yaml.Loader)
+    if type(config) is TestConnection:
+        test_conn = config
+        print(test_conn)
     else:
-        # simple default request
-        test_actions = [TestRequest(path='/test.txt',
-                                    expect={'status': 200, 'body': 'test\n'},
-                                    method='GET')]
-
+        raise TypeError(f'Unsupported configuration: {config!r}')
 
     # note: "--logfile" option requires GnuTLS version >= 3.6.7
     command = ['gnutls-cli', '--logfile=/dev/stderr']
-    if args.insecure:
-        command.append('--insecure')
-    if args.x509cafile:
-        command.append('--x509cafile')
-        command.append(args.x509cafile)
-    if test_conn != None:
-        for s in test_conn.gnutls_params:
-            command.append('--' + s)
+    for s in test_conn.gnutls_params:
+        command.append('--' + s)
     command = command + ['-p', str(args.port), args.host]
 
     conn = HTTPSubprocessConnection(command, args.host, port=args.port,
@@ -387,7 +369,7 @@ if __name__ == "__main__":
                                     timeout=6.0)
 
     try:
-        for act in test_actions:
+        for act in test_conn.actions:
             if type(act) is TestRequest:
                 act.run(conn)
             elif type(act) is TestRaw10:
