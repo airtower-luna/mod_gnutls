@@ -169,15 +169,15 @@ class TestRequest(yaml.YAMLObject):
 class TestConnection(yaml.YAMLObject):
     yaml_tag = '!connection'
 
-    def __init__(self, actions, gnutls_params=[], protocol='https'):
+    def __init__(self, actions, gnutls_params=[], transport='gnutls'):
         self.gnutls_params = gnutls_params
         self.actions = actions
-        self.protocol = protocol
+        self.transport = transport
 
     def __repr__(self):
         return (f'{self.__class__.__name__!s}'
                 f'(gnutls_params={self.gnutls_params!r}, '
-                f'actions={self.actions!r}, protocol={self.protocol!r})')
+                f'actions={self.actions!r}, transport={self.transport!r})')
 
     @classmethod
     def _from_yaml(cls, loader, node):
