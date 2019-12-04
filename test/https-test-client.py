@@ -28,6 +28,8 @@ if __name__ == "__main__":
                         default='localhost')
     parser.add_argument('-p', '--port', type=int,
                         help='Access the specified port', default='8000')
+    parser.add_argument('--timeout', type=float,
+                        help='Timeout for HTTP requests', default='5.0')
     parser.add_argument('--test-config', type=argparse.FileType('r'),
                         required=True, help='load YAML test configuration')
 
@@ -53,4 +55,4 @@ if __name__ == "__main__":
     print(conns)
 
     for test_conn in conns:
-        test_conn.run(host=args.host, port=args.port)
+        test_conn.run(host=args.host, port=args.port, timeout=args.timeout)
