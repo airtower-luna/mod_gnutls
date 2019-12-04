@@ -193,6 +193,28 @@ class TestConnection(yaml.YAMLObject):
                 f'(gnutls_params={self.gnutls_params!r}, '
                 f'actions={self.actions!r}, transport={self.transport!r})')
 
+    def run(self, host, port, timeout=5.0):
+        # note: "--logfile" option requires GnuTLS version >= 3.6.7
+        command = ['gnutls-cli', '--logfile=/dev/stderr']
+        for s in self.gnutls_params:
+            command.append('--' + s)
+        command = command + ['-p', str(port), host]
+
+        conn = HTTPSubprocessConnection(command, host, port,
+                                        output_filter=filter_cert_log,
+                                        timeout=timeout)
+
+        try:
+            for act in self.actions:
+                if type(act) is TestRequest:
+                    act.run(conn)
+                elif type(act) is TestRaw10:
+                    act.run(command, timeout)
+                else:
+                    raise TypeError(f'Unsupported action requested: {act!r}')
+        finally:
+            conn.close()
+
     @classmethod
     def _from_yaml(cls, loader, node):
         fields = loader.construct_mapping(node)
@@ -358,23 +380,4 @@ if __name__ == "__main__":
     else:
         raise TypeError(f'Unsupported configuration: {config!r}')
 
-    # note: "--logfile" option requires GnuTLS version >= 3.6.7
-    command = ['gnutls-cli', '--logfile=/dev/stderr']
-    for s in test_conn.gnutls_params:
-        command.append('--' + s)
-    command = command + ['-p', str(args.port), args.host]
-
-    conn = HTTPSubprocessConnection(command, args.host, port=args.port,
-                                    output_filter=filter_cert_log,
-                                    timeout=6.0)
-
-    try:
-        for act in test_conn.actions:
-            if type(act) is TestRequest:
-                act.run(conn)
-            elif type(act) is TestRaw10:
-                act.run(command, conn.timeout)
-            else:
-                raise TypeError(f'Unsupported action requested: {act!r}')
-    finally:
-        conn.close()
+    test_conn.run(host=args.host, port=args.port)
