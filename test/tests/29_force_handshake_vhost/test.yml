@@ -1,0 +1,13 @@
+!connection
+gnutls_params:
+  - x509cafile=authority/x509.pem
+actions:
+  - !request
+    path: /dump.cgi
+    headers:
+      Host: vhost.example.com
+    expect:
+      status: 421
+      body:
+        - 'Misdirected Request'
+        - 'Server Name Indication (SNI)'

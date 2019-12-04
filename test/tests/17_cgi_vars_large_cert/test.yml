@@ -1,0 +1,20 @@
+!connection
+gnutls_params:
+  - x509cafile=authority/x509.pem
+  - x509certfile=authority/client/x509.pem
+  - x509keyfile=authority/client/secret.key
+actions:
+  - !request
+    path: /dump.cgi
+    expect:
+      status: 200
+      body:
+        contains: |
+          ----Certificate:----
+          GNUTLS_CERTIFICATE_SIZE_LIMIT_EXCEEDED
+
+          ----Verification Status:----
+          SUCCESS
+
+          ----SubjectAltName:----
+          RFC822NAME:test0@modgnutls.test

@@ -1,6 +1,0 @@
-Accept-Ranges: bytes
-Content-Type: text/plain
-Connection: close
-
-test
-- Peer has closed the GnuTLS connection

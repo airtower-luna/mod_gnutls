@@ -1,4 +1,0 @@
-GET /test.txt HTTP/1.1
-Host: __HOSTNAME__
-Connection: close
-

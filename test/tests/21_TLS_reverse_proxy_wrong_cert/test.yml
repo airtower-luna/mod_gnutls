@@ -1,0 +1,12 @@
+!connection
+gnutls_params:
+  - x509cafile=authority/x509.pem
+actions:
+  - !request
+    path: /proxy/test.txt
+    expect:
+      status: 502
+      body:
+        contains:
+          - 'Proxy Error'
+          - 'Error reading from remote server'

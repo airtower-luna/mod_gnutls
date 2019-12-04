@@ -1,4 +1,0 @@
-GET /status?auto HTTP/1.0
-Host: __HOSTNAME__
-Connection: close
-

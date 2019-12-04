@@ -248,7 +248,7 @@ apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/ocsp.cgi \
 
 EXTRA_DIST = $(apache_data) $(cert_templates) $(shared_identities:=/uid.in) \
 	apache_service.bash common.bash runtests authority/server/crl.template \
-	softhsm.bash
+	softhsm.bash https-test-client.py
 
 # Lockfile for the main Apache process
 test_lockfile = ./test.lock
