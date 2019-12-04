@@ -99,13 +99,13 @@ class TestRequest(yaml.YAMLObject):
         >>> r1.check_body('xyz\\n')
         Traceback (most recent call last):
         ...
-        https-test-client.TestExpectationFailed: Unexpected body: 'xyz\\n' != 'test\\n'
+        mgstest.TestExpectationFailed: Unexpected body: 'xyz\\n' != 'test\\n'
         >>> r2 = TestRequest(path='/test.txt', method='GET', headers={}, expect={'status': 200, 'body': {'contains': ['tes', 'est']}})
         >>> r2.check_body('test\\n')
         >>> r2.check_body('est\\n')
         Traceback (most recent call last):
         ...
-        https-test-client.TestExpectationFailed: Unexpected body: 'est\\n' does not contain 'tes'
+        mgstest.TestExpectationFailed: Unexpected body: 'est\\n' does not contain 'tes'
         >>> r3 = TestRequest(path='/test.txt', method='GET', headers={}, expect={'status': 200, 'body': {'contains': 'test'}})
         >>> r3.check_body('test\\n')
         """
