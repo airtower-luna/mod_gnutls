@@ -75,15 +75,16 @@ class HTTPSubprocessConnection(HTTPConnection):
 
         # Wait for the process to stop, send SIGTERM/SIGKILL if
         # necessary
-        try:
-            self.returncode = self._sproc.wait(self.timeout)
-        except subprocess.TimeoutExpired:
+        if self._sproc:
             try:
-                self._sproc.terminate()
                 self.returncode = self._sproc.wait(self.timeout)
             except subprocess.TimeoutExpired:
-                self._sproc.kill()
-                self.returncode = self._sproc.wait(self.timeout)
+                try:
+                    self._sproc.terminate()
+                    self.returncode = self._sproc.wait(self.timeout)
+                except subprocess.TimeoutExpired:
+                    self._sproc.kill()
+                    self.returncode = self._sproc.wait(self.timeout)
 
         # filter process receives HUP on pipe when the subprocess
         # terminates
