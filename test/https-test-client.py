@@ -382,13 +382,17 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    test_conn = None
+    conns = None
 
     config = yaml.load(args.test_config, Loader=yaml.Loader)
     if type(config) is TestConnection:
-        test_conn = config
-        print(test_conn)
+        conns = [config]
+    elif type(config) is list:
+        # assume list elements are connections
+        conns = config
     else:
         raise TypeError(f'Unsupported configuration: {config!r}')
+    print(conns)
 
-    test_conn.run(host=args.host, port=args.port)
+    for test_conn in conns:
+        test_conn.run(host=args.host, port=args.port)

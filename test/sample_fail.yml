@@ -1,8 +1,18 @@
-!connection
-gnutls_params:
-  - x509cafile=rogueca/x509.pem
-actions:
-  - !request
-    path: /
-    expect:
-      reset: yes
+# Example: The first TLS connection fails (certificate error), the
+# second succeeds but receives a 404.
+- !connection
+  gnutls_params:
+    - x509cafile=rogueca/x509.pem
+  actions:
+    - !request
+      path: /
+      expect:
+        reset: yes
+- !connection
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+  actions:
+    - !request
+      path: /
+      expect:
+        status: 404
