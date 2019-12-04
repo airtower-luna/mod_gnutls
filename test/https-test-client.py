@@ -126,22 +126,22 @@ class TestRequest(yaml.YAMLObject):
         print(format_response(resp, body))
         self.check_response(resp, body)
 
-    def _check_body(self, body):
+    def check_body(self, body):
         """
         >>> r1 = TestRequest(path='/test.txt', method='GET', headers={}, expect={'status': 200, 'body': {'exactly': 'test\\n'}})
-        >>> r1._check_body('test\\n')
-        >>> r1._check_body('xyz\\n')
+        >>> r1.check_body('test\\n')
+        >>> r1.check_body('xyz\\n')
         Traceback (most recent call last):
         ...
         https-test-client.TestExpectationFailed: Unexpected body: 'xyz\\n' != 'test\\n'
         >>> r2 = TestRequest(path='/test.txt', method='GET', headers={}, expect={'status': 200, 'body': {'contains': ['tes', 'est']}})
-        >>> r2._check_body('test\\n')
-        >>> r2._check_body('est\\n')
+        >>> r2.check_body('test\\n')
+        >>> r2.check_body('est\\n')
         Traceback (most recent call last):
         ...
         https-test-client.TestExpectationFailed: Unexpected body: 'est\\n' does not contain 'tes'
         >>> r3 = TestRequest(path='/test.txt', method='GET', headers={}, expect={'status': 200, 'body': {'contains': 'test'}})
-        >>> r3._check_body('test\\n')
+        >>> r3.check_body('test\\n')
         """
         if 'exactly' in self.expect['body'] \
            and body != self.expect['body']['exactly']:
@@ -167,7 +167,7 @@ class TestRequest(yaml.YAMLObject):
                 f'Unexpected status: {response.status} != '
                 f'{self.expect["status"]}')
         if 'body' in self.expect:
-            self._check_body(body)
+            self.check_body(body)
 
     def expects_conn_reset(self):
         if 'reset' in self.expect:
@@ -277,7 +277,7 @@ class TestRaw10(TestRequest):
             raise TestExpectationFailed(f'Invalid status line: "{status}"')
 
         if 'body' in self.expect:
-            self._check_body(body)
+            self.check_body(body)
 
 # Override the default constructors. Pyyaml ignores default parameters
 # otherwise.
