@@ -112,6 +112,20 @@ class TestRequest(yaml.YAMLObject):
                 f'method={self.method!r}, headers={self.headers!r}, '
                 f'expect={self.expect!r})')
 
+    def run(self, conn):
+        try:
+            conn.request(self.method, self.path, headers=self.headers)
+            resp = conn.getresponse()
+        except ConnectionResetError as err:
+            if self.expects_conn_reset():
+                print('connection reset as expected.')
+                return
+            else:
+                raise err
+        body = resp.read().decode()
+        print(format_response(resp, body))
+        self.check_response(resp, body)
+
     def _check_body(self, body):
         """
         >>> r1 = TestRequest(path='/test.txt', method='GET', headers={}, expect={'status': 200, 'body': {'exactly': 'test\\n'}})
@@ -375,18 +389,7 @@ if __name__ == "__main__":
     try:
         for act in test_actions:
             if type(act) is TestRequest:
-                try:
-                    conn.request(act.method, act.path, headers=act.headers)
-                    resp = conn.getresponse()
-                except ConnectionResetError as err:
-                    if act.expects_conn_reset():
-                        print('connection reset as expected.')
-                        break
-                    else:
-                        raise err
-                body = resp.read().decode()
-                print(format_response(resp, body))
-                act.check_response(resp, body)
+                act.run(conn)
             elif type(act) is TestRaw10:
                 act.run(command, conn.timeout)
             else:
