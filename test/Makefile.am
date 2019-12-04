@@ -53,6 +53,10 @@ gen_ocsp_index_LDFLAGS = $(LIBGNUTLS_LIBS)
 noinst_HEADERS = cert_helper.h
 endif
 
+# Python tools for tests
+noinst_PYTHON = https-test-client.py mgstest/http.py mgstest/__init__.py \
+	mgstest/tests.py
+
 # Identities in the miniature CA, server, and client environment for
 # the test suite
 shared_identities = authority authority/client
@@ -248,7 +252,7 @@ apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/ocsp.cgi \
 
 EXTRA_DIST = $(apache_data) $(cert_templates) $(shared_identities:=/uid.in) \
 	apache_service.bash common.bash runtests authority/server/crl.template \
-	softhsm.bash https-test-client.py
+	softhsm.bash
 
 # Lockfile for the main Apache process
 test_lockfile = ./test.lock
