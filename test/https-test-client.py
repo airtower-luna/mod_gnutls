@@ -170,6 +170,17 @@ class TestRequest(yaml.YAMLObject):
             self.check_body(body)
 
     def expects_conn_reset(self):
+        """Returns True if running this request is expected to fail due to the
+        connection being reset. That usually means the underlying TLS
+        connection failed.
+
+        >>> r1 = TestRequest(path='/test.txt', method='GET', headers={}, expect={'status': 200, 'body': {'contains': 'test'}})
+        >>> r1.expects_conn_reset()
+        False
+        >>> r2 = TestRequest(path='/test.txt', method='GET', headers={}, expect={'reset': True})
+        >>> r2.expects_conn_reset()
+        True
+        """
         if 'reset' in self.expect:
             return self.expect['reset']
         return False
