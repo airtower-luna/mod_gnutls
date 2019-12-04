@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 import socket
 import subprocess
 import yaml
@@ -184,6 +185,64 @@ class TestConnection(yaml.YAMLObject):
         conn = TestConnection(**fields)
         return conn
 
+class TestRaw10(TestRequest):
+    """This is a minimal (and likely incomplete) HTTP/1.0 test client for
+    the one test case that strictly requires HTTP/1.0. All request
+    parameters (method, path, headers) MUST be specified in the config
+    file.
+
+    """
+    yaml_tag = '!raw10'
+    status_re = re.compile('^HTTP/([\d\.]+) (\d+) (.*)$')
+
+    def __init__(self, method, path, headers, expect):
+        self.method = method
+        self.path = path
+        self.headers = headers
+        self.expect = expect
+
+    def __repr__(self):
+        return (f'{self.__class__.__name__!s}'
+                f'(method={self.method!r}, path={self.path!r}, '
+                f'headers={self.headers!r}, expect={self.expect!r})')
+
+    def run(self, command, timeout=None):
+        req = f'{self.method} {self.path} HTTP/1.0\r\n'
+        for name, value in self.headers.items():
+            req = req + f'{name}: {value}\r\n'
+        req = req + f'\r\n'
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE,
+                                stdin=subprocess.PIPE, close_fds=True,
+                                bufsize=0)
+        try:
+            # Note: errs will be empty because stderr is not captured
+            outs, errs = proc.communicate(input=req.encode(),
+                                          timeout=timeout)
+        except TimeoutExpired:
+            proc.kill()
+            outs, errs = proc.communicate()
+
+        # first line of the received data must be the status
+        status, rest = outs.decode().split('\r\n', maxsplit=1)
+        # headers and body are separated by double newline
+        headers, body = rest.split('\r\n\r\n', maxsplit=1)
+        # log response for debugging
+        print(f'{status}\n{headers}\n\n{body}')
+
+        m = self.status_re.match(status)
+        if m:
+            status_code = int(m.group(2))
+            status_expect = self.expect.get('status')
+            if status_expect and not status_code == status_expect:
+                raise TestExpectationFailed('Unexpected status code: '
+                                            f'{status}, expected '
+                                            f'{status_expect}')
+        else:
+            raise TestExpectationFailed(f'Invalid status line: "{status}"')
+
+        if 'body' in self.expect:
+            self._check_body(body)
+
 # Override the default constructors. Pyyaml ignores default parameters
 # otherwise.
 yaml.add_constructor('!request', TestRequest._from_yaml, yaml.Loader)
@@ -328,6 +387,8 @@ if __name__ == "__main__":
                 body = resp.read().decode()
                 print(format_response(resp, body))
                 act.check_response(resp, body)
+            elif type(act) is TestRaw10:
+                act.run(command, conn.timeout)
             else:
                 raise TypeError(f'Unsupported action requested: {act!r}')
     finally:
