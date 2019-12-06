@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""HTTP handling components for mod_gnutls tests."""
+
 import socket
 import subprocess
 
@@ -21,6 +23,11 @@ from http.client import HTTPConnection
 from multiprocessing import Process
 
 class HTTPSubprocessConnection(HTTPConnection):
+    """An HTTPConnection that transports data through a subprocess instead
+    of a socket. The mod_gnutls test suite uses it to transport data
+    through gnutls-cli instead of the ssl module.
+
+    """
     def __init__(self, command, host, port=None,
                  output_filter=None,
                  timeout=socket._GLOBAL_DEFAULT_TIMEOUT,

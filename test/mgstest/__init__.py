@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Python modules for the mod_gnutls test suite."""
+
 class TestExpectationFailed(Exception):
     """Raise if a test failed. The constructor should be called with a
     string describing the problem."""

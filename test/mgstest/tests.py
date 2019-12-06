@@ -14,6 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test objects and support functions for the mod_gnutls test
+suite. The classes defined in this module represent structures in the
+YAML test configuration files.
+
+"""
+
 import re
 import subprocess
 import yaml
@@ -22,6 +28,17 @@ from . import TestExpectationFailed
 from .http import HTTPSubprocessConnection
 
 class TestConnection(yaml.YAMLObject):
+    """An HTTP connection in a test. It includes parameters for the
+    transport (currently gnutls-cli only), and the actions
+    (e.g. sending requests) to take using this connection.
+
+    Note that running one TestConnection object may result in multiple
+    sequential network connections, if the transport gets closed in a
+    non-failure way (e.g. following a "Connection: close" request) and
+    there are more actions, or (rarely) if an action requires its own
+    transport.
+
+    """
     yaml_tag = '!connection'
 
     def __init__(self, actions, gnutls_params=[], transport='gnutls'):
@@ -65,6 +82,18 @@ class TestConnection(yaml.YAMLObject):
 
 
 class TestRequest(yaml.YAMLObject):
+    """Test action that sends an HTTP/1.1 request.
+
+    The path must be specified in the configuration file, all other
+    parameters (method, headers, expected response) have
+    defaults.
+
+    Options for checking the response currently are:
+    * require a specific response status
+    * require the body to exactly match a specific string
+    * require the body to contain all of a list of strings
+
+    """
     yaml_tag = '!request'
     def __init__(self, path, method='GET', headers=dict(),
                  expect=dict(status=200)):
@@ -160,10 +189,13 @@ class TestRequest(yaml.YAMLObject):
 
 
 class TestRaw10(TestRequest):
-    """This is a minimal (and likely incomplete) HTTP/1.0 test client for
-    the one test case that strictly requires HTTP/1.0. All request
-    parameters (method, path, headers) MUST be specified in the config
-    file.
+    """Test action that sends a request using a minimal (and likely
+    incomplete) HTTP/1.0 test client for the one test case that
+    strictly requires HTTP/1.0.
+
+    All request parameters (method, path, headers) MUST be specified
+    in the config file. Checks on status and body work the same as for
+    TestRequest.
 
     """
     yaml_tag = '!raw10'
@@ -227,14 +259,23 @@ yaml.add_constructor('!connection', TestConnection._from_yaml, yaml.Loader)
 
 
 def filter_cert_log(in_stream, out_stream):
+    """Filter to stop an erroneous gnutls-cli log message.
+
+    This function filters out a log line about loading client
+    certificates that is mistakenly sent to stdout from gnutls-cli. My
+    fix (https://gitlab.com/gnutls/gnutls/merge_requests/1125) has
+    been merged, but buggy binaries will probably be around for a
+    while.
+
+    The filter is meant to run in a multiprocessing.Process or
+    threading.Thread that receives the stdout of gnutls-cli as
+    in_stream, and a connection for further processing as out_stream.
+
+    """
     import fcntl
     import os
     import select
-    # This filters out a log line about loading client
-    # certificates that is mistakenly sent to stdout. My fix has
-    # been merged, but buggy binaries will probably be around for
-    # a while.
-    # https://gitlab.com/gnutls/gnutls/merge_requests/1125
+    # message to filter
     cert_log = b'Processed 1 client X.509 certificates...\n'
 
     # Set the input to non-blocking mode
