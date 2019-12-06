@@ -20,7 +20,7 @@ import socket
 import subprocess
 
 from http.client import HTTPConnection
-from multiprocessing import Process
+from threading import Thread
 
 class HTTPSubprocessConnection(HTTPConnection):
     """An HTTPConnection that transports data through a subprocess instead
@@ -49,8 +49,8 @@ class HTTPSubprocessConnection(HTTPConnection):
         # stdout of self._sproc. Its arguments are self._sproc.stdout
         # and the socket back to the HTTP connection (write-only).
         self._output_filter = output_filter
-        # output filter process
-        self._fproc = None
+        # output filter thread
+        self._fthread = None
 
     def connect(self):
         s_local, s_remote = socket.socketpair(socket.AF_UNIX,
@@ -62,14 +62,13 @@ class HTTPSubprocessConnection(HTTPConnection):
             self._sproc = subprocess.Popen(self.command, stdout=subprocess.PIPE,
                                            stdin=s_remote, close_fds=True,
                                            bufsize=0)
-            self._fproc = Process(target=self._output_filter,
-                                  args=(self._sproc.stdout, s_remote))
-            self._fproc.start()
+            self._fthread = Thread(target=self._output_filter,
+                                   args=(self._sproc.stdout, s_remote))
+            self._fthread.start()
         else:
             self._sproc = subprocess.Popen(self.command, stdout=s_remote,
                                            stdin=s_remote, close_fds=True,
                                            bufsize=0)
-        s_remote.close()
         self.sock = s_local
 
     def close(self):
@@ -90,10 +89,10 @@ class HTTPSubprocessConnection(HTTPConnection):
                     self._sproc.kill()
                     self.returncode = self._sproc.wait(self.timeout)
 
-        # filter process receives HUP on pipe when the subprocess
+        # filter thread receives HUP on pipe when the subprocess
         # terminates
-        if self._fproc:
-            self._fproc.join()
+        if self._fthread:
+            self._fthread.join()
 
         # close the connection in the super class, which also calls
         # self.sock.close()
