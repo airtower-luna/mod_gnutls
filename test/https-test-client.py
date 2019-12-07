@@ -16,6 +16,7 @@
 # limitations under the License.
 
 import os
+import sys
 import yaml
 
 from mgstest.tests import TestConnection
@@ -61,6 +62,7 @@ if __name__ == "__main__":
     else:
         raise TypeError(f'Unsupported configuration: {config!r}')
     print(conns)
+    sys.stdout.flush()
 
     for test_conn in conns:
         test_conn.run(timeout=args.timeout)

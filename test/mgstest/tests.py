@@ -23,6 +23,7 @@ YAML test configuration files.
 import os
 import re
 import subprocess
+import sys
 import yaml
 
 from string import Template
@@ -85,6 +86,7 @@ class TestConnection(yaml.YAMLObject):
                     raise TypeError(f'Unsupported action requested: {act!r}')
         finally:
             conn.close()
+            sys.stdout.flush()
 
     @classmethod
     def _from_yaml(cls, loader, node):
