@@ -216,7 +216,7 @@ if test "${APACHE2}" = "no"; then
 		     PATH. Test suite will fail.])
 fi
 
-AC_PATH_PROGS([HTTP_CLI], [curl wget], [no])
+AC_PATH_PROGS([HTTP_CLI], [curl], [no])
 
 MODULE_CFLAGS="${LIBGNUTLS_CFLAGS} ${GNUTLS_FEAT_CFLAGS} ${MSVA_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES} ${STRICT_CFLAGS}"
 MODULE_LIBS="${LIBGNUTLS_LIBS}"

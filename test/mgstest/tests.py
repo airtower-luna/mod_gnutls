@@ -26,10 +26,19 @@ import subprocess
 import sys
 import yaml
 
+from enum import Enum, auto
+from http.client import HTTPConnection
 from string import Template
 
 from . import TestExpectationFailed
 from .http import HTTPSubprocessConnection
+
+class Transports(Enum):
+    GNUTLS = auto()
+    PLAIN = auto()
+
+    def __repr__(self):
+        return f'{self.__class__.__name__!s}.{self.name}'
 
 class TestConnection(yaml.YAMLObject):
     """An HTTP connection in a test. It includes parameters for the
@@ -49,7 +58,7 @@ class TestConnection(yaml.YAMLObject):
                  transport='gnutls'):
         self.gnutls_params = gnutls_params
         self.actions = actions
-        self.transport = transport
+        self.transport = Transports[transport.upper()]
         if host:
             self.host = subst_env(host)
         else:
@@ -72,9 +81,13 @@ class TestConnection(yaml.YAMLObject):
             command.append('--' + s)
         command = command + ['-p', str(self.port), self.host]
 
-        conn = HTTPSubprocessConnection(command, self.host, self.port,
-                                        output_filter=filter_cert_log,
-                                        timeout=timeout)
+        if self.transport == Transports.GNUTLS:
+            conn = HTTPSubprocessConnection(command, self.host, self.port,
+                                            output_filter=filter_cert_log,
+                                            timeout=timeout)
+        elif self.transport == Transports.PLAIN:
+            conn = HTTPConnection(self.host, port=self.port,
+                                  timeout=timeout)
 
         try:
             for act in self.actions:
