@@ -1,6 +1,7 @@
-# The reverse proxy can't access the backend (certificate validation
-# fails)
 - !connection
+  description: >-
+    The reverse proxy can't access the backend (certificate validation
+    fails)
   gnutls_params:
     - x509cafile=authority/x509.pem
   actions:
@@ -13,9 +14,10 @@
             - 'Proxy Error'
             - 'Error reading from remote server'
 
-# Check if the proxy itself works correctly and presents the expected
-# bad certificate
 - !connection
+  description: >-
+    Check if the proxy itself works correctly and presents the
+    expected bad certificate
   host: '${BACKEND_HOST}'
   port: '${BACKEND_PORT}'
   gnutls_params:

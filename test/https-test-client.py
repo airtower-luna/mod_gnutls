@@ -64,5 +64,8 @@ if __name__ == "__main__":
     print(conns)
     sys.stdout.flush()
 
-    for test_conn in conns:
+    for i, test_conn in enumerate(conns):
+        if test_conn.description:
+            print(f'Running test connection {i}: {test_conn.description}')
+            sys.stdout.flush()
         test_conn.run(timeout=args.timeout)

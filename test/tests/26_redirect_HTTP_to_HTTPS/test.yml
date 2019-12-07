@@ -1,5 +1,5 @@
-# Plain HTTP connection that must be redirected to HTTPS
 - !connection
+  description: 'Plain HTTP connection that must be redirected to HTTPS'
   transport: plain
   host: '${TEST_HOST}'
   port: '${TEST_HTTP_PORT}'
@@ -13,8 +13,8 @@
         body:
           contains: 'Moved Permanently'
 
-# Check that the redirection target works
 - !connection
+  description: 'Check that the redirection target works'
   host: '${TEST_HOST}'
   port: '${TEST_PORT}'
   gnutls_params:

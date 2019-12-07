@@ -55,10 +55,11 @@ class TestConnection(yaml.YAMLObject):
     yaml_tag = '!connection'
 
     def __init__(self, actions, host=None, port=None, gnutls_params=[],
-                 transport='gnutls'):
+                 transport='gnutls', description=None):
         self.gnutls_params = gnutls_params
         self.actions = actions
         self.transport = Transports[transport.upper()]
+        self.description = description
         if host:
             self.host = subst_env(host)
         else:
@@ -72,7 +73,8 @@ class TestConnection(yaml.YAMLObject):
         return (f'{self.__class__.__name__!s}'
                 f'(host={self.host!r}, port={self.port!r}, '
                 f'gnutls_params={self.gnutls_params!r}, '
-                f'actions={self.actions!r}, transport={self.transport!r})')
+                f'actions={self.actions!r}, transport={self.transport!r}, '
+                f'description={self.description!r})')
 
     def run(self, timeout=5.0):
         # note: "--logfile" option requires GnuTLS version >= 3.6.7
