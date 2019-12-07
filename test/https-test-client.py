@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import yaml
 
 from mgstest.tests import TestConnection
@@ -24,10 +25,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Send HTTP requests through gnutls-cli',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('host', nargs='?', help='Access the specified host',
-                        default='localhost')
-    parser.add_argument('-p', '--port', type=int,
-                        help='Access the specified port', default='8000')
+    parser.add_argument('host', nargs='?', default=None,
+                        help='Access this host. Overrides TEST_TARGET, '
+                        'but not the test configuration file.')
+    parser.add_argument('-p', '--port', default=None,
+                        help='Access this port. Overrides TEST_PORT, '
+                        'but not the test configuration file.')
     parser.add_argument('--timeout', type=float,
                         help='Timeout for HTTP requests', default='5.0')
     parser.add_argument('--test-config', type=argparse.FileType('r'),
@@ -42,6 +45,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    if args.host:
+        os.environ['TEST_TARGET'] = args.host
+    if args.port:
+        os.environ['TEST_PORT'] = args.port
+
     conns = None
 
     config = yaml.load(args.test_config, Loader=yaml.Loader)
@@ -55,4 +63,4 @@ if __name__ == "__main__":
     print(conns)
 
     for test_conn in conns:
-        test_conn.run(host=args.host, port=args.port, timeout=args.timeout)
+        test_conn.run(timeout=args.timeout)

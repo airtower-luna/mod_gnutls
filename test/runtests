@@ -190,12 +190,12 @@ if [ -n "${CHECK_OCSP_SERVER}" ]; then
 fi
 
 if [ -n "${TARGET_IP}" ]; then
-    TARGET="${TARGET_IP}"
+    export TEST_TARGET="${TARGET_IP}"
 else
-    TARGET="${TEST_HOST}"
+    export TEST_TARGET="${TEST_HOST}"
 fi
 
-${PYTHON} ${srcdir}/https-test-client.py -p "${TEST_PORT}" "${TARGET}" \
+${PYTHON} ${srcdir}/https-test-client.py \
 	  --test-config "${testdir}/test.yml" \
 	  --timeout "${TEST_QUERY_TIMEOUT}" \
     |& tee "$output"

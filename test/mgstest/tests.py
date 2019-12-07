@@ -20,9 +20,12 @@ YAML test configuration files.
 
 """
 
+import os
 import re
 import subprocess
 import yaml
+
+from string import Template
 
 from . import TestExpectationFailed
 from .http import HTTPSubprocessConnection
@@ -41,24 +44,34 @@ class TestConnection(yaml.YAMLObject):
     """
     yaml_tag = '!connection'
 
-    def __init__(self, actions, gnutls_params=[], transport='gnutls'):
+    def __init__(self, actions, host=None, port=None, gnutls_params=[],
+                 transport='gnutls'):
         self.gnutls_params = gnutls_params
         self.actions = actions
         self.transport = transport
+        if host:
+            self.host = subst_env(host)
+        else:
+            self.host = os.environ.get('TEST_TARGET', 'localhost')
+        if port:
+            self.port = int(subst_env(port))
+        else:
+            self.port = int(os.environ.get('TEST_PORT', 8000))
 
     def __repr__(self):
         return (f'{self.__class__.__name__!s}'
-                f'(gnutls_params={self.gnutls_params!r}, '
+                f'(host={self.host!r}, port={self.port!r}, '
+                f'gnutls_params={self.gnutls_params!r}, '
                 f'actions={self.actions!r}, transport={self.transport!r})')
 
-    def run(self, host, port, timeout=5.0):
+    def run(self, timeout=5.0):
         # note: "--logfile" option requires GnuTLS version >= 3.6.7
         command = ['gnutls-cli', '--logfile=/dev/stderr']
         for s in self.gnutls_params:
             command.append('--' + s)
-        command = command + ['-p', str(port), host]
+        command = command + ['-p', str(self.port), self.host]
 
-        conn = HTTPSubprocessConnection(command, host, port,
+        conn = HTTPSubprocessConnection(command, self.host, self.port,
                                         output_filter=filter_cert_log,
                                         timeout=timeout)
 
@@ -321,3 +334,9 @@ def format_response(resp, body):
     s = s + '\n'.join(f'{name}: {value}' for name, value in resp.getheaders())
     s = s + '\n\n' + body
     return s
+
+
+
+def subst_env(text):
+    t = Template(text)
+    return t.substitute(os.environ)
