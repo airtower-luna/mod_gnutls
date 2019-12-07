@@ -313,7 +313,6 @@ def filter_cert_log(in_stream, out_stream):
     in_stream, and a connection for further processing as out_stream.
 
     """
-    import fcntl
     import os
     import select
     # message to filter
@@ -321,8 +320,7 @@ def filter_cert_log(in_stream, out_stream):
 
     # Set the input to non-blocking mode
     fd = in_stream.fileno()
-    fl = fcntl.fcntl(fd, fcntl.F_GETFL)
-    fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+    os.set_blocking(fd, False)
 
     # The poll object allows waiting for events on non-blocking IO
     # channels.
