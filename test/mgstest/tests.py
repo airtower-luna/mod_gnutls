@@ -136,6 +136,15 @@ class TestRequest(yaml.YAMLObject):
         print(format_response(resp, body))
         self.check_response(resp, body)
 
+    def check_headers(self, headers):
+        for name, expected in self.expect['headers'].items():
+            value = headers.get(name)
+            expected = subst_env(expected)
+            if value != expected:
+                raise TestExpectationFailed(
+                    f'Unexpected value in header {name}: "{value}", '
+                    f'expected "{expected}"')
+
     def check_body(self, body):
         """
         >>> r1 = TestRequest(path='/test.txt', method='GET', headers={}, expect={'status': 200, 'body': {'exactly': 'test\\n'}})
@@ -176,6 +185,8 @@ class TestRequest(yaml.YAMLObject):
             raise TestExpectationFailed(
                 f'Unexpected status: {response.status} != '
                 f'{self.expect["status"]}')
+        if 'headers' in self.expect:
+            self.check_headers(dict(response.getheaders()))
         if 'body' in self.expect:
             self.check_body(body)
 
