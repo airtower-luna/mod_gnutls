@@ -17,10 +17,9 @@ actions:
         exactly: |
           test
   - !request
-    path: /test.txt
+    path: /status?auto
     expect:
       status: 200
       body:
         contains:
-          - 'tes'
-          - 'est'
+          - 'Current TLS session: (TLS1.3)'
