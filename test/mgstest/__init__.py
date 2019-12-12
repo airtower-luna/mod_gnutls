@@ -16,7 +16,37 @@
 
 """Python modules for the mod_gnutls test suite."""
 
+import sys
+
+import fcntl
+from contextlib import contextmanager
+
 class TestExpectationFailed(Exception):
     """Raise if a test failed. The constructor should be called with a
     string describing the problem."""
     pass
+
+
+
+@contextmanager
+def lockfile(file, nolock=False):
+    """Context manager for an optional file-based mutex.
+
+    Unless nolock=True the process must hold a lock on the given file
+    before entering the context. The lock is released when leaving the
+    context.
+
+    """
+    if nolock:
+        yield
+    else:
+        with open(file, 'w') as lockfile:
+            try:
+                print(f'Aquiring lock on {file}...', file=sys.stderr)
+                fcntl.flock(lockfile, fcntl.LOCK_EX)
+                print(f'Got lock on {file}.', file=sys.stderr)
+                yield
+            finally:
+                print(f'Unlocking {file}...', file=sys.stderr)
+                fcntl.flock(lockfile, fcntl.LOCK_UN)
+                print(f'Unlocked {file}.', file=sys.stderr)
