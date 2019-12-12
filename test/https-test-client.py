@@ -49,5 +49,7 @@ if __name__ == "__main__":
     if args.port:
         os.environ['TEST_PORT'] = args.port
 
-    run_test_conf(args.test_config, args.timeout)
-    args.test_config.close()
+    try:
+        run_test_conf(args.test_config, args.timeout)
+    finally:
+        args.test_config.close()
