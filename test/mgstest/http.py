@@ -18,6 +18,7 @@
 
 import socket
 import subprocess
+import sys
 
 from http.client import HTTPConnection
 from threading import Thread
@@ -51,6 +52,9 @@ class HTTPSubprocessConnection(HTTPConnection):
         self._output_filter = output_filter
         # output filter thread
         self._fthread = None
+        # Error stream handler thread. This is needed to synchronize
+        # output between Python and the subprocess.
+        self._ethread = None
 
     def connect(self):
         s_local, s_remote = socket.socketpair(socket.AF_UNIX,
@@ -60,6 +64,7 @@ class HTTPSubprocessConnection(HTTPConnection):
         # TODO: Maybe capture stderr?
         if self._output_filter:
             self._sproc = subprocess.Popen(self.command, stdout=subprocess.PIPE,
+                                           stderr=subprocess.PIPE,
                                            stdin=s_remote, close_fds=True,
                                            bufsize=0)
             self._fthread = Thread(target=self._output_filter,
@@ -67,8 +72,12 @@ class HTTPSubprocessConnection(HTTPConnection):
             self._fthread.start()
         else:
             self._sproc = subprocess.Popen(self.command, stdout=s_remote,
+                                           stderr=subprocess.PIPE,
                                            stdin=s_remote, close_fds=True,
                                            bufsize=0)
+        self._ethread = Thread(target=_stderr_writer,
+                               args=(self._sproc.stderr,))
+        self._ethread.start()
         self.sock = s_local
 
     def close(self):
@@ -93,7 +102,22 @@ class HTTPSubprocessConnection(HTTPConnection):
         # terminates
         if self._fthread:
             self._fthread.join()
+        if self._ethread:
+            self._ethread.join()
 
         # close the connection in the super class, which also calls
         # self.sock.close()
         super().close()
+
+
+
+def _stderr_writer(stream):
+    """Flush incoming data to sys.stderr.
+
+    This is a workaround to prevent output from gnutls-cli and the
+    Python interpreter overwriting each other in the test
+    logs. Forcing gnutls-cli stderr through Python ensures
+    synchronization (via global interpreter lock).
+    """
+    for line in stream:
+        print(line.decode(), file=sys.stderr, end='', flush=True)
