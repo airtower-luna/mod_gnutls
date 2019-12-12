@@ -366,3 +366,25 @@ def format_response(resp, body):
 def subst_env(text):
     t = Template(text)
     return t.substitute(os.environ)
+
+
+
+def run_test_conf(test_config, timeout=5.0):
+    conns = None
+
+    config = yaml.load(test_config, Loader=yaml.Loader)
+    if type(config) is TestConnection:
+        conns = [config]
+    elif type(config) is list:
+        # assume list elements are connections
+        conns = config
+    else:
+        raise TypeError(f'Unsupported configuration: {config!r}')
+    print(conns)
+    sys.stdout.flush()
+
+    for i, test_conn in enumerate(conns):
+        if test_conn.description:
+            print(f'Running test connection {i}: {test_conn.description}')
+            sys.stdout.flush()
+        test_conn.run(timeout=timeout)

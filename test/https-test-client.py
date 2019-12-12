@@ -16,10 +16,8 @@
 # limitations under the License.
 
 import os
-import sys
-import yaml
 
-from mgstest.tests import TestConnection
+from mgstest.tests import run_test_conf
 
 if __name__ == "__main__":
     import argparse
@@ -51,21 +49,5 @@ if __name__ == "__main__":
     if args.port:
         os.environ['TEST_PORT'] = args.port
 
-    conns = None
-
-    config = yaml.load(args.test_config, Loader=yaml.Loader)
-    if type(config) is TestConnection:
-        conns = [config]
-    elif type(config) is list:
-        # assume list elements are connections
-        conns = config
-    else:
-        raise TypeError(f'Unsupported configuration: {config!r}')
-    print(conns)
-    sys.stdout.flush()
-
-    for i, test_conn in enumerate(conns):
-        if test_conn.description:
-            print(f'Running test connection {i}: {test_conn.description}')
-            sys.stdout.flush()
-        test_conn.run(timeout=args.timeout)
+    run_test_conf(args.test_config, args.timeout)
+    args.test_config.close()
