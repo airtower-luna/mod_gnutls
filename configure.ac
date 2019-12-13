@@ -21,7 +21,6 @@ AC_PROG_CC_C99
 AC_PROG_LD
 AC_PROG_INSTALL
 AC_PROG_LIBTOOL
-AM_PATH_PYTHON([3])
 
 AC_CONFIG_MACRO_DIR([m4])
 
@@ -99,6 +98,9 @@ fi
 
 AC_MSG_CHECKING([whether to enable SRP functionality])
 AC_MSG_RESULT($use_srp)
+
+AM_PATH_PYTHON([3])
+AX_PYTHON_MODULE([yaml], [fatal])
 
 dnl Optionally disable flock
 AC_ARG_ENABLE(flock,

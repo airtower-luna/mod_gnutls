@@ -24,8 +24,9 @@ Prerequisites
  * GnuTLS          >= 3.6.3 <https://www.gnutls.org/>
  * Apache HTTPD    >= 2.4.17 <https://httpd.apache.org/>
  * autotools, GNU make, & GCC
- * Python 3
  * libmsv          >= 0.1 (Optional, enable with ./configure --enable-msva)
+ * Python 3 (for tests)
+ * PyYAML   <https://github.com/yaml/pyyaml>
  * pandoc   (for documentation, optional)
  * pdflatex (for PDF documentation, optional)
 
