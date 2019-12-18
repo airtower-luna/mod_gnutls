@@ -386,5 +386,7 @@ def run_test_conf(test_config, timeout=5.0):
     for i, test_conn in enumerate(conns):
         if test_conn.description:
             print(f'Running test connection {i}: {test_conn.description}')
-            sys.stdout.flush()
+        else:
+            print(f'Running test connection {i}.')
+        sys.stdout.flush()
         test_conn.run(timeout=timeout)
