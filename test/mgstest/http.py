@@ -31,6 +31,7 @@ class HTTPSubprocessConnection(HTTPConnection):
     """
     def __init__(self, command, host, port=None,
                  output_filter=None,
+                 stderr_log=None,
                  timeout=socket._GLOBAL_DEFAULT_TIMEOUT,
                  blocksize=8192):
         super(HTTPSubprocessConnection, self).__init__(host, port, timeout,
@@ -50,6 +51,8 @@ class HTTPSubprocessConnection(HTTPConnection):
         # stdout of self._sproc. Its arguments are self._sproc.stdout
         # and the socket back to the HTTP connection (write-only).
         self._output_filter = output_filter
+        # If not None, write a copy of the subprocess' stderr to here.
+        self._stderr_log = stderr_log
         # output filter thread
         self._fthread = None
         # Error stream handler thread. This is needed to synchronize
@@ -76,7 +79,7 @@ class HTTPSubprocessConnection(HTTPConnection):
                                            stdin=s_remote, close_fds=True,
                                            bufsize=0)
         self._ethread = Thread(target=_stderr_writer,
-                               args=(self._sproc.stderr,))
+                               args=(self._sproc.stderr, self._stderr_log))
         self._ethread.start()
         self.sock = s_local
 
@@ -111,13 +114,16 @@ class HTTPSubprocessConnection(HTTPConnection):
 
 
 
-def _stderr_writer(stream):
-    """Flush incoming data to sys.stderr.
+def _stderr_writer(stream, copy=None):
+    """Flush incoming data to sys.stderr, and optionally to "copy".
 
     This is a workaround to prevent output from gnutls-cli and the
     Python interpreter overwriting each other in the test
     logs. Forcing gnutls-cli stderr through Python ensures
     synchronization (via global interpreter lock).
+
     """
     for line in stream:
         print(line.decode(), file=sys.stderr, end='', flush=True)
+        if copy:
+            print(line.decode(), file=copy, end='')

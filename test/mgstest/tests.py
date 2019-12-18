@@ -76,7 +76,7 @@ class TestConnection(yaml.YAMLObject):
                 f'actions={self.actions!r}, transport={self.transport!r}, '
                 f'description={self.description!r})')
 
-    def run(self, timeout=5.0):
+    def run(self, timeout=5.0, conn_log=None):
         # note: "--logfile" option requires GnuTLS version >= 3.6.7
         command = ['gnutls-cli', '--logfile=/dev/stderr']
         for s in self.gnutls_params:
@@ -86,6 +86,7 @@ class TestConnection(yaml.YAMLObject):
         if self.transport == Transports.GNUTLS:
             conn = HTTPSubprocessConnection(command, self.host, self.port,
                                             output_filter=filter_cert_log,
+                                            stderr_log=conn_log,
                                             timeout=timeout)
         elif self.transport == Transports.PLAIN:
             conn = HTTPConnection(self.host, port=self.port,
@@ -369,7 +370,7 @@ def subst_env(text):
 
 
 
-def run_test_conf(test_config, timeout=5.0):
+def run_test_conf(test_config, timeout=5.0, conn_log=None):
     conns = None
 
     config = yaml.load(test_config, Loader=yaml.Loader)
@@ -389,4 +390,4 @@ def run_test_conf(test_config, timeout=5.0):
         else:
             print(f'Running test connection {i}.')
         sys.stdout.flush()
-        test_conn.run(timeout=timeout)
+        test_conn.run(timeout=timeout, conn_log=conn_log)
