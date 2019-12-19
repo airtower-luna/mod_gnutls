@@ -76,7 +76,7 @@ class TestConnection(yaml.YAMLObject):
                 f'actions={self.actions!r}, transport={self.transport!r}, '
                 f'description={self.description!r})')
 
-    def run(self, timeout=5.0, conn_log=None):
+    def run(self, timeout=5.0, conn_log=None, response_log=None):
         # note: "--logfile" option requires GnuTLS version >= 3.6.7
         command = ['gnutls-cli', '--logfile=/dev/stderr']
         for s in self.gnutls_params:
@@ -95,9 +95,9 @@ class TestConnection(yaml.YAMLObject):
         try:
             for act in self.actions:
                 if type(act) is TestRequest:
-                    act.run(conn)
+                    act.run(conn, response_log)
                 elif type(act) is TestRaw10:
-                    act.run(command, timeout)
+                    act.run(command, timeout, conn_log, response_log)
                 else:
                     raise TypeError(f'Unsupported action requested: {act!r}')
         finally:
@@ -138,7 +138,7 @@ class TestRequest(yaml.YAMLObject):
                 f'method={self.method!r}, headers={self.headers!r}, '
                 f'expect={self.expect!r})')
 
-    def run(self, conn):
+    def run(self, conn, response_log=None):
         try:
             conn.request(self.method, self.path, headers=self.headers)
             resp = conn.getresponse()
@@ -152,7 +152,10 @@ class TestRequest(yaml.YAMLObject):
             else:
                 raise err
         body = resp.read().decode()
-        print(format_response(resp, body))
+        log_str = format_response(resp, body)
+        print(log_str)
+        if response_log:
+            print(log_str, file=response_log)
         self.check_response(resp, body)
 
     def check_headers(self, headers):
@@ -257,21 +260,26 @@ class TestRaw10(TestRequest):
                 f'(method={self.method!r}, path={self.path!r}, '
                 f'headers={self.headers!r}, expect={self.expect!r})')
 
-    def run(self, command, timeout=None):
+    def run(self, command, timeout=None, conn_log=None, response_log=None):
         req = f'{self.method} {self.path} HTTP/1.0\r\n'
         for name, value in self.headers.items():
             req = req + f'{name}: {value}\r\n'
         req = req + f'\r\n'
-        proc = subprocess.Popen(command, stdout=subprocess.PIPE,
-                                stdin=subprocess.PIPE, close_fds=True,
+        proc = subprocess.Popen(command,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                stdin=subprocess.PIPE,
+                                close_fds=True,
                                 bufsize=0)
         try:
-            # Note: errs will be empty because stderr is not captured
             outs, errs = proc.communicate(input=req.encode(),
                                           timeout=timeout)
         except TimeoutExpired:
             proc.kill()
             outs, errs = proc.communicate()
+
+        if conn_log:
+            print(errs.decode(), file=conn_log)
 
         # first line of the received data must be the status
         status, rest = outs.decode().split('\r\n', maxsplit=1)
@@ -279,6 +287,8 @@ class TestRaw10(TestRequest):
         headers, body = rest.split('\r\n\r\n', maxsplit=1)
         # log response for debugging
         print(f'{status}\n{headers}\n\n{body}')
+        if response_log:
+            print(f'{status}\n{headers}\n\n{body}', file=response_log)
 
         m = self.status_re.match(status)
         if m:
@@ -373,7 +383,7 @@ def subst_env(text):
 
 
 
-def run_test_conf(test_config, timeout=5.0, conn_log=None):
+def run_test_conf(test_config, timeout=5.0, conn_log=None, response_log=None):
     conns = None
 
     config = yaml.load(test_config, Loader=yaml.Loader)
@@ -393,4 +403,5 @@ def run_test_conf(test_config, timeout=5.0, conn_log=None):
         else:
             print(f'Running test connection {i}.')
         sys.stdout.flush()
-        test_conn.run(timeout=timeout, conn_log=conn_log)
+        test_conn.run(timeout=timeout, conn_log=conn_log,
+                      response_log=response_log)
