@@ -38,14 +38,17 @@ def lockfile(file, nolock=False):
 
     """
     if nolock:
-        yield
+        try:
+            yield None
+        finally:
+            pass
     else:
         with open(file, 'w') as lockfile:
             try:
                 print(f'Aquiring lock on {file}...', file=sys.stderr)
                 fcntl.flock(lockfile, fcntl.LOCK_EX)
                 print(f'Got lock on {file}.', file=sys.stderr)
-                yield
+                yield lockfile
             finally:
                 print(f'Unlocking {file}...', file=sys.stderr)
                 fcntl.flock(lockfile, fcntl.LOCK_UN)
