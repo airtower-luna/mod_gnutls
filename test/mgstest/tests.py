@@ -142,6 +142,9 @@ class TestRequest(yaml.YAMLObject):
         try:
             conn.request(self.method, self.path, headers=self.headers)
             resp = conn.getresponse()
+            if self.expects_conn_reset():
+                raise TestExpectationFailed(
+                    'Expected connection reset did not occur!')
         except (BrokenPipeError, ConnectionResetError) as err:
             if self.expects_conn_reset():
                 print('connection reset as expected.')
