@@ -32,7 +32,7 @@ class HTTPSubprocessConnection(HTTPConnection):
     def __init__(self, command, host, port=None,
                  output_filter=None,
                  stderr_log=None,
-                 timeout=socket._GLOBAL_DEFAULT_TIMEOUT,
+                 timeout=socket.getdefaulttimeout(),
                  blocksize=8192):
         super(HTTPSubprocessConnection, self).__init__(host, port, timeout,
                                                        source_address=None,
