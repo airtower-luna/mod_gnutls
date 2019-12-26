@@ -1,11 +1,15 @@
 #!/bin/bash
 set -e
-${srcdir}/runtests t-16
 
-# expected output file
+# expected output files
+log="outputs/16_view-status.log"
 output="outputs/16_view-status.output"
+
+${srcdir}/netns_py.bash ${srcdir}/runtest.py --test-number 16 \
+	 --log-connection "${log}" --log-responses "${output}"
+
 # get the cipher suite reported by gnutls-cli
-cli_suite="$(grep -o -P '(?<=^-\sDescription:\s).*$' "${output}")" || true
+cli_suite="$(grep -o -P '(?<=^-\sDescription:\s).*$' "${log}")" || true
 # extract cipher suite from the server status output
 status_suite="$(grep -o -P '(?<=^Current TLS session:\s).*$' "${output}")" \
     || true

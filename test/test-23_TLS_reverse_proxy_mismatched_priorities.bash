@@ -4,4 +4,4 @@
 # properly. The proxy server requries a TLS 1.2 connection, but the
 # back end server is configured not to use TLS 1.2. The proxy request
 # must fail and the client must receive an error message to pass.
-${srcdir}/runtests t-23
+. ${srcdir}/netns_py.bash ${srcdir}/runtest.py --test-number 23

@@ -5,4 +5,4 @@ for mod in mod_http2.so mod_proxy_http2.so; do
 	exit 77
     fi
 done
-${srcdir}/runtests t-34
+. ${srcdir}/netns_py.bash ${srcdir}/runtest.py --test-number 34

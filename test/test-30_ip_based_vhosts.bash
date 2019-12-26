@@ -20,4 +20,4 @@ TARGET_IP="${VHOST2_IP#\[}"
 TARGET_IP="${TARGET_IP%\]}"
 export TARGET_IP
 
-${srcdir}/runtests t-30
+. ${srcdir}/netns_py.bash ${srcdir}/runtest.py --test-number 30

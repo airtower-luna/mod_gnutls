@@ -1,6 +1,6 @@
 SUBDIRS = tests
 
-dist_check_SCRIPTS = test-00_basic.bash \
+test_scripts = test-00_basic.bash \
 	test-01_serverwide_priorities.bash \
 	test-02_cache_in_vhost.bash \
 	test-03_cachetimeout_in_vhost.bash \
@@ -16,9 +16,9 @@ dist_check_SCRIPTS = test-00_basic.bash \
 	test-13_cgi_variables_no_client_cert.bash \
 	test-14_resume_session.bash
 if USE_MSVA
-dist_check_SCRIPTS += test-15_basic_msva.bash
+test_scripts += test-15_basic_msva.bash
 endif
-dist_check_SCRIPTS += test-16_view-status.bash \
+test_scripts += test-16_view-status.bash \
 	test-17_cgi_vars_large_cert.bash \
 	test-18_client_verification_wrong_cert.bash \
 	test-19_TLS_reverse_proxy.bash \
@@ -39,7 +39,9 @@ dist_check_SCRIPTS += test-16_view-status.bash \
 	test-34_TLS_reverse_proxy_h2.bash
 
 TEST_EXTENSIONS = .bash
-TESTS = $(dist_check_SCRIPTS)
+TESTS = $(test_scripts)
+
+dist_check_SCRIPTS = netns_py.bash $(test_scripts)
 
 check_PROGRAMS = pgpcrc
 pgpcrc_SOURCES = pgpcrc.c
@@ -55,7 +57,7 @@ endif
 
 # Python tools for tests
 noinst_PYTHON = https-test-client.py mgstest/http.py mgstest/__init__.py \
-	mgstest/tests.py
+	mgstest/services.py mgstest/tests.py runtest.py
 
 # Identities in the miniature CA, server, and client environment for
 # the test suite
@@ -251,7 +253,7 @@ apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/ocsp.cgi \
 	proxy_mods.conf
 
 EXTRA_DIST = $(apache_data) $(cert_templates) $(shared_identities:=/uid.in) \
-	apache_service.bash common.bash runtests authority/server/crl.template \
+	apache_service.bash common.bash authority/server/crl.template \
 	softhsm.bash
 
 # Lockfile for the main Apache process

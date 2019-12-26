@@ -33,7 +33,7 @@ cat "${tmp_softhsm_conf}"
 
 set -e
 
-${srcdir}/runtests t-24
+${srcdir}/netns_py.bash ${srcdir}/runtest.py --test-number 24
 
 cleanup_tmpconf
 trap - EXIT

@@ -1,2 +1,3 @@
 #!/bin/bash
-USE_MSVA="yes" ${srcdir}/runtests t-15
+export USE_MSVA="yes"
+. ${srcdir}/netns_py.bash ${srcdir}/runtest.py --test-number 15

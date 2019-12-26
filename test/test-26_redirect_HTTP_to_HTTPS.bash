@@ -6,4 +6,4 @@
 : ${TEST_HTTP_PORT:="9935"}
 export TEST_HTTP_PORT
 
-${srcdir}/runtests t-26
+. ${srcdir}/netns_py.bash ${srcdir}/runtest.py --test-number 26

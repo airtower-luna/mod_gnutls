@@ -1,2 +1,2 @@
 #!/bin/bash
-${srcdir}/runtests t-29
+. ${srcdir}/netns_py.bash ${srcdir}/runtest.py --test-number 29

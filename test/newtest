@@ -24,8 +24,10 @@ cp -a tests/00_basic "tests/$newname"
 
 # create run script for make check
 newscript="test-${newname}.bash"
-echo '#!/bin/bash' >"${newscript}"
-echo "\${srcdir}/runtests t-${newnum}" >>"${newscript}"
+cat - >"${newscript}" <<EOF
+#!/bin/bash
+. \${srcdir}/netns_py.bash \${srcdir}/runtest.py --test-number ${newnum}
+EOF
 chmod a+x "${newscript}"
 
 echo "You can now edit ${newname}."

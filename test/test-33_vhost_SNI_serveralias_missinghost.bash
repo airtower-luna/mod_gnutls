@@ -4,4 +4,5 @@ set -e
 . ${srcdir}/common.bash
 
 require_gnutls_cli 3.5.12 || (echo "Using --sni-hostname requires gnutls-cli version 3.5.12 or newer"; exit 77)
-${srcdir}/runtests t-33
+
+. ${srcdir}/netns_py.bash ${srcdir}/runtest.py --test-number 33
