@@ -241,19 +241,17 @@ class TestReq10(TestRequest):
     incomplete) HTTP/1.0 test client for the one test case that
     strictly requires HTTP/1.0.
 
-    All request parameters (method, path, headers) MUST be specified
-    in the config file. Checks on status and body work the same as for
-    TestRequest.
+    Objects use the same default parameters as TestRequest, but note
+    that an empty "headers" parameter means that not even a "Host:"
+    header will be sent. All headers must be specified in the test
+    configuration file.
 
     """
     yaml_tag = '!request10'
     status_re = re.compile('^HTTP/([\d\.]+) (\d+) (.*)$')
 
-    def __init__(self, method, path, headers, expect):
-        self.method = method
-        self.path = path
-        self.headers = headers
-        self.expect = expect
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def __repr__(self):
         return (f'{self.__class__.__name__!s}'
@@ -310,6 +308,7 @@ class TestReq10(TestRequest):
 # Override the default constructors. Pyyaml ignores default parameters
 # otherwise.
 yaml.add_constructor('!request', TestRequest._from_yaml, yaml.Loader)
+yaml.add_constructor('!request10', TestReq10._from_yaml, yaml.Loader)
 yaml.add_constructor('!connection', TestConnection._from_yaml, yaml.Loader)
 
 

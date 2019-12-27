@@ -4,7 +4,6 @@ gnutls_params:
   - sni-hostname=example.virtual.host
 actions:
   - !request10
-    method: GET
     path: /test.txt
     headers:
       Connection: close
