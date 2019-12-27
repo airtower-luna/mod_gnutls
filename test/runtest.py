@@ -209,6 +209,15 @@ if __name__ == "__main__":
                               float(os.environ.get('TEST_QUERY_TIMEOUT', 5.0)),
                               conn_log=log_file, response_log=output_file)
 
-        # TODO: add hook to replace the test request, e.g. for curl
-
-        # TODO: add hook for extra checks
+    # run extra checks the test's hooks.py might define
+    if plugin.post_check:
+        log_file = None
+        output_file = None
+        with contextlib.ExitStack() as stack:
+            # TODO: The log files should be created as temporary
+            # files if needed by the plugin but not configured.
+            if args.log_connection:
+                log_file = stack.enter_context(open(args.log_connection, 'r'))
+            if args.log_responses:
+                output_file = stack.enter_context(open(args.log_responses, 'r'))
+            plugin.post_check(conn_log=log_file, response_log=output_file)
