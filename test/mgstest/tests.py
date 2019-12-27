@@ -107,7 +107,7 @@ class TestConnection(yaml.YAMLObject):
     @classmethod
     def _from_yaml(cls, loader, node):
         fields = loader.construct_mapping(node)
-        conn = TestConnection(**fields)
+        conn = cls(**fields)
         return conn
 
 
@@ -231,7 +231,7 @@ class TestRequest(yaml.YAMLObject):
     @classmethod
     def _from_yaml(cls, loader, node):
         fields = loader.construct_mapping(node)
-        req = TestRequest(**fields)
+        req = cls(**fields)
         return req
 
 
