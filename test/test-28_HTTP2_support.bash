@@ -3,13 +3,6 @@
 # Check if HTTP/2 connections using mod_gnutls and mod_http2 work
 
 set -e
-: ${srcdir:="."}
-. ${srcdir}/common.bash
-netns_reexec ${@}
-
-testdir="${srcdir}/tests/28_HTTP2_support"
-TEST_NAME="$(basename ${testdir})"
-. $(dirname ${0})/apache_service.bash
 
 if [ ! -r ${AP_LIBEXECDIR}/mod_http2.so ]; then
     echo "mod_http2.so not found, skipping." 2>&1
@@ -20,25 +13,14 @@ elif [ "$(basename ${HTTP_CLI})" != "curl" ] \
     exit 77
 fi
 
-function stop_server
-{
-    apache_service "${testdir}" "apache.conf" stop
-}
-apache_service "${testdir}" "apache.conf" start "${TEST_LOCK}"
-trap stop_server EXIT
+# expected output files
+log="outputs/28_HTTP2_support.log"
+output="outputs/28_HTTP2_support.output"
 
-output="outputs/${TEST_NAME}.output"
-header="outputs/${TEST_NAME}.header"
-rm -f "${output}" "${header}"
-
-URL="https://${TEST_HOST}:${TEST_PORT}/status?auto"
-${HTTP_CLI} --http2 --location --verbose --cacert authority/x509.pem \
-	    --dump-header "${header}" --output "${output}" "${URL}"
+${srcdir}/netns_py.bash ${srcdir}/runtest.py --test-number 28 \
+	 --log-connection "${log}" --log-responses "${output}"
 
 echo "Checking for HTTP/2 in logged header:"
-grep "HTTP/2 200" "${header}"
+grep "HTTP/2 200" "${log}"
 echo "Checking for TLS session status:"
 grep "Current TLS session: (TLS" "${output}"
-
-apache_service "${testdir}" "apache.conf" stop
-trap - EXIT

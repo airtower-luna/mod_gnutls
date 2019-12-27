@@ -21,6 +21,7 @@ import os.path
 import subprocess
 import sys
 
+import mgstest.hooks
 from mgstest import lockfile, TestExpectationFailed
 from mgstest.services import ApacheService, TestService
 from mgstest.tests import run_test_conf
@@ -109,6 +110,10 @@ if __name__ == "__main__":
     print(f'Found test {testname}, test dir is {testdir}')
     os.environ['TEST_NAME'] = testname
 
+    # Load test case hooks (if any)
+    plugin_path = os.path.join(testdir, 'hooks.py')
+    plugin = mgstest.hooks.load_hooks_plugin(plugin_path)
+
     # PID file name varies depending on whether we're using
     # namespaces.
     #
@@ -186,8 +191,6 @@ if __name__ == "__main__":
 
         # Run the test connections
         with contextlib.ExitStack() as stack:
-            test_conf = stack.enter_context(
-                open(os.path.join(testdir, 'test.yml'), 'r'))
             log_file = None
             output_file = None
             if args.log_connection:
@@ -195,9 +198,16 @@ if __name__ == "__main__":
             if args.log_responses:
                 output_file = stack.enter_context(open(args.log_responses, 'w'))
 
-            run_test_conf(test_conf,
-                          float(os.environ.get('TEST_QUERY_TIMEOUT', 5.0)),
-                          conn_log=log_file, response_log=output_file)
+            if plugin.run_connection:
+                plugin.run_connection(testname,
+                                      conn_log=log_file,
+                                      response_log=output_file)
+            else:
+                test_conf = stack.enter_context(
+                    open(os.path.join(testdir, 'test.yml'), 'r'))
+                run_test_conf(test_conf,
+                              float(os.environ.get('TEST_QUERY_TIMEOUT', 5.0)),
+                              conn_log=log_file, response_log=output_file)
 
         # TODO: add hook to replace the test request, e.g. for curl
 

@@ -57,7 +57,7 @@ endif
 
 # Python tools for tests
 noinst_PYTHON = https-test-client.py mgstest/http.py mgstest/__init__.py \
-	mgstest/services.py mgstest/tests.py runtest.py
+	mgstest/hooks.py mgstest/services.py mgstest/tests.py runtest.py
 
 # Identities in the miniature CA, server, and client environment for
 # the test suite
@@ -253,8 +253,7 @@ apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/ocsp.cgi \
 	proxy_mods.conf
 
 EXTRA_DIST = $(apache_data) $(cert_templates) $(shared_identities:=/uid.in) \
-	apache_service.bash common.bash authority/server/crl.template \
-	softhsm.bash
+	common.bash authority/server/crl.template softhsm.bash
 
 # Lockfile for the main Apache process
 test_lockfile = ./test.lock
