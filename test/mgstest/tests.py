@@ -96,7 +96,7 @@ class TestConnection(yaml.YAMLObject):
             for act in self.actions:
                 if type(act) is TestRequest:
                     act.run(conn, response_log)
-                elif type(act) is TestRaw10:
+                elif type(act) is TestReq10:
                     act.run(command, timeout, conn_log, response_log)
                 else:
                     raise TypeError(f'Unsupported action requested: {act!r}')
@@ -236,7 +236,7 @@ class TestRequest(yaml.YAMLObject):
 
 
 
-class TestRaw10(TestRequest):
+class TestReq10(TestRequest):
     """Test action that sends a request using a minimal (and likely
     incomplete) HTTP/1.0 test client for the one test case that
     strictly requires HTTP/1.0.
@@ -246,7 +246,7 @@ class TestRaw10(TestRequest):
     TestRequest.
 
     """
-    yaml_tag = '!raw10'
+    yaml_tag = '!request10'
     status_re = re.compile('^HTTP/([\d\.]+) (\d+) (.*)$')
 
     def __init__(self, method, path, headers, expect):
