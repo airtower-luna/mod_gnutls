@@ -278,6 +278,7 @@ class TestRaw10(TestRequest):
             proc.kill()
             outs, errs = proc.communicate()
 
+        print(errs.decode())
         if conn_log:
             print(errs.decode(), file=conn_log)
 
