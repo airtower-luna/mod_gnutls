@@ -53,3 +53,16 @@ def lockfile(file, nolock=False):
                 print(f'Unlocking {file}...', file=sys.stderr)
                 fcntl.flock(lockfile, fcntl.LOCK_UN)
                 print(f'Unlocked {file}.', file=sys.stderr)
+
+
+
+def first_line_match(regexp, file):
+    """Return the first match of the regular expression in file (by line),
+    or None. Technically applicable to any iterable containing
+    strings, not just files opened for reading.
+    """
+    for line in file:
+        m = regexp.search(line)
+        if m:
+            return m
+    return None
