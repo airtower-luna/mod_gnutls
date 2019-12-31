@@ -177,14 +177,12 @@ def main(args):
             os.environ['TEST_TARGET'] = os.environ['TEST_HOST']
 
         # Run the test connections
-        with contextlib.ExitStack() as stack:
-            if plugin.run_connection:
-                plugin.run_connection(testname,
-                                      conn_log=args.log_connection,
-                                      response_log=args.log_responses)
-            else:
-                test_conf = stack.enter_context(
-                    open(os.path.join(testdir, 'test.yml'), 'r'))
+        if plugin.run_connection:
+            plugin.run_connection(testname,
+                                  conn_log=args.log_connection,
+                                  response_log=args.log_responses)
+        else:
+            with open(os.path.join(testdir, 'test.yml'), 'r') as test_conf:
                 run_test_conf(test_conf,
                               float(os.environ.get('TEST_QUERY_TIMEOUT', 5.0)),
                               conn_log=args.log_connection,
