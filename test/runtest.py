@@ -44,13 +44,13 @@ def find_testdir(number, dir):
                     if found:
                         # duplicate numbers are an error
                         raise LookupError('Multiple directories found for '
-                                          f'test number {args.test_number}: '
+                                          f'test number {number}: '
                                           f'{found.name} and {entry.name}')
                     else:
                         found = entry
         if found == None:
             raise LookupError('No test directory found for test number '
-                              f'{args.test_number}!')
+                              f'{number}!')
         else:
             return (found.path, found.name)
 
