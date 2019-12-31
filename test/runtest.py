@@ -20,6 +20,7 @@ import os
 import os.path
 import subprocess
 import sys
+import tempfile
 
 import mgstest.hooks
 from mgstest import lockfile, TestExpectationFailed
@@ -53,6 +54,11 @@ def find_testdir(number, dir):
                               f'{number}!')
         else:
             return (found.path, found.name)
+
+def temp_logfile():
+    return tempfile.SpooledTemporaryFile(max_size=4096, mode='w+',
+                                         prefix='mod_gnutls', suffix=".log")
+
 
 
 
@@ -186,10 +192,8 @@ def main(args):
 
     # run extra checks the test's hooks.py might define
     if plugin.post_check:
-        if args.log_connection:
-            args.log_connection.seek(0)
-        if args.log_responses:
-            args.log_responses.seek(0)
+        args.log_connection.seek(0)
+        args.log_responses.seek(0)
         plugin.post_check(conn_log=args.log_connection,
                           response_log=args.log_responses)
 
@@ -201,13 +205,11 @@ if __name__ == "__main__":
         description='Run a mod_gnutls server test')
     parser.add_argument('--test-number', type=int,
                         required=True, help='load YAML test configuration')
-    # TODO: The log files should be created as temporary
-    # files if needed by the plugin but not configured.
     parser.add_argument('--log-connection', type=argparse.FileType('w+'),
-                        default=None,
+                        default=temp_logfile(),
                         help='write connection log to this file')
     parser.add_argument('--log-responses', type=argparse.FileType('w+'),
-                        default=None,
+                        default=temp_logfile(),
                         help='write HTTP responses to this file')
 
     # enable bash completion if argcomplete is available
@@ -220,8 +222,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     with contextlib.ExitStack() as stack:
-        if args.log_connection:
-            stack.enter_context(contextlib.closing(args.log_connection))
-        if args.log_responses:
-            stack.enter_context(contextlib.closing(args.log_responses))
+        stack.enter_context(contextlib.closing(args.log_connection))
+        stack.enter_context(contextlib.closing(args.log_responses))
         main(args)
