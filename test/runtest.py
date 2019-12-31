@@ -172,36 +172,26 @@ def main(args):
 
         # Run the test connections
         with contextlib.ExitStack() as stack:
-            log_file = None
-            output_file = None
-            if args.log_connection:
-                log_file = stack.enter_context(open(args.log_connection, 'w'))
-            if args.log_responses:
-                output_file = stack.enter_context(open(args.log_responses, 'w'))
-
             if plugin.run_connection:
                 plugin.run_connection(testname,
-                                      conn_log=log_file,
-                                      response_log=output_file)
+                                      conn_log=args.log_connection,
+                                      response_log=args.log_responses)
             else:
                 test_conf = stack.enter_context(
                     open(os.path.join(testdir, 'test.yml'), 'r'))
                 run_test_conf(test_conf,
                               float(os.environ.get('TEST_QUERY_TIMEOUT', 5.0)),
-                              conn_log=log_file, response_log=output_file)
+                              conn_log=args.log_connection,
+                              response_log=args.log_responses)
 
     # run extra checks the test's hooks.py might define
     if plugin.post_check:
-        log_file = None
-        output_file = None
-        with contextlib.ExitStack() as stack:
-            # TODO: The log files should be created as temporary
-            # files if needed by the plugin but not configured.
-            if args.log_connection:
-                log_file = stack.enter_context(open(args.log_connection, 'r'))
-            if args.log_responses:
-                output_file = stack.enter_context(open(args.log_responses, 'r'))
-            plugin.post_check(conn_log=log_file, response_log=output_file)
+        if args.log_connection:
+            args.log_connection.seek(0)
+        if args.log_responses:
+            args.log_responses.seek(0)
+        plugin.post_check(conn_log=args.log_connection,
+                          response_log=args.log_responses)
 
 
 
@@ -211,9 +201,13 @@ if __name__ == "__main__":
         description='Run a mod_gnutls server test')
     parser.add_argument('--test-number', type=int,
                         required=True, help='load YAML test configuration')
-    parser.add_argument('--log-connection', type=str, default=None,
+    # TODO: The log files should be created as temporary
+    # files if needed by the plugin but not configured.
+    parser.add_argument('--log-connection', type=argparse.FileType('w+'),
+                        default=None,
                         help='write connection log to this file')
-    parser.add_argument('--log-responses', type=str, default=None,
+    parser.add_argument('--log-responses', type=argparse.FileType('w+'),
+                        default=None,
                         help='write HTTP responses to this file')
 
     # enable bash completion if argcomplete is available
@@ -225,4 +219,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    main(args)
+    with contextlib.ExitStack() as stack:
+        if args.log_connection:
+            stack.enter_context(contextlib.closing(args.log_connection))
+        if args.log_responses:
+            stack.enter_context(contextlib.closing(args.log_responses))
+        main(args)
