@@ -77,26 +77,7 @@ def check_msva():
 
 
 
-if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser(
-        description='Run a mod_gnutls server test')
-    parser.add_argument('--test-number', type=int,
-                        required=True, help='load YAML test configuration')
-    parser.add_argument('--log-connection', type=str, default=None,
-                        help='write connection log to this file')
-    parser.add_argument('--log-responses', type=str, default=None,
-                        help='write HTTP responses to this file')
-
-    # enable bash completion if argcomplete is available
-    try:
-        import argcomplete
-        argcomplete.autocomplete(parser)
-    except ImportError:
-        pass
-
-    args = parser.parse_args()
-
+def main(args):
     # The Automake environment always provides srcdir, the default is
     # for manual use.
     srcdir = os.path.realpath(os.environ.get('srcdir', '.'))
@@ -221,3 +202,27 @@ if __name__ == "__main__":
             if args.log_responses:
                 output_file = stack.enter_context(open(args.log_responses, 'r'))
             plugin.post_check(conn_log=log_file, response_log=output_file)
+
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(
+        description='Run a mod_gnutls server test')
+    parser.add_argument('--test-number', type=int,
+                        required=True, help='load YAML test configuration')
+    parser.add_argument('--log-connection', type=str, default=None,
+                        help='write connection log to this file')
+    parser.add_argument('--log-responses', type=str, default=None,
+                        help='write HTTP responses to this file')
+
+    # enable bash completion if argcomplete is available
+    try:
+        import argcomplete
+        argcomplete.autocomplete(parser)
+    except ImportError:
+        pass
+
+    args = parser.parse_args()
+
+    main(args)
