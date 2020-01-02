@@ -21,5 +21,5 @@ if [ -n "${USE_TEST_NAMESPACE}" ] && [ -z "${MGS_NETNS_ACTIVE}" ]; then
     exec "${UNSHARE}" --net --ipc -r /bin/bash -c \
 	 "export MGS_NETNS_ACTIVE=1; ip link set up lo; exec ${UNSHARE} --user ${PYTHON} ${*}"
 else
-    exec ${PYTHON} "${*}"
+    exec ${PYTHON} "${@}"
 fi
