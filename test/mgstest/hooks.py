@@ -1,7 +1,34 @@
-"""Test case hooks for mod_gnutls tests
+"""Test case hooks for mod_gnutls tests.
 
 Test cases can implement hooks that (depending on the hook) override
-or supplement the default test run behavior."""
+or supplement the default test run behavior. Two hooks are currently
+supported:
+
+    run_connection:
+
+        Will be called *instead* of mgstests.tests.run_test_conf() and
+        is expected to run whatever client actions the test
+        requires. This hook receives three parameters:
+
+        * testname: string containing the test name
+        * conn_log: file object for connection logging
+        * response_log: file object for HTTP response logging
+
+
+    post_check:
+
+        Execute additional checks if desired. This hook is called
+        after the test client run and after the test environment
+        terminates. This hook receives two parameters:
+
+        * conn_log: file object with connection log data
+        * response_log: file object with HTTP response log data
+
+        With the default client implementation conn_log will contain
+        gnutls-cli output, and response_log the full HTTP responses
+        (including status line and headers).
+
+"""
 
 import importlib.util
 import inspect
@@ -14,6 +41,13 @@ hooks = [
 ]
 
 class Plugin:
+    """Represents a set of hooks.
+
+    All attribute names listed in the "hooks" field are guaranteed to
+    exist in an instance of this class, with the value of each being
+    either None or a function.
+
+    """
     def __init__(self, module=None):
         self.module = module
         for hook in hooks:
@@ -26,7 +60,8 @@ class Plugin:
             else:
                 setattr(self, hook, None)
 
-def load_module_file(file_path, module_name='mgstest.plugin'):
+def load_module_file(file_path, module_name):
+    """Load a module from a file path."""
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

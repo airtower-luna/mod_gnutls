@@ -82,7 +82,8 @@ Test directories usually contain the following files:
   configuration problem.
 
 * `hooks.py` [optional] -- Defines hook functions that modify or
-  override the default behavior of runtest.py
+  override the default behavior of `runtest.py`. Please see the module
+  documentation of [mgstest.hooks](./mgstest/hooks.py) for details.
 
 The [`runtest.py`](./runtest.py) program is used to start the required
 services send a request (or more) based on the files described
