@@ -13,7 +13,7 @@ EXTRA_DIST = \
 	11_basic_client_verification_fail/apache.conf 11_basic_client_verification_fail/test.yml \
 	12_cgi_variables/apache.conf 12_cgi_variables/test.yml \
 	13_cgi_variables_no_client_cert/apache.conf 13_cgi_variables_no_client_cert/test.yml \
-	14_resume_session/apache.conf 14_resume_session/test.yml \
+	14_resume_session/apache.conf 14_resume_session/hooks.py 14_resume_session/test.yml \
 	15_basic_msva/apache.conf 15_basic_msva/test.yml \
 	16_view-status/apache.conf 16_view-status/test.yml \
 	17_cgi_vars_large_cert/apache.conf 17_cgi_vars_large_cert/test.yml \
