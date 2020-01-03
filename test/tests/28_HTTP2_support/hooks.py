@@ -1,5 +1,7 @@
 import os
+import re
 import subprocess
+from mgstest import require_match
 
 def run_connection(testname, conn_log, response_log):
     url = f'https://{os.environ["TEST_HOST"]}:{os.environ["TEST_PORT"]}' \
@@ -14,3 +16,11 @@ def run_connection(testname, conn_log, response_log):
     print(proc.stderr, file=conn_log)
     print(proc.stdout)
     print(proc.stdout, file=response_log)
+
+def post_check(conn_log, response_log):
+    print('Checking for HTTP/2 in logged header:')
+    print(require_match(re.compile(r'\bHTTP/2 200\b'), conn_log).group(0))
+    print('Checking for TLS session status:')
+    print(require_match(re.compile(r'^Current TLS session:\s\(TLS.*$'),
+                        response_log)
+          .group(0))

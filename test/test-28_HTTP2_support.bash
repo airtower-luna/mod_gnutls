@@ -13,14 +13,4 @@ elif [ "$(basename ${HTTP_CLI})" != "curl" ] \
     exit 77
 fi
 
-# expected output files
-log="outputs/28_HTTP2_support.log"
-output="outputs/28_HTTP2_support.output"
-
-${srcdir}/netns_py.bash ${srcdir}/runtest.py --test-number 28 \
-	 --log-connection "${log}" --log-responses "${output}"
-
-echo "Checking for HTTP/2 in logged header:"
-grep "HTTP/2 200" "${log}"
-echo "Checking for TLS session status:"
-grep "Current TLS session: (TLS" "${output}"
+. ${srcdir}/netns_py.bash ${srcdir}/runtest.py --test-number 28

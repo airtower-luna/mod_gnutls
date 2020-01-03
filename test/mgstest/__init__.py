@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-# Copyright 2019 Fiona Klute
+# Copyright 2019-2020 Fiona Klute
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -66,3 +66,24 @@ def first_line_match(regexp, file):
         if m:
             return m
     return None
+
+
+
+def require_match(regexp, file, error_message=None):
+    """Return the first match of the regular expression in file (by line),
+    or raise TestExpectationFailed.
+
+    If error_message is not None the exception message will be that
+    string, otherwise a generic message containing the regular
+    expression pattern. Technically applicable to any iterable
+    containing strings, not just files opened for reading.
+
+    """
+    m = first_line_match(regexp, file)
+    if m:
+        return m
+
+    if error_message:
+        raise TestExpectationFailed(error_message)
+    else:
+        raise TestExpectationFailed(f'No match found for {regexp.pattern}!')
