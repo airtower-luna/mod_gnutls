@@ -26,7 +26,7 @@ EXTRA_DIST = \
 	24_pkcs11_cert/apache.conf 24_pkcs11_cert/test.yml \
 	25_Disable_TLS_1.0/apache.conf 25_Disable_TLS_1.0/test.yml \
 	26_redirect_HTTP_to_HTTPS/apache.conf 26_redirect_HTTP_to_HTTPS/test.yml \
-	27_OCSP_server/apache.conf 27_OCSP_server/ocsp.conf 27_OCSP_server/test.yml \
+	27_OCSP_server/apache.conf 27_OCSP_server/hooks.py 27_OCSP_server/ocsp.conf 27_OCSP_server/test.yml \
 	28_HTTP2_support/apache.conf 28_HTTP2_support/hooks.py \
 	29_force_handshake_vhost/apache.conf 29_force_handshake_vhost/test.yml \
 	30_ip_based_vhosts/apache.conf 30_ip_based_vhosts/test.yml \
