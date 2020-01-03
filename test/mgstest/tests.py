@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-# Copyright 2019 Fiona Klute
+# Copyright 2019-2020 Fiona Klute
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -105,7 +105,7 @@ class TestConnection(yaml.YAMLObject):
             sys.stdout.flush()
 
     @classmethod
-    def _from_yaml(cls, loader, node):
+    def from_yaml(cls, loader, node):
         fields = loader.construct_mapping(node)
         conn = cls(**fields)
         return conn
@@ -229,7 +229,7 @@ class TestRequest(yaml.YAMLObject):
         return False
 
     @classmethod
-    def _from_yaml(cls, loader, node):
+    def from_yaml(cls, loader, node):
         fields = loader.construct_mapping(node)
         req = cls(**fields)
         return req
@@ -302,14 +302,6 @@ class TestReq10(TestRequest):
 
         if 'body' in self.expect:
             self.check_body(body)
-
-
-
-# Override the default constructors. Pyyaml ignores default parameters
-# otherwise.
-yaml.add_constructor('!request', TestRequest._from_yaml, yaml.Loader)
-yaml.add_constructor('!request10', TestReq10._from_yaml, yaml.Loader)
-yaml.add_constructor('!connection', TestConnection._from_yaml, yaml.Loader)
 
 
 
