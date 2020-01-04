@@ -251,8 +251,11 @@ endif
 apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/ocsp.cgi \
 	data/test.txt mime.types proxy_mods.conf
 
+# Documentation for the test system
+test_doc = README.md sample_fail.yml sample_test.yml
+
 EXTRA_DIST = $(apache_data) $(cert_templates) $(shared_identities:=/uid.in) \
-	common.bash authority/server/crl.template softhsm.bash
+	common.bash authority/server/crl.template softhsm.bash $(test_doc)
 
 # Lockfile for the main Apache process
 test_lockfile = ./test.lock
