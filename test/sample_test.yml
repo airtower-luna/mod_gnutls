@@ -24,4 +24,5 @@ actions:
         Content-Type: 'text/plain; charset=ISO-8859-1'
       body:
         contains:
+          - 'Using GnuTLS version: '
           - 'Current TLS session: (TLS1.3)'

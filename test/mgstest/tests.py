@@ -18,6 +18,81 @@
 suite. The classes defined in this module represent structures in the
 YAML test configuration files.
 
+The test configuration file defines either a TestConnection, or a list
+of them. Each connection contains a list of actions to run using this
+connection. The actions define their expected results, if an
+expectation is not met mgstest.TestExpectationFailed is raised.
+
+Example of a connection that runs two request actions, which are
+expected to succeed:
+
+```yaml
+!connection
+# "host" defaults to $TEST_TARGET, so usually there's no need to set
+# it. You can use ${VAR} to substitute environment variables.
+host: 'localhost'
+# "port" defaults to $TEST_PORT, so usually there's no need to set it
+# it. You can use ${VAR} to substitute environment variables.
+port: '${TEST_PORT}'
+# All elements of gnutls_params will be prefixed with "--" and passed
+# to gnutls-cli on the command line.
+gnutls_params:
+  - x509cafile=authority/x509.pem
+# The transport encryption. "Gnutls" is the default, "plain" can be
+# set to get an unencrypted connection (e.g. to test redirection to
+# HTTPS).
+transport: 'gnutls'
+description='This connection description will be logged.'
+actions:
+  - !request
+    # GET is the default.
+    method: GET
+    # The path part of the URL, required.
+    path: /test.txt
+    # "Expect" defines how the response must look to pass the test.
+    expect:
+      # 200 (OK) is the default.
+      status: 200
+      # The response body is analyzed only if the "body" element
+      # exists, otherwise any content is accepted.
+      body:
+        # The full response body must exactly match this string.
+        exactly: |
+          test
+  - !request
+    path: /status?auto
+    expect:
+      # The headers are analyzed only if the "headers" element exists.
+      headers:
+        # The Content-Type header must be present with exactly this
+        # value. You can use ${VAR} to substitute environment
+        # variables in the value.
+        Content-Type: 'text/plain; charset=ISO-8859-1'
+      body:
+        # All strings in this list must occur in the body, in any
+        # order. "Contains" may also contain a single string instead
+        # of a list.
+        contains:
+          - 'Using GnuTLS version: '
+          - 'Current TLS session: (TLS1.3)'
+```
+
+Example of a connection that is expected to fail at the TLS level, in
+this case because the configured CA is not the one that issued the
+server certificate:
+
+```yaml
+- !connection
+  gnutls_params:
+    - x509cafile=rogueca/x509.pem
+  actions:
+    - !request
+      path: /
+      expect:
+        # The connection is expected to reset without an HTTP response.
+        reset: yes
+```
+
 """
 
 import os
@@ -35,6 +110,7 @@ from . import TestExpectationFailed
 from .http import HTTPSubprocessConnection
 
 class Transports(Enum):
+    """Transports supported by TestConnection."""
     GNUTLS = auto()
     PLAIN = auto()
 
@@ -43,11 +119,11 @@ class Transports(Enum):
 
 class TestConnection(yaml.YAMLObject):
     """An HTTP connection in a test. It includes parameters for the
-    transport (currently gnutls-cli only), and the actions
-    (e.g. sending requests) to take using this connection.
+    transport, and the actions (e.g. sending requests) to take using
+    this connection.
 
     Note that running one TestConnection object may result in multiple
-    sequential network connections, if the transport gets closed in a
+    sequential network connections if the transport gets closed in a
     non-failure way (e.g. following a "Connection: close" request) and
     there are more actions, or (rarely) if an action requires its own
     transport.
@@ -78,6 +154,8 @@ class TestConnection(yaml.YAMLObject):
                 f'description={self.description!r})')
 
     def run(self, timeout=5.0, conn_log=None, response_log=None):
+        """Set up an HTTP connection and run the configured actions."""
+
         # note: "--logfile" option requires GnuTLS version >= 3.6.7
         command = ['gnutls-cli', '--logfile=/dev/stderr']
         for s in self.gnutls_params:
@@ -122,6 +200,7 @@ class TestRequest(yaml.YAMLObject):
 
     Options for checking the response currently are:
     * require a specific response status
+    * require specific headers to be present with specific values
     * require the body to exactly match a specific string
     * require the body to contain all of a list of strings
 
@@ -242,10 +321,10 @@ class TestReq10(TestRequest):
     incomplete) HTTP/1.0 test client for the one test case that
     strictly requires HTTP/1.0.
 
-    Objects use the same default parameters as TestRequest, but note
-    that an empty "headers" parameter means that not even a "Host:"
-    header will be sent. All headers must be specified in the test
-    configuration file.
+    TestReq10 objects use the same YAML parameters and defaults as
+    TestRequest, but note that an empty "headers" parameter means that
+    not even a "Host:" header will be sent. All headers must be
+    specified in the test configuration file.
 
     """
     yaml_tag = '!request10'
@@ -361,6 +440,7 @@ def filter_cert_log(in_stream, out_stream):
 
 
 def format_response(resp, body):
+    """Format an http.client.HTTPResponse for logging."""
     s = f'{resp.status} {resp.reason}\n'
     s = s + '\n'.join(f'{name}: {value}' for name, value in resp.getheaders())
     s = s + '\n\n' + body
@@ -369,12 +449,27 @@ def format_response(resp, body):
 
 
 def subst_env(text):
+    """Use the parameter "text" as a template, substitute with environment
+    variables.
+
+    >>> os.environ['EXAMPLE_VAR'] = 'abc'
+    >>> subst_env('${EXAMPLE_VAR}def')
+    'abcdef'
+
+    """
     t = Template(text)
     return t.substitute(os.environ)
 
 
 
 def run_test_conf(test_config, timeout=5.0, conn_log=None, response_log=None):
+    """Load and run a test configuration.
+
+    The test_conf parameter must be a YAML file, defining one or more
+    TestConnections, to be run in order. The other three parameters
+    are forwarded to TestConnection.run().
+
+    """
     conns = None
 
     config = yaml.load(test_config, Loader=yaml.Loader)
