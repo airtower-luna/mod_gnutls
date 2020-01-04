@@ -642,8 +642,7 @@ The response file must be updated externally, for example using a cron
 job. This option is an alternative to the server fetching OCSP
 responses over HTTP. Reasons to use this option include:
 
-* Performing OCSP requests separate from the web server, to prevent slow
-  responses from stalling handshakes.
+* Performing OCSP requests separate from the web server.
 * The issuer CA uses an access method other than HTTP.
 * Testing
 
@@ -685,7 +684,9 @@ Retries of failed OCSP requests must be rate limited to avoid
 overloading both the server using mod_gnutls and the CA's OCSP
 responder. A shorter value increases the load on both sides, a longer
 one means that stapling will remain disabled for longer after a failed
-request.
+request. The auto-refresh mechanism updates OCSP responses before they
+expire and can cover short unavailability of OCSP responders, see
+[`GnuTLSOCSPAutoRefresh`](#gnutlsocspautorefresh) for details.
 
 ### GnuTLSOCSPFuzzTime
 
