@@ -13,12 +13,16 @@ want to at least test for some basic/common configurations.
 From the top level of the source, or from `test/` (where this README is),
 just run:
 
-    $ make check
+```bash
+$ make check
+```
 
 You can also run specific test cases by passing their script names to
 make in the `TESTS` variable:
 
-    $ TESTS="test-03_cachetimeout_in_vhost.bash" make -e check
+```bash
+$ TESTS="test-03_cachetimeout_in_vhost.bash" make -e check
+```
 
 This should be handy when you're just trying to experiment with a new
 test and don't want to wait for the full test suite to run.
@@ -29,11 +33,15 @@ IPv6 support is available (`TEST_IP="[::1] 127.0.0.1"`) and that
 addresses. If this does not apply to your system, you can pass
 different values to `./configure`, e.g. to use IPv4 only:
 
-    $ TEST_HOST="localhost" TEST_IP="127.0.0.1" ./configure
+```bash
+$ TEST_HOST="localhost" TEST_IP="127.0.0.1" ./configure
+```
 
 If tests fail due to expired certificates or PGP signatures, run
 
-    $ make mostlyclean
+```bash
+$ make mostlyclean
+```
 
 to delete them and create fresh ones on the next test run. You could
 also use `make clean`, but in that case the keys will be deleted as
@@ -47,7 +55,9 @@ Please add more tests!
 The simplest way to add a test is (from the directory containing this
 file):
 
-    $ ./newtest
+```bash
+$ ./newtest
+```
 
 This will prompt you for a simple name for the test, copy a starting
 set of files from `tests/00_basic`, and create a script which you can
@@ -139,7 +149,9 @@ case. Use `make show-test-env` to dump `AM_TESTS_ENVIRONMENT` to
 stdout. If you want to load the test environment into the current bash
 instance, you can use:
 
-    $ eval $(make show-test-env)
+```bash
+$ eval $(make show-test-env)
+```
 
 If you are building on an exotic architecture which does not support
 flock (or timeouts using `flock -w`), `./configure` should detect that
