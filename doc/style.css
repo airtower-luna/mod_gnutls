@@ -1,9 +1,15 @@
 body {
     margin: 10%;
+    font-family: sans-serif;
 }
 pre {
-    background: #f6f6f6;
+    background: #f5f5f5;
+    border-radius: 4px;
+    padding: 12px;
 }
-p code, pre > code {
-    font-size: 1rem;
+p code {
+    background: #f5f5f5;
+    border-radius: 4px;
+    padding: 0.2em 0.4em;
+    word-break: keep-all;
 }
