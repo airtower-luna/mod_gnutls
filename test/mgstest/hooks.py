@@ -28,7 +28,6 @@ supported:
         * conn_log: file object for connection logging
         * response_log: file object for HTTP response logging
 
-
     post_check:
 
         Execute additional checks if desired. This hook is called

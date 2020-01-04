@@ -22,6 +22,7 @@ YAML test configuration files.
 
 import os
 import re
+import select
 import subprocess
 import sys
 import yaml
@@ -319,8 +320,6 @@ def filter_cert_log(in_stream, out_stream):
     in_stream, and a connection for further processing as out_stream.
 
     """
-    import os
-    import select
     # message to filter
     cert_log = b'Processed 1 client X.509 certificates...\n'
 

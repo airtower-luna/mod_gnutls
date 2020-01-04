@@ -64,7 +64,6 @@ class HTTPSubprocessConnection(HTTPConnection):
                                               socket.SOCK_STREAM)
         s_local.settimeout(self.timeout)
 
-        # TODO: Maybe capture stderr?
         if self._output_filter:
             self._sproc = subprocess.Popen(self.command, stdout=subprocess.PIPE,
                                            stderr=subprocess.PIPE,

@@ -16,9 +16,9 @@
 
 """Python modules for the mod_gnutls test suite."""
 
+import fcntl
 import sys
 
-import fcntl
 from contextlib import contextmanager
 
 class TestExpectationFailed(Exception):
