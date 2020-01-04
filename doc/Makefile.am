@@ -1,5 +1,5 @@
 EXTRA_DIST = mod_gnutls_manual.mdwn mod_gnutls_manual.yaml.in \
-	mod_gnutls.whatis
+	mod_gnutls.whatis style.css
 
 if USE_PANDOC
 html_DATA = mod_gnutls_manual.html
@@ -30,9 +30,9 @@ if USE_PDFLATEX
 endif
 endif
 
-%.html: %.mdwn %.yaml
+%.html: %.mdwn %.yaml style.css
 if USE_PANDOC
-	$(PANDOC) --toc --standalone -f markdown -o $@ $^
+	$(PANDOC) --css $(filter %.css,$^) --toc --self-contained -f markdown -o $@ $(filter-out %.css,$^)
 else
 if USE_MARKDOWN
 	$(MARKDOWN) $< > $@

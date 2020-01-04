@@ -1,0 +1,9 @@
+body {
+    margin: 10%;
+}
+pre {
+    background: #f6f6f6;
+}
+p code, pre > code {
+    font-size: 1rem;
+}
