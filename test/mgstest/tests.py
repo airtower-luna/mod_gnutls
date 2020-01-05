@@ -328,7 +328,8 @@ class TestReq10(TestRequest):
 
     """
     yaml_tag = '!request10'
-    status_re = re.compile('^HTTP/([\d\.]+) (\d+) (.*)$')
+    status_re = re.compile(r'^HTTP/([\d\.]+) (\d+) (.*)$')
+    header_re = re.compile(r'^([-\w]+):\s+(.*)$')
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -363,11 +364,11 @@ class TestReq10(TestRequest):
         # first line of the received data must be the status
         status, rest = outs.decode().split('\r\n', maxsplit=1)
         # headers and body are separated by double newline
-        headers, body = rest.split('\r\n\r\n', maxsplit=1)
+        head, body = rest.split('\r\n\r\n', maxsplit=1)
         # log response for debugging
-        print(f'{status}\n{headers}\n\n{body}')
+        print(f'{status}\n{head}\n\n{body}')
         if response_log:
-            print(f'{status}\n{headers}\n\n{body}', file=response_log)
+            print(f'{status}\n{head}\n\n{body}', file=response_log)
 
         m = self.status_re.match(status)
         if m:
@@ -379,6 +380,14 @@ class TestReq10(TestRequest):
                                             f'{status_expect}')
         else:
             raise TestExpectationFailed(f'Invalid status line: "{status}"')
+
+        if 'headers' in self.expect:
+            headers = dict()
+            for line in head.splitlines():
+                m = self.header_re.fullmatch(line)
+                if m:
+                    headers[m.group(1)] = m.group(2)
+            self.check_headers(headers)
 
         if 'body' in self.expect:
             self.check_body(body)
