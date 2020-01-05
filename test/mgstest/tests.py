@@ -241,13 +241,27 @@ class TestRequest(yaml.YAMLObject):
         self.check_response(resp, body)
 
     def check_headers(self, headers):
+        """
+        >>> r1 = TestRequest(path='/test.txt',
+        ...                  expect={ 'headers': {'X-Forbidden-Header': None,
+        ...                                       'X-Required-Header': 'Hi!' }})
+        >>> r1.check_headers({ 'X-Required-Header': 'Hi!' })
+        >>> r1.check_headers({ 'X-Required-Header': 'Hello!' })
+        Traceback (most recent call last):
+        ...
+        mgstest.TestExpectationFailed: Unexpected value in header X-Required-Header: 'Hello!', expected 'Hi!'
+        >>> r1.check_headers({ 'X-Forbidden-Header': 'Hi!' })
+        Traceback (most recent call last):
+        ...
+        mgstest.TestExpectationFailed: Unexpected value in header X-Forbidden-Header: 'Hi!', expected None
+        """
         for name, expected in self.expect['headers'].items():
             value = headers.get(name)
             expected = subst_env(expected)
             if value != expected:
                 raise TestExpectationFailed(
-                    f'Unexpected value in header {name}: "{value}", '
-                    f'expected "{expected}"')
+                    f'Unexpected value in header {name}: {value!r}, '
+                    f'expected {expected!r}')
 
     def check_body(self, body):
         """
