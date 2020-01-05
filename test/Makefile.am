@@ -1,6 +1,7 @@
 SUBDIRS = tests
 
-test_scripts = test-00_basic.bash \
+test_scripts = doctest-mgstest.py \
+	test-00_basic.bash \
 	test-01_serverwide_priorities.bash \
 	test-02_cache_in_vhost.bash \
 	test-03_cachetimeout_in_vhost.bash \
@@ -38,7 +39,8 @@ test_scripts += test-16_view-status.bash \
 	test-33_vhost_SNI_serveralias_missinghost.bash \
 	test-34_TLS_reverse_proxy_h2.bash
 
-TEST_EXTENSIONS = .bash
+TEST_EXTENSIONS = .bash .py
+PY_LOG_COMPILER = $(PYTHON)
 TESTS = $(test_scripts)
 
 dist_check_SCRIPTS = netns_py.bash $(test_scripts)
@@ -57,7 +59,8 @@ endif
 
 # Python tools for tests
 noinst_PYTHON = https-test-client.py mgstest/http.py mgstest/__init__.py \
-	mgstest/hooks.py mgstest/services.py mgstest/tests.py runtest.py
+	mgstest/hooks.py mgstest/services.py mgstest/tests.py runtest.py \
+	doctest-mgstest.py
 
 # Identities in the miniature CA, server, and client environment for
 # the test suite
