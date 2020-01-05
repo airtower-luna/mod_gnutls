@@ -22,6 +22,7 @@ actions:
       status: 200
       headers:
         Content-Type: 'text/plain; charset=ISO-8859-1'
+        X-Forbidden-Header: null
       body:
         contains:
           - 'Using GnuTLS version: '

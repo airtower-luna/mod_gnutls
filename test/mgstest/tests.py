@@ -68,6 +68,8 @@ actions:
         # value. You can use ${VAR} to substitute environment
         # variables in the value.
         Content-Type: 'text/plain; charset=ISO-8859-1'
+        # You can check the absence of a header by expecting null:
+        X-Forbidden-Header: null
       body:
         # All strings in this list must occur in the body, in any
         # order. "Contains" may also contain a single string instead
@@ -465,7 +467,19 @@ def subst_env(text):
     >>> subst_env('${EXAMPLE_VAR}def')
     'abcdef'
 
+    Referencing undefined environment variables causes a KeyError.
+
+    >>> subst_env('${EXAMPLE_UNSET}')
+    Traceback (most recent call last):
+    ...
+    KeyError: 'EXAMPLE_UNSET'
+
+    >>> subst_env(None) is None
+    True
+
     """
+    if not text:
+        return None
     t = Template(text)
     return t.substitute(os.environ)
 
