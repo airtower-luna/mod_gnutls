@@ -42,7 +42,7 @@ gnutls_params:
 # set to get an unencrypted connection (e.g. to test redirection to
 # HTTPS).
 transport: 'gnutls'
-description='This connection description will be logged.'
+description: 'This connection description will be logged.'
 actions:
   - !request
     # GET is the default.
@@ -362,6 +362,21 @@ class TestReq10(TestRequest):
         print(errs.decode())
         if conn_log:
             print(errs.decode(), file=conn_log)
+
+        if proc.returncode != 0:
+            if len(outs) != 0:
+                raise TestExpectationFailed(
+                    f'Connection failed, but got output: {outs!r}')
+            if self.expects_conn_reset():
+                print('connection reset as expected.')
+                return
+            else:
+                raise TestExpectationFailed(
+                    'Connection failed unexpectedly!')
+        else:
+            if self.expects_conn_reset():
+                raise TestExpectationFailed(
+                    'Expected connection reset did not occur!')
 
         # first line of the received data must be the status
         status, rest = outs.decode().split('\r\n', maxsplit=1)

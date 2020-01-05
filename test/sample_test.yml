@@ -27,3 +27,10 @@ actions:
         contains:
           - 'Using GnuTLS version: '
           - 'Current TLS session: (TLS1.3)'
+  - !request10
+    path: /test.txt
+    headers:
+      Host: localhost
+    expect:
+      headers:
+        Content-Type: 'text/plain'
