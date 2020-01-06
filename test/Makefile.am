@@ -334,3 +334,11 @@ endif
 show-test-env: export TEST_ENV=$(AM_TESTS_ENVIRONMENT)
 show-test-env:
 	@echo "$${TEST_ENV}"
+
+# Build the test suite README as HTML if pandoc is available.
+if USE_PANDOC
+noinst_DATA = README.html
+MOSTLYCLEANFILES += $(noinst_DATA)
+%.html: %.md $(srcdir)/../doc/style.css
+	$(PANDOC) --css $(filter %.css,$^) --metadata pagetitle="$(<)" --self-contained -f markdown -o $@ $<
+endif

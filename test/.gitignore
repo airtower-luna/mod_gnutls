@@ -6,6 +6,7 @@ authority/template
 authority/client/uid
 authority/tofu.db
 __pycache__/
+README.html
 
 # generated X.509 data
 x509.pem
