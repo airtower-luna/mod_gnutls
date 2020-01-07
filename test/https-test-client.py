@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
 import os
 
 from mgstest.tests import run_test_conf
@@ -49,7 +50,5 @@ if __name__ == "__main__":
     if args.port:
         os.environ['TEST_PORT'] = args.port
 
-    try:
+    with contextlib.closing(args.test_config):
         run_test_conf(args.test_config, args.timeout)
-    finally:
-        args.test_config.close()
