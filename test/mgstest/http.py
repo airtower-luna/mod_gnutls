@@ -16,6 +16,7 @@
 
 """HTTP handling components for mod_gnutls tests."""
 
+import contextlib
 import socket
 import subprocess
 import sys
@@ -121,8 +122,11 @@ def _stderr_writer(stream, copy=None):
     logs. Forcing gnutls-cli stderr through Python ensures
     synchronization (via global interpreter lock).
 
+    The incoming stream is closed after all lines have been read.
+
     """
-    for line in stream:
-        print(line.decode(), file=sys.stderr, end='', flush=True)
-        if copy:
-            print(line.decode(), file=copy, end='')
+    with contextlib.closing(stream):
+        for line in stream:
+            print(line.decode(), file=sys.stderr, end='', flush=True)
+            if copy:
+                print(line.decode(), file=copy, end='')
