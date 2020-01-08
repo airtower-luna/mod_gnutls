@@ -17,9 +17,12 @@
 """Python modules for the mod_gnutls test suite."""
 
 import fcntl
+import os
+import os.path
 import sys
 
 from contextlib import contextmanager
+from unittest import SkipTest
 
 class TestExpectationFailed(Exception):
     """Raise if a test failed. The constructor should be called with a
@@ -87,3 +90,15 @@ def require_match(regexp, file, error_message=None):
         raise TestExpectationFailed(error_message)
     else:
         raise TestExpectationFailed(f'No match found for {regexp.pattern}!')
+
+
+
+def require_apache_modules(*modules):
+    """Raise unittest.SkipTest if any of the given module files (full file
+    name) is not present in AP_LIBEXECDIR.
+
+    """
+    mod_dir = os.environ['AP_LIBEXECDIR']
+    for mod in modules:
+        if not os.path.isfile(os.path.join(mod_dir, mod)):
+            raise SkipTest(f'{mod} not found, skipping.')
