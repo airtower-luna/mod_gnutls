@@ -129,8 +129,9 @@ def main(args):
 
     # TODO: check extra requirements (e.g. specific modules)
 
-    # TODO: add hook to modify environment (unless made obsolete by
-    # parameters)
+    # This hook may modify the environment as needed for the test.
+    if plugin.prepare_env:
+        plugin.prepare_env()
 
     # If VERBOSE is enabled, log the HTTPD build configuration
     if 'VERBOSE' in os.environ:

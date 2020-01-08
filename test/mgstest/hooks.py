@@ -15,8 +15,13 @@
 """Test case hooks for mod_gnutls tests.
 
 Test cases can implement hooks that (depending on the hook) override
-or supplement the default test run behavior. Two hooks are currently
+or supplement the default test run behavior. Three hooks are currently
 supported:
+
+    prepare_env:
+
+        This hook runs before the test services are started. It can
+        set any additional environment variables the test might need.
 
     run_connection:
 
