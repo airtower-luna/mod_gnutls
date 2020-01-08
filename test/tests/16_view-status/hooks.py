@@ -8,12 +8,12 @@ def post_check(conn_log, response_log):
     # Group 1 is the TLS version, group 2 the ciphers. The certificate
     # type that may be enclosed in the same brackets as the TLS
     # version is ignored.
-    re_session = '\((TLS[\d\.]+).*?\)-(.*)'
+    re_session = r'\((TLS[\d\.]+).*?\)-(.*)'
 
     # Prefix for gnutls-cli output
-    re_cli = re.compile('(?<=^-\sDescription:\s)' + re_session + '$')
+    re_cli = re.compile(r'(?<=^-\sDescription:\s)' + re_session + '$')
     # Prefix in mod_status output provided by mod_gnutls
-    re_status = re.compile('(?<=^Current TLS session:\s)' + re_session + '$')
+    re_status = re.compile(r'(?<=^Current TLS session:\s)' + re_session + '$')
 
     cli_suite = require_match(re_cli, conn_log,
                               'Client cipher suite information is missing!')
