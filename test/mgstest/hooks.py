@@ -20,8 +20,15 @@ supported:
 
     prepare_env:
 
-        This hook runs before the test services are started. It can
-        set any additional environment variables the test might need.
+        This hook runs before the test services are started. It serves
+        two purposes:
+
+        1. Check special precondition the test might need
+        (e.g. availability of a certain Apache module), and raise
+        unittest.SkipTest to skip the test case if they are not met.
+
+        2. Set any additional environment variables the test might
+        need.
 
     run_connection:
 

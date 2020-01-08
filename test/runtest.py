@@ -21,6 +21,7 @@ import os.path
 import subprocess
 import sys
 import tempfile
+from unittest import SkipTest
 
 import mgstest.hooks
 from mgstest import lockfile, TestExpectationFailed
@@ -130,8 +131,12 @@ def main(args):
     # TODO: check extra requirements (e.g. specific modules)
 
     # This hook may modify the environment as needed for the test.
-    if plugin.prepare_env:
-        plugin.prepare_env()
+    try:
+        if plugin.prepare_env:
+            plugin.prepare_env()
+    except SkipTest as skip:
+        print(f'Skipping: {skip!s}')
+        sys.exit(77)
 
     # If VERBOSE is enabled, log the HTTPD build configuration
     if 'VERBOSE' in os.environ:
