@@ -1,5 +1,8 @@
 - !connection
-  description: 'Plain HTTP connection that must be redirected to HTTPS'
+  description: >-
+    Send a plain HTTP request, mod_rewrite must recognize the
+    unencrypted connection using "%{HTTPS}" and redirect to HTTPS,
+    without otherwise changing the URL.
   transport: plain
   host: '${TEST_HOST}'
   port: '${TEST_HTTP_PORT}'

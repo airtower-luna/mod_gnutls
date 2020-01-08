@@ -1,5 +1,4 @@
 #!/bin/bash
-# Try HTTPS access with OCSP status check
 
 # Skip if OCSP tests are not enabled
 [ -n "${OCSP_PORT}" ] || exit 77
