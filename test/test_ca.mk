@@ -84,14 +84,6 @@ authority/subca/%/x509-chain.pem: authority/subca/%/x509.pem authority/subca/x50
 rogueca/%/x509.pem: rogueca/%/template rogueca/%/secret.key rogueca/x509.pem
 	$(cert_rule)
 
-%/softhsm.conf: %/secret.key
-	echo "0:$(dir $@)softhsm.db" > $@
-
-%/softhsm.db: %/x509.pem %/secret.key %/softhsm.conf
-	SOFTHSM="$(SOFTHSM)" \
-	SOFTHSM_CONF="$(dir $@)softhsm.conf" \
-	$(srcdir)/softhsm.bash init $(dir $@)secret.key $(dir $@)x509.pem
-
 %/softhsm2.conf: %/secret.key
 	echo "objectstore.backend = file" > $@
 	echo "directories.tokendir = $(dir $@)softhsm2.db" >> $@

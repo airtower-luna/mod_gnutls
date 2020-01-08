@@ -13,18 +13,11 @@ function cleanup_tmpconf
 }
 trap cleanup_tmpconf EXIT
 
-if [ "${SOFTHSM_MAJOR_VERSION}" = "1" ]; then
-    cat - >"${tmp_softhsm_conf}" <<EOF
-0:$(realpath $(pwd))/server/softhsm.db
-EOF
-    export SOFTHSM_CONF="${tmp_softhsm_conf}"
-elif [ "${SOFTHSM_MAJOR_VERSION}" = "2" ]; then
-    cat - >"${tmp_softhsm_conf}" <<EOF
+cat - >"${tmp_softhsm_conf}" <<EOF
 objectstore.backend = file
 directories.tokendir = $(realpath $(pwd))/authority/server/softhsm2.db
 EOF
-    export SOFTHSM2_CONF="${tmp_softhsm_conf}"
-fi
+export SOFTHSM2_CONF="${tmp_softhsm_conf}"
 
 echo "Generated temporary SoftHSM config ${tmp_softhsm_conf}:"
 cat "${tmp_softhsm_conf}"

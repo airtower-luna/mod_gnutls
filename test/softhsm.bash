@@ -66,17 +66,7 @@ function prepare_token
 # try to find SoftHSM
 softhsm="$(basename ${SOFTHSM})"
 
-if [ "${softhsm}" = "softhsm" ]; then
-    softhsm_libname="libsofthsm.so"
-    # fail if SOFTHSM_CONF is not set
-    if [ -z "${SOFTHSM_CONF}" ]; then
-	echo "ERROR: SOFTHSM_CONF not set!" 1>&2
-	exit 1
-    else
-	export SOFTHSM_CONF
-    fi
-    echo "using SOFTHSM_CONF=\"${SOFTHSM_CONF}\""
-elif [ "${softhsm}" = "softhsm2-util" ]; then
+if [ "${softhsm}" = "softhsm2-util" ]; then
     softhsm_libname="libsofthsm2.so"
     # fail if SOFTHSM2_CONF is not set
     if [ -z "${SOFTHSM2_CONF}" ]; then
@@ -92,7 +82,7 @@ else
 fi
 
 if [ -z "${SOFTHSM_LIB}" ]; then
-    # Try to find the libsofthsm[2] module in some common locations.
+    # Try to find the libsofthsm2 module in some common locations.
     softhsm_searchpath=(/usr/lib64/pkcs11 /usr/lib/softhsm /usr/lib/x86_64-linux-gnu/softhsm /usr/lib /usr/lib64/softhsm)
     for i in ${softhsm_searchpath[@]} ""; do
 	SOFTHSM_LIB="${i}/${softhsm_libname}"

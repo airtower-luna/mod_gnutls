@@ -196,25 +196,15 @@ check_DATA += $(chain_tokens)
 MOSTLYCLEANFILES += $(chain_tokens) authority/x509-chain.pem
 endif
 
-# SoftHSM tokens. Note that the SoftHSM 2 token is a directory and
-# hence has to be treated slightly differently.
-SOFTHSM_TOKEN = authority/server/softhsm.db
+# SoftHSM token, note that the SoftHSM 2 token is a directory
 SOFTHSM2_TOKEN = authority/server/softhsm2.db
-
-# Tokens should be cleaned whether or not the matching SoftHSM version
-# was detected on the last ./configure run.
-MOSTLYCLEANFILES += $(SOFTHSM_TOKEN)
 # included in mostlyclean-local below
 clean-softhsm2-db:
 	-rm -rf $(SOFTHSM2_TOKEN)
 
-if HAVE_SOFTHSM1
-check_DATA += $(SOFTHSM_TOKEN)
-endif HAVE_SOFTHSM1
-
-if HAVE_SOFTHSM2
+if HAVE_SOFTHSM
 check_DATA += $(SOFTHSM2_TOKEN)
-endif HAVE_SOFTHSM2
+endif HAVE_SOFTHSM
 
 check_DATA += make-test-dirs
 extra_dirs = logs cache outputs
@@ -303,7 +293,6 @@ AM_TESTS_ENVIRONMENT = export APACHE2=@APACHE2@; \
 
 if HAVE_SOFTHSM
 AM_TESTS_ENVIRONMENT += export SOFTHSM="@SOFTHSM@"; \
-	export SOFTHSM_MAJOR_VERSION="@SOFTHSM_MAJOR_VERSION@"; \
 	export SOFTHSM_LIB="@SOFTHSM_LIB@";
 endif
 
