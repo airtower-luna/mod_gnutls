@@ -273,6 +273,8 @@ TEST_PORT ?= 9932
 MSVA_PORT ?= 9933
 # port for TLS proxy backend server
 BACKEND_PORT ?= 9934
+# port for plain HTTP server
+TEST_HTTP_PORT ?= 9935
 # port for the OCSP responder
 if ENABLE_OCSP_TEST
 OCSP_PORT ?= 9936
@@ -296,6 +298,7 @@ AM_TESTS_ENVIRONMENT = export APACHE2=@APACHE2@; \
 	export TEST_QUERY_TIMEOUT="@TEST_QUERY_TIMEOUT@"; \
 	export BACKEND_HOST="@TEST_HOST@"; \
 	export BACKEND_PORT="$(BACKEND_PORT)"; \
+	export TEST_HTTP_PORT="$(TEST_HTTP_PORT)"; \
 	export HTTP_CLI="@HTTP_CLI@";
 
 if HAVE_SOFTHSM
