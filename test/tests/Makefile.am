@@ -23,7 +23,7 @@ EXTRA_DIST = \
 	21_TLS_reverse_proxy_wrong_cert/apache.conf 21_TLS_reverse_proxy_wrong_cert/backend.conf 21_TLS_reverse_proxy_wrong_cert/test.yml \
 	22_TLS_reverse_proxy_crl_revoke/apache.conf 22_TLS_reverse_proxy_crl_revoke/backend.conf 22_TLS_reverse_proxy_crl_revoke/test.yml \
 	23_TLS_reverse_proxy_mismatched_priorities/apache.conf 23_TLS_reverse_proxy_mismatched_priorities/backend.conf 23_TLS_reverse_proxy_mismatched_priorities/test.yml \
-	24_pkcs11_cert/apache.conf 24_pkcs11_cert/test.yml \
+	24_pkcs11_cert/apache.conf 24_pkcs11_cert/hooks.py 24_pkcs11_cert/test.yml \
 	25_Disable_TLS_1.0/apache.conf 25_Disable_TLS_1.0/test.yml \
 	26_redirect_HTTP_to_HTTPS/apache.conf 26_redirect_HTTP_to_HTTPS/test.yml \
 	27_OCSP_server/apache.conf 27_OCSP_server/hooks.py 27_OCSP_server/ocsp.conf 27_OCSP_server/test.yml \

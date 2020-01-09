@@ -84,16 +84,9 @@ authority/subca/%/x509-chain.pem: authority/subca/%/x509.pem authority/subca/x50
 rogueca/%/x509.pem: rogueca/%/template rogueca/%/secret.key rogueca/x509.pem
 	$(cert_rule)
 
-%/softhsm2.conf: %/secret.key
-	echo "objectstore.backend = file" > $@
-	echo "directories.tokendir = $(dir $@)softhsm2.db" >> $@
-
-%/softhsm2.db: %/x509.pem %/secret.key %/softhsm2.conf
-	rm -rf $@
-	mkdir -p $@
+%/softhsm2.db: %/x509.pem %/secret.key
 	SOFTHSM="$(SOFTHSM)" \
-	SOFTHSM2_CONF="$(dir $@)softhsm2.conf" \
-	$(srcdir)/softhsm.bash init $(dir $@)secret.key $(dir $@)x509.pem
+	$(PYTHON) $(srcdir)/softhsm-init.py --token-dir $@ --privkey $(dir $@)secret.key --certificate $(dir $@)x509.pem
 
 # Generate CRL revoking a certain certificate. Currently used to
 # revoke the server certificate and check if setting the CRL as
