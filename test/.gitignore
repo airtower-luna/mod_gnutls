@@ -35,6 +35,7 @@ logs/
 outputs/
 
 # test programs
+test-*.bash
 gen_ocsp_index
 pgpcrc
 gnutls_openpgp_support

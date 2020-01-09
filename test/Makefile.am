@@ -1,7 +1,11 @@
 SUBDIRS = tests
 
-test_scripts = doctest-mgstest.py \
-	test-00_basic.bash \
+# Generate the test scripts
+test-%.bash: test-template.bash.in | tests/%/
+	testname="$(*)"; sed s/@NUMBER@/$${testname%%_*}/ < $< > $@
+	chmod a+x $@
+
+check_SCRIPTS = test-00_basic.bash \
 	test-01_serverwide_priorities.bash \
 	test-02_cache_in_vhost.bash \
 	test-03_cachetimeout_in_vhost.bash \
@@ -17,9 +21,9 @@ test_scripts = doctest-mgstest.py \
 	test-13_cgi_variables_no_client_cert.bash \
 	test-14_resume_session.bash
 if USE_MSVA
-test_scripts += test-15_basic_msva.bash
+check_SCRIPTS += test-15_basic_msva.bash
 endif
-test_scripts += test-16_view-status.bash \
+check_SCRIPTS += test-16_view-status.bash \
 	test-17_cgi_vars_large_cert.bash \
 	test-18_client_verification_wrong_cert.bash \
 	test-19_TLS_reverse_proxy.bash \
@@ -39,11 +43,12 @@ test_scripts += test-16_view-status.bash \
 	test-33_vhost_SNI_serveralias_missinghost.bash \
 	test-34_TLS_reverse_proxy_h2.bash
 
+MOSTLYCLEANFILES = $(check_SCRIPTS)
+dist_check_SCRIPTS = netns_py.bash test-template.bash.in
+
 TEST_EXTENSIONS = .bash .py
 PY_LOG_COMPILER = $(PYTHON)
-TESTS = $(test_scripts)
-
-dist_check_SCRIPTS = netns_py.bash $(test_scripts)
+TESTS = doctest-mgstest.py $(check_SCRIPTS)
 
 check_PROGRAMS = pgpcrc
 pgpcrc_SOURCES = pgpcrc.c
@@ -105,7 +110,7 @@ include $(srcdir)/test_ca.mk
 # other - just not in any particular order.
 check_DATA = $(tokens) authority/server/crl.pem
 
-MOSTLYCLEANFILES = cache/* logs/* outputs/* authority/server/crl.pem
+MOSTLYCLEANFILES += cache/* logs/* outputs/* authority/server/crl.pem
 
 cert_templates = authority/template.in authority/client/template.in \
 	authority/imposter/template.in authority/ocsp-responder/template \
