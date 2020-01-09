@@ -135,9 +135,10 @@ def main(args):
                        check=True)
 
     # This hook may modify the environment as needed for the test.
+    cleanup_callback = None
     try:
         if plugin.prepare_env:
-            plugin.prepare_env()
+            cleanup_callback = plugin.prepare_env()
     except SkipTest as skip:
         print(f'Skipping: {skip!s}')
         sys.exit(77)
@@ -147,6 +148,8 @@ def main(args):
             f'http://127.0.0.1:{os.environ["MSVA_PORT"]}'
 
     with contextlib.ExitStack() as service_stack:
+        if cleanup_callback:
+            service_stack.callback(cleanup_callback)
         service_stack.enter_context(lockfile('test.lock', nolock='MGS_NETNS_ACTIVE' in os.environ))
         service_stack.enter_context(ocsp.run())
         service_stack.enter_context(backend.run())

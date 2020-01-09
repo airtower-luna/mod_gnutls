@@ -30,6 +30,12 @@ supported:
         2. Set any additional environment variables the test might
         need.
 
+        If the hook creates any resources that need to be cleaned up
+        after the test (e.g. delete a temporary file), it should
+        return a callable which performs the cleanup. That callable
+        will be called without arguments when the test services are
+        stopped.
+
     run_connection:
 
         Will be called *instead* of mgstests.tests.run_test_conf() and
