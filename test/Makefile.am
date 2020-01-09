@@ -5,7 +5,7 @@ test-%.bash: test-template.bash.in | tests/%/
 	testname="$(*)"; sed s/@NUMBER@/$${testname%%_*}/ < $< > $@
 	chmod a+x $@
 
-check_SCRIPTS = test-00_basic.bash \
+test_scripts = test-00_basic.bash \
 	test-01_serverwide_priorities.bash \
 	test-02_cache_in_vhost.bash \
 	test-03_cachetimeout_in_vhost.bash \
@@ -21,9 +21,9 @@ check_SCRIPTS = test-00_basic.bash \
 	test-13_cgi_variables_no_client_cert.bash \
 	test-14_resume_session.bash
 if USE_MSVA
-check_SCRIPTS += test-15_basic_msva.bash
+test_scripts += test-15_basic_msva.bash
 endif
-check_SCRIPTS += test-16_view-status.bash \
+test_scripts += test-16_view-status.bash \
 	test-17_cgi_vars_large_cert.bash \
 	test-18_client_verification_wrong_cert.bash \
 	test-19_TLS_reverse_proxy.bash \
@@ -43,12 +43,12 @@ check_SCRIPTS += test-16_view-status.bash \
 	test-33_vhost_SNI_serveralias_missinghost.bash \
 	test-34_TLS_reverse_proxy_h2.bash
 
-MOSTLYCLEANFILES = $(check_SCRIPTS)
+MOSTLYCLEANFILES = $(test_scripts)
 dist_check_SCRIPTS = netns_py.bash test-template.bash.in
 
 TEST_EXTENSIONS = .bash .py
 PY_LOG_COMPILER = $(PYTHON)
-TESTS = doctest-mgstest.py $(check_SCRIPTS)
+TESTS = doctest-mgstest.py $(test_scripts)
 
 check_PROGRAMS = pgpcrc
 pgpcrc_SOURCES = pgpcrc.c
