@@ -9,6 +9,7 @@ if __name__ == "__main__":
         'mgstest.hooks',
         'mgstest.http',
         'mgstest.services',
+        'mgstest.softhsm',
         'mgstest.tests'
     ]
 

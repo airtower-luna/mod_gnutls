@@ -45,9 +45,9 @@ if __name__ == '__main__':
         token = mgstest.softhsm.Token(config_file=softhsm_conf)
         token.reset_db()
         token.init_token()
-        token.store_key(args.privkey, mgstest.softhsm.test_key_label)
+        token.store_key(args.privkey, mgstest.softhsm.test_label)
         if args.certificate:
-            token.store_cert(args.certificate, mgstest.softhsm.test_cert_label)
+            token.store_cert(args.certificate, mgstest.softhsm.test_label)
     except:
         # Don't leave a half-done token around, the next make call
         # only checks the directory and would assume it's done.

@@ -19,6 +19,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from enum import Enum, auto
 from pathlib import Path
 
 softhsm_libname = 'libsofthsm2.so'
@@ -34,8 +35,36 @@ softhsm_searchpath = [
 # token directory setting in token config file
 tokendir_re = re.compile(r'^directories\.tokendir\s*=\s*(.*)$')
 
-test_key_label = 'privkey'
-test_cert_label = 'certificate'
+test_label = 'test_server'
+
+class ObjectType(Enum):
+    """Types that may occur in PKCS#11 URIs (type=...).
+
+    See: https://tools.ietf.org/html/rfc7512#section-2.3
+
+    """
+    CERT = 'cert'
+    DATA = 'data'
+    PRIVATE = 'private'
+    PUBLIC = 'public'
+    SECRET_KEY = 'secret-key'
+
+    def __init__(self, uri_type):
+        self.uri_type = uri_type
+
+    def __str__(self):
+        """
+        >>> str(ObjectType.CERT)
+        'type=cert'
+        """
+        return f'type={self.uri_type}'
+
+    def __repr__(self):
+        """
+        >>> repr(ObjectType.PRIVATE)
+        'ObjectType.PRIVATE'
+        """
+        return f'{self.__class__.__name__!s}.{self.name}'
 
 class Token:
     """Represents a PKCS#11 token."""
@@ -115,7 +144,7 @@ class Token:
                        check=True, text=True, env=self.p11tool_env)
         self._object_listing = None
 
-    def get_object_url(self, label):
+    def get_object_url(self, label, type):
         """Get the PKCS#11 URL for an object in this token, selected by
         label."""
         if not self._object_listing:
@@ -127,7 +156,7 @@ class Token:
         object_re = re.compile(f'^\s*URL:\s+(.*object={label}.*)$')
         for line in self._object_listing:
             m = object_re.fullmatch(line)
-            if m:
+            if m and str(type) in m.group(1):
                 return m.group(1)
 
     @property
@@ -138,8 +167,8 @@ class Token:
             'SOFTHSM2_CONF': str(Path(self.config).resolve()),
             'SOFTHSM_LIB': str(Path(self.softhsm_lib).resolve()),
             'P11_PIN': self.pin,
-            'P11_CERT_URL': self.get_object_url(test_cert_label),
-            'P11_KEY_URL': self.get_object_url(test_key_label)
+            'P11_CERT_URL': self.get_object_url(test_label, ObjectType.CERT),
+            'P11_KEY_URL': self.get_object_url(test_label, ObjectType.PRIVATE)
         }
 
 def find_softhsm_bin():
