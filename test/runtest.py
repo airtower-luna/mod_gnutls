@@ -128,7 +128,11 @@ def main(args):
     # instance is started
     bg_services = [backend, ocsp, msva]
 
-    # TODO: check extra requirements (e.g. specific modules)
+    # If VERBOSE is enabled, log the HTTPD build configuration
+    if 'VERBOSE' in os.environ:
+        apache2 = os.environ.get('APACHE2', 'apache2')
+        subprocess.run([apache2, '-f', f'{srcdir}/base_apache.conf', '-V'],
+                       check=True)
 
     # This hook may modify the environment as needed for the test.
     try:
@@ -137,12 +141,6 @@ def main(args):
     except SkipTest as skip:
         print(f'Skipping: {skip!s}')
         sys.exit(77)
-
-    # If VERBOSE is enabled, log the HTTPD build configuration
-    if 'VERBOSE' in os.environ:
-        apache2 = os.environ.get('APACHE2', 'apache2')
-        subprocess.run([apache2, '-f', f'{srcdir}/base_apache.conf', '-V'],
-                       check=True)
 
     if 'USE_MSVA' in os.environ:
         os.environ['MONKEYSPHERE_VALIDATION_AGENT_SOCKET'] = \
