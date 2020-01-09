@@ -16,12 +16,12 @@
 
 import errno
 import os
-import os.path
 import signal
 import subprocess
 import sys
 
 from contextlib import contextmanager
+from pathlib import Path
 from time import sleep
 
 class TestService:
@@ -36,16 +36,13 @@ class TestService:
         # forking: expect the start command to terminate during startup
         self.forking = forking
         # condition: start service if the function returns true
-        if condition:
-            self.condition = condition
-        else:
-            self.condition = lambda: True
+        self.condition = condition or (lambda: True)
 
         # child process for non-forking services
         self.process = None
         # Forking processes like apache2 require a PID file for
         # tracking. The process must delete its PID file when exiting.
-        self.pidfile = pidfile
+        self.pidfile = Path(pidfile) if pidfile else None
         if not self.pidfile and self.forking:
             raise ValueError('Forking service must provide PID file!')
         self.pid = None
@@ -85,12 +82,11 @@ class TestService:
             return
         # Read PID file before actually sending the stop signal
         if self.pidfile:
-            if not os.path.exists(self.pidfile):
+            if not self.pidfile.exists():
                 print(f'Skipping stop of {self.stop_command}, no PID file!')
                 # Presumably the process isn't running, ignore.
                 return
-            with open(self.pidfile, 'r') as file:
-                self.pid = int(file.read())
+            self.pid = int(self.pidfile.read_text())
         if self.stop_command:
             print(f'Stopping: {self.stop_command}')
             subprocess.run(self.stop_command, check=True, env=self.process_env)
@@ -169,7 +165,7 @@ class ApacheService(TestService):
     apache2 = os.environ.get('APACHE2', 'apache2')
 
     def __init__(self, config, env=None, pidfile=None, check=None):
-        self.config = os.path.realpath(config)
+        self.config = Path(config).resolve()
         base_cmd = [self.apache2, '-f', str(self.config), '-k']
         if not check:
             check = self.pidfile_check
@@ -182,9 +178,9 @@ class ApacheService(TestService):
                                             check=check)
 
     def config_exists(self):
-        return os.path.isfile(self.config)
+        return self.config.is_file()
 
     def pidfile_check(self):
         """Default check method for ApacheService, waits for the PID file to
         be present."""
-        return os.path.exists(self.pidfile)
+        return self.pidfile.is_file()
