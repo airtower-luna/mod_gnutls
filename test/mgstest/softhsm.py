@@ -19,7 +19,7 @@ import re
 import shutil
 import subprocess
 import tempfile
-from enum import Enum, auto
+from enum import Enum
 from pathlib import Path
 
 softhsm_libname = 'libsofthsm2.so'
