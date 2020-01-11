@@ -1220,6 +1220,11 @@ const char* mgs_ocsp_configure_stapling(apr_pool_t *pconf,
         sc->ocsp[i] = ocsp;
         sc->ocsp_num = i + 1;
     }
+
+    ap_log_error(APLOG_MARK, APLOG_INFO, 0, server,
+                 "Configured OCSP stapling for %u certificates for %s:%d.",
+                 sc->ocsp_num,
+                 server->server_hostname, server->addrs->host_port);
     return NULL;
 }
 
