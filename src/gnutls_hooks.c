@@ -416,7 +416,7 @@ static int cert_retrieve_fn(gnutls_session_t session,
             resp->version = 0;
             resp->exptime = 0;
 
-            int ret = mgs_get_ocsp_response(ctxt, ctxt->sc->ocsp,
+            int ret = mgs_get_ocsp_response(ctxt, ctxt->sc->ocsp[0],
                                             &resp->response);
             if (ret == GNUTLS_E_SUCCESS)
             {

@@ -1039,7 +1039,7 @@ static apr_status_t mgs_async_ocsp_update(int state,
      * cache and the mutex is never touched in
      * mgs_get_ocsp_response. */
     apr_global_mutex_lock(sc->ocsp_mutex);
-    apr_status_t rv = mgs_cache_ocsp_response(server, sc->ocsp, &expiry);
+    apr_status_t rv = mgs_cache_ocsp_response(server, sc->ocsp[0], &expiry);
 
     apr_interval_time_t next_interval;
     if (rv != APR_SUCCESS)
@@ -1113,7 +1113,7 @@ static apr_status_t mgs_async_ocsp_update(int state,
         ocsp_response.size = OCSP_RESP_SIZE_MAX;
 
         apr_status_t rv = mgs_cache_fetch(sc->ocsp_cache, server,
-                                          sc->ocsp->fingerprint,
+                                          sc->ocsp[0]->fingerprint,
                                           &ocsp_response,
                                           pool);
 
@@ -1122,7 +1122,7 @@ static apr_status_t mgs_async_ocsp_update(int state,
             ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, server,
                          "Caching OCSP request failure for %s:%d.",
                          server->server_hostname, server->addrs->host_port);
-            mgs_cache_ocsp_failure(server, sc->ocsp,
+            mgs_cache_ocsp_failure(server, sc->ocsp[0],
                                    sc->ocsp_failure_timeout * 2);
         }
     }
@@ -1147,6 +1147,9 @@ const char* mgs_ocsp_configure_stapling(apr_pool_t *pconf,
     if (sc->certs_x509_chain_num < 2)
         return "No issuer (CA) certificate available, cannot enable "
             "stapling. Please add it to the GnuTLSCertificateFile.";
+
+    /* array for ocsp data, currently size 1 */
+    sc->ocsp = apr_palloc(pconf, sizeof(mgs_ocsp_data_t));
 
     mgs_ocsp_data_t ocsp = apr_palloc(pconf, sizeof(struct mgs_ocsp_data));
 
@@ -1181,7 +1184,7 @@ const char* mgs_ocsp_configure_stapling(apr_pool_t *pconf,
                               mgs_cleanup_trust_list,
                               apr_pool_cleanup_null);
 
-    sc->ocsp = ocsp;
+    sc->ocsp[0] = ocsp;
     return NULL;
 }
 

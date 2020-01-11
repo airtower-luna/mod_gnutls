@@ -178,7 +178,7 @@ typedef struct {
      * sending a request over HTTP */
     char *ocsp_response_file;
     /* Internal OCSP data for this server */
-    mgs_ocsp_data_t ocsp;
+    mgs_ocsp_data_t *ocsp;
     /* Mutex to prevent parallel OCSP requests */
     apr_global_mutex_t *ocsp_mutex;
     /* Internal OCSP cache data */
