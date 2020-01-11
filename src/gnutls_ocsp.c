@@ -154,12 +154,12 @@ const char *mgs_store_ocsp_response_path(cmd_parms *parms,
  * @return GNUTLS_E_SUCCESS, or a GnuTLS error code.
  */
 static int mgs_create_ocsp_request(server_rec *s,
-                                   struct mgs_ocsp_data *req_data,
+                                   mgs_ocsp_data_t req_data,
                                    gnutls_datum_t *req,
                                    gnutls_datum_t *nonce)
     __attribute__((nonnull(1, 3)));
 static int mgs_create_ocsp_request(server_rec *s,
-                                   struct mgs_ocsp_data *req_data,
+                                   mgs_ocsp_data_t req_data,
                                    gnutls_datum_t *req,
                                    gnutls_datum_t *nonce)
 {
@@ -265,11 +265,11 @@ static int mgs_create_ocsp_request(server_rec *s,
  *
  * If nonce is not NULL, the response must contain a matching nonce.
  */
-int check_ocsp_response(server_rec *s, struct mgs_ocsp_data *req_data,
+int check_ocsp_response(server_rec *s, mgs_ocsp_data_t req_data,
                         const gnutls_datum_t *ocsp_response,
                         apr_time_t* expiry, const gnutls_datum_t *nonce)
     __attribute__((nonnull(1, 3)));
-int check_ocsp_response(server_rec *s, struct mgs_ocsp_data *req_data,
+int check_ocsp_response(server_rec *s, mgs_ocsp_data_t req_data,
                         const gnutls_datum_t *ocsp_response,
                         apr_time_t* expiry, const gnutls_datum_t *nonce)
 {
@@ -652,7 +652,7 @@ static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
  * @return APR_SUCCESS or an APR error code
  */
 static apr_status_t mgs_cache_ocsp_response(server_rec *s,
-                                            struct mgs_ocsp_data *req_data,
+                                            mgs_ocsp_data_t req_data,
                                             apr_time_t *cache_expiry)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
@@ -785,7 +785,7 @@ static apr_status_t mgs_cache_ocsp_response(server_rec *s,
  * @param timeout lifetime of the cache entry
  */
 static void mgs_cache_ocsp_failure(server_rec *s,
-                                   struct mgs_ocsp_data *req_data,
+                                   mgs_ocsp_data_t req_data,
                                    apr_interval_time_t timeout)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
@@ -808,7 +808,7 @@ static void mgs_cache_ocsp_failure(server_rec *s,
 
 
 int mgs_get_ocsp_response(mgs_handle_t *ctxt,
-                          struct mgs_ocsp_data *req_data,
+                          mgs_ocsp_data_t req_data,
                           gnutls_datum_t *ocsp_response)
 {
     mgs_srvconf_rec *sc = ctxt->sc;
