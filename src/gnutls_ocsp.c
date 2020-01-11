@@ -824,9 +824,9 @@ int mgs_get_ocsp_response(gnutls_session_t session,
     ocsp_response->data = apr_palloc(ctxt->c->pool, OCSP_RESP_SIZE_MAX);
     ocsp_response->size = OCSP_RESP_SIZE_MAX;
 
-    apr_status_t rv = mgs_cache_fetch(ctxt->sc->ocsp_cache,
+    apr_status_t rv = mgs_cache_fetch(sc->ocsp_cache,
                                       ctxt->c->base_server,
-                                      ctxt->sc->ocsp->fingerprint,
+                                      sc->ocsp->fingerprint,
                                       ocsp_response,
                                       ctxt->c->pool);
     if (rv != APR_SUCCESS)
@@ -861,9 +861,9 @@ int mgs_get_ocsp_response(gnutls_session_t session,
          * would be better to have a vhost specific mutex, but at the
          * moment there's no good way to integrate that with the
          * Apache Mutex directive. */
-        rv = mgs_cache_fetch(ctxt->sc->ocsp_cache,
+        rv = mgs_cache_fetch(sc->ocsp_cache,
                              ctxt->c->base_server,
-                             ctxt->sc->ocsp->fingerprint,
+                             sc->ocsp->fingerprint,
                              ocsp_response,
                              ctxt->c->pool);
         if (rv == APR_SUCCESS)
@@ -894,17 +894,17 @@ int mgs_get_ocsp_response(gnutls_session_t session,
                       "Caching a fresh OCSP response failed");
         /* cache failure to rate limit retries */
         mgs_cache_ocsp_failure(ctxt->c->base_server,
-                               ctxt->sc->ocsp,
-                               ctxt->sc->ocsp_failure_timeout);
+                               sc->ocsp,
+                               sc->ocsp_failure_timeout);
         apr_global_mutex_unlock(sc->ocsp_mutex);
         goto fail_cleanup;
     }
     apr_global_mutex_unlock(sc->ocsp_mutex);
 
     /* retry reading from cache */
-    rv = mgs_cache_fetch(ctxt->sc->ocsp_cache,
+    rv = mgs_cache_fetch(sc->ocsp_cache,
                          ctxt->c->base_server,
-                         ctxt->sc->ocsp->fingerprint,
+                         sc->ocsp->fingerprint,
                          ocsp_response,
                          ctxt->c->pool);
     if (rv != APR_SUCCESS)
