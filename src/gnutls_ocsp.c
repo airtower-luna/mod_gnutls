@@ -1140,6 +1140,10 @@ const char* mgs_ocsp_configure_stapling(apr_pool_t *pconf,
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(server->module_config, &gnutls_module);
 
+    if (sc->ocsp_cache == NULL)
+        return "No OCSP response cache available, please check "
+            "the GnuTLSOCSPCache setting.";
+
     if (sc->certs_x509_chain_num < 2)
         return "No issuer (CA) certificate available, cannot enable "
             "stapling. Please add it to the GnuTLSCertificateFile.";
@@ -1151,10 +1155,6 @@ const char* mgs_ocsp_configure_stapling(apr_pool_t *pconf,
     if (ocsp->uri == NULL && sc->ocsp_response_file == NULL)
         return "No OCSP URI in the certificate nor a GnuTLSOCSPResponseFile "
             "setting, cannot configure OCSP stapling.";
-
-    if (sc->ocsp_cache == NULL)
-        return "No OCSP response cache available, please check "
-            "the GnuTLSOCSPCache setting.";
 
     sc->ocsp = ocsp;
     return NULL;
