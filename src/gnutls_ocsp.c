@@ -1133,6 +1133,49 @@ static apr_status_t mgs_async_ocsp_update(int state,
 
 
 
+static const char* configure_cert_staple(mgs_ocsp_data_t ocsp,
+                                         server_rec *server,
+                                         mgs_srvconf_rec *sc,
+                                         unsigned int idx,
+                                         apr_pool_t *pconf)
+{
+    ocsp->cert = sc->certs_x509_crt_chain[idx];
+
+    ocsp->uri = mgs_cert_get_ocsp_uri(pconf, ocsp->cert);
+    // TODO: ocsp_response_file is completely broken with >1
+    // certificates. Allow a list?
+    if (ocsp->uri == NULL && sc->ocsp_response_file == NULL)
+        return "No OCSP URI in the certificate nor a "
+            "GnuTLSOCSPResponseFile setting, cannot configure "
+            "OCSP stapling.";
+
+    ocsp->fingerprint =
+        mgs_get_cert_fingerprint(pconf, sc->certs_x509_crt_chain[idx]);
+    if (ocsp->fingerprint.data == NULL)
+        return "Could not read fingerprint from certificate!";
+
+    ocsp->trust = apr_palloc(pconf,
+                             sizeof(gnutls_x509_trust_list_t));
+    /* Only the direct issuer may sign the OCSP response or an
+     * OCSP signer. */
+    int ret = mgs_create_ocsp_trust_list(
+        ocsp->trust, &(sc->certs_x509_crt_chain[idx + 1]), 1);
+    if (ret != GNUTLS_E_SUCCESS)
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, server,
+                     "Could not create OCSP trust list: %s (%d)",
+                     gnutls_strerror(ret), ret);
+        return "Could not build trust list for OCSP stapling!";
+    }
+    /* deinit trust list when the config pool is destroyed */
+    apr_pool_cleanup_register(pconf, ocsp->trust,
+                              mgs_cleanup_trust_list,
+                              apr_pool_cleanup_null);
+    return NULL;
+}
+
+
+
 const char* mgs_ocsp_configure_stapling(apr_pool_t *pconf,
                                         apr_pool_t *ptemp __attribute__((unused)),
                                         server_rec *server)
@@ -1155,37 +1198,24 @@ const char* mgs_ocsp_configure_stapling(apr_pool_t *pconf,
     {
         mgs_ocsp_data_t ocsp = apr_palloc(pconf, sizeof(struct mgs_ocsp_data));
 
-        ocsp->cert = sc->certs_x509_crt_chain[i];
-
-        ocsp->uri = mgs_cert_get_ocsp_uri(pconf, ocsp->cert);
-        if (ocsp->uri == NULL && sc->ocsp_response_file == NULL)
-            return "No OCSP URI in the certificate nor a "
-                "GnuTLSOCSPResponseFile setting, cannot configure "
-                "OCSP stapling.";
-
-        ocsp->fingerprint =
-            mgs_get_cert_fingerprint(pconf, sc->certs_x509_crt_chain[i]);
-        if (ocsp->fingerprint.data == NULL)
-            return "Could not read fingerprint from certificate!";
-
-        ocsp->trust = apr_palloc(pconf,
-                                 sizeof(gnutls_x509_trust_list_t));
-        /* Only the direct issuer may sign the OCSP response or an
-         * OCSP signer. */
-        int ret = mgs_create_ocsp_trust_list(ocsp->trust,
-                                             &(sc->certs_x509_crt_chain[i+1]),
-                                             1);
-        if (ret != GNUTLS_E_SUCCESS)
+        const char *err = configure_cert_staple(ocsp, server, sc, i, pconf);
+        if (err != NULL)
         {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
-                         "Could not create OCSP trust list: %s (%d)",
-                         gnutls_strerror(ret), ret);
-            return "Could not build trust list for OCSP stapling!";
+            gnutls_datum_t dn;
+            gnutls_x509_crt_get_dn3(sc->certs_x509_crt_chain[i], &dn, 0);
+            /* If stapling is enabled it MUST work for the server
+             * certificate itself, errors for others are
+             * ignored. Either way log a warning. */
+            ap_log_error(APLOG_MARK, APLOG_WARNING, 0, server,
+                         "Could not create OCSP stapling configuration "
+                         "for certificate %u in chain (%s): %s",
+                         i, (char*) dn.data, err);
+            gnutls_free(dn.data);
+            if (i == 0)
+                return err;
+            else
+                break;
         }
-        /* deinit trust list when the config pool is destroyed */
-        apr_pool_cleanup_register(pconf, ocsp->trust,
-                                  mgs_cleanup_trust_list,
-                                  apr_pool_cleanup_null);
 
         sc->ocsp[i] = ocsp;
         sc->ocsp_num = i + 1;
