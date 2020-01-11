@@ -642,6 +642,9 @@ static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
  *
  * @param s server that needs a new response
  *
+ * @param req_data struct describing the certificate for which to
+ * cache a response
+ *
  * @param cache_expiry If not `NULL`, this `apr_time_t` will be set to
  * the expiration time of the cache entry. Remains unchanged on
  * failure.
@@ -649,6 +652,7 @@ static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
  * @return APR_SUCCESS or an APR error code
  */
 static apr_status_t mgs_cache_ocsp_response(server_rec *s,
+                                            struct mgs_ocsp_data *req_data,
                                             apr_time_t *cache_expiry)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
@@ -691,7 +695,7 @@ static apr_status_t mgs_cache_ocsp_response(server_rec *s,
     else
     {
         gnutls_datum_t req;
-        int ret = mgs_create_ocsp_request(s, sc->ocsp, &req, &nonce);
+        int ret = mgs_create_ocsp_request(s, req_data, &req, &nonce);
         if (ret == GNUTLS_E_SUCCESS)
         {
             ap_log_error(APLOG_MARK, APLOG_TRACE2, APR_SUCCESS, s,
@@ -707,7 +711,7 @@ static apr_status_t mgs_cache_ocsp_response(server_rec *s,
             return APR_EGENERAL;
         }
 
-        rv = do_ocsp_request(tmp, s, sc->ocsp->uri, &req, &resp);
+        rv = do_ocsp_request(tmp, s, req_data->uri, &req, &resp);
         gnutls_free(req.data);
         if (rv != APR_SUCCESS)
         {
@@ -719,7 +723,7 @@ static apr_status_t mgs_cache_ocsp_response(server_rec *s,
     }
 
     apr_time_t next_update;
-    if (check_ocsp_response(s, sc->ocsp, &resp, &next_update,
+    if (check_ocsp_response(s, req_data, &resp, &next_update,
                             nonce.size ? &nonce : NULL)
         != GNUTLS_E_SUCCESS)
     {
@@ -748,7 +752,7 @@ static apr_status_t mgs_cache_ocsp_response(server_rec *s,
     }
 
     int r = mgs_cache_store(sc->ocsp_cache, s,
-                            sc->ocsp->fingerprint, resp, expiry);
+                            req_data->fingerprint, resp, expiry);
     /* destroy pool, and original copy of the OCSP response with it */
     apr_pool_destroy(tmp);
     if (r != 0)
@@ -877,7 +881,7 @@ int mgs_get_ocsp_response(gnutls_session_t session,
         }
     }
 
-    rv = mgs_cache_ocsp_response(ctxt->c->base_server, NULL);
+    rv = mgs_cache_ocsp_response(ctxt->c->base_server, sc->ocsp, NULL);
     if (rv != APR_SUCCESS)
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, ctxt->c,
@@ -1029,7 +1033,7 @@ static apr_status_t mgs_async_ocsp_update(int state,
      * cache and the mutex is never touched in
      * mgs_get_ocsp_response. */
     apr_global_mutex_lock(sc->ocsp_mutex);
-    apr_status_t rv = mgs_cache_ocsp_response(server, &expiry);
+    apr_status_t rv = mgs_cache_ocsp_response(server, sc->ocsp, &expiry);
 
     apr_interval_time_t next_interval;
     if (rv != APR_SUCCESS)
