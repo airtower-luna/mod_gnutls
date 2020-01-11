@@ -778,9 +778,15 @@ static apr_status_t mgs_cache_ocsp_response(server_rec *s,
  * recent failure.
  *
  * @param s the server for which an OCSP request failed
+ *
+ * @param req_data OCSP data structure for the certificate that could
+ * not be checked
+ *
  * @param timeout lifetime of the cache entry
  */
-static void mgs_cache_ocsp_failure(server_rec *s, apr_interval_time_t timeout)
+static void mgs_cache_ocsp_failure(server_rec *s,
+                                   struct mgs_ocsp_data *req_data,
+                                   apr_interval_time_t timeout)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
@@ -793,7 +799,7 @@ static void mgs_cache_ocsp_failure(server_rec *s, apr_interval_time_t timeout)
     apr_time_t expiry = apr_time_now() + timeout;
 
     int r = mgs_cache_store(sc->ocsp_cache, s,
-                            sc->ocsp->fingerprint, dummy, expiry);
+                            req_data->fingerprint, dummy, expiry);
     if (r != 0)
         ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
                      "Caching OCSP failure failed.");
@@ -888,6 +894,7 @@ int mgs_get_ocsp_response(gnutls_session_t session,
                       "Caching a fresh OCSP response failed");
         /* cache failure to rate limit retries */
         mgs_cache_ocsp_failure(ctxt->c->base_server,
+                               ctxt->sc->ocsp,
                                ctxt->sc->ocsp_failure_timeout);
         apr_global_mutex_unlock(sc->ocsp_mutex);
         goto fail_cleanup;
@@ -1116,7 +1123,8 @@ static apr_status_t mgs_async_ocsp_update(int state,
             ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, server,
                          "Caching OCSP request failure for %s:%d.",
                          server->server_hostname, server->addrs->host_port);
-            mgs_cache_ocsp_failure(server, sc->ocsp_failure_timeout * 2);
+            mgs_cache_ocsp_failure(server, sc->ocsp,
+                                   sc->ocsp_failure_timeout * 2);
         }
     }
     apr_global_mutex_unlock(sc->ocsp_mutex);
