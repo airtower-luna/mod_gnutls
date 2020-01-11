@@ -472,42 +472,44 @@ static gnutls_datum_t mgs_get_cert_fingerprint(apr_pool_t *p,
 
 
 static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
+                                    apr_uri_t *uri,
                                     gnutls_datum_t *request,
                                     gnutls_datum_t *response)
     __attribute__((nonnull));
 static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
+                                    apr_uri_t *uri,
                                     gnutls_datum_t *request,
                                     gnutls_datum_t *response)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
 
-    if (apr_strnatcmp(sc->ocsp->uri->scheme, "http"))
+    if (apr_strnatcmp(uri->scheme, "http"))
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
                      "Scheme \"%s\" is not supported for OCSP requests!",
-                     sc->ocsp->uri->scheme);
+                     uri->scheme);
         return APR_EINVAL;
     }
 
-    const char* header = http_post_header(p, sc->ocsp->uri,
+    const char* header = http_post_header(p, uri,
                                           OCSP_REQ_TYPE, OCSP_RESP_TYPE,
                                           request->size);
     ap_log_error(APLOG_MARK, APLOG_TRACE2, APR_SUCCESS, s,
                  "OCSP POST header: %s", header);
 
     /* Find correct port */
-    apr_port_t port = sc->ocsp->uri->port ?
-        sc->ocsp->uri->port : apr_uri_port_of_scheme(sc->ocsp->uri->scheme);
+    apr_port_t port = uri->port ?
+        uri->port : apr_uri_port_of_scheme(uri->scheme);
 
     apr_sockaddr_t *sa;
-    apr_status_t rv = apr_sockaddr_info_get(&sa, sc->ocsp->uri->hostname,
+    apr_status_t rv = apr_sockaddr_info_get(&sa, uri->hostname,
                                             APR_UNSPEC, port, 0, p);
     if (rv != APR_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
                      "Address resolution for OCSP responder %s failed.",
-                     sc->ocsp->uri->hostinfo);
+                     uri->hostinfo);
     }
 
     /* There may be multiple answers, try them in order until one
@@ -534,7 +536,7 @@ static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
                      "Connecting to OCSP responder %s failed.",
-                     sc->ocsp->uri->hostinfo);
+                     uri->hostinfo);
         return rv;
     }
 
@@ -569,7 +571,7 @@ static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
                      "Invalid HTTP response status from %s: %s",
-                     sc->ocsp->uri->hostinfo, h);
+                     uri->hostinfo, h);
         rv = APR_ECONNRESET;
         goto exit;
     }
@@ -586,7 +588,7 @@ static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
                      "Error while reading HTTP response header from %s",
-                     sc->ocsp->uri->hostinfo);
+                     uri->hostinfo);
         rv = APR_ECONNRESET;
         goto exit;
     }
@@ -703,7 +705,7 @@ static apr_status_t mgs_cache_ocsp_response(server_rec *s,
             return APR_EGENERAL;
         }
 
-        rv = do_ocsp_request(tmp, s, &req, &resp);
+        rv = do_ocsp_request(tmp, s, sc->ocsp->uri, &req, &resp);
         gnutls_free(req.data);
         if (rv != APR_SUCCESS)
         {
