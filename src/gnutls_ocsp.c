@@ -1,5 +1,5 @@
 /*
- *  Copyright 2016-2018 Fiona Klute
+ *  Copyright 2016-2020 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -807,11 +807,10 @@ static void mgs_cache_ocsp_failure(server_rec *s,
 
 
 
-int mgs_get_ocsp_response(gnutls_session_t session,
-                          void *ptr __attribute__((unused)),
+int mgs_get_ocsp_response(mgs_handle_t *ctxt,
+                          struct mgs_ocsp_data *req_data,
                           gnutls_datum_t *ocsp_response)
 {
-    mgs_handle_t *ctxt = gnutls_session_get_ptr(session);
     mgs_srvconf_rec *sc = ctxt->sc;
 
     if (!sc->ocsp_staple || sc->ocsp_cache == NULL)
@@ -826,7 +825,7 @@ int mgs_get_ocsp_response(gnutls_session_t session,
 
     apr_status_t rv = mgs_cache_fetch(sc->ocsp_cache,
                                       ctxt->c->base_server,
-                                      sc->ocsp->fingerprint,
+                                      req_data->fingerprint,
                                       ocsp_response,
                                       ctxt->c->pool);
     if (rv != APR_SUCCESS)
@@ -863,7 +862,7 @@ int mgs_get_ocsp_response(gnutls_session_t session,
          * Apache Mutex directive. */
         rv = mgs_cache_fetch(sc->ocsp_cache,
                              ctxt->c->base_server,
-                             sc->ocsp->fingerprint,
+                             req_data->fingerprint,
                              ocsp_response,
                              ctxt->c->pool);
         if (rv == APR_SUCCESS)
@@ -887,14 +886,14 @@ int mgs_get_ocsp_response(gnutls_session_t session,
         }
     }
 
-    rv = mgs_cache_ocsp_response(ctxt->c->base_server, sc->ocsp, NULL);
+    rv = mgs_cache_ocsp_response(ctxt->c->base_server, req_data, NULL);
     if (rv != APR_SUCCESS)
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, ctxt->c,
                       "Caching a fresh OCSP response failed");
         /* cache failure to rate limit retries */
         mgs_cache_ocsp_failure(ctxt->c->base_server,
-                               sc->ocsp,
+                               req_data,
                                sc->ocsp_failure_timeout);
         apr_global_mutex_unlock(sc->ocsp_mutex);
         goto fail_cleanup;
@@ -904,7 +903,7 @@ int mgs_get_ocsp_response(gnutls_session_t session,
     /* retry reading from cache */
     rv = mgs_cache_fetch(sc->ocsp_cache,
                          ctxt->c->base_server,
-                         sc->ocsp->fingerprint,
+                         req_data->fingerprint,
                          ocsp_response,
                          ctxt->c->pool);
     if (rv != APR_SUCCESS)

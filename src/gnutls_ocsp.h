@@ -1,5 +1,5 @@
 /*
- *  Copyright 2016-2018 Fiona Klute
+ *  Copyright 2016-2020 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -17,10 +17,12 @@
 #ifndef __MOD_GNUTLS_OCSP_H__
 #define __MOD_GNUTLS_OCSP_H__
 
-#include "gnutls/gnutls.h"
-#include "gnutls/x509.h"
-#include "httpd.h"
-#include "http_config.h"
+#include "mod_gnutls.h"
+
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
+#include <httpd.h>
+#include <http_config.h>
 
 #define MGS_OCSP_MUTEX_NAME "gnutls-ocsp"
 #define MGS_OCSP_CACHE_MUTEX_NAME "gnutls-ocsp-cache"
@@ -121,7 +123,8 @@ const char* mgs_ocsp_configure_stapling(apr_pool_t *pconf, apr_pool_t *ptemp,
 int mgs_ocsp_enable_stapling(apr_pool_t *pconf, apr_pool_t *ptemp,
                              server_rec *server);
 
-int mgs_get_ocsp_response(gnutls_session_t session, void *ptr,
+int mgs_get_ocsp_response(mgs_handle_t *ctxt,
+                          struct mgs_ocsp_data *req_data,
                           gnutls_datum_t *ocsp_response);
 
 #endif /* __MOD_GNUTLS_OCSP_H__ */

@@ -3,7 +3,7 @@
  *  Copyright 2008, 2014 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
  *  Copyright 2013-2014 Daniel Kahn Gillmor
- *  Copyright 2015-2019 Fiona Klute
+ *  Copyright 2015-2020 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -416,7 +416,8 @@ static int cert_retrieve_fn(gnutls_session_t session,
             resp->version = 0;
             resp->exptime = 0;
 
-            int ret = mgs_get_ocsp_response(session, NULL, &resp->response);
+            int ret = mgs_get_ocsp_response(ctxt, ctxt->sc->ocsp,
+                                            &resp->response);
             if (ret == GNUTLS_E_SUCCESS)
             {
                 *ocsp = resp;
