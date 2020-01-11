@@ -1115,8 +1115,8 @@ const char* mgs_ocsp_configure_stapling(apr_pool_t *pconf,
 
     mgs_ocsp_data_t ocsp = apr_palloc(pconf, sizeof(struct mgs_ocsp_data));
 
-    ocsp->uri = mgs_cert_get_ocsp_uri(pconf,
-                                      sc->certs_x509_crt_chain[0]);
+    ocsp->cert = sc->certs_x509_crt_chain[0];
+    ocsp->uri = mgs_cert_get_ocsp_uri(pconf, ocsp->cert);
     if (ocsp->uri == NULL && sc->ocsp_response_file == NULL)
         return "No OCSP URI in the certificate nor a GnuTLSOCSPResponseFile "
             "setting, cannot configure OCSP stapling.";

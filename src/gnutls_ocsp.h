@@ -39,15 +39,15 @@
  * Vhost specific OCSP data structure
  */
 struct mgs_ocsp_data {
-    /** OCSP URI extracted from the server certificate. NULL if
-     * unset. */
+    /** The certificate the following elements refer to. */
+    gnutls_x509_crt_t cert;
+    /** OCSP URI extracted from the certificate. NULL if unset. */
     apr_uri_t *uri;
     /** Trust list to verify OCSP responses for stapling. Should
-     * usually only contain the CA that signed the server
-     * certificate. */
+     * usually only contain the CA that signed the certificate. */
     gnutls_x509_trust_list_t *trust;
-    /** Server certificate fingerprint, used as cache key for the OCSP
-     * response */
+    /** Certificate fingerprint, used as cache key for the OCSP
+     * response. */
     gnutls_datum_t fingerprint;
 };
 
