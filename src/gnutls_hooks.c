@@ -412,16 +412,24 @@ static int cert_retrieve_fn(gnutls_session_t session,
         if (ctxt->sc->ocsp_staple == GNUTLS_ENABLED_TRUE)
         {
             gnutls_ocsp_data_st *resp =
-                apr_palloc(ctxt->c->pool, sizeof(gnutls_ocsp_data_st));
-            resp->version = 0;
-            resp->exptime = 0;
+                apr_palloc(ctxt->c->pool,
+                           sizeof(gnutls_ocsp_data_st)
+                           * (ctxt->sc->certs_x509_chain_num - 1));
 
-            int ret = mgs_get_ocsp_response(ctxt, ctxt->sc->ocsp[0],
-                                            &resp->response);
-            if (ret == GNUTLS_E_SUCCESS)
+            for (unsigned int i = 0; i < ctxt->sc->ocsp_num; i++)
             {
-                *ocsp = resp;
-                *ocsp_length = 1;
+                resp[i].version = 0;
+                resp[i].exptime = 0;
+
+                int ret = mgs_get_ocsp_response(ctxt, ctxt->sc->ocsp[i],
+                                                &resp[i].response);
+                if (ret == GNUTLS_E_SUCCESS)
+                {
+                    ocsp[i] = resp;
+                    *ocsp_length = i + 1;
+                }
+                else
+                    break;
             }
         }
 

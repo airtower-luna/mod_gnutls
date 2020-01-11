@@ -179,6 +179,8 @@ typedef struct {
     char *ocsp_response_file;
     /* Internal OCSP data for this server */
     mgs_ocsp_data_t *ocsp;
+    /* Number of successfully configured OCSP data sets */
+    unsigned int ocsp_num;
     /* Mutex to prevent parallel OCSP requests */
     apr_global_mutex_t *ocsp_mutex;
     /* Internal OCSP cache data */

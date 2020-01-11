@@ -1149,42 +1149,47 @@ const char* mgs_ocsp_configure_stapling(apr_pool_t *pconf,
             "stapling. Please add it to the GnuTLSCertificateFile.";
 
     /* array for ocsp data, currently size 1 */
-    sc->ocsp = apr_palloc(pconf, sizeof(mgs_ocsp_data_t));
+    sc->ocsp = apr_palloc(pconf, sizeof(mgs_ocsp_data_t) * (sc->certs_x509_chain_num - 1));
 
-    mgs_ocsp_data_t ocsp = apr_palloc(pconf, sizeof(struct mgs_ocsp_data));
-
-    ocsp->cert = sc->certs_x509_crt_chain[0];
-
-    ocsp->uri = mgs_cert_get_ocsp_uri(pconf, ocsp->cert);
-    if (ocsp->uri == NULL && sc->ocsp_response_file == NULL)
-        return "No OCSP URI in the certificate nor a GnuTLSOCSPResponseFile "
-            "setting, cannot configure OCSP stapling.";
-
-    ocsp->fingerprint =
-        mgs_get_cert_fingerprint(pconf, sc->certs_x509_crt_chain[0]);
-    if (ocsp->fingerprint.data == NULL)
-        return "Could not read fingerprint from certificate!";
-
-    ocsp->trust = apr_palloc(pconf,
-                             sizeof(gnutls_x509_trust_list_t));
-    /* Only the direct issuer may sign the OCSP response or an OCSP
-     * signer. */
-    int ret = mgs_create_ocsp_trust_list(ocsp->trust,
-                                         &(sc->certs_x509_crt_chain[1]),
-                                         1);
-    if (ret != GNUTLS_E_SUCCESS)
+    for (unsigned int i = 0; i < (sc->certs_x509_chain_num - 1); i++)
     {
-        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
-                     "Could not create OCSP trust list: %s (%d)",
-                     gnutls_strerror(ret), ret);
-        return "Could not build trust list for OCSP stapling!";
-    }
-    /* deinit trust list when the config pool is destroyed */
-    apr_pool_cleanup_register(pconf, ocsp->trust,
-                              mgs_cleanup_trust_list,
-                              apr_pool_cleanup_null);
+        mgs_ocsp_data_t ocsp = apr_palloc(pconf, sizeof(struct mgs_ocsp_data));
 
-    sc->ocsp[0] = ocsp;
+        ocsp->cert = sc->certs_x509_crt_chain[i];
+
+        ocsp->uri = mgs_cert_get_ocsp_uri(pconf, ocsp->cert);
+        if (ocsp->uri == NULL && sc->ocsp_response_file == NULL)
+            return "No OCSP URI in the certificate nor a "
+                "GnuTLSOCSPResponseFile setting, cannot configure "
+                "OCSP stapling.";
+
+        ocsp->fingerprint =
+            mgs_get_cert_fingerprint(pconf, sc->certs_x509_crt_chain[i]);
+        if (ocsp->fingerprint.data == NULL)
+            return "Could not read fingerprint from certificate!";
+
+        ocsp->trust = apr_palloc(pconf,
+                                 sizeof(gnutls_x509_trust_list_t));
+        /* Only the direct issuer may sign the OCSP response or an
+         * OCSP signer. */
+        int ret = mgs_create_ocsp_trust_list(ocsp->trust,
+                                             &(sc->certs_x509_crt_chain[i+1]),
+                                             1);
+        if (ret != GNUTLS_E_SUCCESS)
+        {
+            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
+                         "Could not create OCSP trust list: %s (%d)",
+                         gnutls_strerror(ret), ret);
+            return "Could not build trust list for OCSP stapling!";
+        }
+        /* deinit trust list when the config pool is destroyed */
+        apr_pool_cleanup_register(pconf, ocsp->trust,
+                                  mgs_cleanup_trust_list,
+                                  apr_pool_cleanup_null);
+
+        sc->ocsp[i] = ocsp;
+        sc->ocsp_num = i + 1;
+    }
     return NULL;
 }
 
