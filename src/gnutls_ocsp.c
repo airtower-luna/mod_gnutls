@@ -149,17 +149,20 @@ const char *mgs_store_ocsp_response_path(cmd_parms *parms,
  * gnutls_free() when no longer needed), its nonce in 'nonce' (same,
  * if not NULL).
  *
- * Returns GNUTLS_E_SUCCESS, or a GnuTLS error code.
+ * @param s server reference for logging
+ *
+ * @return GNUTLS_E_SUCCESS, or a GnuTLS error code.
  */
-static int mgs_create_ocsp_request(server_rec *s, gnutls_datum_t *req,
-                            gnutls_datum_t *nonce)
-    __attribute__((nonnull(1, 2)));
-static int mgs_create_ocsp_request(server_rec *s, gnutls_datum_t *req,
-                            gnutls_datum_t *nonce)
+static int mgs_create_ocsp_request(server_rec *s,
+                                   struct mgs_ocsp_data *req_data,
+                                   gnutls_datum_t *req,
+                                   gnutls_datum_t *nonce)
+    __attribute__((nonnull(1, 3)));
+static int mgs_create_ocsp_request(server_rec *s,
+                                   struct mgs_ocsp_data *req_data,
+                                   gnutls_datum_t *req,
+                                   gnutls_datum_t *nonce)
 {
-    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
-        ap_get_module_config(s->module_config, &gnutls_module);
-
     gnutls_ocsp_req_t r;
     int ret = gnutls_ocsp_req_init(&r);
     if (ret != GNUTLS_E_SUCCESS)
@@ -170,11 +173,23 @@ static int mgs_create_ocsp_request(server_rec *s, gnutls_datum_t *req,
         return ret;
     }
 
+    /* issuer is set to a reference, so musn't be cleaned up */
+    gnutls_x509_crt_t issuer;
+    ret = gnutls_x509_trust_list_get_issuer(*req_data->trust, req_data->cert,
+                                            &issuer, 0);
+    if (ret != GNUTLS_E_SUCCESS)
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
+                     "Could not get issuer from trust list: %s (%d)",
+                     gnutls_strerror(ret), ret);
+        gnutls_ocsp_req_deinit(r);
+        return ret;
+    }
+
     /* GnuTLS doc says that the digest is "normally"
      * GNUTLS_DIG_SHA1. */
     ret = gnutls_ocsp_req_add_cert(r, GNUTLS_DIG_SHA256,
-                                   sc->certs_x509_crt_chain[1],
-                                   sc->certs_x509_crt_chain[0]);
+                                   issuer, req_data->cert);
 
     if (ret != GNUTLS_E_SUCCESS)
     {
@@ -672,7 +687,7 @@ static apr_status_t mgs_cache_ocsp_response(server_rec *s,
     else
     {
         gnutls_datum_t req;
-        int ret = mgs_create_ocsp_request(s, &req, &nonce);
+        int ret = mgs_create_ocsp_request(s, sc->ocsp, &req, &nonce);
         if (ret == GNUTLS_E_SUCCESS)
         {
             ap_log_error(APLOG_MARK, APLOG_TRACE2, APR_SUCCESS, s,
