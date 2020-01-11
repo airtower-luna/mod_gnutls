@@ -265,16 +265,18 @@ static int mgs_create_ocsp_request(server_rec *s,
  *
  * If nonce is not NULL, the response must contain a matching nonce.
  */
-int check_ocsp_response(server_rec *s, const gnutls_datum_t *ocsp_response,
+int check_ocsp_response(server_rec *s, struct mgs_ocsp_data *req_data,
+                        const gnutls_datum_t *ocsp_response,
                         apr_time_t* expiry, const gnutls_datum_t *nonce)
-    __attribute__((nonnull(1, 2)));
-int check_ocsp_response(server_rec *s, const gnutls_datum_t *ocsp_response,
+    __attribute__((nonnull(1, 3)));
+int check_ocsp_response(server_rec *s, struct mgs_ocsp_data *req_data,
+                        const gnutls_datum_t *ocsp_response,
                         apr_time_t* expiry, const gnutls_datum_t *nonce)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
 
-    if (sc->ocsp->trust == NULL)
+    if (req_data->trust == NULL)
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
                      "No OCSP trust list available for server \"%s\"!",
@@ -300,7 +302,7 @@ int check_ocsp_response(server_rec *s, const gnutls_datum_t *ocsp_response,
         goto resp_cleanup;
     }
 
-    ret = gnutls_ocsp_resp_check_crt(resp, 0, sc->certs_x509_crt_chain[0]);
+    ret = gnutls_ocsp_resp_check_crt(resp, 0, req_data->cert);
     if (ret != GNUTLS_E_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
@@ -310,7 +312,7 @@ int check_ocsp_response(server_rec *s, const gnutls_datum_t *ocsp_response,
     }
 
     unsigned int verify;
-    ret = gnutls_ocsp_resp_verify(resp, *(sc->ocsp->trust), &verify, 0);
+    ret = gnutls_ocsp_resp_verify(resp, *(req_data->trust), &verify, 0);
     if (ret != GNUTLS_E_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
@@ -717,7 +719,8 @@ static apr_status_t mgs_cache_ocsp_response(server_rec *s,
     }
 
     apr_time_t next_update;
-    if (check_ocsp_response(s, &resp, &next_update, nonce.size ? &nonce : NULL)
+    if (check_ocsp_response(s, sc->ocsp, &resp, &next_update,
+                            nonce.size ? &nonce : NULL)
         != GNUTLS_E_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_EGENERAL, s,
