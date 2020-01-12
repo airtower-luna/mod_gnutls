@@ -27,6 +27,7 @@
 #include <gnutls/crypto.h>
 #include <gnutls/ocsp.h>
 #include <mod_watchdog.h>
+#include <string.h>
 #include <time.h>
 
 #ifdef APLOG_USE_MODULE
@@ -132,12 +133,21 @@ const char *mgs_set_ocsp_check_nonce(cmd_parms *parms,
 
 const char *mgs_store_ocsp_response_path(cmd_parms *parms,
                                          void *dummy __attribute__((unused)),
-                                         const char *arg)
+                                         int argc, char *const *argv)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(parms->server->module_config, &gnutls_module);
 
-    sc->ocsp_response_file = ap_server_root_relative(parms->pool, arg);
+    sc->ocsp_response_file_num = argc;
+    sc->ocsp_response_file = apr_palloc(parms->pool, sizeof(char *) * argc);
+    for (int i = 0; i < argc; i++)
+    {
+        if (strcmp(argv[i], "") == 0)
+            sc->ocsp_response_file[i] = NULL;
+        else
+            sc->ocsp_response_file[i] =
+                ap_server_root_relative(parms->pool, argv[i]);
+    }
     return NULL;
 }
 
@@ -677,17 +687,17 @@ static apr_status_t mgs_cache_ocsp_response(server_rec *s,
     gnutls_datum_t resp;
     gnutls_datum_t nonce = { NULL, 0 };
 
-    if (sc->ocsp_response_file != NULL)
+    if (req_data->response_file != NULL)
     {
         ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
                      "Loading OCSP response from %s",
-                     sc->ocsp_response_file);
-        rv = datum_from_file(tmp, sc->ocsp_response_file, &resp);
+                     req_data->response_file);
+        rv = datum_from_file(tmp, req_data->response_file, &resp);
         if (rv != APR_SUCCESS)
         {
             ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
                          "Loading OCSP response from %s failed!",
-                         sc->ocsp_response_file);
+                         req_data->response_file);
             apr_pool_destroy(tmp);
             return rv;
         }
@@ -1137,16 +1147,19 @@ static apr_status_t mgs_async_ocsp_update(int state,
 static const char* configure_cert_staple(mgs_ocsp_data_t ocsp,
                                          server_rec *server,
                                          mgs_srvconf_rec *sc,
-                                         unsigned int idx,
+                                         int idx,
                                          apr_pool_t *pconf)
 {
     ocsp->cert = sc->certs_x509_crt_chain[idx];
     ocsp->server = server;
 
+    if (sc->ocsp_response_file != NULL && idx < sc->ocsp_response_file_num)
+        ocsp->response_file = sc->ocsp_response_file[idx];
+    else
+        ocsp->response_file = NULL;
+
     ocsp->uri = mgs_cert_get_ocsp_uri(pconf, ocsp->cert);
-    // TODO: ocsp_response_file is completely broken with >1
-    // certificates. Allow a list?
-    if (ocsp->uri == NULL && sc->ocsp_response_file == NULL)
+    if (ocsp->uri == NULL && ocsp->response_file == NULL)
         return "No OCSP URI in the certificate nor a "
             "GnuTLSOCSPResponseFile setting, cannot configure "
             "OCSP stapling.";

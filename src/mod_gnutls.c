@@ -2,7 +2,7 @@
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2008, 2014 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
- *  Copyright 2015-2019 Fiona Klute
+ *  Copyright 2015-2020 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -378,11 +378,13 @@ static const command_rec mgs_config_cmds[] = {
     AP_INIT_FLAG("GnuTLSOCSPCheckNonce", mgs_set_ocsp_check_nonce,
                  NULL, RSRC_CONF,
                  "Check nonce in OCSP responses?"),
-    AP_INIT_TAKE1("GnuTLSOCSPResponseFile", mgs_store_ocsp_response_path,
+    AP_INIT_TAKE_ARGV("GnuTLSOCSPResponseFile", mgs_store_ocsp_response_path,
                   NULL, RSRC_CONF,
-                  "Read OCSP response for stapling from this file instead "
-                  "of sending a request over HTTP (must be updated "
-                  "externally)"),
+                  "Read OCSP responses for stapling from these files instead "
+                  "of sending a request over HTTP. Files must be listed in "
+                  "the same order as listed in GnuTLSX509CertificateFile, "
+                  "and must be updated externally. Use the empty string "
+                  "(\"\") to skip a certificate in the list."),
     AP_INIT_TAKE1("GnuTLSOCSPCacheTimeout", mgs_set_timeout,
                   NULL, RSRC_CONF,
                   "Cache timeout for OCSP responses"),

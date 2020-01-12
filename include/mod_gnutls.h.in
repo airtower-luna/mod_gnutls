@@ -176,7 +176,9 @@ typedef struct {
     unsigned char ocsp_check_nonce;
     /* Read OCSP response for stapling from this file instead of
      * sending a request over HTTP */
-    char *ocsp_response_file;
+    char **ocsp_response_file;
+    /* Number of configured OCSP response files */
+    int ocsp_response_file_num;
     /* Internal OCSP data for this server */
     mgs_ocsp_data_t *ocsp;
     /* Number of successfully configured OCSP data sets */

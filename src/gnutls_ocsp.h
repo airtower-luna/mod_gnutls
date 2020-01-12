@@ -45,6 +45,9 @@ struct mgs_ocsp_data {
     gnutls_x509_crt_t cert;
     /** OCSP URI extracted from the certificate. NULL if unset. */
     apr_uri_t *uri;
+    /** OCSP response file for the certificate. NULL if unset. Takes
+     * precedence over uri. */
+    char *response_file;
     /** Trust list to verify OCSP responses for stapling. Should
      * usually only contain the CA that signed the certificate. */
     gnutls_x509_trust_list_t *trust;
@@ -69,7 +72,7 @@ const char *mgs_set_ocsp_check_nonce(cmd_parms *parms,
 
 const char *mgs_store_ocsp_response_path(cmd_parms * parms,
                                          void *dummy __attribute__((unused)),
-                                         const char *arg);
+                                         int argc, char *const *argv);
 
 /**
  * Create a trust list from a certificate chain (one or more
