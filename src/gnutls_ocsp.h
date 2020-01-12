@@ -51,6 +51,8 @@ struct mgs_ocsp_data {
     /** Certificate fingerprint, used as cache key for the OCSP
      * response. */
     gnutls_datum_t fingerprint;
+    /** Server (virtual host) that uses the certificate */
+    server_rec *server;
 };
 
 const char *mgs_ocsp_stapling_enable(cmd_parms *parms,

@@ -413,8 +413,7 @@ static int cert_retrieve_fn(gnutls_session_t session,
         {
             gnutls_ocsp_data_st *resp =
                 apr_palloc(ctxt->c->pool,
-                           sizeof(gnutls_ocsp_data_st)
-                           * (ctxt->sc->certs_x509_chain_num - 1));
+                           sizeof(gnutls_ocsp_data_st) * ctxt->sc->ocsp_num);
 
             for (unsigned int i = 0; i < ctxt->sc->ocsp_num; i++)
             {

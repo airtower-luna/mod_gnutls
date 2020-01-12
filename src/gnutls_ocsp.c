@@ -1008,7 +1008,7 @@ apr_uri_t * mgs_cert_get_ocsp_uri(apr_pool_t *p, gnutls_x509_crt_t cert)
 
 /**
  * Perform an asynchronous OCSP cache update. This is a callback for
- * mod_watchdog, so the API is fixed.
+ * mod_watchdog, so the API is fixed (except the meaning of data).
  *
  * @param state watchdog state (starting/running/stopping)
  * @param data callback data, contains the server_rec
@@ -1025,7 +1025,8 @@ static apr_status_t mgs_async_ocsp_update(int state,
     if (state == AP_WATCHDOG_STATE_STOPPING)
         return APR_SUCCESS;
 
-    server_rec *server = (server_rec *) data;
+    mgs_ocsp_data_t ocsp_data = (mgs_ocsp_data_t) data;
+    server_rec *server = (server_rec *) ocsp_data->server;
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(server->module_config, &gnutls_module);
     apr_time_t expiry = 0;
@@ -1039,7 +1040,7 @@ static apr_status_t mgs_async_ocsp_update(int state,
      * cache and the mutex is never touched in
      * mgs_get_ocsp_response. */
     apr_global_mutex_lock(sc->ocsp_mutex);
-    apr_status_t rv = mgs_cache_ocsp_response(server, sc->ocsp[0], &expiry);
+    apr_status_t rv = mgs_cache_ocsp_response(server, ocsp_data, &expiry);
 
     apr_interval_time_t next_interval;
     if (rv != APR_SUCCESS)
@@ -1091,7 +1092,7 @@ static apr_status_t mgs_async_ocsp_update(int state,
 
     sc->singleton_wd->set_callback_interval(sc->singleton_wd->wd,
                                             next_interval,
-                                            server, mgs_async_ocsp_update);
+                                            ocsp_data, mgs_async_ocsp_update);
 
     ap_log_error(APLOG_MARK, rv == APR_SUCCESS ? APLOG_DEBUG : APLOG_WARNING,
                  rv, server,
@@ -1113,7 +1114,7 @@ static apr_status_t mgs_async_ocsp_update(int state,
         ocsp_response.size = OCSP_RESP_SIZE_MAX;
 
         apr_status_t rv = mgs_cache_fetch(sc->ocsp_cache, server,
-                                          sc->ocsp[0]->fingerprint,
+                                          ocsp_data->fingerprint,
                                           &ocsp_response,
                                           pool);
 
@@ -1122,7 +1123,7 @@ static apr_status_t mgs_async_ocsp_update(int state,
             ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, server,
                          "Caching OCSP request failure for %s:%d.",
                          server->server_hostname, server->addrs->host_port);
-            mgs_cache_ocsp_failure(server, sc->ocsp[0],
+            mgs_cache_ocsp_failure(server, ocsp_data,
                                    sc->ocsp_failure_timeout * 2);
         }
     }
@@ -1140,6 +1141,7 @@ static const char* configure_cert_staple(mgs_ocsp_data_t ocsp,
                                          apr_pool_t *pconf)
 {
     ocsp->cert = sc->certs_x509_crt_chain[idx];
+    ocsp->server = server;
 
     ocsp->uri = mgs_cert_get_ocsp_uri(pconf, ocsp->cert);
     // TODO: ocsp_response_file is completely broken with >1
@@ -1291,20 +1293,28 @@ int mgs_ocsp_enable_stapling(apr_pool_t *pconf __attribute__((unused)),
     if (sc->singleton_wd != NULL
         && sc->ocsp_auto_refresh == GNUTLS_ENABLED_TRUE)
     {
-        apr_status_t rv =
-            sc->singleton_wd->register_callback(sc->singleton_wd->wd,
-                                                sc->ocsp_cache_time,
-                                                server, mgs_async_ocsp_update);
-        if (rv == APR_SUCCESS)
-            ap_log_error(APLOG_MARK, APLOG_INFO, rv, server,
-                         "Enabled async OCSP update via watchdog "
-                         "for %s:%d",
-                         server->server_hostname, server->addrs->host_port);
-        else
-            ap_log_error(APLOG_MARK, APLOG_WARNING, rv, server,
-                         "Enabling async OCSP update via watchdog "
-                         "for %s:%d failed!",
-                         server->server_hostname, server->addrs->host_port);
+        /* register an update callback for each certificate configured
+         * for stapling */
+        for (unsigned int i = 0; i < sc->ocsp_num; i++)
+        {
+            apr_status_t rv =
+                sc->singleton_wd->register_callback(sc->singleton_wd->wd,
+                                                    sc->ocsp_cache_time,
+                                                    sc->ocsp[i],
+                                                    mgs_async_ocsp_update);
+            if (rv == APR_SUCCESS)
+                ap_log_error(APLOG_MARK, APLOG_INFO, rv, server,
+                             "Enabled async OCSP update via watchdog "
+                             "for %s:%d, cert[%u]",
+                             server->server_hostname, server->addrs->host_port,
+                             i);
+            else
+                ap_log_error(APLOG_MARK, APLOG_WARNING, rv, server,
+                             "Enabling async OCSP update via watchdog "
+                             "for %s:%d, cert[%u] failed!",
+                             server->server_hostname, server->addrs->host_port,
+                             i);
+        }
     }
 
     return OK;
