@@ -4,5 +4,7 @@ tls_www_server
 signing_key
 encryption_key
 dns_name="__HOSTNAME__"
+# must-staple
+tls_feature = 5
 __OCSP_URI__
 __IP_ADDRESSES__

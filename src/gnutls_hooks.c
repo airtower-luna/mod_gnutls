@@ -36,6 +36,8 @@
 #define APR_WANT_STRFUNC
 #include <apr_want.h>
 
+#include <gnutls/x509-ext.h>
+
 #ifdef ENABLE_MSVA
 #include <msv/msv.h>
 #endif
@@ -50,6 +52,10 @@ static apr_file_t *debug_log_fp;
 
 #define IS_PROXY_STR(c) \
     ((c->is_proxy == GNUTLS_ENABLED_TRUE) ? "proxy " : "")
+
+/** Feature number for "must-staple" in the RFC 7633 X.509 TLS Feature
+ * Extension (status_request, defined in RFC 6066) */
+#define TLSFEATURE_MUST_STAPLE 5
 
 /** Key to encrypt session tickets. Must be kept secret. This key is
  * generated in the `pre_config` hook and thus constant across
@@ -526,6 +532,18 @@ static int set_default_dh_param(server_rec *server)
 
 
 /**
+ * Pool cleanup hook to release a gnutls_x509_tlsfeatures_t structure.
+ */
+apr_status_t mgs_cleanup_tlsfeatures(void *data)
+{
+    gnutls_x509_tlsfeatures_t feat = *((gnutls_x509_tlsfeatures_t*) data);
+    gnutls_x509_tlsfeatures_deinit(feat);
+    return APR_SUCCESS;
+}
+
+
+
+/**
  * Post config hook.
  *
  * Must return OK or DECLINED on success, something else on
@@ -607,6 +625,14 @@ int mgs_hook_post_config(apr_pool_t *pconf,
 
     sc_base->singleton_wd =
         mgs_new_singleton_watchdog(base_server, MGS_SINGLETON_WATCHDOG, pconf);
+
+    gnutls_x509_tlsfeatures_t *must_staple =
+        apr_palloc(ptemp, sizeof(gnutls_x509_tlsfeatures_t));
+    gnutls_x509_tlsfeatures_init(must_staple);
+    gnutls_x509_tlsfeatures_add(*must_staple, TLSFEATURE_MUST_STAPLE);
+    apr_pool_cleanup_register(ptemp, must_staple,
+                              mgs_cleanup_tlsfeatures,
+                              apr_pool_cleanup_null);
 
     for (s = base_server; s; s = s->next)
     {
@@ -724,6 +750,18 @@ int mgs_hook_post_config(apr_pool_t *pconf,
 			ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
 						"GnuTLS: Host '%s:%d' is missing a Private Key File!",
 						s->server_hostname, s->addrs->host_port);
+            return HTTP_UNAUTHORIZED;
+        }
+
+        if (sc->certs_x509_chain_num > 0
+            && gnutls_x509_tlsfeatures_check_crt(*must_staple,
+                                                 sc->certs_x509_crt_chain[0])
+            && sc->ocsp_staple == GNUTLS_ENABLED_FALSE)
+        {
+            ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+                         "Must-Staple is set in the host certificate "
+                         "of '%s:%d', but stapling is disabled!",
+                         s->server_hostname, s->addrs->host_port);
             return HTTP_UNAUTHORIZED;
         }
 
