@@ -38,7 +38,7 @@ if [ -z "${OPENSSL}" ]; then
     OPENSSL=$(which openssl)
 fi
 if [ -z "${OCSP_VALID_MIN}" ]; then
-    OCSP_VALID_MIN="3"
+    OCSP_VALID_MIN="5"
 fi
 
 case "${REQUEST_METHOD}" in
