@@ -906,6 +906,8 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
     sc->ocsp_check_nonce = GNUTLS_ENABLED_UNSET;
     sc->ocsp_response_file = NULL;
     sc->ocsp_response_file_num = 0;
+    sc->ocsp = NULL;
+    sc->ocsp_num = 0;
     sc->ocsp_mutex = NULL;
     sc->ocsp_cache = NULL;
     sc->ocsp_cache_time = MGS_TIMEOUT_UNSET;
