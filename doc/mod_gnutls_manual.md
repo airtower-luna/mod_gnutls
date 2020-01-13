@@ -522,6 +522,45 @@ priority string as described in the
 OCSP Stapling Configuration
 ---------------------------
 
+OCSP stapling, formally known as the TLS Certificate Status Request
+extension, allows the server to provide the client with a cached OCSP
+response for its certificate during the handshake. With OCSP stapling
+the client does not have to send an OCSP request to the issuer CA to
+check the certificate status, which offers privacy and performance
+advantages, and avoids the security issue of how to handle errors that
+prevent the client from getting a response.
+
+With TLS 1.2 stapling can be used only for the server certificate,
+with TLS 1.3 mod\_gnutls supports stapling for all certificates in the
+certificate chain except the root CA.
+
+Mod\_gnutls enables OCSP stapling by default if possible. The following
+requirements must be met:
+
+* OCSP responses are verified using the issuer CAs of the certificates
+  being checked, so the CAs must be included in
+  [`GnuTLSCertificateFile`](#gnutlscertificatefile). Providing the
+  whole certificate chain (including the root CA) is recommended.
+
+* Mod\_gnutls needs a cache to store OCSP responses for stapling. If
+  [mod\_socache\_shmcb](http://httpd.apache.org/docs/current/en/mod/mod_socache_shmcb.html)
+  is loaded mod\_gnutls can set up the cache without additional
+  configuration, for other options see
+  [`GnuTLSOCSPCache`](#gnutlsocspcache).
+
+* The certificates must contain OCSP access URIs using HTTP so
+  mod_gnutls can fetch responses, alternatively you may provide
+  responses using [`GnuTLSOCSPResponseFile`](#gnutlsocspresponsefile).
+
+If a server certificate contains the "must-staple" extension (X.509
+TLS Feature extension defined in [RFC
+7633](https://tools.ietf.org/html/rfc7633)) and the configuration does
+not support stapling mod_gnutls will refuse to start.
+
+By default mod\_gnutls regularly refreshes the cached OCSP responses
+in the background, see
+[`GnuTLSOCSPAutoRefresh`](#gnutlsocspautorefresh) for details.
+
 ### GnuTLSOCSPStapling
 
 Enable OCSP stapling for this (virtual) host.
@@ -531,26 +570,10 @@ Enable OCSP stapling for this (virtual) host.
 Default: *on* if requirements are met, *off* otherwise\
 Context: server config, virtual host
 
-OCSP stapling, formally known as the TLS Certificate Status Request
-extension, allows the server to provide the client with a cached OCSP
-response for its certificate during the handshake. With OCSP stapling
-the client does not have to send an OCSP request to the issuer CA to
-check the certificate status, which offers privacy and performance
-advantages, and avoids the security issue of how to handle errors that
-prevent the client from getting a response.
+Stapling is activated by default if the requirements [listed
+above](#ocsp-stapling-configuration) are met.
 
-Using OCSP stapling has a few requirements:
-
-* `GnuTLSCertificateFile` must contain the issuer CA certificate in
-  addition to the server certificate so responses can be verified.
-* The server certificate must either contain an OCSP access URI using
-  HTTP, or `GnuTLSOCSPResponseFile` must be set.
-* Caching OCSP responses requires a cache to store responses. If
-  `mod_socache_shmcb` is loaded `mod_gnutls` can set up the cache
-  automatically without additional configuration, see
-  `GnuTLSOCSPCache`.
-
-Stapling is activated by default if these requirements are met. If
+If the server certificate requires stapling ("must-staple") or
 `GnuTLSOCSPStapling` is explicitly set to `on` unmet requirements are
 an error.
 
@@ -581,7 +604,7 @@ is serialized using the `gnutls-ocsp-cache` mutex.
 
 ### GnuTLSOCSPAutoRefresh
 
-Regularly refresh cached OCSP response independent of TLS handshakes?
+Regularly refresh cached OCSP responses independent of TLS handshakes?
 
     GnuTLSOCSPAutoRefresh [On|Off]
 
@@ -589,15 +612,15 @@ Default: *on*\
 Context: server config, virtual host
 
 By default `mod_gnutls` will regularly refresh the cached OCSP
-response for hosts that have OCSP stapling enabled, regardless of
-whether it is used. This has advantages over updating the OCSP
-response only if a TLS handshake needs it:
+responses, regardless of whether they are used. This has advantages
+over updating OCSP responses only when a TLS handshake needs them:
+
+* Handshakes are not delayed by updating the OCSP response cache
+  first.
 
 * Updating the cached response before it expires can hide short
   unavailability of the OCSP responder, if a repeated request is
   successful before the cache expires (see below).
-
-* Handshakes are not slowed down by fetching responses.
 
 The interval to the next request is determined as follows: After a
 successful OCSP request the next one is scheduled for a random period
