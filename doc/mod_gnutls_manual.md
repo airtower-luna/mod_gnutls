@@ -231,10 +231,8 @@ Use the provided PKCS \#3 encoded Diffie-Hellman parameters
 Default: *none*\
 Context: server config, virtual host
 
-By default, `mod_gnutls` uses the DH parameters included with GnuTLS
-corresponding to the security level of the configured private keys if
-compiled with GnuTLS 3.5.6 or newer, and the ffdhe2048 DH group as
-defined in RFC 7919, Appendix A.1 otherwise.
+By default `mod_gnutls` uses the DH parameters included with GnuTLS
+corresponding to the security level of the configured private keys.
 
 If you need to use different DH parameters, you can provide a PEM file
 containing them in PKCS \#3 encoding using this option. Please see the
@@ -340,11 +338,10 @@ FILEPATH is an absolute or relative path to a file containing the
 PEM-encoded X.509 certificate to use as this Server's End Entity (EE)
 certificate, and optionally those of the issuing Certificate
 Authorities (CAs). If the file contains multiple certificates they
-must be ordered from EE to the CA closest to the root CA (or the root
-CA itself).
+must be ordered from EE to the CA closest to the root CA.
 
-Including at least the immediately issuing CA is highly recommended
-because it is required for OCSP stapling.
+Including the full certificate chain is highly recommended because the
+CA certificates are needed for [OCSP stapling](#ocsp-stapling-configuration).
 
 Since version 0.7 this can be a PKCS #11 URL instead of a file.
 
