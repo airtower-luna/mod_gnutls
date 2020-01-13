@@ -630,20 +630,29 @@ you can use this flag to disable nonce verification. Note that
 
 ### GnuTLSOCSPResponseFile
 
-Read the OCSP response for stapling from this file instead of sending
-a request over HTTP.
+Read OCSP responses for stapling from these files (one or more)
+instead of sending a request over HTTP.
 
-    GnuTLSOCSPResponseFile /path/to/response.der
+    GnuTLSOCSPResponseFile /path/to/response.der [...]
 
 Default: *empty*\
 Context: server config, virtual host
 
-The response file must be updated externally, for example using a cron
-job. This option is an alternative to the server fetching OCSP
+The first listed file must contain a response for the server
+certificate, responses for intermediate CAs may be added in the order
+they appear in [GnuTLSCertificateFile](#gnutlscertificatefile). You
+can revert to the default fetch mechanism for a specific certificate
+(including the server certificate) by giving the empty string (`""`)
+instead of a file path.
+
+The response files must be updated externally, for example using a
+cron job. This option is an alternative to the server fetching OCSP
 responses over HTTP. Reasons to use this option include:
 
-* Performing OCSP requests separate from the web server.
-* The issuer CA uses an access method other than HTTP.
+* Performing OCSP requests separate from the web server (e.g. to share
+  responses across a server cluster).
+* The issuer CA uses an access method other than HTTP, or doesn't
+  include an OCSP URL in the certificate.
 * Testing
 
 You can use a GnuTLS `ocsptool` command like the following to create
