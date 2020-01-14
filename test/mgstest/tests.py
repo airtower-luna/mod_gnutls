@@ -208,21 +208,23 @@ class TestRequest(yaml.YAMLObject):
 
     """
     yaml_tag = '!request'
-    def __init__(self, path, method='GET', headers=dict(),
+    def __init__(self, path, method='GET', body=None, headers=dict(),
                  expect=dict(status=200)):
         self.method = method
         self.path = path
+        self.body = body
         self.headers = headers
         self.expect = expect
 
     def __repr__(self):
         return (f'{self.__class__.__name__!s}(path={self.path!r}, '
-                f'method={self.method!r}, headers={self.headers!r}, '
-                f'expect={self.expect!r})')
+                f'method={self.method!r}, body={self.body!r}, '
+                f'headers={self.headers!r}, expect={self.expect!r})')
 
     def run(self, conn, response_log=None):
         try:
-            conn.request(self.method, self.path, headers=self.headers)
+            conn.request(self.method, self.path, body=self.body,
+                         headers=self.headers)
             resp = conn.getresponse()
             if self.expects_conn_reset():
                 raise TestExpectationFailed(
@@ -350,16 +352,13 @@ class TestReq10(TestRequest):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def __repr__(self):
-        return (f'{self.__class__.__name__!s}'
-                f'(method={self.method!r}, path={self.path!r}, '
-                f'headers={self.headers!r}, expect={self.expect!r})')
-
     def run(self, command, timeout=None, conn_log=None, response_log=None):
         req = f'{self.method} {self.path} HTTP/1.0\r\n'
         for name, value in self.headers.items():
             req = req + f'{name}: {value}\r\n'
         req = req + f'\r\n'
+        if self.body:
+            req = req + self.body
         proc = subprocess.Popen(command,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
