@@ -19,6 +19,7 @@
 
 #include "mod_gnutls.h"
 #include "gnutls_config.h"
+#include "gnutls_io.h"
 #include "gnutls_ocsp.h"
 #include "gnutls_util.h"
 

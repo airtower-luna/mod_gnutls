@@ -18,6 +18,7 @@
  */
 
 #include "mod_gnutls.h"
+#include "gnutls_io.h"
 #include "gnutls_proxy.h"
 
 #ifdef APLOG_USE_MODULE
