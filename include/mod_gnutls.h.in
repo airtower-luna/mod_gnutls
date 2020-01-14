@@ -260,9 +260,6 @@ typedef struct {
 
 
 
-/* apr_signal_block() for blocking SIGPIPE */
-apr_status_t apr_signal_block(int signum);
-
 /* Proxy Support */
 /* An optional function which returns non-zero if the given connection
 is using SSL/TLS. */

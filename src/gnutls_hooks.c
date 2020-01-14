@@ -833,14 +833,6 @@ void mgs_hook_child_init(apr_pool_t *p, server_rec *s)
     if (rv != APR_SUCCESS)
         ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
                      "Failed to reinit mutex '" MGS_OCSP_MUTEX_NAME "'.");
-
-    /* Block SIGPIPE Signals */
-    rv = apr_signal_block(SIGPIPE);
-    if(rv != APR_SUCCESS) {
-        /* error sending output */
-        ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
-                "GnuTLS: Error Blocking SIGPIPE Signal!");
-    }
 }
 
 const char *mgs_hook_http_scheme(const request_rec * r) {
