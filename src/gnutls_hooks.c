@@ -58,6 +58,22 @@ static apr_file_t *debug_log_fp;
  * Extension (status_request, defined in RFC 6066) */
 #define TLSFEATURE_MUST_STAPLE 5
 
+/**
+ * Request protocol string for HTTP/2, as hard-coded in mod_http2
+ * h2_request.c.
+ */
+#define HTTP2_PROTOCOL "HTTP/2.0"
+
+/**
+ * mod_http2 checks this note, set it to signal that a request would
+ * require renegotiation/reauth, which isn't allowed under HTTP/2. The
+ * content of the note is expected to be a string giving the reason
+ * renegotiation would be needed.
+ *
+ * See: https://tools.ietf.org/html/rfc7540#section-9.2.1
+ */
+#define RENEGOTIATE_FORBIDDEN_NOTE "ssl-renegotiate-forbidden"
+
 /** Key to encrypt session tickets. Must be kept secret. This key is
  * generated in the `pre_config` hook and thus constant across
  * forks. The problem with this approach is that it does not support
@@ -1444,6 +1460,16 @@ int mgs_hook_authz(request_rec * r) {
             rv = mgs_cert_verify(r, ctxt);
             if (rv != DECLINED && rv != HTTP_FORBIDDEN)
                 return rv;
+
+            if (strcmp(r->protocol, HTTP2_PROTOCOL) == 0)
+            {
+                ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                              "Rehandshake is prohibited for HTTP/2 "
+                              "(RFC 7540, section 9.2.1).");
+                apr_table_setn(r->notes, RENEGOTIATE_FORBIDDEN_NOTE,
+                               "verify-client");
+                return HTTP_FORBIDDEN;
+            }
 
             gnutls_certificate_server_set_request
                     (ctxt->session, dc->client_verify_mode);
