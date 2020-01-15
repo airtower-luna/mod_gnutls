@@ -1655,7 +1655,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
         /* It is perfectly OK for a client not to send a certificate if on REQUEST mode
          */
         if (ctxt->sc->client_verify_mode == GNUTLS_CERT_REQUEST)
-            return OK;
+            return DECLINED;
 
         /* no certificate provided by the client, but one was required. */
         ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
@@ -1833,7 +1833,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
     if (status == 0) {
         apr_table_setn(r->subprocess_env, "SSL_CLIENT_VERIFY",
                 "SUCCESS");
-        ret = OK;
+        ret = DECLINED;
     } else {
         apr_table_setn(r->subprocess_env, "SSL_CLIENT_VERIFY",
                 "FAILED");
