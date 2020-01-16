@@ -1790,33 +1790,14 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
 
     cur_time = apr_time_now();
 
-    if (status & GNUTLS_CERT_SIGNER_NOT_FOUND) {
+    if (status != 0) {
+        gnutls_datum_t errmsg;
+        gnutls_certificate_verification_status_print(
+            status, gnutls_certificate_type_get(ctxt->session),
+            &errmsg, 0);
         ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                "GnuTLS: Could not find Signer for Peer Certificate");
-    }
-
-    if (status & GNUTLS_CERT_SIGNER_NOT_CA) {
-        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                "GnuTLS: Peer's Certificate signer is not a CA");
-    }
-
-    if (status & GNUTLS_CERT_INSECURE_ALGORITHM) {
-        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                "GnuTLS: Peer's Certificate is using insecure algorithms");
-    }
-
-    if (status & GNUTLS_CERT_EXPIRED
-            || status & GNUTLS_CERT_NOT_ACTIVATED) {
-        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                "GnuTLS: Peer's Certificate signer is expired or not yet activated");
-    }
-
-    if (status & GNUTLS_CERT_INVALID) {
-        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                "GnuTLS: Peer Certificate is invalid.");
-    } else if (status & GNUTLS_CERT_REVOKED) {
-        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                "GnuTLS: Peer Certificate is revoked.");
+                      "Client authentication failed: %s", errmsg.data);
+        gnutls_free(errmsg.data);
     }
 
     mgs_add_common_cert_vars(r, cert.x509[0], 1, ctxt->sc->export_certificates_size);
