@@ -1461,7 +1461,7 @@ int mgs_hook_authz(request_rec * r) {
             if (rv != DECLINED && rv != HTTP_FORBIDDEN)
                 return rv;
 
-            if (strcmp(r->protocol, HTTP2_PROTOCOL) == 0)
+            if (r->proto_num == HTTP_VERSION(2, 0))
             {
                 ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
                               "Rehandshake is prohibited for HTTP/2 "
