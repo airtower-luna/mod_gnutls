@@ -1838,7 +1838,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
         apr_table_setn(r->subprocess_env, "SSL_CLIENT_VERIFY",
                 "FAILED");
         if (ctxt->sc->client_verify_mode == GNUTLS_CERT_REQUEST)
-            ret = OK;
+            ret = DECLINED;
         else
             ret = HTTP_FORBIDDEN;
     }
