@@ -24,11 +24,12 @@ def run_connection(testname, conn_log, response_log):
 
     proc = subprocess.run(command,
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                          check=True, text=True)
+                          text=True)
     print(proc.stderr)
     print(proc.stderr, file=conn_log)
     print(proc.stdout)
     print(proc.stdout, file=response_log)
+    proc.check_returncode()
 
 def post_check(conn_log, response_log):
     print('Checking for HTTP/2 in logged header:')
