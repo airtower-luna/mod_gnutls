@@ -212,7 +212,7 @@ class TestRequest(yaml.YAMLObject):
                  expect=dict(status=200)):
         self.method = method
         self.path = path
-        self.body = body
+        self.body = body.encode('utf-8') if body else None
         self.headers = headers
         self.expect = expect
 
@@ -356,7 +356,7 @@ class TestReq10(TestRequest):
         req = f'{self.method} {self.path} HTTP/1.0\r\n'
         for name, value in self.headers.items():
             req = req + f'{name}: {value}\r\n'
-        req = req + f'\r\n'
+        req = req.encode('utf-8') + b'\r\n'
         if self.body:
             req = req + self.body
         proc = subprocess.Popen(command,
@@ -366,8 +366,7 @@ class TestReq10(TestRequest):
                                 close_fds=True,
                                 bufsize=0)
         try:
-            outs, errs = proc.communicate(input=req.encode(),
-                                          timeout=timeout)
+            outs, errs = proc.communicate(input=req, timeout=timeout)
         except TimeoutExpired:
             proc.kill()
             outs, errs = proc.communicate()
