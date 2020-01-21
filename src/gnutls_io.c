@@ -450,14 +450,14 @@ tryagain:
 
 
 
-int mgs_reauth(mgs_handle_t * ctxt)
+int mgs_reauth(mgs_handle_t *ctxt, request_rec *r)
 {
     if (ctxt->session == NULL)
         return GNUTLS_E_INVALID_REQUEST;
 
     int rv = gnutls_reauth(ctxt->session, 0);
-    // TODO: Handle non-fatal errors: GNUTLS_E_INTERRUPTED,
-    // GNUTLS_E_AGAIN, GNUTLS_E_GOT_APPLICATION_DATA
+    // TODO: Handle remaining non-fatal errors: GNUTLS_E_INTERRUPTED,
+    // GNUTLS_E_AGAIN
 
     /* GNUTLS_E_GOT_APPLICATION_DATA can (randomly, depending on
      * timing) happen with a request containing a body. According to
@@ -465,22 +465,35 @@ int mgs_reauth(mgs_handle_t * ctxt)
      * post-handshake authentication proves that the authenticated
      * party is the one that did the handshake, so caching the data
      * is appropriate. */
-    /* Allocate cache to content-length (if available), with an upper
-     * limit to prevent resource exhaustion attacks. Do we have to
-     * prevent creating multiple caches for one connection? */
-    /* ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, */
-    /*               "Request content: %s bytes", */
-    /*               apr_table_get(r->headers_in, "Content-Length")); */
-    /* If the cache is too small,
-     * a) return HTTP_REQUEST_ENTITY_TOO_LARGE to the client
-     * b) IF reauth was successful set Retry-After to immediately: */
-    /* apr_table_setn(r->err_headers_out, "Retry-After", "0"); */
+    if (rv == GNUTLS_E_GOT_APPLICATION_DATA)
+    {
+        /* Fill connection input buffer using a speculative read. */
+        apr_size_t len = sizeof(ctxt->input_buffer);
+        ctxt->input_mode = AP_MODE_SPECULATIVE;
+        apr_status_t status =
+            gnutls_io_input_read(ctxt, ctxt->input_buffer, &len);
+        if (status == APR_SUCCESS)
+        {
+            ap_log_rerror(APLOG_MARK, APLOG_DEBUG, status, r,
+                          "%s: cached %" APR_SIZE_T_FMT " bytes.",
+                          __func__, len);
+            /* If the cache was too small to accept all pending data
+             * we'll get GNUTLS_E_GOT_APPLICATION_DATA again, and the
+             * authz hook will return HTTP_REQUEST_ENTITY_TOO_LARGE to
+             * the client. */
+            rv = gnutls_reauth(ctxt->session, 0);
+        }
+        else
+            ap_log_rerror(APLOG_MARK, APLOG_ERR, status, r,
+                          "%s: buffering request data failed!",
+                          __func__);
+    }
 
     if (rv != GNUTLS_E_SUCCESS)
     {
-        ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, ctxt->c,
-                      "Reauthentication failed: %s (%d)",
-                      gnutls_strerror(rv), rv);
+        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                      "%s: Reauthentication failed: %s (%d)",
+                      __func__, gnutls_strerror(rv), rv);
         return rv;
     }
 

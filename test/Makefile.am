@@ -248,7 +248,8 @@ endif
 
 # Apache configuration and data files
 apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/ocsp.cgi \
-	data/test.txt mime.types proxy_mods.conf
+	data/test.txt data/secret/mirror.cgi data/secret/test.txt \
+	mime.types proxy_mods.conf
 
 # Documentation for the test system
 test_doc = README.md sample_fail.yml sample_test.yml

@@ -16,13 +16,25 @@ actions:
         exactly: |
           test
   - !request
-    method: GET
-    path: /secret/test.txt
+    method: POST
+    path: /secret/mirror.cgi
+    body: |
+      GNUTLS_E_GOT_APPLICATION_DATA can (randomly, depending on
+      timing) happen with a request containing a body. According to
+      https://tools.ietf.org/html/rfc8446#appendix-E.1.2
+      post-handshake authentication proves that the authenticated
+      party is the one that did the handshake, so caching the data
+      is appropriate.
     expect:
       status: 200
       body:
         exactly: |
-          top secret
+          GNUTLS_E_GOT_APPLICATION_DATA can (randomly, depending on
+          timing) happen with a request containing a body. According to
+          https://tools.ietf.org/html/rfc8446#appendix-E.1.2
+          post-handshake authentication proves that the authenticated
+          party is the one that did the handshake, so caching the data
+          is appropriate.
   - !request
     method: GET
     path: /secret/test.txt

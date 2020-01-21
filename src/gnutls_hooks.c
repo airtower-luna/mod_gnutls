@@ -1490,17 +1490,21 @@ int mgs_hook_authz(request_rec *r)
 
         gnutls_certificate_server_set_request(ctxt->session,
                                               client_verify_mode);
-        if (mgs_reauth(ctxt) != GNUTLS_E_SUCCESS) {
-            return HTTP_FORBIDDEN;
+        int rv = mgs_reauth(ctxt, r);
+        if (rv != GNUTLS_E_SUCCESS) {
+            if (rv == GNUTLS_E_GOT_APPLICATION_DATA)
+                return HTTP_REQUEST_ENTITY_TOO_LARGE;
+            else
+                return HTTP_FORBIDDEN;
         }
     }
 
-    int rv = mgs_cert_verify(r, ctxt);
+    int ret = mgs_cert_verify(r, ctxt);
     /* In "request" mode we always allow the request, otherwise the
      * verify result decides. */
     if (client_verify_mode == GNUTLS_CERT_REQUEST)
         return DECLINED;
-    return rv;
+    return ret;
 }
 
 /* variables that are not sent by default:
