@@ -251,7 +251,7 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
             if (ctxt->input_mode == AP_MODE_SPECULATIVE) {
                 /* We want to rollback this read. */
                 char_buffer_write(&ctxt->input_cbuf, buf,
-                        rc);
+                                  *len);
             }
             return ctxt->input_rc;
         } else if (rc == 0) {
