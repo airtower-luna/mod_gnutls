@@ -41,7 +41,8 @@ test_scripts += test-16_view-status.bash \
 	test-31_vhost_SNI_serveralias_match.bash \
 	test-32_vhost_SNI_serveralias_mismatch.bash \
 	test-33_vhost_SNI_serveralias_missinghost.bash \
-	test-34_TLS_reverse_proxy_h2.bash
+	test-34_TLS_reverse_proxy_h2.bash \
+	test-35_client_reauth.bash
 
 MOSTLYCLEANFILES = $(test_scripts)
 dist_check_SCRIPTS = netns_py.bash test-template.bash.in

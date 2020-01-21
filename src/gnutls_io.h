@@ -83,6 +83,6 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
 ssize_t mgs_transport_write(gnutls_transport_ptr_t ptr,
                             const void *buffer, size_t len);
 
-int mgs_rehandshake(mgs_handle_t * ctxt);
+int mgs_reauth(mgs_handle_t * ctxt);
 
 #endif /* __MOD_GNUTLS_IO_H__ */

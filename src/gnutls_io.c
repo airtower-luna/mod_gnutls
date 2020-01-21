@@ -2,7 +2,7 @@
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2008 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
- *  Copyright 2015-2019 Fiona Klute
+ *  Copyright 2015-2020 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -448,26 +448,43 @@ tryagain:
     }
 }
 
-int mgs_rehandshake(mgs_handle_t * ctxt) {
-    int rv;
 
+
+int mgs_reauth(mgs_handle_t * ctxt)
+{
     if (ctxt->session == NULL)
-        return -1;
+        return GNUTLS_E_INVALID_REQUEST;
 
-    rv = gnutls_rehandshake(ctxt->session);
+    int rv = gnutls_reauth(ctxt->session, 0);
+    // TODO: Handle non-fatal errors: GNUTLS_E_INTERRUPTED,
+    // GNUTLS_E_AGAIN, GNUTLS_E_GOT_APPLICATION_DATA
 
-    if (rv != 0) {
-        /* the client did not want to rehandshake. goodbye */
+    /* GNUTLS_E_GOT_APPLICATION_DATA can (randomly, depending on
+     * timing) happen with a request containing a body. According to
+     * https://tools.ietf.org/html/rfc8446#appendix-E.1.2
+     * post-handshake authentication proves that the authenticated
+     * party is the one that did the handshake, so caching the data
+     * is appropriate. */
+    /* Allocate cache to content-length (if available), with an upper
+     * limit to prevent resource exhaustion attacks. Do we have to
+     * prevent creating multiple caches for one connection? */
+    /* ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r, */
+    /*               "Request content: %s bytes", */
+    /*               apr_table_get(r->headers_in, "Content-Length")); */
+    /* If the cache is too small,
+     * a) return HTTP_REQUEST_ENTITY_TOO_LARGE to the client
+     * b) IF reauth was successful set Retry-After to immediately: */
+    /* apr_table_setn(r->err_headers_out, "Retry-After", "0"); */
+
+    if (rv != GNUTLS_E_SUCCESS)
+    {
         ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, ctxt->c,
-                      "GnuTLS: Client Refused Rehandshake request.");
-        return -1;
+                      "Reauthentication failed: %s (%d)",
+                      gnutls_strerror(rv), rv);
+        return rv;
     }
 
-    ctxt->status = 0;
-
-    rv = gnutls_do_handshake(ctxt);
-
-    return rv;
+    return GNUTLS_E_SUCCESS;
 }
 
 

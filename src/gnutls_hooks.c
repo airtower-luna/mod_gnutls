@@ -1170,7 +1170,8 @@ static void create_gnutls_handle(conn_rec * c)
     else
     {
         /* incoming connection, server mode */
-        err = gnutls_init(&ctxt->session, GNUTLS_SERVER);
+        err = gnutls_init(&ctxt->session,
+                          GNUTLS_SERVER | GNUTLS_POST_HANDSHAKE_AUTH);
         if (err != GNUTLS_E_SUCCESS)
             ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
                           "gnutls_init for server side failed: %s (%d)",
@@ -1459,10 +1460,17 @@ int mgs_hook_authz(request_rec *r)
     const gnutls_datum_t *cert_list =
         gnutls_certificate_get_peers(ctxt->session, &cert_list_size);
 
-    if (cert_list == NULL || cert_list_size == 0) {
+    /* We can reauthenticate the client if using TLS 1.3 and the
+     * client annouced support. Note that there may still not be any
+     * client certificate after. */
+    if ((cert_list == NULL || cert_list_size == 0)
+        && gnutls_protocol_get_version(ctxt->session) == GNUTLS_TLS1_3
+        && (gnutls_session_get_flags(ctxt->session)
+            & GNUTLS_SFLAGS_POST_HANDSHAKE_AUTH))
+    {
         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
-                      "%s: No certificate, attempting to rehandshake "
-                      "with peer (%d)",
+                      "%s: No certificate, attempting to reauthenticate "
+                      "peer (%d)",
                       __func__, client_verify_mode);
 
         if (r->proto_num == HTTP_VERSION(2, 0))
@@ -1482,9 +1490,7 @@ int mgs_hook_authz(request_rec *r)
 
         gnutls_certificate_server_set_request(ctxt->session,
                                               client_verify_mode);
-        /* TODO: rehandshake code is broken and has been for years,
-         * replace with TLS 1.3 post-handshake auth. */
-        if (mgs_rehandshake(ctxt) != 0) {
+        if (mgs_reauth(ctxt) != GNUTLS_E_SUCCESS) {
             return HTTP_FORBIDDEN;
         }
     }

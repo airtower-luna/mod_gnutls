@@ -1,0 +1,33 @@
+!connection
+description: >-
+  There's no authentication needed on handshake, but the server will
+  require reauth to serve the second request.
+gnutls_params:
+  - x509cafile=authority/x509.pem
+  - x509keyfile=authority/client/secret.key
+  - x509certfile=authority/client/x509.pem
+  - post-handshake-auth
+actions:
+  - !request
+    path: /test.txt
+    expect:
+      status: 200
+      body:
+        exactly: |
+          test
+  - !request
+    method: GET
+    path: /secret/test.txt
+    expect:
+      status: 200
+      body:
+        exactly: |
+          top secret
+  - !request
+    method: GET
+    path: /secret/test.txt
+    expect:
+      status: 200
+      body:
+        exactly: |
+          top secret
