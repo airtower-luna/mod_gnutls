@@ -1428,75 +1428,73 @@ int mgs_hook_fixups(request_rec * r) {
     return rv;
 }
 
-int mgs_hook_authz(request_rec * r) {
-    int rv;
-    mgs_handle_t *ctxt;
-    mgs_dirconf_rec *dc;
-
+int mgs_hook_authz(request_rec *r)
+{
     if (r == NULL)
         return DECLINED;
 
-    dc = ap_get_module_config(r->per_dir_config, &gnutls_module);
+    mgs_dirconf_rec *dc = ap_get_module_config(
+        r->per_dir_config, &gnutls_module);
 
-    _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
-    ctxt = get_effective_gnutls_ctxt(r->connection);
-
+    mgs_handle_t *ctxt = get_effective_gnutls_ctxt(r->connection);
     if (!ctxt || ctxt->session == NULL) {
         return DECLINED;
     }
 
-    if (dc->client_verify_mode == GNUTLS_CERT_IGNORE) {
+    /* The effective verify mode. Directory configuration takes
+     * precedence if present (-1 means it is unset). */
+    int client_verify_mode = ctxt->sc->client_verify_mode;
+    if (dc->client_verify_mode != -1)
+        client_verify_mode = dc->client_verify_mode;
+
+    if (client_verify_mode == GNUTLS_CERT_IGNORE)
+    {
         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
-                "GnuTLS: Directory set to Ignore Client Certificate!");
-    } else {
-        if (ctxt->sc->client_verify_mode < dc->client_verify_mode) {
-            ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
-                    "GnuTLS: Attempting to rehandshake with peer. %d %d",
-                    ctxt->sc->client_verify_mode,
-                    dc->client_verify_mode);
+                      "%s: verify mode is \"ignore\"", __func__);
+        return DECLINED;
+    }
 
-            /* If we already have a client certificate, there's no point in
-             * re-handshaking... */
-            rv = mgs_cert_verify(r, ctxt);
-            if (rv != DECLINED && rv != HTTP_FORBIDDEN)
-                return rv;
+    /* At this point the verify mode is either request or require */
+    unsigned int cert_list_size;
+    const gnutls_datum_t *cert_list =
+        gnutls_certificate_get_peers(ctxt->session, &cert_list_size);
 
-            if (r->proto_num == HTTP_VERSION(2, 0))
-            {
-                ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
-                              "Rehandshake is prohibited for HTTP/2 "
-                              "(RFC 7540, section 9.2.1).");
-                apr_table_setn(r->notes, RENEGOTIATE_FORBIDDEN_NOTE,
-                               "verify-client");
-                return HTTP_FORBIDDEN;
-            }
+    if (cert_list == NULL || cert_list_size == 0) {
+        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                      "%s: No certificate, attempting to rehandshake "
+                      "with peer (%d)",
+                      __func__, client_verify_mode);
 
-            gnutls_certificate_server_set_request
-                    (ctxt->session, dc->client_verify_mode);
-
-            if (mgs_rehandshake(ctxt) != 0) {
-                return HTTP_FORBIDDEN;
-            }
-        } else if (ctxt->sc->client_verify_mode ==
-                GNUTLS_CERT_IGNORE) {
-#if MOD_GNUTLS_DEBUG
-            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                    "GnuTLS: Peer is set to IGNORE");
-#endif
-            return DECLINED;
-        }
-        rv = mgs_cert_verify(r, ctxt);
-        if (rv != DECLINED
-            && (rv != HTTP_FORBIDDEN
-                || dc->client_verify_mode == GNUTLS_CERT_REQUIRE
-                || (dc->client_verify_mode == -1
-                    && ctxt->sc->client_verify_mode == GNUTLS_CERT_REQUIRE)))
+        if (r->proto_num == HTTP_VERSION(2, 0))
         {
-            return rv;
+            ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                          "Rehandshake is prohibited for HTTP/2 "
+                          "(RFC 7540, section 9.2.1).");
+
+            /* This also applies to request mode, otherwise
+             * per-directory request would never work with HTTP/2. The
+             * note makes mod_http2 send an HTTP_1_1_REQUIRED
+             * error to tell the client to switch. */
+            apr_table_setn(r->notes, RENEGOTIATE_FORBIDDEN_NOTE,
+                           "verify-client");
+            return HTTP_FORBIDDEN;
+        }
+
+        gnutls_certificate_server_set_request(ctxt->session,
+                                              client_verify_mode);
+        /* TODO: rehandshake code is broken and has been for years,
+         * replace with TLS 1.3 post-handshake auth. */
+        if (mgs_rehandshake(ctxt) != 0) {
+            return HTTP_FORBIDDEN;
         }
     }
 
-    return DECLINED;
+    int rv = mgs_cert_verify(r, ctxt);
+    /* In "request" mode we always allow the request, otherwise the
+     * verify result decides. */
+    if (client_verify_mode == GNUTLS_CERT_REQUEST)
+        return DECLINED;
+    return rv;
 }
 
 /* variables that are not sent by default:
