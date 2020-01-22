@@ -489,7 +489,7 @@ int mgs_reauth(mgs_handle_t *ctxt, request_rec *r)
                 rv = gnutls_reauth(ctxt->session, 0);
             }
             else
-                ap_log_rerror(APLOG_MARK, APLOG_ERR, status, r,
+                ap_log_rerror(APLOG_MARK, APLOG_INFO, status, r,
                               "%s: buffering request data failed!",
                               __func__);
         }
@@ -501,7 +501,7 @@ int mgs_reauth(mgs_handle_t *ctxt, request_rec *r)
     if (rv != GNUTLS_E_SUCCESS)
     {
         ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
-                      "%s: Reauthentication failed: %s (%d)",
+                      "%s: post-handshake authentication failed: %s (%d)",
                       __func__, gnutls_strerror(rv), rv);
         return rv;
     }

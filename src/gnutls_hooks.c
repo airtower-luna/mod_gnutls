@@ -1448,10 +1448,20 @@ int mgs_hook_authz(request_rec *r)
     if (dc->client_verify_mode != -1)
         client_verify_mode = dc->client_verify_mode;
 
+    char *verify_mode;
+    if (client_verify_mode == GNUTLS_CERT_IGNORE)
+        verify_mode = "ignore";
+    else if (client_verify_mode == GNUTLS_CERT_REQUEST)
+        verify_mode = "request";
+    else if (client_verify_mode == GNUTLS_CERT_REQUIRE)
+        verify_mode = "require";
+    else
+        verify_mode = "(undefined)";
+    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                  "%s: verify mode is \"%s\"", __func__, verify_mode);
+
     if (client_verify_mode == GNUTLS_CERT_IGNORE)
     {
-        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
-                      "%s: verify mode is \"ignore\"", __func__);
         return DECLINED;
     }
 
@@ -1469,8 +1479,8 @@ int mgs_hook_authz(request_rec *r)
             & GNUTLS_SFLAGS_POST_HANDSHAKE_AUTH))
     {
         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
-                      "%s: No certificate, attempting to reauthenticate "
-                      "peer (%d)",
+                      "%s: No certificate, attempting post-handshake "
+                      "authentication (%d)",
                       __func__, client_verify_mode);
 
         if (r->proto_num == HTTP_VERSION(2, 0))
