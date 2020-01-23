@@ -179,6 +179,8 @@ class TestConnection(yaml.YAMLObject):
                     act.run(conn, response_log)
                 elif type(act) is TestReq10:
                     act.run(command, timeout, conn_log, response_log)
+                elif type(act) is Resume:
+                    act.run(conn, command)
                 else:
                     raise TypeError(f'Unsupported action requested: {act!r}')
         finally:
@@ -420,6 +422,30 @@ class TestReq10(TestRequest):
 
         if 'body' in self.expect:
             self.check_body(body)
+
+
+
+class Resume(yaml.YAMLObject):
+    """Test action to close and resume the TLS session.
+
+    Send the gnutls-cli inline command "^resume^" to close and resume
+    the TLS session. "inline-commands" must be present in
+    gnutls_params of the parent connection. This action does not need
+    any arguments, but you must specify with an explicitly empty
+    dictionary for YAML parsing to work, like this:
+
+      !resume {}
+
+    """
+    yaml_tag = '!resume'
+    def run(self, conn, command):
+        if not '--inline-commands' in command:
+            raise ValueError('gnutls_params must include "inline-commands" '
+                             'to use the resume action!')
+        if not type(conn) is HTTPSubprocessConnection:
+            raise TypeError('Resume action works only with '
+                            'HTTPSubprocessConnection.')
+        conn.sock.send(b'^resume^\n')
 
 
 
