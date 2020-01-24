@@ -556,7 +556,6 @@ def run_test_conf(test_config, timeout=5.0, conn_log=None, response_log=None):
         conns = config
     else:
         raise TypeError(f'Unsupported configuration: {config!r}')
-    print(conns)
     sys.stdout.flush()
 
     for i, test_conn in enumerate(conns):
