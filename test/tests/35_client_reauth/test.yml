@@ -57,3 +57,27 @@
         status: 403
         body:
           contains: Forbidden
+- !connection
+  description: >-
+    This client has an untrusted certificate, so the the second
+    request will receive 403 Forbidden.
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+    - x509keyfile=rogueca/rogueclient/secret.key
+    - x509certfile=rogueca/rogueclient/x509.pem
+    - post-handshake-auth
+  actions:
+    - !request
+      path: /test.txt
+      expect:
+        status: 200
+        body:
+          exactly: |
+            test
+    - !request
+      method: GET
+      path: /secret/test.txt
+      expect:
+        status: 403
+        body:
+          contains: Forbidden
