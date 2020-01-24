@@ -1498,8 +1498,11 @@ int mgs_hook_authz(request_rec *r)
             return HTTP_FORBIDDEN;
         }
 
+        /* The request mode sent to the client is always "request"
+         * because if reauth with "require" fails GnuTLS invalidates
+         * the session, so we couldn't send 403 to the client. */
         gnutls_certificate_server_set_request(ctxt->session,
-                                              client_verify_mode);
+                                              GNUTLS_CERT_REQUEST);
         int rv = mgs_reauth(ctxt, r);
         if (rv != GNUTLS_E_SUCCESS) {
             if (rv == GNUTLS_E_GOT_APPLICATION_DATA)

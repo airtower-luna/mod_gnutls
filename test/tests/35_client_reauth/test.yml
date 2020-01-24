@@ -1,45 +1,59 @@
-!connection
-description: >-
-  There's no authentication needed on handshake, but the server will
-  require reauth to serve the second request.
-gnutls_params:
-  - x509cafile=authority/x509.pem
-  - x509keyfile=authority/client/secret.key
-  - x509certfile=authority/client/x509.pem
-  - post-handshake-auth
-actions:
-  - !request
-    path: /test.txt
-    expect:
-      status: 200
-      body:
-        exactly: |
-          test
-  - !request
-    method: POST
-    path: /secret/mirror.cgi
-    body: |
-      GNUTLS_E_GOT_APPLICATION_DATA can (randomly, depending on
-      timing) happen with a request containing a body. According to
-      https://tools.ietf.org/html/rfc8446#appendix-E.1.2
-      post-handshake authentication proves that the authenticated
-      party is the one that did the handshake, so caching the data
-      is appropriate.
-    expect:
-      status: 200
-      body:
-        exactly: |
-          GNUTLS_E_GOT_APPLICATION_DATA can (randomly, depending on
-          timing) happen with a request containing a body. According to
-          https://tools.ietf.org/html/rfc8446#appendix-E.1.2
-          post-handshake authentication proves that the authenticated
-          party is the one that did the handshake, so caching the data
-          is appropriate.
-  - !request
-    method: GET
-    path: /secret/test.txt
-    expect:
-      status: 200
-      body:
-        exactly: |
-          top secret
+- !connection
+  description: >-
+    There's no authentication needed on handshake, but the server will
+    require reauth to serve the second request.
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+    - x509keyfile=authority/client/secret.key
+    - x509certfile=authority/client/x509.pem
+    - post-handshake-auth
+  actions:
+    - !request
+      path: /test.txt
+      expect:
+        status: 200
+        body:
+          exactly: |
+            test
+    - !request
+      method: POST
+      path: /secret/mirror.cgi
+      body: |
+        GNUTLS_E_GOT_APPLICATION_DATA can (randomly, depending on
+        timing) happen with a request containing a body. According to
+        https://tools.ietf.org/html/rfc8446#appendix-E.1.2
+        post-handshake authentication proves that the authenticated
+        party is the one that did the handshake, so caching the data
+        is appropriate.
+      expect:
+        status: 200
+        body:
+          exactly: |
+            GNUTLS_E_GOT_APPLICATION_DATA can (randomly, depending on
+            timing) happen with a request containing a body. According to
+            https://tools.ietf.org/html/rfc8446#appendix-E.1.2
+            post-handshake authentication proves that the authenticated
+            party is the one that did the handshake, so caching the data
+            is appropriate.
+- !connection
+  description: >-
+    This client has no certificate, so the the second request will
+    receive 403 Forbidden.
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+    - post-handshake-auth
+  actions:
+    - !request
+      path: /test.txt
+      expect:
+        status: 200
+        body:
+          exactly: |
+            test
+    - !request
+      method: GET
+      path: /secret/test.txt
+      expect:
+        status: 403
+        body:
+          contains: Forbidden
