@@ -173,34 +173,6 @@ sessions in case an attacker gains access to server memory. GnuTLS
 3.6.4 introduced an automatic TOTP-based key rollover, so this warning
 does not apply any more and tickets are enabled by default.
 
-### GnuTLSClientVerify
-
-Enable Client Certificate Verification
-
-    GnuTLSClientVerify [ignore|request|require]
-
-Default: `ignore`\
-Context: server config, virtual host, directory, .htaccess
-
-This directive controls the use of TLS Client Certificate
-Authentication. If used in the .htaccess context, it can force TLS
-re-negotiation.
-
-`ignore`
-:   `mod_gnutls` will ignore the contents of any TLS Client Certificates
-    sent. It will not request that the client sends a certificate.
-
-`request`
-:   The client certificate will be requested, but not required.
-    The Certificate will be validated if sent.  The output of the
-    validation status will be stored in the `SSL_CLIENT_VERIFY`
-    environment variable and can be `SUCCESS`, `FAILED` or `NONE`.
-
-`require`
-:   A Client certificate will be required. Any requests without a valid
-    client certificate will be denied.  The `SSL_CLIENT_VERIFY`
-    environment variable will only be set to `SUCCESS`.
-
 ### GnuTLSDHFile
 
 Use the provided PKCS \#3 encoded Diffie-Hellman parameters
@@ -348,6 +320,56 @@ Since version 0.7 this can be a PKCS #11 URL.
 This private key must be protected. It is read while Apache is still
 running as root, and does not need to be readable by the nobody or
 apache user.
+
+### GnuTLSClientVerify
+
+Enable client certificate verification
+
+    GnuTLSClientVerify [ignore|request|require]
+
+Default: `ignore`\
+Context: server config, virtual host, directory, .htaccess
+
+This directive controls if clients need to authenticate with a
+certificate to access resources. If a mode other than `ignore` is used
+in a directory context the server may request post-handshake
+authentication (TLS 1.3 only, see below). Trusted CAs for certificate
+validation are set using [`GnuTLSClientCAFile`](#gnutlsclientcafile).
+
+`ignore`
+:   `mod_gnutls` will not request certificates from clients, and allow
+    any requests.
+
+`request`
+:   Client certificates will be requested, but requests are still
+    allowed if the client does not send one or the provided
+    certificate is invalid. If the client authenticates, the
+    certificate validation status will be stored in the
+    [`SSL_CLIENT_VERIFY`](#ssl_client_verify) environment variable and
+    can be `SUCCESS`, `FAILED` or `NONE`.
+
+`require`
+:   Client certificate authentication will be required for access. If
+    set at server or virtual host level TLS connections from clients
+    without a valid certificate will be denied. If set at directory
+    level any requests without a valid client certificate will be
+    denied with a 403 Forbidden error. The `SSL_CLIENT_VERIFY`
+    environment variable will be set to `SUCCESS` if access is
+    allowed, additional [environment
+    variables](#environment-variables) will hold details on the client
+    certificate.
+
+When using TLS 1.3 `mod_gnutls` will request [post-handshake
+authentication](https://tools.ietf.org/html/rfc8446#section-4.6.2) as
+necessary if the client announced support during the handshake. With
+TLS versions 1.2 and earlier `mod_gnutls` supports client
+authentication only during the initial handshake.
+
+If you want clients that do not support TLS 1.3 at all or do not
+support the post-handshake authentication extension to have access to
+resources that require authentication, you can set `GnuTLSClientVerify
+request` at the server or virtual host level so clients can
+authenticate during the initial handshake.
 
 ### GnuTLSClientCAFile
 
@@ -863,7 +885,6 @@ Listen 192.0.2.3:443
 	ServerName site3.example.com:443
 	GnuTLSCertificateFile conf/tls/site3.crt
 	GnuTLSKeyFile conf/tls/site3.key
-	GnuTLSClientVerify ignore
 	GnuTLSSRPPasswdFile conf/tls/tpasswd.site3
 	GnuTLSSRPPasswdConfFile conf/tls/tpasswd.site3.conf
 </VirtualHost>
@@ -970,6 +991,13 @@ This will not be set if DH is not used.
 
 The session ID negotiated in this session. Can be the same during client
 reloads.
+
+`SSL_CLIENT_VERIFY`
+-------------------
+
+Verification status of the client's certificate, if any. May be
+`SUCCESS`, `FAILED` or `NONE`. See
+[`GnuTLSClientVerify`](#gnutlsclientverify).
 
 `SSL_CLIENT_V_REMAIN`
 ---------------------
