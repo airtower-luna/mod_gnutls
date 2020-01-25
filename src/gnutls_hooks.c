@@ -1021,7 +1021,6 @@ mgs_srvconf_rec *mgs_find_sni_server(mgs_handle_t *ctxt)
 
 
 
-#ifdef ENABLE_EARLY_SNI
 /**
  * Pre client hello hook function for GnuTLS that implements early SNI
  * processing using `gnutls_ext_raw_parse()` (available since GnuTLS
@@ -1092,7 +1091,6 @@ static int early_sni_hook(gnutls_session_t session,
 
     return ret;
 }
-#endif
 
 
 
@@ -1188,14 +1186,10 @@ static void create_gnutls_handle(conn_rec * c)
         ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
                       "gnutls_priority_set failed!");
 
-#ifdef ENABLE_EARLY_SNI
-    /* Pre-handshake hook, EXPERIMENTAL */
+    /* Pre-handshake hook for early SNI parsing */
     gnutls_handshake_set_hook_function(ctxt->session,
                                        GNUTLS_HANDSHAKE_CLIENT_HELLO,
                                        GNUTLS_HOOK_PRE, early_sni_hook);
-#else
-    prepare_alpn_proposals(ctxt);
-#endif
 
     /* Post client hello hook (called after GnuTLS has parsed it) */
     gnutls_handshake_set_post_client_hello_function(ctxt->session,

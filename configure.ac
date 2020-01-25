@@ -71,21 +71,6 @@ if test "$use_srp" != "no"; then
 	GNUTLS_FEAT_CFLAGS="-DENABLE_SRP=1"
 fi
 
-# check if the available GnuTLS library supports raw extension parsing
-AC_SEARCH_LIBS([gnutls_ext_raw_parse], [gnutls], [early_sni="yes"],
-	[early_sni="no"])
-if test "$early_sni" != "no"; then
-	ENABLE_EARLY_SNI=1
-	# This is for the test server configuration
-	EXPECT_EARLY_SNI="Define EXPECT_EARLY_SNI"
-else
-	ENABLE_EARLY_SNI=0
-	EXPECT_EARLY_SNI=""
-fi
-AC_SUBST(ENABLE_EARLY_SNI)
-AC_SUBST(EXPECT_EARLY_SNI)
-AM_SUBST_NOTMAKE(EXPECT_EARLY_SNI)
-
 AC_ARG_ENABLE(strict,
        AS_HELP_STRING([--disable-strict],
                [Avoid strict compiler warnings and errors]),
@@ -289,7 +274,6 @@ DX_INIT_DOXYGEN([mod_gnutls], [doc/doxygen.conf], [doc/api])
 AC_CONFIG_FILES([Makefile src/Makefile test/Makefile test/tests/Makefile \
 			doc/Makefile doc/doxygen.conf include/mod_gnutls.h \
 			test/proxy_backend.conf test/ocsp_server.conf \
-			test/apache-conf/early_sni.conf \
 			test/apache-conf/listen.conf \
 			test/apache-conf/netns.conf])
 AC_OUTPUT
@@ -304,7 +288,6 @@ echo "   * CFLAGS for GnuTLS:		${LIBGNUTLS_CFLAGS}"
 echo "   * LDFLAGS for GnuTLS:	${LIBGNUTLS_LIBS}"
 echo "   * SRP Authentication:	${use_srp}"
 echo "   * MSVA Client Verification:	${use_msva}"
-echo "   * Early SNI:			${early_sni}"
 echo "   * Build documentation:	${build_doc}"
 echo ""
 echo "---"
