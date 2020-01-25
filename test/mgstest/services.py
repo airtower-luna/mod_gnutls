@@ -108,17 +108,14 @@ class TestService:
         if self.process:
             self.process.wait()
             self.process = None
-        elif self.pid:
-            print(f'Waiting for PID {self.pid}...', file=sys.stderr)
+        elif self.pid and self.pidfile:
+            print(f'Waiting for PID {self.pid} to delete its PID file '
+                  f'({self.pidfile})...', file=sys.stderr)
+            sys.stderr.flush()
             while True:
-                try:
-                    # signal 0 just checks if the target process exists
-                    os.kill(self.pid, 0)
+                if self.pidfile.exists():
                     sleep(self._step)
-                except OSError as e:
-                    if e.errno != errno.ESRCH:
-                        print('Unexpected exception while checking process '
-                              f'state: {e}', file=sys.stderr)
+                else:
                     break
             self.pid = None
 
