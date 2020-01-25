@@ -1,5 +1,11 @@
 name: CI build
-on: [push]
+on:
+  push:
+    # don't run on packaging branches
+    branches-ignore:
+      - 'for-debian'
+      - 'debian/**'
+      - 'pristine-tar'
 jobs:
   debian-buster:
     runs-on: ubuntu-latest
