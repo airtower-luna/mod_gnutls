@@ -1,7 +1,7 @@
 name: CI build
 on: [push]
 jobs:
-  build:
+  debian-buster:
     runs-on: ubuntu-latest
     container: debian:buster
     steps:
@@ -23,6 +23,53 @@ jobs:
       - name: set mutex
         run: |
           echo "Mutex sem default" >test/apache-conf/github_mutex.conf
+      - name: make check
+        run: VERBOSE=1 make check
+      - uses: actions/upload-artifact@v1
+        if: failure() || cancelled()
+        with:
+          name: apache-logs
+          path: test/logs/
+      - uses: actions/upload-artifact@v1
+        if: cancelled()
+        with:
+          name: test-logs
+          path: test/test-00_basic.log
+  fedora-31:
+    runs-on: ubuntu-latest
+    container: fedora:31
+    steps:
+      - uses: actions/checkout@v2
+      - name: install dependencies
+        run: |
+          dnf -y group install "C Development Tools and Libraries"
+          dnf -y install curl gnutls-devel gnutls-utils httpd-devel iproute python3-pyyaml redhat-rpm-config softhsm
+      - name: network overview
+        run: |
+          ip addr show
+          cat /etc/hosts
+      - name: autoreconf
+        run: autoreconf -fiv
+      - name: configure
+        run: TEST_IP=127.0.0.1 ./configure
+      - name: store config.log
+        uses: actions/upload-artifact@v1
+        if: failure()
+        with:
+          name: config-log
+          path: config.log
+      - name: make
+        run: make
+      - name: set mutex
+        run: |
+          echo "Mutex sem default" >test/apache-conf/github_mutex.conf
+      - name: configure extra modules needed for Fedora
+        run: |
+          cat - >test/apache-conf/fedora.conf <<EOF
+          LoadModule  log_config_module  \${AP_LIBEXECDIR}/mod_log_config.so
+          LoadModule  logio_module       \${AP_LIBEXECDIR}/mod_logio.so
+          LoadModule  unixd_module       \${AP_LIBEXECDIR}/mod_unixd.so
+          EOF
       - name: make check
         run: VERBOSE=1 make check
       - uses: actions/upload-artifact@v1
