@@ -61,27 +61,6 @@ default](#gnutlsocspstapling), without needing any further
 configuration other than a [certificate chain](#gnutlscertificatefile)
 with OCSP support.
 
-Note on HTTP/2
---------------
-
-HTTP/2 is supported with `mod_gnutls`. However, full support requires
-compiling with GnuTLS 3.6.3 or later. When using lower versions all
-virtual hosts using `mod_gnutls` with overlapping IP/port combinations
-need to use identical `Protocols` directives for protocol negotiation
-to work correctly.
-
-The technical reason is that using HTTP/2 requires ALPN (Application
-Layer Protocol Negotiation) to be set up before GnuTLS parses the TLS
-ClientHello message, but earlier hooks cannot use
-`gnutls_server_name_get()` to retrieve SNI (Server Name Indication)
-data for virtual host selection. Because of this `mod_gnutls` provides
-its own early SNI parser, which requires the `gnutls_ext_raw_parse()`
-function introduced in GnuTLS 3.6.3 to retrieve the extension data in
-a *pre* client hello hook.
-
-During build `./configure` will report "Early SNI: yes" if your
-version of GnuTLS is new enough.
-
 * * * * *
 
 Configuration Directives
@@ -830,9 +809,7 @@ Listen 198.51.100.1:443
 	ServerName site3.example.com:443
 	GnuTLSCertificateFile conf/tls/site3.crt
 	GnuTLSKeyFile conf/tls/site3.key
-	# Enable HTTP/2. With GnuTLS before version 3.6.3 all
-	# virtual hosts in this example would have to share this
-	# directive to work correctly.
+	# Enable HTTP/2
 	Protocols h2 http/1.1
 </VirtualHost>
 ```
