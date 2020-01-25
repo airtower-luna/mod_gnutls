@@ -35,6 +35,18 @@
             post-handshake authentication proves that the authenticated
             party is the one that did the handshake, so caching the data
             is appropriate.
+    - !request
+      path: /dump.cgi
+      expect:
+        status: 200
+        body:
+          contains:
+            - |
+              ----Verification Status:----
+              SUCCESS
+            - |
+              ----SubjectAltName:----
+              RFC822NAME:test0@modgnutls.test
 - !connection
   description: >-
     This client has no certificate, so the the second request will
@@ -57,6 +69,14 @@
         status: 403
         body:
           contains: Forbidden
+    - !request
+      path: /dump.cgi
+      expect:
+        status: 200
+        body:
+          contains: |
+            ----Verification Status:----
+            NONE
 - !connection
   description: >-
     This client has an untrusted certificate, so the the second
@@ -81,3 +101,11 @@
         status: 403
         body:
           contains: Forbidden
+    - !request
+      path: /dump.cgi
+      expect:
+        status: 200
+        body:
+          contains: |
+            ----Verification Status:----
+            FAILED
