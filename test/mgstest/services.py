@@ -27,25 +27,20 @@ from time import sleep
 class TestService:
     """A generic service used in the mod_gnutls test environment."""
 
-    def __init__(self, start=None, stop=None, forking=False,
-                 env=None, condition=None, check=None, pidfile=None):
+    def __init__(self, start=None, stop=None, env=None,
+                 condition=None, check=None, pidfile=None):
         # command to start the service
         self.start_command = start
         # command to stop the service (otherwise use SIGTERM)
         self.stop_command = stop
-        # forking: expect the start command to terminate during startup
-        self.forking = forking
         # condition: start service if the function returns true
         self.condition = condition or (lambda: True)
 
-        # child process for non-forking services
+        # child process
         self.process = None
-        # Forking processes like apache2 require a PID file for
-        # tracking. The process must delete its PID file when exiting.
+        # PID file, if any. The process must delete its PID file when
+        # exiting.
         self.pidfile = Path(pidfile) if pidfile else None
-        if not self.pidfile and self.forking:
-            raise ValueError('Forking service must provide PID file!')
-        self.pid = None
 
         # add environment variables for a subprocess only
         if env:
@@ -67,37 +62,25 @@ class TestService:
             # skip
             return
         print(f'Starting: {self.start_command}')
-        if self.forking:
-            subprocess.run(self.start_command, check=True,
-                           env=self.process_env)
-        else:
-            self.process = subprocess.Popen(self.start_command,
-                                            env=self.process_env,
-                                            close_fds=True)
+        self.process = subprocess.Popen(self.start_command,
+                                        env=self.process_env,
+                                        close_fds=True)
 
     def stop(self):
         """Order the service to stop"""
         if not self.condition():
             # skip
             return
-        # Read PID file before actually sending the stop signal
-        if self.pidfile:
-            if not self.pidfile.exists():
-                print(f'Skipping stop of {self.stop_command}, no PID file!')
-                # Presumably the process isn't running, ignore.
-                return
-            self.pid = int(self.pidfile.read_text())
+        if not self.process or self.process.poll():
+            # process either never started or already stopped
+            return
+
         if self.stop_command:
             print(f'Stopping: {self.stop_command}')
             subprocess.run(self.stop_command, check=True, env=self.process_env)
         else:
             print(f'Stopping (SIGTERM): {self.start_command}')
-            if self.process:
-                # non-forking process: direct SIGTERM to child process
-                self.process.terminate()
-            else:
-                # forking process: SIGTERM based on PID file
-                os.kill(self.pid, signal.SIGTERM)
+            self.process.terminate()
 
     def wait(self):
         """Wait for the process to actually stop after calling stop().
@@ -108,16 +91,6 @@ class TestService:
         if self.process:
             self.process.wait()
             self.process = None
-        elif self.pid and self.pidfile:
-            print(f'Waiting for PID {self.pid} to delete its PID file '
-                  f'({self.pidfile})...', file=sys.stderr)
-            sys.stderr.flush()
-            while True:
-                if self.pidfile.exists():
-                    sleep(self._step)
-                else:
-                    break
-            self.pid = None
 
     def wait_ready(self, timeout=None):
         """Wait for the started service to be ready.
@@ -187,7 +160,6 @@ class ApacheService(TestService):
             check = self.pidfile_check
         super(ApacheService, self).__init__(start=start_cmd,
                                             stop=base_cmd + ['stop'],
-                                            forking=False,
                                             env=env,
                                             pidfile=pidfile,
                                             condition=self.config_exists,
