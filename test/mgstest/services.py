@@ -120,15 +120,27 @@ class TestService:
             self.pid = None
 
     def wait_ready(self, timeout=None):
-        """Wait for the started service to be ready. The function passed to
-        the constructor as "check" is called to determine whether it is."""
+        """Wait for the started service to be ready.
+
+        The function passed to the constructor as "check" is called to
+        determine whether it is. Waiting also ends if self.process
+        terminates.
+
+        Returns: None if the service is ready, or the return code if
+        the process has terminated.
+
+        Raises a TimeoutError if the given timeout has been exceeded.
+
+        """
         if not self.check:
-            return
+            return None
 
         slept = 0
         while not timeout or slept < timeout:
+            if self.process and self.process.poll():
+                return self.process.returncode
             if self.check():
-                return
+                return None
             else:
                 sleep(self._step)
                 slept = slept + self._step
@@ -164,21 +176,18 @@ class ApacheService(TestService):
     def __init__(self, config, env=None, pidfile=None, check=None,
                  valgrind_log=None):
         self.config = Path(config).resolve()
-        self.forking = True
         base_cmd = [self.apache2, '-f', str(self.config), '-k']
-        start_cmd = base_cmd + ['start']
-        stop_cmd = base_cmd + ['stop']
+        start_cmd = base_cmd + ['start', '-DFOREGROUND']
         if valgrind_log:
             start_cmd = ['valgrind', '-s', '--leak-check=full',
                          '--track-origins=yes', '--vgdb=no',
                          f'--log-file={valgrind_log}'] \
-                         + start_cmd + ['-DFOREGROUND']
-            self.forking = False
+                         + start_cmd
         if not check:
             check = self.pidfile_check
         super(ApacheService, self).__init__(start=start_cmd,
-                                            stop=stop_cmd,
-                                            forking=self.forking,
+                                            stop=base_cmd + ['stop'],
+                                            forking=False,
                                             env=env,
                                             pidfile=pidfile,
                                             condition=self.config_exists,

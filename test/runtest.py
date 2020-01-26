@@ -168,18 +168,15 @@ def main(args):
                 s.wait_ready(timeout=wait_timeout)
 
         # special case: expected to fail in a few cases
-        try:
-            service_stack.enter_context(apache.run())
-            if os.path.exists(os.path.join(testdir, 'fail.server')):
-                raise TestExpectationFailed(
-                    'Server start did not fail as expected!')
-            apache.wait_ready()
-        except subprocess.CalledProcessError as e:
-            if os.path.exists(os.path.join(testdir, 'fail.server')):
+        service_stack.enter_context(apache.run())
+        failed = apache.wait_ready()
+        if os.path.exists(os.path.join(testdir, 'fail.server')):
+            if failed:
                 print('Apache server failed to start as expected',
                       file=sys.stderr)
             else:
-                raise e
+                raise TestExpectationFailed(
+                    'Server start did not fail as expected!')
 
         # Set TEST_TARGET for the request. Might be replaced with a
         # parameter later.
