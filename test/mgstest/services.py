@@ -161,14 +161,24 @@ class ApacheService(TestService):
 
     apache2 = os.environ.get('APACHE2', 'apache2')
 
-    def __init__(self, config, env=None, pidfile=None, check=None):
+    def __init__(self, config, env=None, pidfile=None, check=None,
+                 valgrind_log=None):
         self.config = Path(config).resolve()
+        self.forking = True
         base_cmd = [self.apache2, '-f', str(self.config), '-k']
+        start_cmd = base_cmd + ['start']
+        stop_cmd = base_cmd + ['stop']
+        if valgrind_log:
+            start_cmd = ['valgrind', '-s', '--leak-check=full',
+                         '--track-origins=yes', '--vgdb=no',
+                         f'--log-file={valgrind_log}'] \
+                         + start_cmd + ['-DFOREGROUND']
+            self.forking = False
         if not check:
             check = self.pidfile_check
-        super(ApacheService, self).__init__(start=base_cmd + ['start'],
-                                            stop=base_cmd + ['stop'],
-                                            forking=True,
+        super(ApacheService, self).__init__(start=start_cmd,
+                                            stop=stop_cmd,
+                                            forking=self.forking,
                                             env=env,
                                             pidfile=pidfile,
                                             condition=self.config_exists,

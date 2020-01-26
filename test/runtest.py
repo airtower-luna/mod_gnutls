@@ -110,9 +110,14 @@ def main(args):
     if 'USE_TEST_NAMESPACE' in os.environ:
         pidaffix = f'-{testname}'
 
+    valgrind_log = None
+    if args.valgrind:
+        valgrind_log = os.path.join('logs', f'valgrind-{testname}.log')
+
     # Define the available services
     apache = ApacheService(config=os.path.join(testdir, 'apache.conf'),
-                           pidfile=f'apache2{pidaffix}.pid')
+                           pidfile=f'apache2{pidaffix}.pid',
+                           valgrind_log=valgrind_log)
     backend = ApacheService(config=os.path.join(testdir, 'backend.conf'),
                             pidfile=f'backend{pidaffix}.pid')
     ocsp = ApacheService(config=os.path.join(testdir, 'ocsp.conf'),
@@ -216,6 +221,8 @@ if __name__ == "__main__":
     parser.add_argument('--log-responses', type=argparse.FileType('w+'),
                         default=temp_logfile(),
                         help='write HTTP responses to this file')
+    parser.add_argument('--valgrind', action='store_true',
+                        help='run primary Apache instance with Valgrind')
 
     # enable bash completion if argcomplete is available
     try:
