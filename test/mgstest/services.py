@@ -38,6 +38,9 @@ class TestService:
 
         # child process
         self.process = None
+        # will contain the return code of the child process after
+        # successful wait()
+        self.returncode = None
         # PID file, if any. The process must delete its PID file when
         # exiting.
         self.pidfile = Path(pidfile) if pidfile else None
@@ -65,6 +68,7 @@ class TestService:
         self.process = subprocess.Popen(self.start_command,
                                         env=self.process_env,
                                         close_fds=True)
+        self.returncode = None
 
     def stop(self):
         """Order the service to stop"""
@@ -83,7 +87,9 @@ class TestService:
             self.process.terminate()
 
     def wait(self, timeout=None):
-        """Wait for the process to actually stop after calling stop().
+        """Wait for the process to terminate.
+
+        Sets returncode to the process' return code and returns it.
 
         WARNING: Calling this method without a timeout or calling
         stop() first will hang. An expired timeout will raise a
@@ -92,7 +98,9 @@ class TestService:
         """
         if self.process:
             self.process.wait(timeout=timeout)
+            self.returncode = self.process.returncode
             self.process = None
+            return self.returncode
 
     def wait_ready(self, timeout=None):
         """Wait for the started service to be ready.
