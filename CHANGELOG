@@ -1,9 +1,19 @@
 ** Version 0.10.0 (UNRELEASED)
-- Support for stapling mutiple OCSP responses (TLS 1.3 only)
+
+- Support for stapling multiple OCSP responses (TLS 1.3
+  only). mod_gnutls will staple for as many consecutive certificates
+  in the certificate chain as possible.
+
+- Support for TLS 1.3 post-handshake authentication, used if TLS
+  client authentication is required only for some resources on the
+  server. Rehandshake (for older TLS versions) is not supported.
+
 - The test infrastructure has been mostly rewritten in Python, note
   the new dependencies (Python 3, Pyyaml).
+
 - Server certificates are checked for the must-staple TLS feature
   extension, stapling must be enabled if so.
+
 - Compatibility fix for GnuTLS 3.6.11 in the test suite: Handle
   certificate type in TLS session information strings
 
