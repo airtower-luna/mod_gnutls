@@ -82,14 +82,16 @@ class TestService:
             print(f'Stopping (SIGTERM): {self.start_command}')
             self.process.terminate()
 
-    def wait(self):
+    def wait(self, timeout=None):
         """Wait for the process to actually stop after calling stop().
 
-        WARNING: Calling this method without stop() first is likely to
-        hang.
+        WARNING: Calling this method without a timeout or calling
+        stop() first will hang. An expired timeout will raise a
+        subprocess.TimeoutExpired exception.
+
         """
         if self.process:
-            self.process.wait()
+            self.process.wait(timeout=timeout)
             self.process = None
 
     def wait_ready(self, timeout=None):
