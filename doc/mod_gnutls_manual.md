@@ -528,9 +528,10 @@ check the certificate status, which offers privacy and performance
 advantages, and avoids the security issue of how to handle errors that
 prevent the client from getting a response.
 
-With TLS 1.2 stapling can be used only for the server certificate,
-with TLS 1.3 mod\_gnutls supports stapling for all certificates in the
-certificate chain except the root CA.
+With TLS 1.2 stapling can be used only for the server certificate.
+TLS 1.3 supports stapling for all transmitted certificates.
+Mod\_gnutls will staple for as many consecutive certificates in the
+certificate chain as possible, ideally all except the root CA.
 
 Mod\_gnutls enables OCSP stapling by default if possible. The following
 requirements must be met:
