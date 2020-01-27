@@ -588,7 +588,8 @@ Default: `shmcb:gnutls_ocsp_cache`\
 Context: server config
 
 This directive configures the OCSP stapling cache, and uses the same
-syntax as `GnuTLSOCSPCache`. Please check there for details.
+syntax as [`GnuTLSCache`](#gnutlscache). Please check there for
+details.
 
 The default should be reasonable for most servers and requires
 [mod\_socache\_shmcb](http://httpd.apache.org/docs/current/en/mod/mod_socache_shmcb.html)
