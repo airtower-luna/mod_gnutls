@@ -77,13 +77,6 @@ jobs:
       - name: set mutex
         run: |
           echo "Mutex sem default" >test/apache-conf/github_mutex.conf
-      - name: configure extra modules needed for Fedora
-        run: |
-          cat - >test/apache-conf/fedora.conf <<EOF
-          LoadModule  log_config_module  \${AP_LIBEXECDIR}/mod_log_config.so
-          LoadModule  logio_module       \${AP_LIBEXECDIR}/mod_logio.so
-          LoadModule  unixd_module       \${AP_LIBEXECDIR}/mod_unixd.so
-          EOF
       - name: make check
         run: VERBOSE=1 make check
       - name: store Apache logs

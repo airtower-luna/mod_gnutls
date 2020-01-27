@@ -66,7 +66,8 @@ endif
 # Python tools for tests
 noinst_PYTHON = https-test-client.py mgstest/http.py mgstest/__init__.py \
 	mgstest/hooks.py mgstest/services.py mgstest/softhsm.py \
-	mgstest/tests.py runtest.py softhsm-init.py doctest-mgstest.py
+	mgstest/tests.py runtest.py softhsm-init.py doctest-mgstest.py \
+	required-modules.py
 
 # Identities in the miniature CA, server, and client environment for
 # the test suite
@@ -250,6 +251,14 @@ endif
 apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/ocsp.cgi \
 	data/test.txt data/secret/mirror.cgi data/secret/test.txt \
 	mime.types proxy_mods.conf
+
+# Which modules are compiled into the Apache binary varies between
+# distributions. required-modules.py creates additional LoadModule
+# directives if needed.
+check_DATA += apache-conf/required-modules.conf
+MOSTLYCLEANFILES += apache-conf/required-modules.conf
+apache-conf/required-modules.conf: required-modules.py
+	APACHE2=$(APACHE2) $(PYTHON) $< >$@
 
 # Documentation for the test system
 test_doc = README.md sample_fail.yml sample_test.yml
