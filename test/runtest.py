@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # PYTHON_ARGCOMPLETE_OK
 
-# Copyright 2019 Fiona Klute
+# Copyright 2019-2020 Fiona Klute
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import tempfile
 from unittest import SkipTest
 
 import mgstest.hooks
+import mgstest.valgrind
 from mgstest import lockfile, TestExpectationFailed
 from mgstest.services import ApacheService, TestService
 from mgstest.tests import run_test_conf
@@ -204,6 +205,14 @@ def main(args):
         args.log_responses.seek(0)
         plugin.post_check(conn_log=args.log_connection,
                           response_log=args.log_responses)
+
+    if valgrind_log:
+        with open(valgrind_log) as log:
+            errors = mgstest.valgrind.error_summary(log)
+            print(f'Valgrind summary: {errors[0]} errors, '
+                  f'{errors[1]} suppressed')
+            if errors[0] > 0:
+                sys.exit(ord('V'))
 
 
 
