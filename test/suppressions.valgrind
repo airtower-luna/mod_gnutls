@@ -36,9 +36,28 @@
    fun:child_main
    fun:make_child
    fun:startup_children
-   fun:*
-   fun:ap_run_mpm
-   fun:main
+   ...
+}
+
+# mod_http2 needs thread-local storage, too.
+{
+   http2_child_thread_init
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   fun:allocate_dtv
+   fun:_dl_allocate_tls
+   fun:allocate_stack
+   fun:pthread_create@*
+   fun:activate_slot
+   fun:h2_workers_create
+   fun:h2_conn_child_init
+   fun:h2_child_init
+   fun:ap_run_child_init
+   fun:child_main
+   fun:make_child
+   fun:startup_children
+   ...
 }
 
 # There's a bunch of reports of leaks from getaddrinfo, but outside
@@ -53,4 +72,19 @@
    ...
    fun:ap_get_local_host
    fun:ap_fini_vhost_config
+}
+
+# Whatever OpenSSL does to initialize its DRBG, this happens when
+# using SoftHSM.
+{
+   libcrypto_drbg_init
+   Memcheck:Value8
+   obj:/usr/lib/*/libcrypto.so.*
+   fun:AES_encrypt
+   obj:/usr/lib/*/libcrypto.so.*
+   ...
+   obj:/usr/lib/*/libcrypto.so.*
+   fun:RAND_DRBG_instantiate
+   obj:/usr/lib/*/libcrypto.so.*
+   obj:/usr/lib/*/libcrypto.so.*
 }
