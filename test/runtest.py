@@ -117,7 +117,8 @@ def main(args):
     # Define the available services
     apache = ApacheService(config=os.path.join(testdir, 'apache.conf'),
                            pidfile=f'apache2{pidaffix}.pid',
-                           valgrind_log=valgrind_log)
+                           valgrind_log=valgrind_log,
+                           valgrind_suppress=args.valgrind_suppressions)
     backend = ApacheService(config=os.path.join(testdir, 'backend.conf'),
                             pidfile=f'backend{pidaffix}.pid')
     ocsp = ApacheService(config=os.path.join(testdir, 'ocsp.conf'),
@@ -220,6 +221,9 @@ if __name__ == "__main__":
                         help='write HTTP responses to this file')
     parser.add_argument('--valgrind', action='store_true',
                         help='run primary Apache instance with Valgrind')
+    parser.add_argument('--valgrind-suppressions', action='append',
+                        default=[],
+                        help='use Valgrind suppressions file')
 
     # enable bash completion if argcomplete is available
     try:

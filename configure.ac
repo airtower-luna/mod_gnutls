@@ -87,6 +87,19 @@ AC_MSG_RESULT($use_srp)
 AM_PATH_PYTHON([3])
 AX_PYTHON_MODULE([yaml], [fatal])
 
+dnl Enable testing with Valgrind? Default is "no".
+AC_ARG_ENABLE([valgrind-test],
+	AS_HELP_STRING([--enable-valgrind-test], [Enable running \
+	tests with Valgrind (slow)]),
+	[use_valgrind=$enableval], [use_valgrind=no])
+AC_MSG_CHECKING([whether to run tests with Valgrind])
+AC_MSG_RESULT([$use_valgrind])
+AC_PATH_PROG([VALGRIND], [valgrind], [no])
+AS_IF([test "${use_valgrind}" != "no" -a "${VALGRIND}" = "no"],
+      [AC_MSG_ERROR([Valgrind test are enabled, but "valgrind" not \
+      found in PATH!])])
+AM_CONDITIONAL([ENABLE_VALGRIND], [test "${use_valgrind}" != "no"])
+
 dnl Optionally disable flock
 AC_ARG_ENABLE(flock,
 	AS_HELP_STRING([--disable-flock], [Disable use of flock during tests \

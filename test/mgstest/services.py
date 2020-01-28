@@ -157,15 +157,17 @@ class ApacheService(TestService):
     apache2 = os.environ.get('APACHE2', 'apache2')
 
     def __init__(self, config, env=None, pidfile=None, check=None,
-                 valgrind_log=None):
+                 valgrind_log=None, valgrind_suppress=[]):
         self.config = Path(config).resolve()
         base_cmd = [self.apache2, '-f', str(self.config), '-k']
         start_cmd = base_cmd + ['start', '-DFOREGROUND']
         if valgrind_log:
-            start_cmd = ['valgrind', '-s', '--leak-check=full',
+            valgrind = os.environ.get('VALGRIND', 'valgrind')
+            suppress = [f'--suppressions={s}' for s in valgrind_suppress]
+            start_cmd = [valgrind, '-s', '--leak-check=full',
                          '--track-origins=yes', '--vgdb=no',
                          f'--log-file={valgrind_log}'] \
-                         + start_cmd
+                         + suppress + start_cmd
         if not check:
             check = self.pidfile_check
         super(ApacheService, self).__init__(start=start_cmd,

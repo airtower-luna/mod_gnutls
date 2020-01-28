@@ -1,0 +1,56 @@
+# The first call to gnutls_rng in a new thread causes a "possible
+# loss" setting up thread-local storage (TLS). According to search
+# results that seems to be a common issue with glibc.
+{
+   gnutls_rng_init
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc
+   ...
+   fun:__tls_get_addr
+   ...
+   fun:mgs_create_ocsp_request
+   ...
+   fun:mgs_async_ocsp_update
+   fun:*
+   fun:start_thread
+   fun:clone
+}
+
+# Whatever mod_watchdog does setting up its threads, it involves
+# thread-local storage, too.
+{
+   watchdog_child_thread_init
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   fun:allocate_dtv
+   fun:_dl_allocate_tls
+   fun:allocate_stack
+   fun:pthread_create@*
+   fun:wd_startup
+   fun:wd_startup
+   fun:wd_child_init_hook
+   fun:wd_child_init_hook
+   fun:ap_run_child_init
+   fun:child_main
+   fun:make_child
+   fun:startup_children
+   fun:*
+   fun:ap_run_mpm
+   fun:main
+}
+
+# There's a bunch of reports of leaks from getaddrinfo, but outside
+# the scope of mod_gnutls to fix.
+{
+   apr_getaddrinfo_leak
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   ...
+   fun:getaddrinfo
+   ...
+   fun:ap_get_local_host
+   fun:ap_fini_vhost_config
+}

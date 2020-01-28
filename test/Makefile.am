@@ -1,8 +1,19 @@
 SUBDIRS = tests
 
+VALGRIND_SUPPRESS = suppressions.valgrind
+EXTRA_DIST = $(VALGRIND_SUPPRESS)
+
+if ENABLE_VALGRIND
+valgrind = --valgrind \
+	$(foreach supp,$(VALGRIND_SUPPRESS),--valgrind-suppressions "$(srcdir)/$(supp)")
+else
+valgrind =
+endif
+
 # Generate the test scripts
 test-%.bash: test-template.bash.in | tests/%/
-	testname="$(*)"; sed s/@NUMBER@/$${testname%%_*}/ < $< > $@
+	testname="$(*)"; \
+	sed -e s/_NUM_/$${testname%%_*}/ -e 's,_VALGRIND_,$(valgrind),' < $< > $@
 	chmod a+x $@
 
 test_scripts = test-00_basic.bash \
@@ -263,7 +274,7 @@ apache-conf/required-modules.conf: required-modules.py
 # Documentation for the test system
 test_doc = README.md sample_fail.yml sample_test.yml
 
-EXTRA_DIST = $(apache_data) $(cert_templates) $(shared_identities:=/uid.in) \
+EXTRA_DIST += $(apache_data) $(cert_templates) $(shared_identities:=/uid.in) \
 	authority/server/crl.template $(test_doc)
 
 # Lockfile for the main Apache process
@@ -315,6 +326,10 @@ endif
 if ENABLE_OCSP_TEST
 AM_TESTS_ENVIRONMENT += export OPENSSL="@OPENSSL@"; \
 	export OCSP_PORT="$(OCSP_PORT)";
+endif
+
+if ENABLE_VALGRIND
+AM_TESTS_ENVIRONMENT += export VALGRIND="@VALGRIND@";
 endif
 
 if ENABLE_NETNS
