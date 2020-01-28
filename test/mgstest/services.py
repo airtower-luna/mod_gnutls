@@ -165,6 +165,7 @@ class ApacheService(TestService):
             valgrind = os.environ.get('VALGRIND', 'valgrind')
             suppress = [f'--suppressions={s}' for s in valgrind_suppress]
             start_cmd = [valgrind, '-s', '--leak-check=full',
+                         '--keep-debuginfo=yes',
                          '--track-origins=yes', '--vgdb=no',
                          f'--log-file={valgrind_log}'] \
                          + suppress + start_cmd

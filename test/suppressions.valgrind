@@ -8,8 +8,9 @@
    fun:malloc
    ...
    fun:__tls_get_addr
-   ...
-   fun:mgs_create_ocsp_request
+   fun:_gnutls_rnd_init
+   fun:gnutls_rnd
+   fun:gnutls_ocsp_req_randomize_nonce
    ...
    fun:mgs_async_ocsp_update
    fun:*
