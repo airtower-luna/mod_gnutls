@@ -175,13 +175,13 @@ AC_ARG_ENABLE(msva,
 AM_CONDITIONAL([USE_MSVA], [test "$use_msva" != "no"])
 
 MSVA_CFLAGS=""
-if test "$use_msva" != "no"; then
+AS_IF([test "$use_msva" != "no"], [
 	AC_CHECK_HEADERS([msv/msv.h], [],
-                         [AC_MSG_ERROR([*** No libmsv headers found!])])
-        AC_SEARCH_LIBS([msv_query_agent], [msv], [],
-                         [AC_MSG_ERROR([*** No libmsv found with msv_query_agent!])])
+	                 [AC_MSG_ERROR([*** No libmsv headers found!])])
+	AC_SEARCH_LIBS([msv_query_agent], [msv], [],
+	                 [AC_MSG_ERROR([*** No libmsv found with msv_query_agent!])])
 	MSVA_CFLAGS="-DENABLE_MSVA=1"
-fi
+])
 
 AC_MSG_CHECKING([whether to enable MSVA functionality])
 AC_MSG_RESULT($use_msva)
@@ -190,19 +190,19 @@ AC_MSG_RESULT($use_msva)
 # to build PDF output.
 build_doc=no
 AC_PATH_PROG([PANDOC], [pandoc], [no])
-if test "$PANDOC" != "no"; then
+AS_IF([test "$PANDOC" != "no"], [
 	AC_PATH_PROG([PDFLATEX], [pdflatex], [no])
 	if test "$PDFLATEX" != "no"; then
 		build_doc="html, manual page, pdf"
 	else
 		build_doc="html, manual page"
 	fi
-else
+], [
 	AC_PATH_PROG([MARKDOWN], [markdown], [no])
 	if test "$MARKDOWN" != "no"; then
 		build_doc="html stub"
 	fi
-fi
+])
 AM_CONDITIONAL([USE_PANDOC], [test "$PANDOC" != "no"])
 AM_CONDITIONAL([USE_PDFLATEX], [test "$PANDOC" != "no" && \
 			       test "$PDFLATEX" != "no"])
@@ -211,10 +211,10 @@ AM_CONDITIONAL([USE_MARKDOWN], [test -n "$MARKDOWN" && \
 
 # Check for Apache binary
 AC_PATH_PROGS([APACHE2], [apache2 httpd], [no], [$PATH:/usr/sbin])
-if test "${APACHE2}" = "no"; then
+AS_IF([test "${APACHE2}" = "no"], [
 	AC_MSG_WARN([Neither apache2 nor httpd found in \
 		     PATH. Test suite will fail.])
-fi
+])
 
 AC_PATH_PROGS([HTTP_CLI], [curl], [no])
 
