@@ -34,7 +34,7 @@ jobs:
         run: make
       - name: set mutex
         run: |
-          echo "Mutex sem default" >test/apache-conf/github_mutex.conf
+          echo "Mutex pthread default" >test/apache-conf/github_mutex.conf
       - name: make check
         run: VERBOSE=1 make check
       - name: store Apache logs
@@ -76,7 +76,7 @@ jobs:
         run: make
       - name: set mutex
         run: |
-          echo "Mutex sem default" >test/apache-conf/github_mutex.conf
+          echo "Mutex pthread default" >test/apache-conf/github_mutex.conf
       - name: make check
         run: VERBOSE=1 make check
       - name: store Apache logs
