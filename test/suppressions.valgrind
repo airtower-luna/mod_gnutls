@@ -8,7 +8,7 @@
    fun:malloc
    ...
    fun:__tls_get_addr
-   fun:_gnutls_rnd_init
+   ...
    fun:gnutls_rnd
    fun:gnutls_ocsp_req_randomize_nonce
    ...
@@ -29,14 +29,13 @@
    fun:_dl_allocate_tls
    fun:allocate_stack
    fun:pthread_create@*
-   fun:wd_startup
-   fun:wd_startup
-   fun:wd_child_init_hook
-   fun:wd_child_init_hook
+   obj:/usr/sbin/apache2
+   ...
    fun:ap_run_child_init
-   fun:child_main
-   fun:make_child
-   fun:startup_children
+   obj:/usr/lib/apache2/modules/mod_mpm_*.so
+   ...
+   obj:/usr/lib/apache2/modules/mod_mpm_*.so
+   fun:ap_run_mpm
    ...
 }
 
@@ -50,14 +49,11 @@
    fun:_dl_allocate_tls
    fun:allocate_stack
    fun:pthread_create@*
-   fun:activate_slot
-   fun:h2_workers_create
-   fun:h2_conn_child_init
-   fun:h2_child_init
+   obj:/usr/lib/apache2/modules/mod_http2.so
+   ...
+   obj:/usr/lib/apache2/modules/mod_http2.so
    fun:ap_run_child_init
-   fun:child_main
-   fun:make_child
-   fun:startup_children
+   obj:/usr/lib/apache2/modules/mod_mpm_*.so
    ...
 }
 
