@@ -1,0 +1,54 @@
+name: Valgrind memcheck
+on:
+  push:
+    # don't run on packaging branches
+    branches-ignore:
+      - 'for-debian'
+      - 'debian/**'
+      - 'pristine-tar'
+    paths:
+      - '**'
+      - '!doc/**'
+jobs:
+  debian-buster:
+    runs-on: ubuntu-latest
+    container: debian:buster
+    steps:
+      - uses: actions/checkout@v2
+      - name: network overview
+        run: |
+          ip addr show
+          cat /etc/hosts
+      - name: install dependencies
+        run: |
+          apt-get update
+          apt-get -y install python3-yaml apache2-bin apache2-dev curl gnutls-bin libapr1-dev libgnutls28-dev openssl pkg-config procps softhsm2 valgrind
+      - name: autoreconf
+        run: autoreconf -fiv
+      - name: configure
+        run: TEST_IP=127.0.0.1 ./configure --enable-valgrind-test
+      - name: store config.log
+        uses: actions/upload-artifact@v1
+        if: failure()
+        with:
+          name: buster-config-log
+          path: config.log
+      - name: make
+        run: make
+      - name: set mutex
+        run: |
+          echo "Mutex pthread default" >test/apache-conf/github_mutex.conf
+      - name: make check
+        run: VERBOSE=1 make check
+      - name: store Apache and Valgrind logs
+        uses: actions/upload-artifact@v1
+        if: failure() || cancelled()
+        with:
+          name: buster-apache-logs
+          path: test/logs/
+      - name: store test log if cancelled
+        uses: actions/upload-artifact@v1
+        if: cancelled()
+        with:
+          name: buster-test-log
+          path: test/test-00_basic.log
