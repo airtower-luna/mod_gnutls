@@ -68,7 +68,7 @@
    fun:getaddrinfo
    ...
    fun:ap_get_local_host
-   fun:ap_fini_vhost_config
+   ...
 }
 
 # Whatever OpenSSL does to initialize its DRBG, this happens when
