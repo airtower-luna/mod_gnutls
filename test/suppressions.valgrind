@@ -66,8 +66,7 @@
    fun:malloc
    ...
    fun:getaddrinfo
-   ...
-   fun:ap_get_local_host
+   obj:/usr/lib/*/libapr-1.so.*
    ...
 }
 
