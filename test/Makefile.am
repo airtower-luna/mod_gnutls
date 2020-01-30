@@ -269,7 +269,7 @@ apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/ocsp.cgi \
 check_DATA += apache-conf/required-modules.conf
 MOSTLYCLEANFILES += apache-conf/required-modules.conf
 apache-conf/required-modules.conf: required-modules.py
-	APACHE2=$(APACHE2) $(PYTHON) $< >$@
+	APACHE2=@APACHE2@ AP_LIBEXECDIR=@AP_LIBEXECDIR@ $(PYTHON) $< >$@
 
 # Documentation for the test system
 test_doc = README.md sample_fail.yml sample_test.yml
