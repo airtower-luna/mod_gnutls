@@ -2,7 +2,6 @@
 cache
 proxy_backend.conf
 ocsp_server.conf
-apache-conf/required-modules.conf
 authority/template
 authority/client/uid
 authority/tofu.db
