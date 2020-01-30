@@ -12,10 +12,14 @@
   the new dependencies (Python 3, Pyyaml).
 
 - Server certificates are checked for the must-staple TLS feature
-  extension, stapling must be enabled if so.
+  extension, stapling must be enabled if it is present.
 
 - Compatibility fix for GnuTLS 3.6.11 in the test suite: Handle
-  certificate type in TLS session information strings
+  certificate type in TLS session information strings.
+
+- Tests can optionally run with Valgrind for the primary HTTPD
+  instance by running ./configure with --enable-valgrind-test, see
+  test/README.md for details.
 
 ** Version 0.9.1 (2019-11-29)
 - Fix possible segfault (NULL pointer dereference) on failed TLS

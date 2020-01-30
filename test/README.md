@@ -143,6 +143,20 @@ and disable locking, or you can disable it manually by passing
 of tests, including environment setup.
 
 
+## Testing with Valgrind memcheck
+
+The primary HTTPD instance will run under Valgrind if you run
+`./configure` with `--enable-valgrind-test`. While very slow that can
+be useful to catch memory leaks early.
+
+The [`suppressions.valgrind`](./suppressions.valgrind) file contains
+some suppressions for known reported errors that are deemed not to be
+mod\_gnutls issues. Note that the suppressions in that file are aimed
+at Debian x86_64 (or similar) systems, you may need to adjust them on
+other platforms. The Valgrind suppressions files to use are read from
+the `VALGRIND_SUPPRESS` variable in [`Makefile.am`](./Makefile.am).
+
+
 ## Adding a Test
 
 Please add more tests!
