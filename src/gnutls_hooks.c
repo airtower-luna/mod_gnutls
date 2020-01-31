@@ -577,15 +577,6 @@ int mgs_hook_post_config(apr_pool_t *pconf,
     server_rec *s;
     mgs_srvconf_rec *sc;
     mgs_srvconf_rec *sc_base;
-    void *data = NULL;
-    const char *userdata_key = "mgs_init";
-
-    _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
-
-    apr_pool_userdata_get(&data, userdata_key, base_server->process->pool);
-    if (data == NULL) {
-        apr_pool_userdata_set((const void *) 1, userdata_key, apr_pool_cleanup_null, base_server->process->pool);
-    }
 
     s = base_server;
     sc_base = (mgs_srvconf_rec *) ap_get_module_config(s->module_config, &gnutls_module);
