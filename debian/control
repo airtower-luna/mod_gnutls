@@ -14,15 +14,14 @@ Build-Depends:
  libgnutls28-dev (>= 3.1.4) | libgnutls-dev (>= 3.1.4),
  libmsv-dev (>= 1.0),
  libwww-perl,
- markdown [m68k powerpcspe sh4 x32],
  monkeysphere (>= 0.36) <!nocheck>,
  msva-perl [linux-any] <!nocheck>,
  openssl <!nocheck>,
- pandoc [!m68k !powerpcspe !sh4 !x32],
  pkg-config,
  procps <!nocheck>,
  softhsm2 <!nocheck> | softhsm <!nocheck>,
 Standards-Version: 4.3.0
+Build-Depends-Indep: pandoc
 Homepage: https://mod.gnutls.org/
 Vcs-Git: https://mod.gnutls.org/git/mod_gnutls -b debian/master
 Vcs-Browser: https://mod.gnutls.org/browser/mod_gnutls
@@ -33,6 +32,7 @@ Architecture: any
 Depends:
  ${misc:Depends},
  ${shlibs:Depends},
+Suggests: libapache2-mod-gnutls-doc
 Description: Apache module for TLS encryption with GnuTLS
  mod_gnutls provides TLS encryption using the GnuTLS library. It's
  similar in purpose to mod_ssl, but doesn't use OpenSSL, and provides
@@ -40,3 +40,18 @@ Description: Apache module for TLS encryption with GnuTLS
   * Background OCSP stapling,
   * PKCS #11 access to server keys and certificates,
   * using Monkeysphere for client certificate validation.
+
+Package: libapache2-mod-gnutls-doc
+Architecture: all
+Depends: ${misc:Depends}
+Suggests: www-browser
+Section: doc
+Description: Apache module for TLS encryption with GnuTLS
+ mod_gnutls provides TLS encryption using the GnuTLS library. It's
+ similar in purpose to mod_ssl, but doesn't use OpenSSL, and provides
+ some additional features:
+  * Background OCSP stapling,
+  * PKCS #11 access to server keys and certificates,
+  * using Monkeysphere for client certificate validation.
+ .
+ This package contains the module documentation as manual page and HTML.
