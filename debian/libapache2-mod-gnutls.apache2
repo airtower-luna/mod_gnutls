@@ -1,2 +1,3 @@
 mod src/.libs/mod_gnutls.so
 mod debian/gnutls.load
+mod debian/gnutls.conf
