@@ -1,1 +1,2 @@
+# Depends: socache_shmcb
 LoadModule gnutls_module /usr/lib/apache2/modules/mod_gnutls.so
