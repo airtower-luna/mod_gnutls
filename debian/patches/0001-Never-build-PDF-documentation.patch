@@ -9,13 +9,13 @@ available but fonts used by pandoc are missing.
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/configure.ac b/configure.ac
-index 48febcf..4082777 100644
+index d6620f1..2cc4fa5 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -210,7 +210,7 @@ AC_MSG_RESULT($use_msva)
+@@ -191,7 +191,7 @@ AC_MSG_RESULT($use_msva)
  build_doc=no
  AC_PATH_PROG([PANDOC], [pandoc], [no])
- if test "$PANDOC" != "no"; then
+ AS_IF([test "$PANDOC" != "no"], [
 -	AC_PATH_PROG([PDFLATEX], [pdflatex], [no])
 +	PDFLATEX="no"
  	if test "$PDFLATEX" != "no"; then
