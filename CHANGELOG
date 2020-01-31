@@ -21,6 +21,11 @@
   instance by running ./configure with --enable-valgrind-test, see
   test/README.md for details.
 
+- Known issue: When using MSVA client certificate validation the
+  Valgrind tests indicate memory leaks from libcurl, which is used by
+  libmsv to send requests to the MSVA. For details see the bug report:
+  https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=950359
+
 ** Version 0.9.1 (2019-11-29)
 - Fix possible segfault (NULL pointer dereference) on failed TLS
   handshake. Calling ssl_var_lookup() after a failed handshake could
