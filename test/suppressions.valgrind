@@ -70,6 +70,19 @@
    ...
 }
 
+# For some reason there's a leak from dlopen called by
+# p11_kit_module_load in the child processes.
+{
+   p11_kit_module_load
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   ...
+   fun:dlopen@*
+   obj:/usr/lib/*/libp11-kit.so.*
+   fun:p11_kit_module_load
+}
+
 # Whatever OpenSSL does to initialize its DRBG, this happens when
 # using SoftHSM.
 {
