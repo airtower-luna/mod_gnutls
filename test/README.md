@@ -155,6 +155,12 @@ mod\_gnutls issues. Note that the suppressions in that file are aimed
 at Debian x86_64 (or similar) systems, you may need to adjust them on
 other platforms. The Valgrind suppressions files to use are read from
 the `VALGRIND_SUPPRESS` variable in [`Makefile.am`](./Makefile.am).
+You can add suppression files on the command line by overriding
+`VALGRIND_SUPPRESS` like this:
+
+```bash
+VALGRIND_SUPPRESS="suppressions.valgrind extra.valgrind" make -e check
+```
 
 
 ## Adding a Test
