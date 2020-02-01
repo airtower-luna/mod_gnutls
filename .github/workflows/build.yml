@@ -61,3 +61,5 @@ jobs:
         with:
           name: ${{ matrix.container }}-test-log
           path: test/test-00_basic.log
+      - name: make distcheck
+        run: VERBOSE=1 make distcheck
