@@ -82,18 +82,3 @@
    obj:/usr/lib/*/libp11-kit.so.*
    fun:p11_kit_module_load
 }
-
-# Whatever OpenSSL does to initialize its DRBG, this happens when
-# using SoftHSM.
-{
-   libcrypto_drbg_init
-   Memcheck:Value8
-   obj:/usr/lib/*/libcrypto.so.*
-   fun:AES_encrypt
-   obj:/usr/lib/*/libcrypto.so.*
-   ...
-   obj:/usr/lib/*/libcrypto.so.*
-   fun:RAND_DRBG_instantiate
-   obj:/usr/lib/*/libcrypto.so.*
-   obj:/usr/lib/*/libcrypto.so.*
-}
