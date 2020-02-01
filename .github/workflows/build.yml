@@ -35,7 +35,7 @@ jobs:
       - name: autoreconf
         run: autoreconf -fiv
       - name: configure
-        run: TEST_IP=127.0.0.1 ./configure
+        run: TEST_IP=127.0.0.1 APACHE_MUTEX=pthread ./configure
       - name: store config.log
         uses: actions/upload-artifact@v1
         if: failure()
@@ -44,9 +44,6 @@ jobs:
           path: config.log
       - name: make
         run: make
-      - name: set mutex
-        run: |
-          echo "Mutex pthread default" >test/apache-conf/github_mutex.conf
       - name: make check
         run: VERBOSE=1 make check
       - name: store Apache logs

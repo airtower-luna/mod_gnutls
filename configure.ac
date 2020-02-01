@@ -158,15 +158,6 @@ AS_IF([test "$enable_test_namespaces" != "no" \
 	    && test "$unshare_works" = "yes"],
       [use_netns="yes"], [use_netns="no"])
 AM_CONDITIONAL([ENABLE_NETNS], [test "$use_netns" != "no"])
-# Adjust Apache configuration for tests accordingly: Use pthread mutex
-# and test specific PID files if using namespaces, defaults otherwise.
-AS_IF([test "$use_netns" = "yes"],
-      [MUTEX_CONF="Mutex pthread default"; PID_AFFIX="-\${TEST_NAME}"],
-      [MUTEX_CONF=""; PID_AFFIX=""])
-AC_SUBST(MUTEX_CONF)
-AC_SUBST(PID_AFFIX)
-AM_SUBST_NOTMAKE(MUTEX_CONF)
-AM_SUBST_NOTMAKE(PID_AFFIX)
 
 AC_ARG_ENABLE(msva,
        AS_HELP_STRING([--enable-msva],
@@ -226,6 +217,24 @@ AM_CONDITIONAL([HAVE_SOFTHSM], [test "${SOFTHSM}" != "no"])
 
 AC_SUBST(MODULE_CFLAGS)
 AC_SUBST(MODULE_LIBS)
+
+# Adjust Apache configuration for tests: Use pthread mutex and test
+# specific PID files if using namespaces. Otherwise defaults are used,
+# and the user can override the default mutex type.
+AC_ARG_VAR([APACHE_MUTEX], [Override the default mutex for the test \
+			   environment. The value is used only when running \
+			   without namespace isolation, tests running in \
+			   their own namespaces always use "pthread".])
+AS_IF([test -n "${APACHE_MUTEX}"],
+      [MUTEX_CONF="Mutex ${APACHE_MUTEX} default"],
+      [MUTEX_CONF=""])
+AS_IF([test "$use_netns" = "yes"],
+      [MUTEX_CONF="Mutex pthread default"; PID_AFFIX="-\${TEST_NAME}"],
+      [PID_AFFIX=""])
+AC_SUBST(MUTEX_CONF)
+AC_SUBST(PID_AFFIX)
+AM_SUBST_NOTMAKE(MUTEX_CONF)
+AM_SUBST_NOTMAKE(PID_AFFIX)
 
 # assign default values to TEST_HOST and TEST_IP if necessary
 : ${TEST_HOST:="localhost"}
