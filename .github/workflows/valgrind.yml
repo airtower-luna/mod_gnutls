@@ -9,6 +9,7 @@ on:
     paths:
       - '**'
       - '!doc/**'
+      - '!**.md'
 jobs:
   debian-buster:
     runs-on: ubuntu-latest
