@@ -30,6 +30,9 @@ CHECK_APACHE(,$AP_VERSION,
     AC_MSG_ERROR([*** Apache version $AP_VERSION not found!])
 )
 
+PKG_CHECK_MODULES([LIBGNUTLS], [gnutls >= 3.6.3])
+LIBGNUTLS_VERSION=`pkg-config --modversion gnutls`
+
 dnl Maybe use the binaries for tests, too?
 AC_ARG_WITH([gnutls-dev],
 	AS_HELP_STRING([--with-gnutls-dev=DIR],
@@ -41,13 +44,10 @@ AC_ARG_WITH([gnutls-dev],
 		[
 			LIBGNUTLS_CFLAGS="-I${with_gnutls_dev}/lib/includes"
 			LIBGNUTLS_LIBS="-lgnutls -L${with_gnutls_dev}/lib/.libs -R${with_gnutls_dev}/lib/.libs"
+			LIBGNUTLS_VERSION=`PKG_CONFIG_PATH="${with_gnutls_dev}/lib" pkg-config --modversion gnutls`
 		],
 		[AC_MSG_ERROR([--with-gnutls-dev=DIR requires a directory!])])
 	], [])
-
-PKG_CHECK_MODULES([LIBGNUTLS], [gnutls >= 3.6.3])
-
-LIBGNUTLS_VERSION=`pkg-config --modversion gnutls`
 
 AC_ARG_ENABLE(vpath-install,
        AS_HELP_STRING([--enable-vpath-install],
