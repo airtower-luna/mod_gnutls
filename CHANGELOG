@@ -1,21 +1,29 @@
-** Version 0.10.0 (UNRELEASED)
+** Version 0.10.0 (2020-02-03)
 
-- Support for stapling multiple OCSP responses (TLS 1.3
+- Added support for stapling multiple OCSP responses (TLS 1.3
   only). mod_gnutls will staple for as many consecutive certificates
   in the certificate chain as possible.
 
-- Support for TLS 1.3 post-handshake authentication, used if TLS
+- Added support for TLS 1.3 post-handshake authentication, used if TLS
   client authentication is required only for some resources on the
-  server. Rehandshake (for older TLS versions) is not supported.
+  server. Rehandshake (for older TLS versions) is not supported, the
+  existing but broken code has been removed.
 
 - The test infrastructure has been mostly rewritten in Python, note
-  the new dependencies (Python 3, Pyyaml).
+  the new dependencies (Python 3, Pyyaml). Tests can run multiple TLS
+  connections and HTTP(S) requests as well as custom hooks now, see
+  test/README.md for details.
 
 - Server certificates are checked for the must-staple TLS feature
   extension, stapling must be enabled if it is present.
 
 - Compatibility fix for GnuTLS 3.6.11 in the test suite: Handle
-  certificate type in TLS session information strings.
+  peer certificate type in TLS session information strings.
+
+- The test system will automatically detect if it needs to load
+  critical modules (e.g. mod_logio) that are built-in with the Debian
+  packages. This makes the tests work on Fedora without modifications,
+  and likely on similar distributions too.
 
 - Tests can optionally run with Valgrind for the primary HTTPD
   instance by running ./configure with --enable-valgrind-test, see
