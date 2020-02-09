@@ -138,13 +138,15 @@ int mgs_cache_store(mgs_cache_t cache, server_rec *server, gnutls_datum_t key,
  *
  * @param key key for the cache entry to be fetched
  *
- * @param pool pool to allocate the response and other temporary
- * memory from
+ * @param output pre-allocated buffer to write to and its size
  *
- * @return the requested cache entry, or `{NULL, 0}`
+ * @param pool pool to allocate temporary memory from
+ *
+ * @return APR status or error value
  */
-gnutls_datum_t mgs_cache_fetch(mgs_cache_t cache, server_rec *server,
-                               gnutls_datum_t key, apr_pool_t *pool);
+apr_status_t mgs_cache_fetch(mgs_cache_t cache, server_rec *server,
+                             gnutls_datum_t key, gnutls_datum_t *output,
+                             apr_pool_t *pool);
 
 /**
  * Internal cache configuration structure

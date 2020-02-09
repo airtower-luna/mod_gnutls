@@ -1,0 +1,84 @@
+# The first call to gnutls_rng in a new thread causes a "possible
+# loss" setting up thread-local storage (TLS). According to search
+# results that seems to be a common issue with glibc.
+{
+   gnutls_rng_init
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc
+   ...
+   fun:__tls_get_addr
+   ...
+   fun:gnutls_rnd
+   fun:gnutls_ocsp_req_randomize_nonce
+   ...
+   fun:mgs_async_ocsp_update
+   fun:*
+   fun:start_thread
+   fun:clone
+}
+
+# Whatever mod_watchdog does setting up its threads, it involves
+# thread-local storage, too.
+{
+   watchdog_child_thread_init
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   fun:allocate_dtv
+   fun:_dl_allocate_tls
+   fun:allocate_stack
+   fun:pthread_create@*
+   obj:/usr/sbin/apache2
+   ...
+   fun:ap_run_child_init
+   obj:/usr/lib/apache2/modules/mod_mpm_*.so
+   ...
+   obj:/usr/lib/apache2/modules/mod_mpm_*.so
+   fun:ap_run_mpm
+   ...
+}
+
+# mod_http2 needs thread-local storage, too.
+{
+   http2_child_thread_init
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   fun:allocate_dtv
+   fun:_dl_allocate_tls
+   fun:allocate_stack
+   fun:pthread_create@*
+   obj:/usr/lib/apache2/modules/mod_http2.so
+   ...
+   obj:/usr/lib/apache2/modules/mod_http2.so
+   fun:ap_run_child_init
+   obj:/usr/lib/apache2/modules/mod_mpm_*.so
+   ...
+}
+
+# There's a bunch of reports of leaks from getaddrinfo, but outside
+# the scope of mod_gnutls to fix.
+{
+   apr_getaddrinfo_leak
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   ...
+   fun:getaddrinfo
+   obj:/usr/lib/*/libapr-1.so.*
+   ...
+}
+
+# For some reason there's a leak from dlopen called by
+# p11_kit_module_load in the child processes.
+{
+   p11_kit_module_load
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   ...
+   fun:dlopen@*
+   obj:/usr/lib/*/libp11-kit.so.*
+   fun:p11_kit_module_load
+}

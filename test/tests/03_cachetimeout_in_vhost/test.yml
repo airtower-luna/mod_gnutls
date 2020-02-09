@@ -1,0 +1,11 @@
+!connection
+gnutls_params:
+  - x509cafile=authority/x509.pem
+actions:
+  - !request
+    path: /test.txt
+    expect:
+      status: 200
+      body:
+        exactly: |
+          test

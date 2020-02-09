@@ -1,0 +1,9 @@
+serial=587198682
+cn=__HOSTNAME__
+tls_www_server
+signing_key
+dns_name="__HOSTNAME__"
+# must-staple
+tls_feature = 5
+__OCSP_URI__
+__IP_ADDRESSES__

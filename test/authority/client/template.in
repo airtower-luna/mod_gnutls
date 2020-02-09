@@ -1,0 +1,6 @@
+serial=3
+cn="Test User"
+email=test0@modgnutls.test
+tls_www_client
+signing_key
+### ocsp_uri=http://__HOSTNAME__:__OCSP_PORT__/ocsp/

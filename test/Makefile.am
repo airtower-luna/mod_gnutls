@@ -1,6 +1,22 @@
 SUBDIRS = tests
 
-dist_check_SCRIPTS = test-00_basic.bash \
+VALGRIND_SUPPRESS = suppressions.valgrind
+EXTRA_DIST = $(VALGRIND_SUPPRESS)
+
+if ENABLE_VALGRIND
+valgrind = --valgrind \
+	$(foreach supp,$(VALGRIND_SUPPRESS),--valgrind-suppressions "$(srcdir)/$(supp)")
+else
+valgrind =
+endif
+
+# Generate the test scripts
+test-%.bash: test-template.bash.in | tests/%/
+	testname="$(*)"; \
+	sed -e s/_NUM_/$${testname%%_*}/ -e 's,_VALGRIND_,$(valgrind),' < $< > $@
+	chmod a+x $@
+
+test_scripts = test-00_basic.bash \
 	test-01_serverwide_priorities.bash \
 	test-02_cache_in_vhost.bash \
 	test-03_cachetimeout_in_vhost.bash \
@@ -16,9 +32,9 @@ dist_check_SCRIPTS = test-00_basic.bash \
 	test-13_cgi_variables_no_client_cert.bash \
 	test-14_resume_session.bash
 if USE_MSVA
-dist_check_SCRIPTS += test-15_basic_msva.bash
+test_scripts += test-15_basic_msva.bash
 endif
-dist_check_SCRIPTS += test-16_view-status.bash \
+test_scripts += test-16_view-status.bash \
 	test-17_cgi_vars_large_cert.bash \
 	test-18_client_verification_wrong_cert.bash \
 	test-19_TLS_reverse_proxy.bash \
@@ -36,10 +52,15 @@ dist_check_SCRIPTS += test-16_view-status.bash \
 	test-31_vhost_SNI_serveralias_match.bash \
 	test-32_vhost_SNI_serveralias_mismatch.bash \
 	test-33_vhost_SNI_serveralias_missinghost.bash \
-	test-34_TLS_reverse_proxy_h2.bash
+	test-34_TLS_reverse_proxy_h2.bash \
+	test-35_client_reauth.bash
 
-TEST_EXTENSIONS = .bash
-TESTS = $(dist_check_SCRIPTS)
+MOSTLYCLEANFILES = $(test_scripts)
+dist_check_SCRIPTS = netns_py.bash test-template.bash.in
+
+TEST_EXTENSIONS = .bash .py
+PY_LOG_COMPILER = $(PYTHON)
+TESTS = doctest-mgstest.py $(test_scripts)
 
 check_PROGRAMS = pgpcrc
 pgpcrc_SOURCES = pgpcrc.c
@@ -53,13 +74,21 @@ gen_ocsp_index_LDFLAGS = $(LIBGNUTLS_LIBS)
 noinst_HEADERS = cert_helper.h
 endif
 
+# Python tools for tests
+noinst_PYTHON = https-test-client.py mgstest/http.py mgstest/__init__.py \
+	mgstest/hooks.py mgstest/services.py mgstest/softhsm.py \
+	mgstest/tests.py mgstest/valgrind.py runtest.py softhsm-init.py \
+	doctest-mgstest.py required-modules.py
+
 # Identities in the miniature CA, server, and client environment for
 # the test suite
-shared_identities = authority client
+shared_identities = authority authority/client
 pgp_identities = $(shared_identities)
-x509_only_identities = server rogueca imposter rogueclient
+x509_only_identities = authority/server authority/imposter \
+	authority/subca authority/subca/server \
+	rogueca rogueca/rogueclient
 if ENABLE_OCSP_TEST
-x509_only_identities += ocsp-responder
+x509_only_identities += authority/ocsp-responder authority/subca/ocsp-responder
 endif
 x509_identities = $(shared_identities) $(x509_only_identities)
 identities = $(shared_identities) $(x509_only_identities)
@@ -92,15 +121,19 @@ include $(srcdir)/test_ca.mk
 # one Apache instance (possibly plus a proxy back end instance) is
 # running at any time, so test cases actually have to wait for each
 # other - just not in any particular order.
-check_DATA = $(tokens) server/crl.pem
+check_DATA = $(tokens) authority/server/crl.pem
 
-MOSTLYCLEANFILES = cache/* logs/* outputs/* server/crl.pem
+MOSTLYCLEANFILES += cache/* logs/* outputs/* authority/server/crl.pem
 
-cert_templates = authority.template.in client.template.in \
-	imposter.template.in ocsp-responder.template rogueca.template \
-	rogueclient.template.in server.template.in
-generated_templates = authority.template client.template \
-	imposter.template rogueclient.template server.template
+cert_templates = authority/template.in authority/client/template.in \
+	authority/imposter/template.in authority/ocsp-responder/template \
+	authority/server/template.in \
+	authority/subca/template.in authority/subca/server/template.in \
+	authority/subca/ocsp-responder/template \
+	rogueca/template rogueca/rogueclient/template.in
+generated_templates = authority/template authority/client/template \
+	authority/imposter/template rogueca/rogueclient/template \
+	authority/server/template
 
 # Delete X.509 private keys on full clean. Note that unless you need
 # to generate fresh keys, the "mostlyclean" target should be
@@ -112,16 +145,17 @@ CLEANFILES = $(x509_keys)
 # pairs, and regenerating them makes it possible to change identities
 # (e.g. host names) without wasting time on new keys (which would
 # happen after "clean").
-MOSTLYCLEANFILES += */x509.pem $(generated_templates) *.uid
+MOSTLYCLEANFILES += $(x509_certs) $(generated_templates) $(identities:=/uid)
 
 
 # Delete PGP keyrings on "mostlyclean" target. They are created from
 # the X.509 private keys and certificates with an expiration time of
 # one day, so regenerating them is both fast and frequently
 # necessary.
-MOSTLYCLEANFILES += */*.pgp */*.pgp.raw */*.gpg */*.gpg~ */gpg.conf \
-	authority/lock */*.kbx */*.kbx~ */S.gpg-agent */private-keys-v1.d/* \
-	authority/tofu.db
+pgp_patterns = /*.pgp /*.pgp.raw /*.gpg /*.gpg~ /gpg.conf \
+	/*.kbx /*.kbx~ /S.gpg-agent /private-keys-v1.d/*
+MOSTLYCLEANFILES += $(foreach pat,$(pgp_patterns),$(pgp_identities:=$(pat))) \
+	authority/lock authority/tofu.db
 # GnuPG random pool, no need to regenerate on every build
 CLEANFILES += authority/random_seed
 
@@ -144,52 +178,51 @@ MOSTLYCLEANFILES += *.lock
 # rule to build MSVA trust database
 if USE_MSVA
 msva_home = msva.gnupghome
-check_DATA += $(msva_home)/trustdb.gpg client.uid
-MOSTLYCLEANFILES += $(msva_home)/trustdb.gpg
-$(msva_home)/trustdb.gpg: authority/minimal.pgp client/cert.pgp
+check_DATA += $(msva_home)/trustdb.gpg authority/client/uid
+MOSTLYCLEANFILES += $(foreach pat,$(pgp_patterns),$(msva_home)$(pat))
+$(msva_home)/trustdb.gpg: authority/minimal.pgp authority/client/cert.pgp
 	mkdir -p -m 0700 $(dir $@)
 	GNUPGHOME=$(dir $@) gpg --import < $<
 	printf "%s:6:\n" "$$(GNUPGHOME=authority/ gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" | GNUPGHOME=$(dir $@) gpg --import-ownertrust
-	GNUPGHOME=$(dir $@) gpg --import < client/cert.pgp
+	GNUPGHOME=$(dir $@) gpg --import < authority/client/cert.pgp
 	printf "keyserver does-not-exist.example\n" > $(msva_home)/gpg.conf
 endif
 
 if ENABLE_OCSP_TEST
 # rules to build OCSP database
-check_DATA += authority/ocsp_index.txt
-MOSTLYCLEANFILES += authority/ocsp_index.txt authority/ocsp_index.txt.attr
-authority/ocsp_index.txt: $(x509_tokens) gen_ocsp_index authority/ocsp_index.txt.attr
-	./gen_ocsp_index server/x509.pem client/x509.pem > $@
+ocsp_index_data = authority/ocsp_index.txt authority/ocsp_index.txt.attr \
+	authority/subca/ocsp_index.txt authority/subca/ocsp_index.txt.attr
+check_DATA += $(ocsp_index_data)
+MOSTLYCLEANFILES += $(ocsp_index_data)
 
-authority/ocsp_index.txt.attr: authority/secret.key
+# The "find" command builds a list of all certificates directly below
+# the CA that aren't for the ocsp-responder.
+%/ocsp_index.txt: $(x509_tokens) gen_ocsp_index
+	./gen_ocsp_index $$(find $(*) -mindepth 2 -maxdepth 2 ! -path '*/ocsp-responder/*' -name x509.pem) > $@
+
+%/ocsp_index.txt.attr:
+	@mkdir -m 0700 -p $(dir $@)
 	echo "unique_subject = no" > $@
 
-# build certificate chain file for server
-check_DATA += server/x509-chain.pem
-MOSTLYCLEANFILES += server/x509-chain.pem
-%/x509-chain.pem: %/x509.pem authority/x509.pem
-	cat $< authority/x509.pem > $@
+# Build certificate chain files. Note that intermediate tokens must be
+# listed explicitly, or the dependency chain will be broken because
+# the higher level pattern matches, too.
+chain_tokens = authority/server/x509-chain.pem \
+	authority/subca/x509-chain.pem \
+	authority/subca/server/x509-chain.pem
+check_DATA += $(chain_tokens)
+MOSTLYCLEANFILES += $(chain_tokens) authority/x509-chain.pem
 endif
 
-# SoftHSM tokens. Note that the SoftHSM 2 token is a directory and
-# hence has to be treated slightly differently.
-SOFTHSM_TOKEN = server/softhsm.db
-SOFTHSM2_TOKEN = server/softhsm2.db
-
-# Tokens should be cleaned whether or not the matching SoftHSM version
-# was detected on the last ./configure run.
-MOSTLYCLEANFILES += $(SOFTHSM_TOKEN)
+# SoftHSM token, note that the SoftHSM 2 token is a directory
+SOFTHSM2_TOKEN = authority/server/softhsm2.db
 # included in mostlyclean-local below
 clean-softhsm2-db:
 	-rm -rf $(SOFTHSM2_TOKEN)
 
-if HAVE_SOFTHSM1
-check_DATA += $(SOFTHSM_TOKEN)
-endif HAVE_SOFTHSM1
-
-if HAVE_SOFTHSM2
+if HAVE_SOFTHSM
 check_DATA += $(SOFTHSM2_TOKEN)
-endif HAVE_SOFTHSM2
+endif HAVE_SOFTHSM
 
 check_DATA += make-test-dirs
 extra_dirs = logs cache outputs
@@ -214,7 +247,6 @@ endif
 # avoids this issue, and the timeout will expose actually unclean
 # stops.
 clean-local:
-	-rmdir $(identities) || true
 	-rmdir $(extra_dirs) || true
 if USE_MSVA
 	-rmdir $(msva_home) || true
@@ -228,12 +260,22 @@ endif
 
 # Apache configuration and data files
 apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/ocsp.cgi \
-	data/secret.txt data/test.txt ffdhe3072.pem mime.types \
-	proxy_mods.conf
+	data/test.txt data/secret/mirror.cgi data/secret/test.txt \
+	mime.types proxy_mods.conf
 
-EXTRA_DIST = $(apache_data) $(cert_templates) $(shared_identities:=.uid.in) \
-	apache_service.bash common.bash runtests server-crl.template \
-	softhsm.bash
+# Which modules are compiled into the Apache binary varies between
+# distributions. required-modules.py creates additional LoadModule
+# directives if needed.
+check_DATA += apache-conf/required-modules.conf
+MOSTLYCLEANFILES += apache-conf/required-modules.conf
+apache-conf/required-modules.conf: required-modules.py
+	APACHE2=@APACHE2@ AP_LIBEXECDIR=@AP_LIBEXECDIR@ $(PYTHON) $< >$@
+
+# Documentation for the test system
+test_doc = README.md sample_fail.yml sample_test.yml
+
+EXTRA_DIST += $(apache_data) $(cert_templates) $(shared_identities:=/uid.in) \
+	authority/server/crl.template $(test_doc)
 
 # Lockfile for the main Apache process
 test_lockfile = ./test.lock
@@ -248,6 +290,8 @@ TEST_PORT ?= 9932
 MSVA_PORT ?= 9933
 # port for TLS proxy backend server
 BACKEND_PORT ?= 9934
+# port for plain HTTP server
+TEST_HTTP_PORT ?= 9935
 # port for the OCSP responder
 if ENABLE_OCSP_TEST
 OCSP_PORT ?= 9936
@@ -260,6 +304,7 @@ TEST_SERVICE_WAIT ?= 400
 
 AM_TESTS_ENVIRONMENT = export APACHE2=@APACHE2@; \
 	export AP_LIBEXECDIR=@AP_LIBEXECDIR@; \
+	export PYTHON="@PYTHON@"; \
 	export TEST_LOCK_WAIT="@TEST_LOCK_WAIT@"; \
 	export TEST_IP="@TEST_IP@"; \
 	export TEST_HOST="@TEST_HOST@"; \
@@ -270,17 +315,21 @@ AM_TESTS_ENVIRONMENT = export APACHE2=@APACHE2@; \
 	export TEST_QUERY_TIMEOUT="@TEST_QUERY_TIMEOUT@"; \
 	export BACKEND_HOST="@TEST_HOST@"; \
 	export BACKEND_PORT="$(BACKEND_PORT)"; \
+	export TEST_HTTP_PORT="$(TEST_HTTP_PORT)"; \
 	export HTTP_CLI="@HTTP_CLI@";
 
 if HAVE_SOFTHSM
 AM_TESTS_ENVIRONMENT += export SOFTHSM="@SOFTHSM@"; \
-	export SOFTHSM_MAJOR_VERSION="@SOFTHSM_MAJOR_VERSION@"; \
-	export SOFTHSM_LIB="@SOFTHSM_LIB@"
+	export SOFTHSM_LIB="@SOFTHSM_LIB@";
 endif
 
 if ENABLE_OCSP_TEST
 AM_TESTS_ENVIRONMENT += export OPENSSL="@OPENSSL@"; \
 	export OCSP_PORT="$(OCSP_PORT)";
+endif
+
+if ENABLE_VALGRIND
+AM_TESTS_ENVIRONMENT += export VALGRIND="@VALGRIND@";
 endif
 
 if ENABLE_NETNS
@@ -308,3 +357,11 @@ endif
 show-test-env: export TEST_ENV=$(AM_TESTS_ENVIRONMENT)
 show-test-env:
 	@echo "$${TEST_ENV}"
+
+# Build the test suite README as HTML if pandoc is available.
+if USE_PANDOC
+noinst_DATA = README.html
+MOSTLYCLEANFILES += $(noinst_DATA)
+%.html: %.md $(srcdir)/../doc/style.css
+	$(PANDOC) --css $(filter %.css,$^) --metadata pagetitle="$(<)" --self-contained -f markdown -o $@ $<
+endif

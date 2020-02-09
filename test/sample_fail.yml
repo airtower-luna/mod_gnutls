@@ -1,0 +1,29 @@
+- !connection
+  description: 'This TLS connection must fail with a certificate error.'
+  gnutls_params:
+    - x509cafile=rogueca/x509.pem
+  actions:
+    - !request
+      path: /
+      expect:
+        reset: yes
+- !connection
+  description: 'TLS connection succeeds, the request receives error 404.'
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+  actions:
+    - !request
+      path: /missing-file.txt
+      expect:
+        status: 404
+- !connection
+  description: 'This TLS connection must fail with a certificate error.'
+  gnutls_params:
+    - x509cafile=rogueca/x509.pem
+  actions:
+    - !request10
+      path: /test.txt
+      headers:
+        Host: localhost
+      expect:
+        reset: yes

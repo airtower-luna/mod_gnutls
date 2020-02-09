@@ -1,3 +1,0 @@
-GET /test.txt HTTP/1.1
-Host: mismatched.virtual.host
-
