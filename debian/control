@@ -19,6 +19,8 @@ Build-Depends:
  openssl <!nocheck>,
  pkg-config,
  procps <!nocheck>,
+ python3,
+ python3-yaml,
  softhsm2 <!nocheck> | softhsm <!nocheck>,
 Standards-Version: 4.3.0
 Build-Depends-Indep: pandoc
