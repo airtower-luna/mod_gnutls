@@ -1,3 +1,16 @@
+mod-gnutls (0.10.0-1) UNRELEASED; urgency=medium
+
+  [ Fiona Klute ]
+  * New upstream version 0.10.0 (Closes: #950300, Closes: #950301).
+  * Update comments in default-tls site config
+  * Add module dependency on socache_shmcb to gnutls.load (Closes: #923302)
+  * Use shmcb as default session cache, install gnutls.conf as module file
+  * Refresh 0001-Never-build-PDF-documentation.patch
+  * Install manual page
+  * Move module documentation into a an architecture-independent package
+
+ -- Fiona Klute <fiona.klute@gmx.de>  Sun, 09 Feb 2020 17:30:30 +0100
+
 mod-gnutls (0.9.0-1) unstable; urgency=medium
 
   [ Fiona Klute ]
