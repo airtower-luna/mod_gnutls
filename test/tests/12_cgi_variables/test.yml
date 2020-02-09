@@ -1,0 +1,24 @@
+!connection
+gnutls_params:
+  - x509cafile=authority/x509.pem
+  - x509keyfile=authority/client/secret.key
+  - x509certfile=authority/client/x509.pem
+actions:
+  - !request
+    path: /dump.cgi
+    expect:
+      status: 200
+      body:
+        contains:
+          - |
+            ----Certificate:----
+            -----BEGIN CERTIFICATE-----
+          - |
+            -----END CERTIFICATE-----
+
+
+            ----Verification Status:----
+            SUCCESS
+
+            ----SubjectAltName:----
+            RFC822NAME:test0@modgnutls.test

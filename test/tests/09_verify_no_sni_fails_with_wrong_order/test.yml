@@ -1,0 +1,10 @@
+!connection
+gnutls_params:
+  - x509cafile=authority/x509.pem
+  - disable-sni
+actions:
+  - !request
+    path: /test.txt
+    expect:
+      reset: yes
+

@@ -1,5 +1,5 @@
 /*
- *  Copyright 2016-2018 Fiona Klute
+ *  Copyright 2016-2020 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@
 #include <gnutls/crypto.h>
 #include <gnutls/ocsp.h>
 #include <mod_watchdog.h>
+#include <string.h>
 #include <time.h>
 
 #ifdef APLOG_USE_MODULE
@@ -40,6 +41,11 @@ APLOG_USE_MODULE(gnutls);
 
 /** Dummy data for failure cache entries (one byte). */
 #define OCSP_FAILURE_CACHE_DATA 0x0f
+/** Macro to check if an OCSP reponse pointer contains a cached
+ * failure */
+#define IS_FAILURE_RESPONSE(resp) \
+    (((resp)->size == sizeof(unsigned char)) &&                     \
+     (*((unsigned char *) (resp)->data) == OCSP_FAILURE_CACHE_DATA))
 
 
 #define _log_one_ocsp_fail(str, srv)                                    \
@@ -127,12 +133,21 @@ const char *mgs_set_ocsp_check_nonce(cmd_parms *parms,
 
 const char *mgs_store_ocsp_response_path(cmd_parms *parms,
                                          void *dummy __attribute__((unused)),
-                                         const char *arg)
+                                         int argc, char *const *argv)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(parms->server->module_config, &gnutls_module);
 
-    sc->ocsp_response_file = ap_server_root_relative(parms->pool, arg);
+    sc->ocsp_response_file_num = argc;
+    sc->ocsp_response_file = apr_palloc(parms->pool, sizeof(char *) * argc);
+    for (int i = 0; i < argc; i++)
+    {
+        if (strcmp(argv[i], "") == 0)
+            sc->ocsp_response_file[i] = NULL;
+        else
+            sc->ocsp_response_file[i] =
+                ap_server_root_relative(parms->pool, argv[i]);
+    }
     return NULL;
 }
 
@@ -144,17 +159,20 @@ const char *mgs_store_ocsp_response_path(cmd_parms *parms,
  * gnutls_free() when no longer needed), its nonce in 'nonce' (same,
  * if not NULL).
  *
- * Returns GNUTLS_E_SUCCESS, or a GnuTLS error code.
+ * @param s server reference for logging
+ *
+ * @return GNUTLS_E_SUCCESS, or a GnuTLS error code.
  */
-static int mgs_create_ocsp_request(server_rec *s, gnutls_datum_t *req,
-                            gnutls_datum_t *nonce)
-    __attribute__((nonnull(1, 2)));
-static int mgs_create_ocsp_request(server_rec *s, gnutls_datum_t *req,
-                            gnutls_datum_t *nonce)
+static int mgs_create_ocsp_request(server_rec *s,
+                                   mgs_ocsp_data_t req_data,
+                                   gnutls_datum_t *req,
+                                   gnutls_datum_t *nonce)
+    __attribute__((nonnull(1, 3)));
+static int mgs_create_ocsp_request(server_rec *s,
+                                   mgs_ocsp_data_t req_data,
+                                   gnutls_datum_t *req,
+                                   gnutls_datum_t *nonce)
 {
-    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
-        ap_get_module_config(s->module_config, &gnutls_module);
-
     gnutls_ocsp_req_t r;
     int ret = gnutls_ocsp_req_init(&r);
     if (ret != GNUTLS_E_SUCCESS)
@@ -165,11 +183,23 @@ static int mgs_create_ocsp_request(server_rec *s, gnutls_datum_t *req,
         return ret;
     }
 
+    /* issuer is set to a reference, so musn't be cleaned up */
+    gnutls_x509_crt_t issuer;
+    ret = gnutls_x509_trust_list_get_issuer(*req_data->trust, req_data->cert,
+                                            &issuer, 0);
+    if (ret != GNUTLS_E_SUCCESS)
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
+                     "Could not get issuer from trust list: %s (%d)",
+                     gnutls_strerror(ret), ret);
+        gnutls_ocsp_req_deinit(r);
+        return ret;
+    }
+
     /* GnuTLS doc says that the digest is "normally"
      * GNUTLS_DIG_SHA1. */
     ret = gnutls_ocsp_req_add_cert(r, GNUTLS_DIG_SHA256,
-                                   sc->certs_x509_crt_chain[1],
-                                   sc->certs_x509_crt_chain[0]);
+                                   issuer, req_data->cert);
 
     if (ret != GNUTLS_E_SUCCESS)
     {
@@ -245,16 +275,18 @@ static int mgs_create_ocsp_request(server_rec *s, gnutls_datum_t *req,
  *
  * If nonce is not NULL, the response must contain a matching nonce.
  */
-int check_ocsp_response(server_rec *s, const gnutls_datum_t *ocsp_response,
+int check_ocsp_response(server_rec *s, mgs_ocsp_data_t req_data,
+                        const gnutls_datum_t *ocsp_response,
                         apr_time_t* expiry, const gnutls_datum_t *nonce)
-    __attribute__((nonnull(1, 2)));
-int check_ocsp_response(server_rec *s, const gnutls_datum_t *ocsp_response,
+    __attribute__((nonnull(1, 3)));
+int check_ocsp_response(server_rec *s, mgs_ocsp_data_t req_data,
+                        const gnutls_datum_t *ocsp_response,
                         apr_time_t* expiry, const gnutls_datum_t *nonce)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
 
-    if (sc->ocsp->trust == NULL)
+    if (req_data->trust == NULL)
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
                      "No OCSP trust list available for server \"%s\"!",
@@ -280,7 +312,7 @@ int check_ocsp_response(server_rec *s, const gnutls_datum_t *ocsp_response,
         goto resp_cleanup;
     }
 
-    ret = gnutls_ocsp_resp_check_crt(resp, 0, sc->certs_x509_crt_chain[0]);
+    ret = gnutls_ocsp_resp_check_crt(resp, 0, req_data->cert);
     if (ret != GNUTLS_E_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
@@ -290,7 +322,7 @@ int check_ocsp_response(server_rec *s, const gnutls_datum_t *ocsp_response,
     }
 
     unsigned int verify;
-    ret = gnutls_ocsp_resp_verify(resp, *(sc->ocsp->trust), &verify, 0);
+    ret = gnutls_ocsp_resp_verify(resp, *(req_data->trust), &verify, 0);
     if (ret != GNUTLS_E_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
@@ -452,42 +484,44 @@ static gnutls_datum_t mgs_get_cert_fingerprint(apr_pool_t *p,
 
 
 static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
+                                    apr_uri_t *uri,
                                     gnutls_datum_t *request,
                                     gnutls_datum_t *response)
     __attribute__((nonnull));
 static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
+                                    apr_uri_t *uri,
                                     gnutls_datum_t *request,
                                     gnutls_datum_t *response)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
 
-    if (apr_strnatcmp(sc->ocsp->uri->scheme, "http"))
+    if (apr_strnatcmp(uri->scheme, "http"))
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
                      "Scheme \"%s\" is not supported for OCSP requests!",
-                     sc->ocsp->uri->scheme);
+                     uri->scheme);
         return APR_EINVAL;
     }
 
-    const char* header = http_post_header(p, sc->ocsp->uri,
+    const char* header = http_post_header(p, uri,
                                           OCSP_REQ_TYPE, OCSP_RESP_TYPE,
                                           request->size);
     ap_log_error(APLOG_MARK, APLOG_TRACE2, APR_SUCCESS, s,
                  "OCSP POST header: %s", header);
 
     /* Find correct port */
-    apr_port_t port = sc->ocsp->uri->port ?
-        sc->ocsp->uri->port : apr_uri_port_of_scheme(sc->ocsp->uri->scheme);
+    apr_port_t port = uri->port ?
+        uri->port : apr_uri_port_of_scheme(uri->scheme);
 
     apr_sockaddr_t *sa;
-    apr_status_t rv = apr_sockaddr_info_get(&sa, sc->ocsp->uri->hostname,
+    apr_status_t rv = apr_sockaddr_info_get(&sa, uri->hostname,
                                             APR_UNSPEC, port, 0, p);
     if (rv != APR_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
                      "Address resolution for OCSP responder %s failed.",
-                     sc->ocsp->uri->hostinfo);
+                     uri->hostinfo);
     }
 
     /* There may be multiple answers, try them in order until one
@@ -514,7 +548,7 @@ static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
                      "Connecting to OCSP responder %s failed.",
-                     sc->ocsp->uri->hostinfo);
+                     uri->hostinfo);
         return rv;
     }
 
@@ -549,7 +583,7 @@ static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
                      "Invalid HTTP response status from %s: %s",
-                     sc->ocsp->uri->hostinfo, h);
+                     uri->hostinfo, h);
         rv = APR_ECONNRESET;
         goto exit;
     }
@@ -566,7 +600,7 @@ static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
                      "Error while reading HTTP response header from %s",
-                     sc->ocsp->uri->hostinfo);
+                     uri->hostinfo);
         rv = APR_ECONNRESET;
         goto exit;
     }
@@ -618,6 +652,9 @@ static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
  *
  * @param s server that needs a new response
  *
+ * @param req_data struct describing the certificate for which to
+ * cache a response
+ *
  * @param cache_expiry If not `NULL`, this `apr_time_t` will be set to
  * the expiration time of the cache entry. Remains unchanged on
  * failure.
@@ -625,6 +662,7 @@ static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
  * @return APR_SUCCESS or an APR error code
  */
 static apr_status_t mgs_cache_ocsp_response(server_rec *s,
+                                            mgs_ocsp_data_t req_data,
                                             apr_time_t *cache_expiry)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
@@ -649,17 +687,17 @@ static apr_status_t mgs_cache_ocsp_response(server_rec *s,
     gnutls_datum_t resp;
     gnutls_datum_t nonce = { NULL, 0 };
 
-    if (sc->ocsp_response_file != NULL)
+    if (req_data->response_file != NULL)
     {
         ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, s,
                      "Loading OCSP response from %s",
-                     sc->ocsp_response_file);
-        rv = datum_from_file(tmp, sc->ocsp_response_file, &resp);
+                     req_data->response_file);
+        rv = datum_from_file(tmp, req_data->response_file, &resp);
         if (rv != APR_SUCCESS)
         {
             ap_log_error(APLOG_MARK, APLOG_ERR, rv, s,
                          "Loading OCSP response from %s failed!",
-                         sc->ocsp_response_file);
+                         req_data->response_file);
             apr_pool_destroy(tmp);
             return rv;
         }
@@ -667,7 +705,7 @@ static apr_status_t mgs_cache_ocsp_response(server_rec *s,
     else
     {
         gnutls_datum_t req;
-        int ret = mgs_create_ocsp_request(s, &req, &nonce);
+        int ret = mgs_create_ocsp_request(s, req_data, &req, &nonce);
         if (ret == GNUTLS_E_SUCCESS)
         {
             ap_log_error(APLOG_MARK, APLOG_TRACE2, APR_SUCCESS, s,
@@ -683,7 +721,7 @@ static apr_status_t mgs_cache_ocsp_response(server_rec *s,
             return APR_EGENERAL;
         }
 
-        rv = do_ocsp_request(tmp, s, &req, &resp);
+        rv = do_ocsp_request(tmp, s, req_data->uri, &req, &resp);
         gnutls_free(req.data);
         if (rv != APR_SUCCESS)
         {
@@ -695,7 +733,8 @@ static apr_status_t mgs_cache_ocsp_response(server_rec *s,
     }
 
     apr_time_t next_update;
-    if (check_ocsp_response(s, &resp, &next_update, nonce.size ? &nonce : NULL)
+    if (check_ocsp_response(s, req_data, &resp, &next_update,
+                            nonce.size ? &nonce : NULL)
         != GNUTLS_E_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_EGENERAL, s,
@@ -723,7 +762,7 @@ static apr_status_t mgs_cache_ocsp_response(server_rec *s,
     }
 
     int r = mgs_cache_store(sc->ocsp_cache, s,
-                            sc->ocsp->fingerprint, resp, expiry);
+                            req_data->fingerprint, resp, expiry);
     /* destroy pool, and original copy of the OCSP response with it */
     apr_pool_destroy(tmp);
     if (r != 0)
@@ -749,9 +788,15 @@ static apr_status_t mgs_cache_ocsp_response(server_rec *s,
  * recent failure.
  *
  * @param s the server for which an OCSP request failed
+ *
+ * @param req_data OCSP data structure for the certificate that could
+ * not be checked
+ *
  * @param timeout lifetime of the cache entry
  */
-static void mgs_cache_ocsp_failure(server_rec *s, apr_interval_time_t timeout)
+static void mgs_cache_ocsp_failure(server_rec *s,
+                                   mgs_ocsp_data_t req_data,
+                                   apr_interval_time_t timeout)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
@@ -764,7 +809,7 @@ static void mgs_cache_ocsp_failure(server_rec *s, apr_interval_time_t timeout)
     apr_time_t expiry = apr_time_now() + timeout;
 
     int r = mgs_cache_store(sc->ocsp_cache, s,
-                            sc->ocsp->fingerprint, dummy, expiry);
+                            req_data->fingerprint, dummy, expiry);
     if (r != 0)
         ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
                      "Caching OCSP failure failed.");
@@ -772,11 +817,10 @@ static void mgs_cache_ocsp_failure(server_rec *s, apr_interval_time_t timeout)
 
 
 
-int mgs_get_ocsp_response(gnutls_session_t session,
-                          void *ptr __attribute__((unused)),
+int mgs_get_ocsp_response(mgs_handle_t *ctxt,
+                          mgs_ocsp_data_t req_data,
                           gnutls_datum_t *ocsp_response)
 {
-    mgs_handle_t *ctxt = gnutls_session_get_ptr(session);
     mgs_srvconf_rec *sc = ctxt->sc;
 
     if (!sc->ocsp_staple || sc->ocsp_cache == NULL)
@@ -785,17 +829,21 @@ int mgs_get_ocsp_response(gnutls_session_t session,
         return GNUTLS_E_NO_CERTIFICATE_STATUS;
     }
 
-    *ocsp_response = mgs_cache_fetch(ctxt->sc->ocsp_cache,
-                                     ctxt->c->base_server,
-                                     ctxt->sc->ocsp->fingerprint,
-                                     ctxt->c->pool);
-    if (ocsp_response->size == 0)
+    // TODO: Large allocation, and the pool system doesn't offer realloc
+    ocsp_response->data = apr_palloc(ctxt->c->pool, OCSP_RESP_SIZE_MAX);
+    ocsp_response->size = OCSP_RESP_SIZE_MAX;
+
+    apr_status_t rv = mgs_cache_fetch(sc->ocsp_cache,
+                                      ctxt->c->base_server,
+                                      req_data->fingerprint,
+                                      ocsp_response,
+                                      ctxt->c->pool);
+    if (rv != APR_SUCCESS)
     {
         ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_EGENERAL, ctxt->c,
                       "Fetching OCSP response from cache failed.");
     }
-    else if ((ocsp_response->size == sizeof(unsigned char)) &&
-             (*((unsigned char *) ocsp_response->data) == OCSP_FAILURE_CACHE_DATA))
+    else if (IS_FAILURE_RESPONSE(ocsp_response))
     {
         ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_EGENERAL, ctxt->c,
                       "Cached OCSP failure found for %s.",
@@ -806,15 +854,14 @@ int mgs_get_ocsp_response(gnutls_session_t session,
     {
         return GNUTLS_E_SUCCESS;
     }
-    /* get rid of invalid response (if any) */
-    gnutls_free(ocsp_response->data);
-    ocsp_response->data = NULL;
+    /* keep response buffer, reset size for reuse */
+    ocsp_response->size = OCSP_RESP_SIZE_MAX;
 
     /* If the cache had no response or an invalid one, try to update. */
     ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
                   "No valid OCSP response in cache, trying to update.");
 
-    apr_status_t rv = apr_global_mutex_trylock(sc->ocsp_mutex);
+    rv = apr_global_mutex_trylock(sc->ocsp_mutex);
     if (APR_STATUS_IS_EBUSY(rv))
     {
         /* Another thread is currently holding the mutex, wait. */
@@ -823,42 +870,53 @@ int mgs_get_ocsp_response(gnutls_session_t session,
          * would be better to have a vhost specific mutex, but at the
          * moment there's no good way to integrate that with the
          * Apache Mutex directive. */
-        *ocsp_response = mgs_cache_fetch(ctxt->sc->ocsp_cache,
-                                         ctxt->c->base_server,
-                                         ctxt->sc->ocsp->fingerprint,
-                                         ctxt->c->pool);
-        if (ocsp_response->size > 0)
+        rv = mgs_cache_fetch(sc->ocsp_cache,
+                             ctxt->c->base_server,
+                             req_data->fingerprint,
+                             ocsp_response,
+                             ctxt->c->pool);
+        if (rv == APR_SUCCESS)
         {
-            /* Got a valid response now, unlock mutex and return. */
             apr_global_mutex_unlock(sc->ocsp_mutex);
-            return GNUTLS_E_SUCCESS;
+            /* Check if the response is valid. */
+            if (IS_FAILURE_RESPONSE(ocsp_response))
+            {
+                ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_EGENERAL, ctxt->c,
+                              "Cached OCSP failure found for %s.",
+                              ctxt->c->base_server->server_hostname);
+                goto fail_cleanup;
+            }
+            else
+                return GNUTLS_E_SUCCESS;
         }
         else
         {
-            gnutls_free(ocsp_response->data);
-            ocsp_response->data = NULL;
+            /* keep response buffer, reset size for reuse */
+            ocsp_response->size = OCSP_RESP_SIZE_MAX;
         }
     }
 
-    rv = mgs_cache_ocsp_response(ctxt->c->base_server, NULL);
+    rv = mgs_cache_ocsp_response(ctxt->c->base_server, req_data, NULL);
     if (rv != APR_SUCCESS)
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, ctxt->c,
                       "Caching a fresh OCSP response failed");
         /* cache failure to rate limit retries */
         mgs_cache_ocsp_failure(ctxt->c->base_server,
-                               ctxt->sc->ocsp_failure_timeout);
+                               req_data,
+                               sc->ocsp_failure_timeout);
         apr_global_mutex_unlock(sc->ocsp_mutex);
         goto fail_cleanup;
     }
     apr_global_mutex_unlock(sc->ocsp_mutex);
 
     /* retry reading from cache */
-    *ocsp_response = mgs_cache_fetch(ctxt->sc->ocsp_cache,
-                                     ctxt->c->base_server,
-                                     ctxt->sc->ocsp->fingerprint,
-                                     ctxt->c->pool);
-    if (ocsp_response->size == 0)
+    rv = mgs_cache_fetch(sc->ocsp_cache,
+                         ctxt->c->base_server,
+                         req_data->fingerprint,
+                         ocsp_response,
+                         ctxt->c->pool);
+    if (rv != APR_SUCCESS)
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_EGENERAL, ctxt->c,
                       "Fetching OCSP response from cache failed on retry.");
@@ -868,9 +926,9 @@ int mgs_get_ocsp_response(gnutls_session_t session,
         return GNUTLS_E_SUCCESS;
     }
 
-    /* failure, clean up response data */
+    /* failure, reset struct, buffer will be released with the
+     * connection pool */
  fail_cleanup:
-    gnutls_free(ocsp_response->data);
     ocsp_response->size = 0;
     ocsp_response->data = NULL;
     return GNUTLS_E_NO_CERTIFICATE_STATUS;
@@ -960,7 +1018,7 @@ apr_uri_t * mgs_cert_get_ocsp_uri(apr_pool_t *p, gnutls_x509_crt_t cert)
 
 /**
  * Perform an asynchronous OCSP cache update. This is a callback for
- * mod_watchdog, so the API is fixed.
+ * mod_watchdog, so the API is fixed (except the meaning of data).
  *
  * @param state watchdog state (starting/running/stopping)
  * @param data callback data, contains the server_rec
@@ -977,7 +1035,8 @@ static apr_status_t mgs_async_ocsp_update(int state,
     if (state == AP_WATCHDOG_STATE_STOPPING)
         return APR_SUCCESS;
 
-    server_rec *server = (server_rec *) data;
+    mgs_ocsp_data_t ocsp_data = (mgs_ocsp_data_t) data;
+    server_rec *server = (server_rec *) ocsp_data->server;
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(server->module_config, &gnutls_module);
     apr_time_t expiry = 0;
@@ -991,7 +1050,7 @@ static apr_status_t mgs_async_ocsp_update(int state,
      * cache and the mutex is never touched in
      * mgs_get_ocsp_response. */
     apr_global_mutex_lock(sc->ocsp_mutex);
-    apr_status_t rv = mgs_cache_ocsp_response(server, &expiry);
+    apr_status_t rv = mgs_cache_ocsp_response(server, ocsp_data, &expiry);
 
     apr_interval_time_t next_interval;
     if (rv != APR_SUCCESS)
@@ -1043,7 +1102,7 @@ static apr_status_t mgs_async_ocsp_update(int state,
 
     sc->singleton_wd->set_callback_interval(sc->singleton_wd->wd,
                                             next_interval,
-                                            server, mgs_async_ocsp_update);
+                                            ocsp_data, mgs_async_ocsp_update);
 
     ap_log_error(APLOG_MARK, rv == APR_SUCCESS ? APLOG_DEBUG : APLOG_WARNING,
                  rv, server,
@@ -1060,28 +1119,74 @@ static apr_status_t mgs_async_ocsp_update(int state,
      * update. */
     if (rv != APR_SUCCESS)
     {
-        const gnutls_datum_t ocsp_response =
-            mgs_cache_fetch(sc->ocsp_cache, server,
-                            sc->ocsp->fingerprint, pool);
+        gnutls_datum_t ocsp_response;
+        ocsp_response.data = apr_palloc(pool, OCSP_RESP_SIZE_MAX);
+        ocsp_response.size = OCSP_RESP_SIZE_MAX;
 
-        if (ocsp_response.size == 0 ||
-            ((ocsp_response.size == sizeof(unsigned char)) &&
-             (*((unsigned char *) ocsp_response.data) ==
-              OCSP_FAILURE_CACHE_DATA)))
+        apr_status_t rv = mgs_cache_fetch(sc->ocsp_cache, server,
+                                          ocsp_data->fingerprint,
+                                          &ocsp_response,
+                                          pool);
+
+        if (rv != APR_SUCCESS || (IS_FAILURE_RESPONSE(&ocsp_response)))
         {
             ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, server,
                          "Caching OCSP request failure for %s:%d.",
                          server->server_hostname, server->addrs->host_port);
-            mgs_cache_ocsp_failure(server, sc->ocsp_failure_timeout * 2);
+            mgs_cache_ocsp_failure(server, ocsp_data,
+                                   sc->ocsp_failure_timeout * 2);
         }
-
-        /* Get rid of the response, if any */
-        if (ocsp_response.size != 0)
-            gnutls_free(ocsp_response.data);
     }
     apr_global_mutex_unlock(sc->ocsp_mutex);
 
     return APR_SUCCESS;
+}
+
+
+
+static const char* configure_cert_staple(mgs_ocsp_data_t ocsp,
+                                         server_rec *server,
+                                         mgs_srvconf_rec *sc,
+                                         int idx,
+                                         apr_pool_t *pconf)
+{
+    ocsp->cert = sc->certs_x509_crt_chain[idx];
+    ocsp->server = server;
+
+    if (sc->ocsp_response_file != NULL && idx < sc->ocsp_response_file_num)
+        ocsp->response_file = sc->ocsp_response_file[idx];
+    else
+        ocsp->response_file = NULL;
+
+    ocsp->uri = mgs_cert_get_ocsp_uri(pconf, ocsp->cert);
+    if (ocsp->uri == NULL && ocsp->response_file == NULL)
+        return "No OCSP URI in the certificate nor a "
+            "GnuTLSOCSPResponseFile setting, cannot configure "
+            "OCSP stapling.";
+
+    ocsp->fingerprint =
+        mgs_get_cert_fingerprint(pconf, sc->certs_x509_crt_chain[idx]);
+    if (ocsp->fingerprint.data == NULL)
+        return "Could not read fingerprint from certificate!";
+
+    ocsp->trust = apr_palloc(pconf,
+                             sizeof(gnutls_x509_trust_list_t));
+    /* Only the direct issuer may sign the OCSP response or an
+     * OCSP signer. */
+    int ret = mgs_create_ocsp_trust_list(
+        ocsp->trust, &(sc->certs_x509_crt_chain[idx + 1]), 1);
+    if (ret != GNUTLS_E_SUCCESS)
+    {
+        ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, server,
+                     "Could not create OCSP trust list: %s (%d)",
+                     gnutls_strerror(ret), ret);
+        return "Could not build trust list for OCSP stapling!";
+    }
+    /* deinit trust list when the config pool is destroyed */
+    apr_pool_cleanup_register(pconf, ocsp->trust,
+                              mgs_cleanup_trust_list,
+                              apr_pool_cleanup_null);
+    return NULL;
 }
 
 
@@ -1093,23 +1198,48 @@ const char* mgs_ocsp_configure_stapling(apr_pool_t *pconf,
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(server->module_config, &gnutls_module);
 
-    if (sc->certs_x509_chain_num < 2)
-        return "No issuer (CA) certificate available, cannot enable "
-            "stapling. Please add it to the GnuTLSCertificateFile.";
-
-    mgs_ocsp_data_t ocsp = apr_palloc(pconf, sizeof(struct mgs_ocsp_data));
-
-    ocsp->uri = mgs_cert_get_ocsp_uri(pconf,
-                                      sc->certs_x509_crt_chain[0]);
-    if (ocsp->uri == NULL && sc->ocsp_response_file == NULL)
-        return "No OCSP URI in the certificate nor a GnuTLSOCSPResponseFile "
-            "setting, cannot configure OCSP stapling.";
-
     if (sc->ocsp_cache == NULL)
         return "No OCSP response cache available, please check "
             "the GnuTLSOCSPCache setting.";
 
-    sc->ocsp = ocsp;
+    if (sc->certs_x509_chain_num < 2)
+        return "No issuer (CA) certificate available, cannot enable "
+            "stapling. Please add it to the GnuTLSCertificateFile.";
+
+    /* array for ocsp data, currently size 1 */
+    sc->ocsp = apr_palloc(pconf, sizeof(mgs_ocsp_data_t) * (sc->certs_x509_chain_num - 1));
+
+    for (unsigned int i = 0; i < (sc->certs_x509_chain_num - 1); i++)
+    {
+        mgs_ocsp_data_t ocsp = apr_palloc(pconf, sizeof(struct mgs_ocsp_data));
+
+        const char *err = configure_cert_staple(ocsp, server, sc, i, pconf);
+        if (err != NULL)
+        {
+            gnutls_datum_t dn;
+            gnutls_x509_crt_get_dn3(sc->certs_x509_crt_chain[i], &dn, 0);
+            /* If stapling is enabled it MUST work for the server
+             * certificate itself, errors for others are
+             * ignored. Either way log a warning. */
+            ap_log_error(APLOG_MARK, APLOG_WARNING, 0, server,
+                         "Could not create OCSP stapling configuration "
+                         "for certificate %u in chain (%s): %s",
+                         i, (char*) dn.data, err);
+            gnutls_free(dn.data);
+            if (i == 0)
+                return err;
+            else
+                break;
+        }
+
+        sc->ocsp[i] = ocsp;
+        sc->ocsp_num = i + 1;
+    }
+
+    ap_log_error(APLOG_MARK, APLOG_INFO, 0, server,
+                 "Configured OCSP stapling for %u certificates for %s:%d.",
+                 sc->ocsp_num,
+                 server->server_hostname, server->addrs->host_port);
     return NULL;
 }
 
@@ -1120,7 +1250,7 @@ const char* mgs_ocsp_configure_stapling(apr_pool_t *pconf,
  * errors are just for fun. What matters is "neither OK nor DECLINED"
  * to denote an error.
  */
-int mgs_ocsp_enable_stapling(apr_pool_t *pconf,
+int mgs_ocsp_enable_stapling(apr_pool_t *pconf __attribute__((unused)),
                              apr_pool_t *ptemp __attribute__((unused)),
                              server_rec *server)
 {
@@ -1171,54 +1301,33 @@ int mgs_ocsp_enable_stapling(apr_pool_t *pconf,
         return HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    sc->ocsp->fingerprint =
-        mgs_get_cert_fingerprint(pconf, sc->certs_x509_crt_chain[0]);
-    if (sc->ocsp->fingerprint.data == NULL)
-        return HTTP_INTERNAL_SERVER_ERROR;
-
-    sc->ocsp->trust = apr_palloc(pconf,
-                                 sizeof(gnutls_x509_trust_list_t));
-    /* Only the direct issuer may sign the OCSP response or an OCSP
-     * signer. */
-    int ret = mgs_create_ocsp_trust_list(sc->ocsp->trust,
-                                         &(sc->certs_x509_crt_chain[1]),
-                                         1);
-    if (ret != GNUTLS_E_SUCCESS)
-    {
-        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
-                     "Could not create OCSP trust list: %s (%d)",
-                     gnutls_strerror(ret), ret);
-        return HTTP_INTERNAL_SERVER_ERROR;
-    }
-    /* deinit trust list when the config pool is destroyed */
-    apr_pool_cleanup_register(pconf, sc->ocsp->trust,
-                              mgs_cleanup_trust_list,
-                              apr_pool_cleanup_null);
-
-    /* enable status request callback */
-    gnutls_certificate_set_ocsp_status_request_function(sc->certs,
-                                                        mgs_get_ocsp_response,
-                                                        sc);
-
     /* The watchdog structure may be NULL if mod_watchdog is
      * unavailable. */
     if (sc->singleton_wd != NULL
         && sc->ocsp_auto_refresh == GNUTLS_ENABLED_TRUE)
     {
-        apr_status_t rv =
-            sc->singleton_wd->register_callback(sc->singleton_wd->wd,
-                                                sc->ocsp_cache_time,
-                                                server, mgs_async_ocsp_update);
-        if (rv == APR_SUCCESS)
-            ap_log_error(APLOG_MARK, APLOG_INFO, rv, server,
-                         "Enabled async OCSP update via watchdog "
-                         "for %s:%d",
-                         server->server_hostname, server->addrs->host_port);
-        else
-            ap_log_error(APLOG_MARK, APLOG_WARNING, rv, server,
-                         "Enabling async OCSP update via watchdog "
-                         "for %s:%d failed!",
-                         server->server_hostname, server->addrs->host_port);
+        /* register an update callback for each certificate configured
+         * for stapling */
+        for (unsigned int i = 0; i < sc->ocsp_num; i++)
+        {
+            apr_status_t rv =
+                sc->singleton_wd->register_callback(sc->singleton_wd->wd,
+                                                    sc->ocsp_cache_time,
+                                                    sc->ocsp[i],
+                                                    mgs_async_ocsp_update);
+            if (rv == APR_SUCCESS)
+                ap_log_error(APLOG_MARK, APLOG_INFO, rv, server,
+                             "Enabled async OCSP update via watchdog "
+                             "for %s:%d, cert[%u]",
+                             server->server_hostname, server->addrs->host_port,
+                             i);
+            else
+                ap_log_error(APLOG_MARK, APLOG_WARNING, rv, server,
+                             "Enabling async OCSP update via watchdog "
+                             "for %s:%d, cert[%u] failed!",
+                             server->server_hostname, server->addrs->host_port,
+                             i);
+        }
     }
 
     return OK;

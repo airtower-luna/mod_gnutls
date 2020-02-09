@@ -1,8 +1,9 @@
-EXTRA_DIST = mod_gnutls_manual.mdwn mod_gnutls_manual.yaml.in
+EXTRA_DIST = mod_gnutls_manual.md mod_gnutls_manual.yaml.in \
+	mod_gnutls.whatis style.css
 
 if USE_PANDOC
 html_DATA = mod_gnutls_manual.html
-man3_MANS = mod_gnutls_manual.man
+man5_MANS = mod_gnutls.5
 if USE_PDFLATEX
 # pandoc && pdflatex
 pdf_DATA = mod_gnutls_manual.pdf
@@ -14,24 +15,24 @@ html_DATA = mod_gnutls_manual.html
 endif
 endif
 
-MOSTLYCLEANFILES = $(html_DATA) $(pdf_DATA) $(man3_MANS)
+MOSTLYCLEANFILES = $(html_DATA) $(pdf_DATA) $(man5_MANS)
 
 %.yaml: %.yaml.in
 	sed -e s/__MOD_GNUTLS_VERSION__/@MOD_GNUTLS_VERSION@/ < $< > $@
 
 if USE_PANDOC
-%.man: %.mdwn %.yaml
+%.5: %.whatis %_manual.md %_manual.yaml
 	$(PANDOC) --standalone -f markdown -t man -o $@ $^
 
 if USE_PDFLATEX
-%.pdf: %.mdwn
-	$(PANDOC) --toc -f markdown -o $@ $<
+%.pdf: %.md %.yaml
+	$(PANDOC) --toc -f markdown -o $@ $^
 endif
 endif
 
-%.html: %.mdwn
+%.html: %.md %.yaml style.css
 if USE_PANDOC
-	$(PANDOC) --toc --standalone -f markdown -o $@ $<
+	$(PANDOC) --css $(filter %.css,$^) --toc --self-contained -f markdown -o $@ $(filter-out %.css,$^)
 else
 if USE_MARKDOWN
 	$(MARKDOWN) $< > $@

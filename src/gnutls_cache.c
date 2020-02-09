@@ -51,11 +51,7 @@
 
 /** Maximum length of the hex string representation of a GnuTLS
  * session ID: two characters per byte, plus one more for `\0` */
-#if GNUTLS_VERSION_NUMBER >= 0x030400
 #define GNUTLS_SESSION_ID_STRING_LEN ((GNUTLS_MAX_SESSION_ID_SIZE * 2) + 1)
-#else
-#define GNUTLS_SESSION_ID_STRING_LEN ((GNUTLS_MAX_SESSION_ID * 2) + 1)
-#endif
 
 #ifdef APLOG_USE_MODULE
 APLOG_USE_MODULE(gnutls);
@@ -178,15 +174,10 @@ static int socache_store_session(void *baton, gnutls_datum_t key,
  * minimal and temporary. */
 #define SOCACHE_FETCH_BUF_SIZE (8 * 1024)
 
-gnutls_datum_t mgs_cache_fetch(mgs_cache_t cache, server_rec *server,
-                               gnutls_datum_t key, apr_pool_t *pool)
+apr_status_t mgs_cache_fetch(mgs_cache_t cache, server_rec *server,
+                             gnutls_datum_t key, gnutls_datum_t *output,
+                             apr_pool_t *pool)
 {
-    gnutls_datum_t data = {NULL, 0};
-    data.data = gnutls_malloc(SOCACHE_FETCH_BUF_SIZE);
-    if (data.data == NULL)
-        return data;
-    data.size = SOCACHE_FETCH_BUF_SIZE;
-
     apr_pool_t *spool;
     apr_pool_create(&spool, pool);
 
@@ -194,7 +185,7 @@ gnutls_datum_t mgs_cache_fetch(mgs_cache_t cache, server_rec *server,
         apr_global_mutex_lock(cache->mutex);
     apr_status_t rv = cache->prov->retrieve(cache->socache, server,
                                             key.data, key.size,
-                                            data.data, &data.size,
+                                            output->data, &output->size,
                                             spool);
     if (cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
         apr_global_mutex_unlock(cache->mutex);
@@ -210,32 +201,16 @@ gnutls_datum_t mgs_cache_fetch(mgs_cache_t cache, server_rec *server,
             ap_log_error(APLOG_MARK, APLOG_WARNING, rv, server,
                          "error fetching from cache '%s:%s'",
                          cache->prov->name, cache->config);
-        /* free unused buffer */
-        gnutls_free(data.data);
-        data.data = NULL;
-        data.size = 0;
     }
     else
     {
         ap_log_error(APLOG_MARK, APLOG_TRACE1, rv, server,
                      "fetched %u bytes from cache '%s:%s'",
-                     data.size, cache->prov->name, cache->config);
-
-        /* Realloc buffer to data.size. Data size must be less than or
-         * equal to the initial buffer size, so this REALLY should not
-         * fail. */
-        data.data = gnutls_realloc(data.data, data.size);
-        if (__builtin_expect(data.data == NULL, 0))
-        {
-            ap_log_error(APLOG_MARK, APLOG_CRIT, APR_ENOMEM, server,
-                         "%s: Could not realloc fetch buffer to data size!",
-                         __func__);
-            data.size = 0;
-        }
+                     output->size, cache->prov->name, cache->config);
     }
     apr_pool_destroy(spool);
 
-    return data;
+    return rv;
 }
 
 
@@ -264,8 +239,37 @@ static gnutls_datum_t socache_fetch_session(void *baton, gnutls_datum_t key)
     if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
         return data;
 
-    return mgs_cache_fetch(ctxt->sc->cache, ctxt->c->base_server,
-                           dbmkey, ctxt->c->pool);
+    data.data = gnutls_malloc(SOCACHE_FETCH_BUF_SIZE);
+    if (data.data == NULL)
+        return data;
+    data.size = SOCACHE_FETCH_BUF_SIZE;
+
+    apr_status_t rv = mgs_cache_fetch(ctxt->sc->cache, ctxt->c->base_server,
+                                      dbmkey, &data, ctxt->c->pool);
+
+    if (rv != APR_SUCCESS)
+    {
+        /* free unused buffer */
+        gnutls_free(data.data);
+        data.data = NULL;
+        data.size = 0;
+    }
+    else
+    {
+        /* Realloc buffer to data.size. Data size must be less than or
+         * equal to the initial buffer size, so this REALLY should not
+         * fail. */
+        data.data = gnutls_realloc(data.data, data.size);
+        if (__builtin_expect(data.data == NULL, 0))
+        {
+            ap_log_cerror(APLOG_MARK, APLOG_CRIT, APR_ENOMEM, ctxt->c,
+                         "%s: Could not realloc fetch buffer to data size!",
+                         __func__);
+            data.size = 0;
+        }
+    }
+
+    return data;
 }
 
 

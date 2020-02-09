@@ -1,5 +1,5 @@
 /*
- *  Copyright 2016-2018 Fiona Klute
+ *  Copyright 2016-2020 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -17,10 +17,12 @@
 #ifndef __MOD_GNUTLS_OCSP_H__
 #define __MOD_GNUTLS_OCSP_H__
 
-#include "gnutls/gnutls.h"
-#include "gnutls/x509.h"
-#include "httpd.h"
-#include "http_config.h"
+#include "mod_gnutls.h"
+
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
+#include <httpd.h>
+#include <http_config.h>
 
 #define MGS_OCSP_MUTEX_NAME "gnutls-ocsp"
 #define MGS_OCSP_CACHE_MUTEX_NAME "gnutls-ocsp-cache"
@@ -39,16 +41,21 @@
  * Vhost specific OCSP data structure
  */
 struct mgs_ocsp_data {
-    /** OCSP URI extracted from the server certificate. NULL if
-     * unset. */
+    /** The certificate the following elements refer to. */
+    gnutls_x509_crt_t cert;
+    /** OCSP URI extracted from the certificate. NULL if unset. */
     apr_uri_t *uri;
+    /** OCSP response file for the certificate. NULL if unset. Takes
+     * precedence over uri. */
+    char *response_file;
     /** Trust list to verify OCSP responses for stapling. Should
-     * usually only contain the CA that signed the server
-     * certificate. */
+     * usually only contain the CA that signed the certificate. */
     gnutls_x509_trust_list_t *trust;
-    /** Server certificate fingerprint, used as cache key for the OCSP
-     * response */
+    /** Certificate fingerprint, used as cache key for the OCSP
+     * response. */
     gnutls_datum_t fingerprint;
+    /** Server (virtual host) that uses the certificate */
+    server_rec *server;
 };
 
 const char *mgs_ocsp_stapling_enable(cmd_parms *parms,
@@ -65,7 +72,7 @@ const char *mgs_set_ocsp_check_nonce(cmd_parms *parms,
 
 const char *mgs_store_ocsp_response_path(cmd_parms * parms,
                                          void *dummy __attribute__((unused)),
-                                         const char *arg);
+                                         int argc, char *const *argv);
 
 /**
  * Create a trust list from a certificate chain (one or more
@@ -121,7 +128,8 @@ const char* mgs_ocsp_configure_stapling(apr_pool_t *pconf, apr_pool_t *ptemp,
 int mgs_ocsp_enable_stapling(apr_pool_t *pconf, apr_pool_t *ptemp,
                              server_rec *server);
 
-int mgs_get_ocsp_response(gnutls_session_t session, void *ptr,
+int mgs_get_ocsp_response(mgs_handle_t *ctxt,
+                          struct mgs_ocsp_data *req_data,
                           gnutls_datum_t *ocsp_response);
 
 #endif /* __MOD_GNUTLS_OCSP_H__ */

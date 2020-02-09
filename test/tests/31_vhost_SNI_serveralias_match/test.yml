@@ -1,0 +1,14 @@
+!connection
+gnutls_params:
+  - x509cafile=authority/x509.pem
+  - sni-hostname=example.virtual.host
+actions:
+  - !request
+    path: /test.txt
+    headers:
+      Host: example.virtual.host
+    expect:
+      status: 200
+      body:
+        exactly: |
+          test

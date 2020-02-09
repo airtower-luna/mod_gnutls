@@ -3,7 +3,7 @@
  *  Copyright 2008, 2014 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
  *  Copyright 2013-2014 Daniel Kahn Gillmor
- *  Copyright 2015-2019 Fiona Klute
+ *  Copyright 2015-2020 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@
 #include "mod_gnutls.h"
 #include "gnutls_cache.h"
 #include "gnutls_config.h"
+#include "gnutls_io.h"
 #include "gnutls_ocsp.h"
 #include "gnutls_proxy.h"
 #include "gnutls_sni.h"
@@ -36,6 +37,8 @@
 #define APR_WANT_STRFUNC
 #include <apr_want.h>
 
+#include <gnutls/x509-ext.h>
+
 #ifdef ENABLE_MSVA
 #include <msv/msv.h>
 #endif
@@ -50,6 +53,26 @@ static apr_file_t *debug_log_fp;
 
 #define IS_PROXY_STR(c) \
     ((c->is_proxy == GNUTLS_ENABLED_TRUE) ? "proxy " : "")
+
+/** Feature number for "must-staple" in the RFC 7633 X.509 TLS Feature
+ * Extension (status_request, defined in RFC 6066) */
+#define TLSFEATURE_MUST_STAPLE 5
+
+/**
+ * Request protocol string for HTTP/2, as hard-coded in mod_http2
+ * h2_request.c.
+ */
+#define HTTP2_PROTOCOL "HTTP/2.0"
+
+/**
+ * mod_http2 checks this note, set it to signal that a request would
+ * require renegotiation/reauth, which isn't allowed under HTTP/2. The
+ * content of the note is expected to be a string giving the reason
+ * renegotiation would be needed.
+ *
+ * See: https://tools.ietf.org/html/rfc7540#section-9.2.1
+ */
+#define RENEGOTIATE_FORBIDDEN_NOTE "ssl-renegotiate-forbidden"
 
 /** Key to encrypt session tickets. Must be kept secret. This key is
  * generated in the `pre_config` hook and thus constant across
@@ -72,9 +95,7 @@ static const char* mgs_x509_construct_uid(request_rec * pool, gnutls_x509_crt_t 
 apr_status_t mgs_cleanup_pre_config(void *data __attribute__((unused)))
 {
     /* Free session ticket master key */
-#if GNUTLS_VERSION_NUMBER >= 0x030400
     gnutls_memset(session_ticket_key.data, 0, session_ticket_key.size);
-#endif
     gnutls_free(session_ticket_key.data);
     session_ticket_key.data = NULL;
     session_ticket_key.size = 0;
@@ -383,13 +404,13 @@ static int post_client_hello_hook(gnutls_session_t session)
 }
 
 static int cert_retrieve_fn(gnutls_session_t session,
-                            const gnutls_datum_t * req_ca_rdn __attribute__((unused)),
-                            int nreqs __attribute__((unused)),
-                            const gnutls_pk_algorithm_t * pk_algos __attribute__((unused)),
-                            int pk_algos_length __attribute__((unused)),
+                            const struct gnutls_cert_retr_st *info __attribute__((unused)),
                             gnutls_pcert_st **pcerts,
                             unsigned int *pcert_length,
-                            gnutls_privkey_t *privkey)
+                            gnutls_ocsp_data_st **ocsp,
+                            unsigned int *ocsp_length,
+                            gnutls_privkey_t *privkey,
+                            unsigned int *flags)
 {
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
 
@@ -406,7 +427,34 @@ static int cert_retrieve_fn(gnutls_session_t session,
 		// X509 CERTIFICATE
         *pcerts = ctxt->sc->certs_x509_chain;
         *pcert_length = ctxt->sc->certs_x509_chain_num;
+        *ocsp = NULL;
+        *ocsp_length = 0;
         *privkey = ctxt->sc->privkey_x509;
+        *flags = 0;
+
+        if (ctxt->sc->ocsp_staple == GNUTLS_ENABLED_TRUE)
+        {
+            gnutls_ocsp_data_st *resp =
+                apr_palloc(ctxt->c->pool,
+                           sizeof(gnutls_ocsp_data_st) * ctxt->sc->ocsp_num);
+
+            for (unsigned int i = 0; i < ctxt->sc->ocsp_num; i++)
+            {
+                resp[i].version = 0;
+                resp[i].exptime = 0;
+
+                int ret = mgs_get_ocsp_response(ctxt, ctxt->sc->ocsp[i],
+                                                &resp[i].response);
+                if (ret == GNUTLS_E_SUCCESS)
+                {
+                    ocsp[i] = resp;
+                    *ocsp_length = i + 1;
+                }
+                else
+                    break;
+            }
+        }
+
         return 0;
     } else {
 		// UNKNOWN CERTIFICATE
@@ -416,10 +464,6 @@ static int cert_retrieve_fn(gnutls_session_t session,
 
 
 
-#if GNUTLS_VERSION_NUMBER >= 0x030506
-#define HAVE_KNOWN_DH_GROUPS 1
-#endif
-#ifdef HAVE_KNOWN_DH_GROUPS
 /**
  * Try to estimate a GnuTLS security parameter based on the given
  * private key. Any errors are logged.
@@ -446,25 +490,6 @@ static gnutls_sec_param_t sec_param_from_privkey(server_rec *server,
     }
     return gnutls_pk_bits_to_sec_param(pk_algo, bits);
 }
-#else
-/** ffdhe2048 DH group as defined in RFC 7919, Appendix A.1. This is
- * the default DH group if mod_gnutls is compiled agains a GnuTLS
- * version that does not provide known DH groups based on security
- * parameters (before 3.5.6). */
-static const char FFDHE2048_PKCS3[] =
-    "-----BEGIN DH PARAMETERS-----\n"
-    "MIIBDAKCAQEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz\n"
-    "+8yTnc4kmz75fS/jY2MMddj2gbICrsRhetPfHtXV/WVhJDP1H18GbtCFY2VVPe0a\n"
-    "87VXE15/V8k1mE8McODmi3fipona8+/och3xWKE2rec1MKzKT0g6eXq8CrGCsyT7\n"
-    "YdEIqUuyyOP7uWrat2DX9GgdT0Kj3jlN9K5W7edjcrsZCwenyO4KbXCeAvzhzffi\n"
-    "7MA0BM0oNC9hkXL+nOmFg/+OTxIy7vKBg8P+OxtMb61zO7X8vC7CIAXFjvGDfRaD\n"
-    "ssbzSibBsu/6iGtCOGEoXJf//////////wIBAgICAQA=\n"
-    "-----END DH PARAMETERS-----\n";
-const gnutls_datum_t default_dh_params = {
-    (void *) FFDHE2048_PKCS3,
-    sizeof(FFDHE2048_PKCS3)
-};
-#endif
 
 
 
@@ -484,7 +509,6 @@ static int set_default_dh_param(server_rec *server)
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(server->module_config, &gnutls_module);
 
-#ifdef HAVE_KNOWN_DH_GROUPS
     gnutls_sec_param_t seclevel = GNUTLS_SEC_PARAM_UNKNOWN;
     if (sc->privkey_x509)
     {
@@ -518,30 +542,20 @@ static int set_default_dh_param(server_rec *server)
                      __func__, gnutls_strerror(ret), ret);
         return HTTP_UNAUTHORIZED;
     }
-#else
-    int ret = gnutls_dh_params_init(&sc->dh_params);
-    if (ret < 0)
-    {
-        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
-                     "%s: Failed to initialize DH params structure: "
-                     "%s (%d)", __func__, gnutls_strerror(ret), ret);
-        return HTTP_UNAUTHORIZED;
-    }
-    ret = gnutls_dh_params_import_pkcs3(sc->dh_params, &default_dh_params,
-                                        GNUTLS_X509_FMT_PEM);
-    if (ret < 0)
-    {
-        ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, server,
-                     "%s: Failed to import default DH params: %s (%d)",
-                     __func__, gnutls_strerror(ret), ret);
-        return HTTP_UNAUTHORIZED;
-    }
-
-    gnutls_certificate_set_dh_params(sc->certs, sc->dh_params);
-    gnutls_anon_set_server_dh_params(sc->anon_creds, sc->dh_params);
-#endif
 
     return OK;
+}
+
+
+
+/**
+ * Pool cleanup hook to release a gnutls_x509_tlsfeatures_t structure.
+ */
+apr_status_t mgs_cleanup_tlsfeatures(void *data)
+{
+    gnutls_x509_tlsfeatures_t feat = *((gnutls_x509_tlsfeatures_t*) data);
+    gnutls_x509_tlsfeatures_deinit(feat);
+    return APR_SUCCESS;
 }
 
 
@@ -563,15 +577,6 @@ int mgs_hook_post_config(apr_pool_t *pconf,
     server_rec *s;
     mgs_srvconf_rec *sc;
     mgs_srvconf_rec *sc_base;
-    void *data = NULL;
-    const char *userdata_key = "mgs_init";
-
-    _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
-
-    apr_pool_userdata_get(&data, userdata_key, base_server->process->pool);
-    if (data == NULL) {
-        apr_pool_userdata_set((const void *) 1, userdata_key, apr_pool_cleanup_null, base_server->process->pool);
-    }
 
     s = base_server;
     sc_base = (mgs_srvconf_rec *) ap_get_module_config(s->module_config, &gnutls_module);
@@ -628,6 +633,14 @@ int mgs_hook_post_config(apr_pool_t *pconf,
 
     sc_base->singleton_wd =
         mgs_new_singleton_watchdog(base_server, MGS_SINGLETON_WATCHDOG, pconf);
+
+    gnutls_x509_tlsfeatures_t *must_staple =
+        apr_palloc(ptemp, sizeof(gnutls_x509_tlsfeatures_t));
+    gnutls_x509_tlsfeatures_init(must_staple);
+    gnutls_x509_tlsfeatures_add(*must_staple, TLSFEATURE_MUST_STAPLE);
+    apr_pool_cleanup_register(ptemp, must_staple,
+                              mgs_cleanup_tlsfeatures,
+                              apr_pool_cleanup_null);
 
     for (s = base_server; s; s = s->next)
     {
@@ -730,20 +743,7 @@ int mgs_hook_post_config(apr_pool_t *pconf,
                 return rv;
         }
 
-        /* The call after this comment is a workaround for bug in
-         * gnutls_certificate_set_retrieve_function2 that ignores
-         * supported certificate types. Should be fixed in GnuTLS
-         * 3.3.12.
-         *
-         * Details:
-         * https://lists.gnupg.org/pipermail/gnutls-devel/2015-January/007377.html
-         * Workaround from:
-         * https://github.com/vanrein/tlspool/commit/4938102d3d1b086491d147e6c8e4e2a02825fc12 */
-#if GNUTLS_VERSION_NUMBER < 0x030312
-        gnutls_certificate_set_retrieve_function(sc->certs, (void *) exit);
-#endif
-
-        gnutls_certificate_set_retrieve_function2(sc->certs, cert_retrieve_fn);
+        gnutls_certificate_set_retrieve_function3(sc->certs, cert_retrieve_fn);
 
         if ((sc->certs_x509_chain == NULL || sc->certs_x509_chain_num < 1) &&
             sc->enabled == GNUTLS_ENABLED_TRUE) {
@@ -758,6 +758,18 @@ int mgs_hook_post_config(apr_pool_t *pconf,
 			ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
 						"GnuTLS: Host '%s:%d' is missing a Private Key File!",
 						s->server_hostname, s->addrs->host_port);
+            return HTTP_UNAUTHORIZED;
+        }
+
+        if (sc->certs_x509_chain_num > 0
+            && gnutls_x509_tlsfeatures_check_crt(*must_staple,
+                                                 sc->certs_x509_crt_chain[0])
+            && sc->ocsp_staple == GNUTLS_ENABLED_FALSE)
+        {
+            ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
+                         "Must-Staple is set in the host certificate "
+                         "of '%s:%d', but stapling is disabled!",
+                         s->server_hostname, s->addrs->host_port);
             return HTTP_UNAUTHORIZED;
         }
 
@@ -828,14 +840,6 @@ void mgs_hook_child_init(apr_pool_t *p, server_rec *s)
     if (rv != APR_SUCCESS)
         ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
                      "Failed to reinit mutex '" MGS_OCSP_MUTEX_NAME "'.");
-
-    /* Block SIGPIPE Signals */
-    rv = apr_signal_block(SIGPIPE);
-    if(rv != APR_SUCCESS) {
-        /* error sending output */
-        ap_log_error(APLOG_MARK, APLOG_EMERG, rv, s,
-                "GnuTLS: Error Blocking SIGPIPE Signal!");
-    }
 }
 
 const char *mgs_hook_http_scheme(const request_rec * r) {
@@ -1008,7 +1012,6 @@ mgs_srvconf_rec *mgs_find_sni_server(mgs_handle_t *ctxt)
 
 
 
-#ifdef ENABLE_EARLY_SNI
 /**
  * Pre client hello hook function for GnuTLS that implements early SNI
  * processing using `gnutls_ext_raw_parse()` (available since GnuTLS
@@ -1079,7 +1082,6 @@ static int early_sni_hook(gnutls_session_t session,
 
     return ret;
 }
-#endif
 
 
 
@@ -1157,7 +1159,8 @@ static void create_gnutls_handle(conn_rec * c)
     else
     {
         /* incoming connection, server mode */
-        err = gnutls_init(&ctxt->session, GNUTLS_SERVER);
+        err = gnutls_init(&ctxt->session,
+                          GNUTLS_SERVER | GNUTLS_POST_HANDSHAKE_AUTH);
         if (err != GNUTLS_E_SUCCESS)
             ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
                           "gnutls_init for server side failed: %s (%d)",
@@ -1174,14 +1177,10 @@ static void create_gnutls_handle(conn_rec * c)
         ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
                       "gnutls_priority_set failed!");
 
-#ifdef ENABLE_EARLY_SNI
-    /* Pre-handshake hook, EXPERIMENTAL */
+    /* Pre-handshake hook for early SNI parsing */
     gnutls_handshake_set_hook_function(ctxt->session,
                                        GNUTLS_HANDSHAKE_CLIENT_HELLO,
                                        GNUTLS_HOOK_PRE, early_sni_hook);
-#else
-    prepare_alpn_proposals(ctxt);
-#endif
 
     /* Post client hello hook (called after GnuTLS has parsed it) */
     gnutls_handshake_set_post_client_hello_function(ctxt->session,
@@ -1371,13 +1370,8 @@ int mgs_hook_fixups(request_rec * r) {
                                          gnutls_cipher_get(ctxt->session),
                                          gnutls_mac_get(ctxt->session)));
 
-#if GNUTLS_VERSION_NUMBER >= 0x030600
     /* Compression support has been removed since GnuTLS 3.6.0 */
     apr_table_setn(env, "SSL_COMPRESS_METHOD", "NULL");
-#else
-    apr_table_setn(env, "SSL_COMPRESS_METHOD",
-            gnutls_compression_get_name(gnutls_compression_get(ctxt->session)));
-#endif
 
 #ifdef ENABLE_SRP
     if (ctxt->sc->srp_tpasswd_conf_file != NULL && ctxt->sc->srp_tpasswd_file != NULL) {
@@ -1420,65 +1414,95 @@ int mgs_hook_fixups(request_rec * r) {
     return rv;
 }
 
-int mgs_hook_authz(request_rec * r) {
-    int rv;
-    mgs_handle_t *ctxt;
-    mgs_dirconf_rec *dc;
-
+int mgs_hook_authz(request_rec *r)
+{
     if (r == NULL)
         return DECLINED;
 
-    dc = ap_get_module_config(r->per_dir_config, &gnutls_module);
+    mgs_dirconf_rec *dc = ap_get_module_config(
+        r->per_dir_config, &gnutls_module);
 
-    _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
-    ctxt = get_effective_gnutls_ctxt(r->connection);
-
+    mgs_handle_t *ctxt = get_effective_gnutls_ctxt(r->connection);
     if (!ctxt || ctxt->session == NULL) {
         return DECLINED;
     }
 
-    if (dc->client_verify_mode == GNUTLS_CERT_IGNORE) {
+    /* The effective verify mode. Directory configuration takes
+     * precedence if present (-1 means it is unset). */
+    int client_verify_mode = ctxt->sc->client_verify_mode;
+    if (dc->client_verify_mode != -1)
+        client_verify_mode = dc->client_verify_mode;
+
+    char *verify_mode;
+    if (client_verify_mode == GNUTLS_CERT_IGNORE)
+        verify_mode = "ignore";
+    else if (client_verify_mode == GNUTLS_CERT_REQUEST)
+        verify_mode = "request";
+    else if (client_verify_mode == GNUTLS_CERT_REQUIRE)
+        verify_mode = "require";
+    else
+        verify_mode = "(undefined)";
+    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                  "%s: verify mode is \"%s\"", __func__, verify_mode);
+
+    if (client_verify_mode == GNUTLS_CERT_IGNORE)
+    {
+        return DECLINED;
+    }
+
+    /* At this point the verify mode is either request or require */
+    unsigned int cert_list_size;
+    const gnutls_datum_t *cert_list =
+        gnutls_certificate_get_peers(ctxt->session, &cert_list_size);
+
+    /* We can reauthenticate the client if using TLS 1.3 and the
+     * client annouced support. Note that there may still not be any
+     * client certificate after. */
+    if ((cert_list == NULL || cert_list_size == 0)
+        && gnutls_protocol_get_version(ctxt->session) == GNUTLS_TLS1_3
+        && (gnutls_session_get_flags(ctxt->session)
+            & GNUTLS_SFLAGS_POST_HANDSHAKE_AUTH))
+    {
         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
-                "GnuTLS: Directory set to Ignore Client Certificate!");
-    } else {
-        if (ctxt->sc->client_verify_mode < dc->client_verify_mode) {
-            ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
-                    "GnuTLS: Attempting to rehandshake with peer. %d %d",
-                    ctxt->sc->client_verify_mode,
-                    dc->client_verify_mode);
+                      "%s: No certificate, attempting post-handshake "
+                      "authentication (%d)",
+                      __func__, client_verify_mode);
 
-            /* If we already have a client certificate, there's no point in
-             * re-handshaking... */
-            rv = mgs_cert_verify(r, ctxt);
-            if (rv != DECLINED && rv != HTTP_FORBIDDEN)
-                return rv;
-
-            gnutls_certificate_server_set_request
-                    (ctxt->session, dc->client_verify_mode);
-
-            if (mgs_rehandshake(ctxt) != 0) {
-                return HTTP_FORBIDDEN;
-            }
-        } else if (ctxt->sc->client_verify_mode ==
-                GNUTLS_CERT_IGNORE) {
-#if MOD_GNUTLS_DEBUG
-            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                    "GnuTLS: Peer is set to IGNORE");
-#endif
-            return DECLINED;
-        }
-        rv = mgs_cert_verify(r, ctxt);
-        if (rv != DECLINED
-            && (rv != HTTP_FORBIDDEN
-                || dc->client_verify_mode == GNUTLS_CERT_REQUIRE
-                || (dc->client_verify_mode == -1
-                    && ctxt->sc->client_verify_mode == GNUTLS_CERT_REQUIRE)))
+        if (r->proto_num == HTTP_VERSION(2, 0))
         {
-            return rv;
+            ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
+                          "Rehandshake is prohibited for HTTP/2 "
+                          "(RFC 7540, section 9.2.1).");
+
+            /* This also applies to request mode, otherwise
+             * per-directory request would never work with HTTP/2. The
+             * note makes mod_http2 send an HTTP_1_1_REQUIRED
+             * error to tell the client to switch. */
+            apr_table_setn(r->notes, RENEGOTIATE_FORBIDDEN_NOTE,
+                           "verify-client");
+            return HTTP_FORBIDDEN;
+        }
+
+        /* The request mode sent to the client is always "request"
+         * because if reauth with "require" fails GnuTLS invalidates
+         * the session, so we couldn't send 403 to the client. */
+        gnutls_certificate_server_set_request(ctxt->session,
+                                              GNUTLS_CERT_REQUEST);
+        int rv = mgs_reauth(ctxt, r);
+        if (rv != GNUTLS_E_SUCCESS) {
+            if (rv == GNUTLS_E_GOT_APPLICATION_DATA)
+                return HTTP_REQUEST_ENTITY_TOO_LARGE;
+            else
+                return HTTP_FORBIDDEN;
         }
     }
 
-    return DECLINED;
+    int ret = mgs_cert_verify(r, ctxt);
+    /* In "request" mode we always allow the request, otherwise the
+     * verify result decides. */
+    if (client_verify_mode == GNUTLS_CERT_REQUEST)
+        return DECLINED;
+    return ret;
 }
 
 /* variables that are not sent by default:
@@ -1637,7 +1661,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
         /* It is perfectly OK for a client not to send a certificate if on REQUEST mode
          */
         if (ctxt->sc->client_verify_mode == GNUTLS_CERT_REQUEST)
-            return OK;
+            return DECLINED;
 
         /* no certificate provided by the client, but one was required. */
         ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
@@ -1772,33 +1796,14 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
 
     cur_time = apr_time_now();
 
-    if (status & GNUTLS_CERT_SIGNER_NOT_FOUND) {
+    if (status != 0) {
+        gnutls_datum_t errmsg;
+        gnutls_certificate_verification_status_print(
+            status, gnutls_certificate_type_get(ctxt->session),
+            &errmsg, 0);
         ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                "GnuTLS: Could not find Signer for Peer Certificate");
-    }
-
-    if (status & GNUTLS_CERT_SIGNER_NOT_CA) {
-        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                "GnuTLS: Peer's Certificate signer is not a CA");
-    }
-
-    if (status & GNUTLS_CERT_INSECURE_ALGORITHM) {
-        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                "GnuTLS: Peer's Certificate is using insecure algorithms");
-    }
-
-    if (status & GNUTLS_CERT_EXPIRED
-            || status & GNUTLS_CERT_NOT_ACTIVATED) {
-        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                "GnuTLS: Peer's Certificate signer is expired or not yet activated");
-    }
-
-    if (status & GNUTLS_CERT_INVALID) {
-        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                "GnuTLS: Peer Certificate is invalid.");
-    } else if (status & GNUTLS_CERT_REVOKED) {
-        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                "GnuTLS: Peer Certificate is revoked.");
+                      "Client authentication failed: %s", errmsg.data);
+        gnutls_free(errmsg.data);
     }
 
     mgs_add_common_cert_vars(r, cert.x509[0], 1, ctxt->sc->export_certificates_size);
@@ -1815,12 +1820,12 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
     if (status == 0) {
         apr_table_setn(r->subprocess_env, "SSL_CLIENT_VERIFY",
                 "SUCCESS");
-        ret = OK;
+        ret = DECLINED;
     } else {
         apr_table_setn(r->subprocess_env, "SSL_CLIENT_VERIFY",
                 "FAILED");
         if (ctxt->sc->client_verify_mode == GNUTLS_CERT_REQUEST)
-            ret = OK;
+            ret = DECLINED;
         else
             ret = HTTP_FORBIDDEN;
     }

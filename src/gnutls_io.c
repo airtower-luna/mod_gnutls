@@ -2,7 +2,7 @@
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2008 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
- *  Copyright 2015-2019 Fiona Klute
+ *  Copyright 2015-2020 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@
  */
 
 #include "mod_gnutls.h"
+#include "gnutls_io.h"
 #include "gnutls_proxy.h"
 
 #ifdef APLOG_USE_MODULE
@@ -250,7 +251,7 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
             if (ctxt->input_mode == AP_MODE_SPECULATIVE) {
                 /* We want to rollback this read. */
                 char_buffer_write(&ctxt->input_cbuf, buf,
-                        rc);
+                                  *len);
             }
             return ctxt->input_rc;
         } else if (rc == 0) {
@@ -447,26 +448,65 @@ tryagain:
     }
 }
 
-int mgs_rehandshake(mgs_handle_t * ctxt) {
-    int rv;
 
+
+int mgs_reauth(mgs_handle_t *ctxt, request_rec *r)
+{
     if (ctxt->session == NULL)
-        return -1;
+        return GNUTLS_E_INVALID_REQUEST;
 
-    rv = gnutls_rehandshake(ctxt->session);
+    /* Initialize to error to avoid false-good return value. */
+    int rv = GNUTLS_E_INTERNAL_ERROR;
+    int tries = 0;
 
-    if (rv != 0) {
-        /* the client did not want to rehandshake. goodbye */
-        ap_log_cerror(APLOG_MARK, APLOG_WARNING, 0, ctxt->c,
-                      "GnuTLS: Client Refused Rehandshake request.");
-        return -1;
+    do
+    {
+        rv = gnutls_reauth(ctxt->session, 0);
+        tries++;
+
+        /* GNUTLS_E_GOT_APPLICATION_DATA can (randomly, depending on
+         * timing) happen with a request containing a body. According to
+         * https://tools.ietf.org/html/rfc8446#appendix-E.1.2
+         * post-handshake authentication proves that the authenticated
+         * party is the one that did the handshake, so caching the data
+         * is appropriate. */
+        if (rv == GNUTLS_E_GOT_APPLICATION_DATA)
+        {
+            /* Fill connection input buffer using a speculative read. */
+            apr_size_t len = sizeof(ctxt->input_buffer);
+            ctxt->input_mode = AP_MODE_SPECULATIVE;
+            apr_status_t status =
+                gnutls_io_input_read(ctxt, ctxt->input_buffer, &len);
+            if (status == APR_SUCCESS)
+            {
+                ap_log_rerror(APLOG_MARK, APLOG_DEBUG, status, r,
+                              "%s: cached %" APR_SIZE_T_FMT " bytes.",
+                              __func__, len);
+                /* If the cache was too small to accept all pending data
+                 * we'll get GNUTLS_E_GOT_APPLICATION_DATA again, and the
+                 * authz hook will return HTTP_REQUEST_ENTITY_TOO_LARGE to
+                 * the client. */
+                rv = gnutls_reauth(ctxt->session, 0);
+            }
+            else
+                ap_log_rerror(APLOG_MARK, APLOG_INFO, status, r,
+                              "%s: buffering request data failed!",
+                              __func__);
+        }
+        /* Retry on GNUTLS_E_INTERRUPTED or GNUTLS_E_AGAIN, whether
+         * from initial gnutls_reauth() call or after buffering. */
+    } while (tries < HANDSHAKE_MAX_TRIES
+             && (rv == GNUTLS_E_INTERRUPTED || rv == GNUTLS_E_AGAIN));
+
+    if (rv != GNUTLS_E_SUCCESS)
+    {
+        ap_log_rerror(APLOG_MARK, APLOG_WARNING, 0, r,
+                      "%s: post-handshake authentication failed: %s (%d)",
+                      __func__, gnutls_strerror(rv), rv);
+        return rv;
     }
 
-    ctxt->status = 0;
-
-    rv = gnutls_do_handshake(ctxt);
-
-    return rv;
+    return GNUTLS_E_SUCCESS;
 }
 
 

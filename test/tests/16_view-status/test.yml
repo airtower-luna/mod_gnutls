@@ -1,0 +1,13 @@
+!connection
+gnutls_params:
+  - x509cafile=authority/x509.pem
+actions:
+  - !request
+    path: /status?auto
+    expect:
+      status: 200
+      body:
+        contains:
+          - 'Using GnuTLS version:'
+          - 'Built against GnuTLS version:'
+          - 'Current TLS session:'
