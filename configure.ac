@@ -181,9 +181,11 @@ AC_MSG_RESULT($use_msva)
 # to build PDF output.
 build_doc=no
 AC_PATH_PROG([PANDOC], [pandoc], [no])
+AC_ARG_ENABLE(pdf-doc,
+	AS_HELP_STRING([--disable-pdf-doc], [don't build PDF documentation]))
 AS_IF([test "$PANDOC" != "no"], [
 	AC_PATH_PROG([PDFLATEX], [pdflatex], [no])
-	if test "$PDFLATEX" != "no"; then
+	if test "$PDFLATEX" != "no" && test "${enable_pdf_doc}" != "no"; then
 		build_doc="html, manual page, pdf"
 	else
 		build_doc="html, manual page"
@@ -196,7 +198,8 @@ AS_IF([test "$PANDOC" != "no"], [
 ])
 AM_CONDITIONAL([USE_PANDOC], [test "$PANDOC" != "no"])
 AM_CONDITIONAL([USE_PDFLATEX], [test "$PANDOC" != "no" && \
-			       test "$PDFLATEX" != "no"])
+			       test "$PDFLATEX" != "no" && \
+			       test "${enable_pdf_doc}" != "no"])
 AM_CONDITIONAL([USE_MARKDOWN], [test -n "$MARKDOWN" && \
 			       test "$MARKDOWN" != "no"])
 
