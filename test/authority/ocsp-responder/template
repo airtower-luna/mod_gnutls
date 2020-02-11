@@ -1,3 +1,5 @@
 cn="Testing Authority OCSP Responder"
 signing_key
 ocsp_signing_key
+# id-pkix-ocsp-nocheck, NULL
+add_extension = 1.3.6.1.5.5.7.48.1.5 0x0500
