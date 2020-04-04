@@ -639,20 +639,21 @@ handshakes if `mod_watchdog` is not available or this option is set to
 
 ### GnuTLSOCSPCheckNonce
 
-Check the nonce in OCSP responses?
+Send nonces in OCSP requests and verify them in responses.
 
     GnuTLSOCSPCheckNonce [On|Off]
 
 Default: *off*\
 Context: server config, virtual host
 
-Most CAs do not to send nonces in their OCSP responses, probably
-because that way they can cache responses, which is [explicitly
-allowed by RFC
-6960](https://tools.ietf.org/html/rfc6960#section-2.5). You can enable
-`GnuTLSOCSPCheckNonce` to enforce nonce validation if your CA is one
-that supports OCSP nonces. Note that `mod_gnutls` will _send_ a nonce
-either way.
+If `GnuTLSOCSPCheckNonce` is enabled, `mod_gnutls` will send nonces in
+OCSP requests and verify them in responses. Responses without a nonce
+or with a mismatching one will be considered invalid and discarded.
+
+This option is disabled by default because many CAs do not support the
+OCSP nonce extension. The likely reason for that is the use of
+pre-produced responses, as described in [RFC 6960, Section
+2.5](https://tools.ietf.org/html/rfc6960#section-2.5).
 
 ### GnuTLSOCSPResponseFile
 

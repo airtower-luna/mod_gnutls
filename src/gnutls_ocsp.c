@@ -212,18 +212,18 @@ static int mgs_create_ocsp_request(server_rec *s,
         return ret;
     }
 
-    ret = gnutls_ocsp_req_randomize_nonce(r);
-    if (ret != GNUTLS_E_SUCCESS)
-    {
-        ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
-                     "OCSP nonce creation failed: %s (%d)",
-                     gnutls_strerror(ret), ret);
-        gnutls_ocsp_req_deinit(r);
-        return ret;
-    }
-
     if (nonce != NULL)
     {
+        ret = gnutls_ocsp_req_randomize_nonce(r);
+        if (ret != GNUTLS_E_SUCCESS)
+        {
+            ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
+                         "OCSP nonce creation failed: %s (%d)",
+                         gnutls_strerror(ret), ret);
+            gnutls_ocsp_req_deinit(r);
+            return ret;
+        }
+
         ret = gnutls_ocsp_req_get_nonce(r, NULL, nonce);
         if (ret != GNUTLS_E_SUCCESS)
         {
@@ -705,7 +705,8 @@ static apr_status_t mgs_cache_ocsp_response(server_rec *s,
     else
     {
         gnutls_datum_t req;
-        int ret = mgs_create_ocsp_request(s, req_data, &req, &nonce);
+        int ret = mgs_create_ocsp_request(s, req_data, &req,
+                                          sc->ocsp_check_nonce ? &nonce : NULL);
         if (ret == GNUTLS_E_SUCCESS)
         {
             ap_log_error(APLOG_MARK, APLOG_TRACE2, APR_SUCCESS, s,
