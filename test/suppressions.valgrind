@@ -10,7 +10,6 @@
    fun:__tls_get_addr
    ...
    fun:gnutls_rnd
-   fun:gnutls_ocsp_req_randomize_nonce
    ...
    fun:mgs_async_ocsp_update
    fun:*
