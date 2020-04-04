@@ -643,13 +643,16 @@ Check the nonce in OCSP responses?
 
     GnuTLSOCSPCheckNonce [On|Off]
 
-Default: *on*\
+Default: *off*\
 Context: server config, virtual host
 
-Some CAs refuse to send nonces in their OCSP responses, probably
-because that way they can cache responses. If your CA is one of them
-you can use this flag to disable nonce verification. Note that
-`mod_gnutls` will _send_ a nonce either way.
+Most CAs do not to send nonces in their OCSP responses, probably
+because that way they can cache responses, which is [explicitly
+allowed by RFC
+6960](https://tools.ietf.org/html/rfc6960#section-2.5). You can enable
+`GnuTLSOCSPCheckNonce` to enforce nonce validation if your CA is one
+that supports OCSP nonces. Note that `mod_gnutls` will _send_ a nonce
+either way.
 
 ### GnuTLSOCSPResponseFile
 

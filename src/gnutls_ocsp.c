@@ -1269,7 +1269,7 @@ int mgs_ocsp_enable_stapling(apr_pool_t *pconf __attribute__((unused)),
     if (sc->ocsp_auto_refresh == GNUTLS_ENABLED_UNSET)
         sc->ocsp_auto_refresh = GNUTLS_ENABLED_TRUE;
     if (sc->ocsp_check_nonce == GNUTLS_ENABLED_UNSET)
-        sc->ocsp_check_nonce = GNUTLS_ENABLED_TRUE;
+        sc->ocsp_check_nonce = GNUTLS_ENABLED_FALSE;
     if (sc->ocsp_cache_time == MGS_TIMEOUT_UNSET)
         sc->ocsp_cache_time = apr_time_from_sec(MGS_OCSP_CACHE_TIMEOUT);
     if (sc->ocsp_failure_timeout == MGS_TIMEOUT_UNSET)
