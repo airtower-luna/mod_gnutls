@@ -544,21 +544,20 @@ def subst_env(text):
 def run_test_conf(test_config, timeout=5.0, conn_log=None, response_log=None):
     """Load and run a test configuration.
 
-    The test_conf parameter must be a YAML file, defining one or more
-    TestConnections, to be run in order. The other three parameters
-    are forwarded to TestConnection.run().
+    The test_conf parameter must either a single TestConnection
+    object, or a list of such objects to be run in order. The other
+    three parameters are forwarded to TestConnection.run().
 
     """
     conns = None
 
-    config = yaml.load(test_config, Loader=yaml.Loader)
-    if type(config) is TestConnection:
-        conns = [config]
-    elif type(config) is list:
+    if type(test_config) is TestConnection:
+        conns = [test_config]
+    elif type(test_config) is list:
         # assume list elements are connections
-        conns = config
+        conns = test_config
     else:
-        raise TypeError(f'Unsupported configuration: {config!r}')
+        raise TypeError(f'Unsupported configuration: {test_config!r}')
     sys.stdout.flush()
 
     for i, test_conn in enumerate(conns):

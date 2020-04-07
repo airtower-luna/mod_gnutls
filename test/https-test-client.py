@@ -17,6 +17,7 @@
 
 import contextlib
 import os
+import yaml
 
 from mgstest.tests import run_test_conf
 
@@ -51,4 +52,5 @@ if __name__ == "__main__":
         os.environ['TEST_PORT'] = args.port
 
     with contextlib.closing(args.test_config):
-        run_test_conf(args.test_config, args.timeout)
+        test_conf = yaml.load(args.test_config, Loader=yaml.Loader)
+        run_test_conf(test_conf, args.timeout)

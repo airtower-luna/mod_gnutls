@@ -21,6 +21,7 @@ import os.path
 import subprocess
 import sys
 import tempfile
+import yaml
 from unittest import SkipTest
 
 import mgstest.hooks
@@ -98,6 +99,13 @@ def main(args):
                                      os.path.join(srcdir, 'tests'))
     print(f'Found test {testname}, test dir is {testdir}')
     os.environ['TEST_NAME'] = testname
+
+    # Load test config
+    try:
+        with open(os.path.join(testdir, 'test.yml'), 'r') as conf_file:
+            test_conf = yaml.load(conf_file, Loader=yaml.Loader)
+    except FileNotFoundError:
+        test_conf = None
 
     # Load test case hooks (if any)
     plugin_path = os.path.join(testdir, 'hooks.py')
@@ -193,11 +201,10 @@ def main(args):
                                   conn_log=args.log_connection,
                                   response_log=args.log_responses)
         else:
-            with open(os.path.join(testdir, 'test.yml'), 'r') as test_conf:
-                run_test_conf(test_conf,
-                              float(os.environ.get('TEST_QUERY_TIMEOUT', 5.0)),
-                              conn_log=args.log_connection,
-                              response_log=args.log_responses)
+            run_test_conf(test_conf,
+                          float(os.environ.get('TEST_QUERY_TIMEOUT', 5.0)),
+                          conn_log=args.log_connection,
+                          response_log=args.log_responses)
 
     # run extra checks the test's hooks.py might define
     if plugin.post_check:
