@@ -139,14 +139,8 @@ class TestConnection(yaml.YAMLObject):
         self.actions = actions
         self.transport = Transports[transport.upper()]
         self.description = description
-        if host:
-            self.host = subst_env(host)
-        else:
-            self.host = os.environ.get('TEST_TARGET', 'localhost')
-        if port:
-            self.port = int(subst_env(port))
-        else:
-            self.port = int(os.environ.get('TEST_PORT', 8000))
+        self.host = host
+        self.port = port
 
     def __repr__(self):
         return (f'{self.__class__.__name__!s}'
@@ -157,6 +151,15 @@ class TestConnection(yaml.YAMLObject):
 
     def run(self, timeout=5.0, conn_log=None, response_log=None):
         """Set up an HTTP connection and run the configured actions."""
+
+        if self.host:
+            self.host = subst_env(self.host)
+        else:
+            self.host = os.environ.get('TEST_TARGET', 'localhost')
+        if self.port:
+            self.port = int(subst_env(self.port))
+        else:
+            self.port = int(os.environ.get('TEST_PORT', 8000))
 
         # note: "--logfile" option requires GnuTLS version >= 3.6.7
         command = ['gnutls-cli', '--logfile=/dev/stderr']
