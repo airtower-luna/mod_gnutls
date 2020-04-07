@@ -1,0 +1,14 @@
+!connection
+description: Check if the HTTPS server provides an OCSP status
+gnutls_params:
+  - x509cafile=authority/x509.pem
+  - ocsp
+  - save-ocsp=outputs/36-ocsp.der
+actions:
+  - !request
+    path: /test.txt
+    expect:
+      status: 200
+      body:
+        exactly: |
+          test

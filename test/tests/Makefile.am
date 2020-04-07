@@ -34,4 +34,5 @@ EXTRA_DIST = \
 	32_vhost_SNI_serveralias_mismatch/apache.conf 32_vhost_SNI_serveralias_mismatch/test.yml \
 	33_vhost_SNI_serveralias_missinghost/apache.conf 33_vhost_SNI_serveralias_missinghost/test.yml \
 	34_TLS_reverse_proxy_h2/apache.conf 34_TLS_reverse_proxy_h2/hooks.py 34_TLS_reverse_proxy_h2/backend.conf 34_TLS_reverse_proxy_h2/test.yml \
-	35_client_reauth/apache.conf 35_client_reauth/test.yml
+	35_client_reauth/apache.conf 35_client_reauth/test.yml \
+	36_OCSP_server_nonce/apache.conf 36_OCSP_server_nonce/hooks.py 36_OCSP_server_nonce/ocsp.conf 36_OCSP_server_nonce/test.yml
