@@ -5,7 +5,7 @@ Include ${srcdir}/base_apache.conf
 
 Include		${srcdir}/cgi_module.conf
 LoadModule	env_module		${AP_LIBEXECDIR}/mod_env.so
-LoadModule	rewrite_module		${AP_LIBEXECDIR}/mod_rewrite.so
+LoadModule	alias_module		${AP_LIBEXECDIR}/mod_alias.so
 
 # separate log and PID file
 CustomLog	logs/${TEST_NAME}.ocsp.access.log combined
@@ -19,8 +19,7 @@ PidFile		ocsp@PID_AFFIX@.pid
 </IfDefine>
 
 <VirtualHost _default_:${OCSP_PORT}>
-	RewriteEngine	On
-	RewriteRule	^/ocsp(.*)	/ocsp.cgi$1	[L]
+	ScriptAlias /ocsp "${srcdir}/data/ocsp.cgi"
 	# General rules for all OCSP handling
 	<Location /ocsp/>
 		# Some clients seem to have trouble with chunked
@@ -45,7 +44,4 @@ PidFile		ocsp@PID_AFFIX@.pid
 		SetEnv	OCSP_CERT	${PWD}/authority/subca/ocsp-responder/x509.pem
 		SetEnv	OCSP_KEY	${PWD}/authority/subca/ocsp-responder/secret.key
 	</Location>
-	<Directory ${srcdir}/data>
-		Options	+ExecCGI
-	</Directory>
 </VirtualHost>
