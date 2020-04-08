@@ -1,5 +1,5 @@
 /*
- *  Copyright 2018 Fiona Klute
+ *  Copyright 2018-2020 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@
 #include <httpd.h>
 #include <mod_watchdog.h>
 
+APLOG_USE_MODULE(gnutls);
 
 struct mgs_watchdog* mgs_new_singleton_watchdog(server_rec *s, char *name,
                                                 apr_pool_t* p)
