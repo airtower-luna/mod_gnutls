@@ -79,7 +79,7 @@ endif
 noinst_PYTHON = https-test-client.py mgstest/http.py mgstest/__init__.py \
 	mgstest/hooks.py mgstest/services.py mgstest/softhsm.py \
 	mgstest/tests.py mgstest/valgrind.py runtest.py softhsm-init.py \
-	doctest-mgstest.py required-modules.py
+	doctest-mgstest.py required-modules.py data/ocsp.py
 
 # Identities in the miniature CA, server, and client environment for
 # the test suite
@@ -260,7 +260,7 @@ endif
 	done
 
 # Apache configuration and data files
-apache_data = base_apache.conf cgi_module.conf data/dump.cgi data/ocsp.cgi \
+apache_data = base_apache.conf cgi_module.conf data/dump.cgi \
 	data/test.txt data/secret/mirror.cgi data/secret/test.txt \
 	mime.types proxy_mods.conf
 
