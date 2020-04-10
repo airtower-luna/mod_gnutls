@@ -19,7 +19,7 @@ PidFile		ocsp@PID_AFFIX@.pid
 </IfDefine>
 
 <VirtualHost _default_:${OCSP_PORT}>
-	ScriptAlias /ocsp "${srcdir}/data/ocsp.cgi"
+	ScriptAlias /ocsp "${srcdir}/data/ocsp.py"
 	# General rules for all OCSP handling
 	<Location /ocsp/>
 		# Some clients seem to have trouble with chunked
@@ -31,14 +31,14 @@ PidFile		ocsp@PID_AFFIX@.pid
 		</If>
 	</Location>
 	<Location /ocsp/authority/>
-		# certificates and key for ocsp.cgi
+		# certificates and key for ocsp.py
 		SetEnv	CA_CERT		${PWD}/authority/x509.pem
 		SetEnv	OCSP_INDEX	${OCSP_INDEX}
 		SetEnv	OCSP_CERT	${PWD}/authority/ocsp-responder/x509.pem
 		SetEnv	OCSP_KEY	${PWD}/authority/ocsp-responder/secret.key
 	</Location>
 	<Location /ocsp/authority/subca/>
-		# certificates and key for ocsp.cgi
+		# certificates and key for ocsp.py
 		SetEnv	CA_CERT		${PWD}/authority/subca/x509.pem
 		SetEnv	OCSP_INDEX	${PWD}/authority/subca/ocsp_index.txt
 		SetEnv	OCSP_CERT	${PWD}/authority/subca/ocsp-responder/x509.pem
