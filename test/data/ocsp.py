@@ -77,6 +77,7 @@ def handle_post():
         return
 
     try:
+        req = sys.stdin.buffer.read(int(content_length))
         openssl = os.getenv('OPENSSL') or shutil.which('openssl')
         openssl_run = subprocess.run([openssl, 'ocsp',
             '-index', os.getenv('OCSP_INDEX'),
@@ -85,7 +86,7 @@ def handle_post():
             '-rkey', os.getenv('OCSP_KEY'),
             '-nmin', os.getenv('OCSP_VALID_MIN', '5'),
             '-reqin', '-', '-respout', '-'],
-            stdin=sys.stdin.buffer, capture_output=True)
+            input=req, capture_output=True)
 
         if openssl_run.returncode == 0:
             stdout_response(HTTPStatus.OK, openssl_run.stdout)
