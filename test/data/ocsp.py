@@ -35,6 +35,7 @@
 # searched.
 
 from http import HTTPStatus
+import base64
 import os
 import shutil
 import subprocess
@@ -78,6 +79,8 @@ def handle_post():
 
     try:
         req = sys.stdin.buffer.read(int(content_length))
+        print(f'Received OCSP request: \'{base64.b64encode(req).decode()}\'',
+              file=sys.stderr, flush=True)
         openssl = os.getenv('OPENSSL') or shutil.which('openssl')
         openssl_run = subprocess.run([openssl, 'ocsp',
             '-index', os.getenv('OCSP_INDEX'),
