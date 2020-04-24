@@ -77,9 +77,9 @@ endif
 
 # Python tools for tests
 noinst_PYTHON = https-test-client.py mgstest/http.py mgstest/__init__.py \
-	mgstest/hooks.py mgstest/services.py mgstest/softhsm.py \
-	mgstest/tests.py mgstest/valgrind.py runtest.py softhsm-init.py \
-	doctest-mgstest.py required-modules.py data/ocsp.py
+	mgstest/hooks.py mgstest/ocsp.py mgstest/services.py \
+	mgstest/softhsm.py mgstest/tests.py mgstest/valgrind.py runtest.py \
+	softhsm-init.py	doctest-mgstest.py required-modules.py data/ocsp.py
 
 # Identities in the miniature CA, server, and client environment for
 # the test suite
