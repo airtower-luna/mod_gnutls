@@ -14,7 +14,7 @@ jobs:
         container:
           - 'debian:buster'
           - 'debian:sid'
-          - 'fedora:31'
+          - 'fedora:32'
     runs-on: ubuntu-latest
     container: ${{ matrix.container }}
     name: ${{ matrix.container }}
