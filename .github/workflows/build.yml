@@ -34,6 +34,10 @@ jobs:
         run: |
           ip addr show
           cat /etc/hosts
+      - name: set prefix for container-specific artifacts
+        # this is because upload-artifact doesn't like ":" in file names
+        run: |
+          echo "::set-env name=artifact_prefix::$(echo debian:sid | sed s/:/-/)"
       - name: autoreconf
         run: autoreconf -fiv
       - name: configure
@@ -52,13 +56,13 @@ jobs:
         uses: actions/upload-artifact@v1
         if: failure() || cancelled()
         with:
-          name: ${{ matrix.container }}-apache-logs
+          name: ${{ env.artifact_prefix }}-apache-logs
           path: test/logs/
       - name: store test log if cancelled
         uses: actions/upload-artifact@v1
         if: cancelled()
         with:
-          name: ${{ matrix.container }}-test-log
+          name: ${{ env.artifact_prefix }}-test-log
           path: test/test-00_basic.log
       - name: make distcheck
         run: VERBOSE=1 make distcheck
