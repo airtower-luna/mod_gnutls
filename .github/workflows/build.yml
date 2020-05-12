@@ -53,16 +53,16 @@ jobs:
       - name: make check
         run: VERBOSE=1 make check
       - name: store Apache logs
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v2
         if: failure() || cancelled()
         with:
           name: ${{ env.artifact_prefix }}-apache-logs
           path: test/logs/
-      - name: store test log if cancelled
-        uses: actions/upload-artifact@v1
-        if: cancelled()
+      - name: store test logs
+        uses: actions/upload-artifact@v2
+        if: failure() || cancelled()
         with:
-          name: ${{ env.artifact_prefix }}-test-log
-          path: test/test-00_basic.log
+          name: ${{ env.artifact_prefix }}-test-logs
+          path: test/test-*.log
       - name: make distcheck
         run: VERBOSE=1 make distcheck
