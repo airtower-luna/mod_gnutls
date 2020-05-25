@@ -30,7 +30,6 @@ jobs:
         run: |
           dnf -y group install "C Development Tools and Libraries"
           dnf -y install curl gnutls-devel gnutls-utils httpd-devel iproute python3-pyyaml redhat-rpm-config softhsm
-          dnf -y upgrade --enablerepo=updates-testing --advisory=FEDORA-2020-77604f07ae
       - name: network overview
         run: |
           ip addr show
