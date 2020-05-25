@@ -829,6 +829,128 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
     return status;
 }
 
+int mgs_transport_read_ready(gnutls_transport_ptr_t ptr,
+                             unsigned int ms)
+{
+    mgs_handle_t *ctxt = ptr;
+    ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, ctxt->c,
+                  "%s: called with %u ms wait", __func__, ms);
+
+    apr_pool_t *tmp = NULL;
+    apr_status_t rv = apr_pool_create(&tmp, ctxt->c->pool);
+    if (rv != APR_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_ENOMEM, ctxt->c,
+                      "could not create temporary pool for %s",
+                     __func__);
+        return -1;
+    }
+
+    apr_bucket_brigade *bb = apr_brigade_create(tmp, ctxt->c->bucket_alloc);
+
+    /* one byte non-blocking speculative read to see if there's data
+     * in the filter chain */
+    rv = ap_get_brigade(ctxt->input_filter->next, bb, AP_MODE_SPECULATIVE,
+                        APR_NONBLOCK_READ, 1);
+
+    int result;
+    if (rv == APR_SUCCESS && !APR_BRIGADE_EMPTY(bb))
+        result = 1;
+    else
+        result = 0;
+
+    apr_brigade_destroy(bb);
+
+    /* If GnuTLS doesn't want to wait or we already have data,
+     * return. */
+    if (ms == 0 || result == 1)
+    {
+        apr_pool_destroy(tmp);
+        return result;
+    }
+
+    ap_log_cerror(APLOG_MARK, APLOG_TRACE1, APR_SUCCESS, ctxt->c,
+                  "%s: waiting for data", __func__);
+
+    /* No data yet, and we're supposed to wait, so wait for data on
+     * the socket. */
+    apr_socket_t *sock = ap_get_conn_socket(ctxt->c);
+    apr_interval_time_t timeout = -1;
+    apr_interval_time_t original_timeout;
+    rv = apr_socket_timeout_get(sock, &original_timeout);
+    if (rv != APR_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, ctxt->c,
+                      "%s: could not get socket timeout",
+                      __func__);
+        apr_pool_destroy(tmp);
+        return -1;
+    }
+
+    /* If GnuTLS requests an "indefinite" wait we do not want to mess
+     * with whatever Apache does by default. Otherwise temporarily
+     * adjust the socket timeout. */
+    if (ms != GNUTLS_INDEFINITE_TIMEOUT)
+    {
+        /* apr_interval_time_t is in microseconds */
+        if (__builtin_mul_overflow(ms, 1000, &timeout))
+        {
+            ap_log_cerror(APLOG_MARK, APLOG_ERR, APR_ENOMEM, ctxt->c,
+                          "%s: overflow while calculating timeout!",
+                          __func__);
+            apr_pool_destroy(tmp);
+            return -1;
+        }
+        rv = apr_socket_timeout_set(sock, timeout);
+        if (rv != APR_SUCCESS)
+        {
+            ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, ctxt->c,
+                          "%s: could not set socket timeout",
+                          __func__);
+            apr_pool_destroy(tmp);
+            return -1;
+        }
+    }
+
+#if APR_MAJOR_VERSION < 2
+    apr_pollfd_t pollset;
+    apr_int32_t nsds;
+    pollset.p = tmp;
+    pollset.desc_type = APR_POLL_SOCKET;
+    pollset.reqevents = APR_POLLIN | APR_POLLHUP;
+    pollset.desc.s = sock;
+    rv = apr_poll(&pollset, 1, &nsds, timeout);
+#else
+    rv = apr_socket_wait(sock, APR_WAIT_READ);
+#endif
+    apr_pool_destroy(tmp);
+
+    if (ms != GNUTLS_INDEFINITE_TIMEOUT)
+    {
+        /* We still need "rv" below, so new variable. */
+        apr_status_t rc = apr_socket_timeout_set(sock, original_timeout);
+        if (rc != APR_SUCCESS)
+        {
+            ap_log_cerror(APLOG_MARK, APLOG_CRIT, rc, ctxt->c,
+                          "%s: could not restore socket timeout",
+                          __func__);
+            return -1;
+        }
+    }
+
+    if (rv == APR_SUCCESS)
+        return 1;
+    else if (APR_STATUS_IS_TIMEUP(rv))
+        return 0;
+    else
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, ctxt->c,
+                      "%s: waiting for data on connection socket failed",
+                      __func__);
+        return -1;
+    }
+}
+
 /**
  * Pull function for GnuTLS
  *

@@ -1217,9 +1217,11 @@ static void create_gnutls_handle(conn_rec * c)
 
     /* Set pull, push & ptr functions */
     gnutls_transport_set_pull_function(ctxt->session,
-            mgs_transport_read);
+                                       mgs_transport_read);
+    gnutls_transport_set_pull_timeout_function(ctxt->session,
+                                               mgs_transport_read_ready);
     gnutls_transport_set_push_function(ctxt->session,
-            mgs_transport_write);
+                                       mgs_transport_write);
     gnutls_transport_set_ptr(ctxt->session, ctxt);
     /* Add IO filters */
     ctxt->input_filter = ap_add_input_filter(GNUTLS_INPUT_FILTER_NAME,

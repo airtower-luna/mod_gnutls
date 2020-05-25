@@ -83,6 +83,19 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
 ssize_t mgs_transport_write(gnutls_transport_ptr_t ptr,
                             const void *buffer, size_t len);
 
+/**
+ * mgs_transport_read is called from GnuTLS check if data is available
+ * on the underlying transport.
+ *
+ * @param ptr     transport pointer, the mod_gnutls connection context
+ * @param ms      maximum time to wait in milliseconds
+ * @return GnuTLS requirement: "The callback should return 0 on
+ *      timeout, a positive number if data can be received, and -1 on
+ *      error."
+ */
+int mgs_transport_read_ready(gnutls_transport_ptr_t ptr,
+                             unsigned int ms);
+
 int mgs_reauth(mgs_handle_t * ctxt, request_rec *r);
 
 #endif /* __MOD_GNUTLS_IO_H__ */
