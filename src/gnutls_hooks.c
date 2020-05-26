@@ -1129,6 +1129,47 @@ static apr_status_t cleanup_gnutls_session(void *data)
     return APR_SUCCESS;
 }
 
+static int got_ticket_func(gnutls_session_t session,
+                           unsigned int htype,
+                           unsigned when,
+                           unsigned int incoming __attribute__((unused)),
+                           const gnutls_datum_t *msg __attribute__((unused)))
+{
+    /* Ignore all unexpected messages */
+    if (htype != GNUTLS_HANDSHAKE_NEW_SESSION_TICKET
+        || when != GNUTLS_HOOK_POST)
+        return GNUTLS_E_SUCCESS;
+
+    mgs_handle_t *ctxt = gnutls_session_get_ptr(session);
+    if (!(gnutls_session_get_flags(session) & GNUTLS_SFLAGS_SESSION_TICKET))
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_WARNING, APR_SUCCESS, ctxt->c,
+                      "%s called but session has no ticket!",
+                      __func__);
+        /* Tickets are optional, so don't break the session on
+         * errors. */
+        return GNUTLS_E_SUCCESS;
+    }
+
+    gnutls_datum_t dump;
+    int ret = gnutls_session_get_data2(session, &dump);
+    if (ret != GNUTLS_E_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                      "%s: error reading session ticket: %s (%d)",
+                      __func__, gnutls_strerror(ret), ret);
+        if (dump.data)
+            gnutls_free(dump.data);
+        return GNUTLS_E_SUCCESS;
+    }
+
+    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                  "%s: session ticket read (%u bytes)",
+                  __func__, dump.size);
+    gnutls_free(dump.data);
+    return GNUTLS_E_SUCCESS;
+}
+
 static void create_gnutls_handle(conn_rec * c)
 {
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
@@ -1155,6 +1196,9 @@ static void create_gnutls_handle(conn_rec * c)
             ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
                           "gnutls_init for proxy connection failed: %s (%d)",
                           gnutls_strerror(err), err);
+        gnutls_handshake_set_hook_function(ctxt->session,
+                                           GNUTLS_HANDSHAKE_NEW_SESSION_TICKET,
+                                           GNUTLS_HOOK_POST, got_ticket_func);
     }
     else
     {
@@ -1165,6 +1209,11 @@ static void create_gnutls_handle(conn_rec * c)
             ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
                           "gnutls_init for server side failed: %s (%d)",
                           gnutls_strerror(err), err);
+
+        /* Pre-handshake hook for early SNI parsing */
+        gnutls_handshake_set_hook_function(ctxt->session,
+                                           GNUTLS_HANDSHAKE_CLIENT_HELLO,
+                                           GNUTLS_HOOK_PRE, early_sni_hook);
     }
 
     /* Ensure TLS session resources are released when the connection
@@ -1176,11 +1225,6 @@ static void create_gnutls_handle(conn_rec * c)
     if (err != GNUTLS_E_SUCCESS)
         ap_log_cerror(APLOG_MARK, APLOG_ERR, err, c,
                       "gnutls_priority_set failed!");
-
-    /* Pre-handshake hook for early SNI parsing */
-    gnutls_handshake_set_hook_function(ctxt->session,
-                                       GNUTLS_HANDSHAKE_CLIENT_HELLO,
-                                       GNUTLS_HOOK_PRE, early_sni_hook);
 
     /* Post client hello hook (called after GnuTLS has parsed it) */
     gnutls_handshake_set_post_client_hello_function(ctxt->session,
