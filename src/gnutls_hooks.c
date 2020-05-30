@@ -1167,6 +1167,9 @@ static int got_ticket_func(gnutls_session_t session,
                   "%s: session ticket read (%u bytes)",
                   __func__, dump.size);
     gnutls_free(dump.data);
+    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                  "%s: cache key for the session ticket is %s",
+                  __func__, mgs_proxy_ticket_id(ctxt, NULL));
     return GNUTLS_E_SUCCESS;
 }
 

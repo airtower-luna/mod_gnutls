@@ -1,5 +1,5 @@
 /*
- *  Copyright 2015-2019 Fiona Klute
+ *  Copyright 2015-2020 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -293,18 +293,33 @@ apr_status_t load_proxy_x509_credentials(apr_pool_t *pconf,
 
 
 
-static void proxy_conn_set_sni(mgs_handle_t *ctxt)
+/**
+ * Returns either a valid hostname for use with SNI, or NULL.
+ */
+static const char *get_proxy_sni_name(mgs_handle_t *ctxt)
 {
     /* Get peer hostname from note left by mod_proxy */
     const char *peer_hostname =
         apr_table_get(ctxt->c->notes, PROXY_SNI_NOTE);
+
     /* Used only as target for apr_ipsubnet_create() */
     apr_ipsubnet_t *probe;
-    /* Check if the note is present (!= NULL) and NOT an IP
-     * address */
-    if ((peer_hostname) != NULL
+    /* If the note is present (!= NULL) check that the value is NOT an
+     * IP address, which wouldn't be valid for SNI. */
+    if ((peer_hostname != NULL)
         && (apr_ipsubnet_create(&probe, peer_hostname, NULL, ctxt->c->pool)
-            != APR_SUCCESS))
+            == APR_SUCCESS))
+        return NULL;
+
+    return peer_hostname;
+}
+
+
+
+static void proxy_conn_set_sni(mgs_handle_t *ctxt)
+{
+    const char *peer_hostname = get_proxy_sni_name(ctxt);
+    if (peer_hostname != NULL)
     {
         int ret = gnutls_server_name_set(ctxt->session, GNUTLS_NAME_DNS,
                                          peer_hostname, strlen(peer_hostname));
@@ -376,6 +391,32 @@ static void proxy_conn_set_alpn(mgs_handle_t *ctxt)
                       "Could not set ALPN proposals for proxy "
                       "connection: %s (%d)",
                       gnutls_strerror(ret), ret);
+}
+
+
+
+char *mgs_proxy_ticket_id(mgs_handle_t *ctxt, apr_pool_t *pool)
+{
+    apr_pool_t *tmp;
+    if (pool)
+        tmp = pool;
+    else
+        tmp = ctxt->c->pool;
+
+    /* c->client_addr->port and c->client_ip actually contain
+     * information on the remote server for outgoing proxy
+     * connections, prefer SNI hostname over IP.
+     *
+     * The server_hostname is used to tie the cache entry to a
+     * specific vhost, because different vhosts may have different
+     * settings for the same backend server.
+     */
+    const char *peer_hostname = get_proxy_sni_name(ctxt);
+    return apr_psprintf(
+        tmp, "proxy:%s:%s:%d",
+        ctxt->c->base_server->server_hostname,
+        peer_hostname ? peer_hostname : ctxt->c->client_ip,
+        ctxt->c->client_addr->port);
 }
 
 

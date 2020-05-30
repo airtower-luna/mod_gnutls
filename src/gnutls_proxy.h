@@ -1,5 +1,5 @@
 /*
- *  Copyright 2015-2018 Fiona Klute
+ *  Copyright 2015-2020 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -40,5 +40,17 @@ apr_status_t load_proxy_x509_credentials(apr_pool_t *pconf,
  * currently SNI and ALPN.
  */
 void mgs_set_proxy_handshake_ext(mgs_handle_t * ctxt);
+
+/**
+ * Create a cache key for a session ticket of a proxy connection.
+ *
+ * @param ctxt The proxy connection handle (mod_gnutls is client)
+ *
+ * @param pool Pool to allocate the string from, if `NULL` the
+ * connection pool is used
+ *
+ * @return string to be used as cache key
+ */
+char *mgs_proxy_ticket_id(mgs_handle_t *ctxt, apr_pool_t *pool);
 
 #endif /* __MOD_GNUTLS_PROXY_H__ */
