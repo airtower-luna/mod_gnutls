@@ -1,5 +1,6 @@
 name: Valgrind memcheck
 on:
+  pull_request:
   push:
     # don't run on packaging branches
     branches-ignore:
