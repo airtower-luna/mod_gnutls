@@ -49,8 +49,9 @@ void mgs_set_proxy_handshake_ext(mgs_handle_t * ctxt);
  * @param pool Pool to allocate the string from, if `NULL` the
  * connection pool is used
  *
- * @return string to be used as cache key
+ * @return `gnutls_datum_t` containing the string to be used as cache
+ * key as `data` and its size (`strlen()`) as `size`.
  */
-char *mgs_proxy_ticket_id(mgs_handle_t *ctxt, apr_pool_t *pool);
+gnutls_datum_t mgs_proxy_ticket_id(mgs_handle_t *ctxt, apr_pool_t *pool);
 
 #endif /* __MOD_GNUTLS_PROXY_H__ */

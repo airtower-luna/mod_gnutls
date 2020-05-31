@@ -395,7 +395,7 @@ static void proxy_conn_set_alpn(mgs_handle_t *ctxt)
 
 
 
-char *mgs_proxy_ticket_id(mgs_handle_t *ctxt, apr_pool_t *pool)
+gnutls_datum_t mgs_proxy_ticket_id(mgs_handle_t *ctxt, apr_pool_t *pool)
 {
     apr_pool_t *tmp;
     if (pool)
@@ -412,11 +412,14 @@ char *mgs_proxy_ticket_id(mgs_handle_t *ctxt, apr_pool_t *pool)
      * settings for the same backend server.
      */
     const char *peer_hostname = get_proxy_sni_name(ctxt);
-    return apr_psprintf(
-        tmp, "proxy:%s:%s:%d",
-        ctxt->c->base_server->server_hostname,
-        peer_hostname ? peer_hostname : ctxt->c->client_ip,
-        ctxt->c->client_addr->port);
+    gnutls_datum_t key;
+    key.data = (unsigned char *)
+        apr_psprintf(tmp, "proxy:%s:%s:%d",
+                     ctxt->c->base_server->server_hostname,
+                     peer_hostname ? peer_hostname : ctxt->c->client_ip,
+                     ctxt->c->client_addr->port);
+    key.size = strlen((const char*) key.data);
+    return key;
 }
 
 

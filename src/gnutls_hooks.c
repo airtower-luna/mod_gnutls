@@ -1151,25 +1151,24 @@ static int got_ticket_func(gnutls_session_t session,
         return GNUTLS_E_SUCCESS;
     }
 
-    gnutls_datum_t dump;
-    int ret = gnutls_session_get_data2(session, &dump);
+    gnutls_datum_t ticket;
+    int ret = gnutls_session_get_data2(session, &ticket);
     if (ret != GNUTLS_E_SUCCESS)
     {
         ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
                       "%s: error reading session ticket: %s (%d)",
                       __func__, gnutls_strerror(ret), ret);
-        if (dump.data)
-            gnutls_free(dump.data);
+        if (ticket.data)
+            gnutls_free(ticket.data);
         return GNUTLS_E_SUCCESS;
     }
 
+    apr_time_t expiry = apr_time_now() + ctxt->sc->cache_timeout;
     ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
-                  "%s: session ticket read (%u bytes)",
-                  __func__, dump.size);
-    gnutls_free(dump.data);
-    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
-                  "%s: cache key for the session ticket is %s",
-                  __func__, mgs_proxy_ticket_id(ctxt, NULL));
+                  "%s: caching session ticket for %s (%u bytes)",
+                  __func__, ctxt->proxy_ticket_key.data, ticket.size);
+    mgs_cache_store(ctxt->sc->cache, ctxt->c->base_server,
+                    ctxt->proxy_ticket_key, ticket, expiry);
     return GNUTLS_E_SUCCESS;
 }
 
@@ -1202,6 +1201,7 @@ static void create_gnutls_handle(conn_rec * c)
         gnutls_handshake_set_hook_function(ctxt->session,
                                            GNUTLS_HANDSHAKE_NEW_SESSION_TICKET,
                                            GNUTLS_HOOK_POST, got_ticket_func);
+        ctxt->proxy_ticket_key = mgs_proxy_ticket_id(ctxt, NULL);
     }
     else
     {

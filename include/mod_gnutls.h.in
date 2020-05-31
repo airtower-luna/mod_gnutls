@@ -251,6 +251,9 @@ typedef struct {
     /** Connection status: 0 before (re-)handshake, 1 when up, -1 on
      * error (checks use status < 0 or status > 0) */
     int status;
+    /** For proxy connections: cache key to store/retrieve session
+     * tickets */
+    gnutls_datum_t proxy_ticket_key;
 } mgs_handle_t;
 
 
