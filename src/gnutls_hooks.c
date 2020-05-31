@@ -1169,6 +1169,7 @@ static int got_ticket_func(gnutls_session_t session,
                   __func__, ctxt->proxy_ticket_key.data, ticket.size);
     mgs_cache_store(ctxt->sc->cache, ctxt->c->base_server,
                     ctxt->proxy_ticket_key, ticket, expiry);
+    gnutls_free(ticket.data);
     return GNUTLS_E_SUCCESS;
 }
 
