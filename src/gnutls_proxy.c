@@ -15,11 +15,14 @@
  */
 
 #include "mod_gnutls.h"
+#include "gnutls_cache.h"
 #include "gnutls_proxy.h"
 #include "gnutls_util.h"
 
 #include <apr_strings.h>
 #include <gnutls/gnutls.h>
+
+APLOG_USE_MODULE(gnutls);
 
 /*
  * Callback to check the server certificate for proxy HTTPS
@@ -395,6 +398,45 @@ static void proxy_conn_set_alpn(mgs_handle_t *ctxt)
 
 
 
+/**
+ * Check if there is a cached session for the connection, and load it
+ * if yes. The session is deleted from the cache after that, because
+ * tickets should not be reused for forward secrecy.
+ *
+ * @param ctxt the mod_gnutls connection handle
+ */
+static void proxy_conn_load_session(mgs_handle_t *ctxt)
+{
+    gnutls_datum_t data = {NULL, 0};
+    data.data = gnutls_malloc(MGS_SESSION_FETCH_BUF_SIZE);
+    if (data.data == NULL)
+        return;
+    data.size = MGS_SESSION_FETCH_BUF_SIZE;
+
+    apr_status_t rv = mgs_cache_fetch(ctxt->sc->cache, ctxt->c->base_server,
+                                      ctxt->proxy_ticket_key, &data,
+                                      ctxt->c->pool);
+    if (rv != APR_SUCCESS)
+    {
+        gnutls_free(data.data);
+        return;
+    }
+
+    // TODO: delete the cache entry
+
+    int ret = gnutls_session_set_data(ctxt->session, data.data, data.size);
+    if (ret == GNUTLS_E_SUCCESS)
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                      "%s: Cached session loaded.", __func__);
+    else
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_EGENERAL, ctxt->c,
+                      "%s: Loading cached session failed: %s (%d)",
+                      __func__, gnutls_strerror(ret), ret);
+    gnutls_free(data.data);
+}
+
+
+
 gnutls_datum_t mgs_proxy_ticket_id(mgs_handle_t *ctxt, apr_pool_t *pool)
 {
     apr_pool_t *tmp;
@@ -428,4 +470,5 @@ void mgs_set_proxy_handshake_ext(mgs_handle_t *ctxt)
 {
     proxy_conn_set_sni(ctxt);
     proxy_conn_set_alpn(ctxt);
+    proxy_conn_load_session(ctxt);
 }

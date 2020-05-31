@@ -1,7 +1,7 @@
 /*
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2014 Nikos Mavrogiannopoulos
- *  Copyright 2015-2018 Fiona Klute
+ *  Copyright 2015-2020 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -32,6 +32,12 @@
 /** Name of the mod_gnutls cache access mutex, for use with Apache's
  * `Mutex` directive */
 #define MGS_CACHE_MUTEX_NAME "gnutls-cache"
+
+/** 8K is the maximum size accepted when receiving OCSP responses,
+ * sessions cache entries should be much smaller. The buffer is
+ * reallocated to actual size after fetching, so memory waste is
+ * minimal and temporary. */
+#define MGS_SESSION_FETCH_BUF_SIZE (8 * 1024)
 
 /**
  * Configure a cache instance

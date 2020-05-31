@@ -384,7 +384,8 @@ static int gnutls_do_handshake(mgs_handle_t * ctxt) {
         return -1;
     }
 
-    /* Enable SNI and ALPN for proxy connections */
+    /* Enable SNI and ALPN for proxy connections, and load cached
+     * session if any. */
     if (ctxt->is_proxy == GNUTLS_ENABLED_TRUE)
         mgs_set_proxy_handshake_ext(ctxt);
 

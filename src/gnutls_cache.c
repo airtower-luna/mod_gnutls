@@ -2,7 +2,7 @@
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2008 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
- *  Copyright 2015-2018 Fiona Klute
+ *  Copyright 2015-2020 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -168,12 +168,6 @@ static int socache_store_session(void *baton, gnutls_datum_t key,
 
 
 
-/** 8K is the maximum size accepted when receiving OCSP responses,
- * sessions cache entries should be much smaller. The buffer is
- * reallocated to actual size after fetching, so memory waste is
- * minimal and temporary. */
-#define SOCACHE_FETCH_BUF_SIZE (8 * 1024)
-
 apr_status_t mgs_cache_fetch(mgs_cache_t cache, server_rec *server,
                              gnutls_datum_t key, gnutls_datum_t *output,
                              apr_pool_t *pool)
@@ -239,10 +233,10 @@ static gnutls_datum_t socache_fetch_session(void *baton, gnutls_datum_t key)
     if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
         return data;
 
-    data.data = gnutls_malloc(SOCACHE_FETCH_BUF_SIZE);
+    data.data = gnutls_malloc(MGS_SESSION_FETCH_BUF_SIZE);
     if (data.data == NULL)
         return data;
-    data.size = SOCACHE_FETCH_BUF_SIZE;
+    data.size = MGS_SESSION_FETCH_BUF_SIZE;
 
     apr_status_t rv = mgs_cache_fetch(ctxt->sc->cache, ctxt->c->base_server,
                                       dbmkey, &data, ctxt->c->pool);
