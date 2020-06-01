@@ -6,7 +6,7 @@ AC_CONFIG_SRCDIR([src/mod_gnutls.c])
 AC_CONFIG_AUX_DIR(config)
 
 OOO_MAINTAIN_MODE
-AM_MAINTAINER_MODE
+AM_MAINTAINER_MODE([enable])
 AC_CANONICAL_TARGET
 # mod_gnutls test suite requires GNU make
 AM_INIT_AUTOMAKE([-Wno-portability])
