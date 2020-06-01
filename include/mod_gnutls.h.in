@@ -48,7 +48,7 @@ extern module AP_MODULE_DECLARE_DATA gnutls_module;
 #define MOD_GNUTLS_VERSION "@MOD_GNUTLS_VERSION@"
 
 /* Module Debug Mode */
-#define MOD_GNUTLS_DEBUG @OOO_MAINTAIN@
+#define MOD_GNUTLS_DEBUG @MOD_GNUTLS_DEBUG@
 
 /** Name of the module-wide singleton watchdog */
 #define MGS_SINGLETON_WATCHDOG "_mod_gnutls_singleton_"

@@ -22,15 +22,3 @@ EOF
   echo '"[$]@"' >> $1
   chmod +x $1
 ])
-
-dnl this macro adds a maintainer mode option to enable programmer specific
-dnl  code in makefiles
-AC_DEFUN([OOO_MAINTAIN_MODE],[
-  AC_ARG_ENABLE(
-        maintainer,
-        [AC_HELP_STRING([--enable-maintainer],[Enable maintainer mode for this project])],
-        AC_MSG_RESULT([Enabling Maintainer Mode!!])
-        OOO_MAINTAIN=1,
-        OOO_MAINTAIN=0)
-  AC_SUBST(OOO_MAINTAIN)
-])

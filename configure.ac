@@ -5,7 +5,6 @@ AC_PREREQ(2.53)
 AC_CONFIG_SRCDIR([src/mod_gnutls.c])
 AC_CONFIG_AUX_DIR(config)
 
-OOO_MAINTAIN_MODE
 AM_MAINTAINER_MODE([enable])
 AC_CANONICAL_TARGET
 # mod_gnutls test suite requires GNU make
@@ -83,6 +82,17 @@ fi
 
 AC_MSG_CHECKING([whether to enable SRP functionality])
 AC_MSG_RESULT($use_srp)
+
+MOD_GNUTLS_DEBUG=0
+AC_ARG_ENABLE(gnutls-debug-log,
+       AS_HELP_STRING([--enable-gnutls-debug-log],
+               [Write GnuTLS debug output to /tmp/gnutls_debug, for \
+               debugging only!]),
+       enable_gnutls_debug=$enableval, enable_gnutls_debug=no)
+if test "$enable_gnutls_debug" != "no"; then
+	MOD_GNUTLS_DEBUG=1
+fi
+AC_SUBST(MOD_GNUTLS_DEBUG)
 
 AM_PATH_PYTHON([3])
 AX_PYTHON_MODULE([yaml], [fatal])
