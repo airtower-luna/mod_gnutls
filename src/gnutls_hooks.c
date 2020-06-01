@@ -1151,6 +1151,10 @@ static int got_ticket_func(gnutls_session_t session,
         return GNUTLS_E_SUCCESS;
     }
 
+    /* No cache means we cannot cache tickets. */
+    if (!ctxt->sc->cache_enable)
+        return GNUTLS_E_SUCCESS;
+
     gnutls_datum_t ticket;
     int ret = gnutls_session_get_data2(session, &ticket);
     if (ret != GNUTLS_E_SUCCESS)

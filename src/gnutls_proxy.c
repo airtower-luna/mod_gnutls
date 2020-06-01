@@ -407,6 +407,10 @@ static void proxy_conn_set_alpn(mgs_handle_t *ctxt)
  */
 static void proxy_conn_load_session(mgs_handle_t *ctxt)
 {
+    /* No cache means there cannot be a cached ticket. */
+    if (!ctxt->sc->cache_enable)
+        return;
+
     gnutls_datum_t data = {NULL, 0};
     data.data = gnutls_malloc(MGS_SESSION_FETCH_BUF_SIZE);
     if (data.data == NULL)
