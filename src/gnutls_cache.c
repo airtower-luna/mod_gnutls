@@ -281,17 +281,17 @@ static gnutls_datum_t socache_fetch_session(void *baton, gnutls_datum_t key)
  */
 static int socache_delete_session(void *baton, gnutls_datum_t key)
 {
-    gnutls_datum_t tmpkey;
+    gnutls_datum_t dbmkey;
     mgs_handle_t *ctxt = baton;
 
-    if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &tmpkey) < 0)
+    if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
         return -1;
 
     if (ctxt->sc->cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
         apr_global_mutex_lock(ctxt->sc->cache->mutex);
     apr_status_t rv = ctxt->sc->cache->prov->remove(ctxt->sc->cache->socache,
                                                     ctxt->c->base_server,
-                                                    key.data, key.size,
+                                                    dbmkey.data, dbmkey.size,
                                                     ctxt->c->pool);
     if (ctxt->sc->cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
         apr_global_mutex_unlock(ctxt->sc->cache->mutex);
