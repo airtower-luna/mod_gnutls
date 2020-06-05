@@ -296,6 +296,56 @@ apr_status_t load_proxy_x509_credentials(apr_pool_t *pconf,
 
 
 
+int mgs_proxy_got_ticket_func(gnutls_session_t session,
+                              unsigned int htype,
+                              unsigned when,
+                              unsigned int incoming __attribute__((unused)),
+                              const gnutls_datum_t *msg __attribute__((unused)))
+{
+    /* Ignore all unexpected messages */
+    if (htype != GNUTLS_HANDSHAKE_NEW_SESSION_TICKET
+        || when != GNUTLS_HOOK_POST)
+        return GNUTLS_E_SUCCESS;
+
+    mgs_handle_t *ctxt = gnutls_session_get_ptr(session);
+    if (!(gnutls_session_get_flags(session) & GNUTLS_SFLAGS_SESSION_TICKET))
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_WARNING, APR_SUCCESS, ctxt->c,
+                      "%s called but session has no ticket!",
+                      __func__);
+        /* Tickets are optional, so don't break the session on
+         * errors. */
+        return GNUTLS_E_SUCCESS;
+    }
+
+    /* No cache means we cannot cache tickets. */
+    if (!ctxt->sc->cache_enable)
+        return GNUTLS_E_SUCCESS;
+
+    gnutls_datum_t ticket;
+    int ret = gnutls_session_get_data2(session, &ticket);
+    if (ret != GNUTLS_E_SUCCESS)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                      "%s: error reading session ticket: %s (%d)",
+                      __func__, gnutls_strerror(ret), ret);
+        if (ticket.data)
+            gnutls_free(ticket.data);
+        return GNUTLS_E_SUCCESS;
+    }
+
+    apr_time_t expiry = apr_time_now() + ctxt->sc->cache_timeout;
+    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                  "%s: caching session ticket for %s (%u bytes)",
+                  __func__, ctxt->proxy_ticket_key.data, ticket.size);
+    mgs_cache_store(ctxt->sc->cache, ctxt->c->base_server,
+                    ctxt->proxy_ticket_key, ticket, expiry);
+    gnutls_free(ticket.data);
+    return GNUTLS_E_SUCCESS;
+}
+
+
+
 /**
  * Returns either a valid hostname for use with SNI, or NULL.
  */

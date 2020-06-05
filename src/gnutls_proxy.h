@@ -54,4 +54,14 @@ void mgs_set_proxy_handshake_ext(mgs_handle_t * ctxt);
  */
 gnutls_datum_t mgs_proxy_ticket_id(mgs_handle_t *ctxt, apr_pool_t *pool);
 
+/**
+ * `gnutls_handshake_hook_func` to handle incoming session tickets on
+ * proxy connections.
+ */
+int mgs_proxy_got_ticket_func(gnutls_session_t session,
+                              unsigned int htype,
+                              unsigned when,
+                              unsigned int incoming __attribute__((unused)),
+                              const gnutls_datum_t *msg __attribute__((unused)));
+
 #endif /* __MOD_GNUTLS_PROXY_H__ */
