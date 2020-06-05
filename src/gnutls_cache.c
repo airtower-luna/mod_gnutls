@@ -268,6 +268,34 @@ static gnutls_datum_t socache_fetch_session(void *baton, gnutls_datum_t key)
 
 
 
+apr_status_t mgs_cache_delete(mgs_cache_t cache, server_rec *server,
+                              gnutls_datum_t key, apr_pool_t *pool)
+{
+    apr_pool_t *spool;
+    apr_pool_create(&spool, pool);
+
+    if (cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
+        apr_global_mutex_lock(cache->mutex);
+    apr_status_t rv = cache->prov->remove(cache->socache, server,
+                                          key.data, key.size,
+                                          spool);
+    if (cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
+        apr_global_mutex_unlock(cache->mutex);
+
+    if (rv != APR_SUCCESS)
+        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv, server,
+                     "error deleting from cache '%s:%s'",
+                     cache->prov->name, cache->config);
+    else
+        ap_log_error(APLOG_MARK, APLOG_TRACE1, rv, server,
+                     "deleted entry from cache '%s:%s'",
+                     cache->prov->name, cache->config);
+    apr_pool_destroy(spool);
+    return rv;
+}
+
+
+
 /**
  * Remove function for the GnuTLS session cache, see
  * gnutls_db_set_remove_function().
@@ -287,23 +315,12 @@ static int socache_delete_session(void *baton, gnutls_datum_t key)
     if (mgs_session_id2dbm(ctxt->c, key.data, key.size, &dbmkey) < 0)
         return -1;
 
-    if (ctxt->sc->cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
-        apr_global_mutex_lock(ctxt->sc->cache->mutex);
-    apr_status_t rv = ctxt->sc->cache->prov->remove(ctxt->sc->cache->socache,
-                                                    ctxt->c->base_server,
-                                                    dbmkey.data, dbmkey.size,
-                                                    ctxt->c->pool);
-    if (ctxt->sc->cache->prov->flags & AP_SOCACHE_FLAG_NOTMPSAFE)
-        apr_global_mutex_unlock(ctxt->sc->cache->mutex);
-
-    if (rv != APR_SUCCESS) {
-        ap_log_error(APLOG_MARK, APLOG_NOTICE, rv,
-                     ctxt->c->base_server,
-                     "error deleting from cache '%s:%s'",
-                     ctxt->sc->cache->prov->name, ctxt->sc->cache->config);
+    apr_status_t rv = mgs_cache_delete(ctxt->sc->cache, ctxt->c->base_server,
+                                       dbmkey, ctxt->c->pool);
+    if (rv != APR_SUCCESS)
         return -1;
-    }
-    return 0;
+    else
+        return 0;
 }
 
 

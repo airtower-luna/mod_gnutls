@@ -426,7 +426,12 @@ static void proxy_conn_load_session(mgs_handle_t *ctxt)
         return;
     }
 
-    // TODO: delete the cache entry
+    /* Best effort attempt to avoid ticket reuse. Unfortunately
+     * another thread or process could update (or remove) the cache in
+     * between, but that can't be avoided without forcing use of a
+     * global mutex even with a multiprocess-safe socache provider. */
+    mgs_cache_delete(ctxt->sc->cache, ctxt->c->base_server,
+                     ctxt->proxy_ticket_key, ctxt->c->pool);
 
     int ret = gnutls_session_set_data(ctxt->session, data.data, data.size);
     if (ret == GNUTLS_E_SUCCESS)

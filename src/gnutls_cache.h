@@ -155,6 +155,22 @@ apr_status_t mgs_cache_fetch(mgs_cache_t cache, server_rec *server,
                              apr_pool_t *pool);
 
 /**
+ * Delete an item from the mod_gnutls object caches.
+ *
+ * @param cache the cache to delete from
+ *
+ * @param server server context for the request
+ *
+ * @param key key for the cache entry to be deleted
+ *
+ * @param pool pool to allocate temporary memory from
+ *
+ * @return APR status or error value
+ */
+apr_status_t mgs_cache_delete(mgs_cache_t cache, server_rec *server,
+                              gnutls_datum_t key, apr_pool_t *pool);
+
+/**
  * Internal cache configuration structure
  */
 struct mgs_cache {
