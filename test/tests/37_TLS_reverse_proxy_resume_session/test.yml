@@ -1,0 +1,22 @@
+!connection
+description: >-
+  The client sends two requests, each of which must be passed on to
+  the backend server. KeepAlive is disabled on the backend, so the TLS
+  session should be resumed for the second request.
+gnutls_params:
+  - x509cafile=authority/x509.pem
+actions:
+  - !request
+    path: /proxy/test.txt
+    expect:
+      status: 200
+      body:
+        exactly: |
+          test
+  - !request
+    path: /proxy/test.txt
+    expect:
+      status: 200
+      body:
+        exactly: |
+          test
