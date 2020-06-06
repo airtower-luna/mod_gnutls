@@ -89,10 +89,16 @@ Configure TLS Session Cache
 Default: `GnuTLSCache none`\
 Context: server config
 
-This directive configures the TLS Session Cache for `mod_gnutls`. This
-could be shared between machines of different architectures. If the
-selected cache implementation is not thread-safe, access is serialized
-using the `gnutls-cache` mutex.
+This directive configures the TLS session cache for `mod_gnutls`. The
+TLS session cache is used both as a server side session cache if not
+using session tickets (for TLS 1.2 and earlier), and if `mod_gnutls`
+is configured as a HTTPS reverse proxy also to cache client sessions
+to backend servers (for TLS 1.3 only).
+
+A cache accessed over network (e.g. memcache) may be shared between
+machines of different architectures. If the selected cache
+implementation is not thread-safe, access is serialized using the
+`gnutls-cache` mutex.
 
 Which cache implementations are available depends on your Apache
 installation and configuration, `mod_gnutls` can use any socache
@@ -111,7 +117,9 @@ configuration.
 
 `dbm`
 :   Uses a DBM cache file. The parameter is a relative or absolute
-    path to be used as the DBM cache file.
+    path to be used as the DBM cache file. Note that the dbm cache has
+    a size limitation for entries that is too small for OCSP responses
+    or proxy session data.
 
     Example: `dbm:cache/gnutls_cache`
 
