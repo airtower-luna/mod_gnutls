@@ -308,6 +308,19 @@ int mgs_proxy_got_ticket_func(gnutls_session_t session,
         return GNUTLS_E_SUCCESS;
 
     mgs_handle_t *ctxt = gnutls_session_get_ptr(session);
+
+    /* No cache means we cannot cache tickets. */
+    if (!ctxt->sc->cache_enable)
+        return GNUTLS_E_SUCCESS;
+
+    if (gnutls_protocol_get_version(ctxt->session) != GNUTLS_TLS1_3)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                      "%s: session tickets for proxy connections are used "
+                      "only with TLS 1.3.", __func__);
+        return GNUTLS_E_SUCCESS;
+    }
+
     if (!(gnutls_session_get_flags(session) & GNUTLS_SFLAGS_SESSION_TICKET))
     {
         ap_log_cerror(APLOG_MARK, APLOG_WARNING, APR_SUCCESS, ctxt->c,
@@ -317,10 +330,6 @@ int mgs_proxy_got_ticket_func(gnutls_session_t session,
          * errors. */
         return GNUTLS_E_SUCCESS;
     }
-
-    /* No cache means we cannot cache tickets. */
-    if (!ctxt->sc->cache_enable)
-        return GNUTLS_E_SUCCESS;
 
     gnutls_datum_t ticket;
     int ret = gnutls_session_get_data2(session, &ticket);
