@@ -1,3 +1,22 @@
+** Version 0.11.0 (UNRELEASED)
+
+- Change default for GnuTLSOCSPCheckNonce to "off", and send OCSP
+  nonces only if it has been enabled. The reason for this change is
+  that in practice most public CAs do not support OCSP nonces, which
+  is permitted by both RFC 6960 and the CA/Browser Forum baseline
+  requirements (as of version 1.6.9). In this situation enforcing
+  correct nonces by default makes the automatic OCSP stapling support
+  mostly useless.
+
+- Add a test for correct nonce handling with "GnuTLSOCSPCheckNonce
+  on", thanks to Krista Karppinen for that and a rewrite of the OCSP
+  responder script in Python!
+
+- Support session resumption using session tickets for proxy
+  connections (TLS 1.3 connections only).
+
+- Add ./configure option to disable building PDF documentation
+
 ** Version 0.10.0 (2020-02-03)
 
 - Added support for stapling multiple OCSP responses (TLS 1.3
