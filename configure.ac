@@ -58,17 +58,21 @@ AC_ARG_ENABLE(vpath-install,
 AM_CONDITIONAL([ENABLE_VPATH_INSTALL], [test "$vpath_install" = "yes"])
 
 AC_ARG_ENABLE(srp,
-       AS_HELP_STRING([--disable-srp],
-               [unconditionally disable the SRP functionality]),
-       use_srp=$enableval, use_srp=yes)
+       AS_HELP_STRING([--enable-srp],
+               [enable SRP functionality if supported by libgnutls]),
+       use_srp=$enableval, use_srp=no)
 
 # check if the available GnuTLS library supports SRP
 AC_SEARCH_LIBS([gnutls_srp_server_get_username], [gnutls], [], [use_srp="no"])
 
+AC_MSG_CHECKING([whether to enable SRP functionality])
+AC_MSG_RESULT($use_srp)
+
 GNUTLS_FEAT_CFLAGS=""
-if test "$use_srp" != "no"; then
+AS_IF([test "${use_srp}" != "no"], [
 	GNUTLS_FEAT_CFLAGS="-DENABLE_SRP=1"
-fi
+	AC_MSG_WARN([You have enabled SRP support. This feature is deprecated and will be removed in a future release.])
+])
 
 AC_ARG_ENABLE(strict,
        AS_HELP_STRING([--disable-strict],
@@ -79,9 +83,6 @@ STRICT_CFLAGS=""
 if test "$use_strict" != "no"; then
 	STRICT_CFLAGS="-Wall -Werror -Wextra -Wno-error=deprecated-declarations"
 fi
-
-AC_MSG_CHECKING([whether to enable SRP functionality])
-AC_MSG_RESULT($use_srp)
 
 MOD_GNUTLS_DEBUG=0
 AC_ARG_ENABLE(gnutls-debug-log,
