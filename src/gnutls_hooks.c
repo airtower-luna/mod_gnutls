@@ -658,13 +658,7 @@ int mgs_hook_post_config(apr_pool_t *pconf,
         if (sc->enabled == GNUTLS_ENABLED_UNSET)
             sc->enabled = GNUTLS_ENABLED_FALSE;
         if (sc->tickets == GNUTLS_ENABLED_UNSET)
-        {
-            /* GnuTLS 3.6.4 introduced automatic master key rotation */
-            if (gnutls_check_version_numeric(3, 6, 4))
-                sc->tickets = GNUTLS_ENABLED_TRUE;
-            else
-                sc->tickets = GNUTLS_ENABLED_FALSE;
-        }
+            sc->tickets = GNUTLS_ENABLED_FALSE;
         if (sc->export_certificates_size < 0)
             sc->export_certificates_size = 0;
         if (sc->client_verify_mode == -1)

@@ -133,10 +133,10 @@ configuration.
 `none`
 :   Turns off all caching of TLS sessions.
 
-    This can significantly reduce the performance of `mod_gnutls`
-    since even followup connections by a client must renegotiate
-    parameters instead of reusing old ones. This is the default, since
-    it requires no configuration.
+    This can reduce the performance of `mod_gnutls` since every
+    followup connection by a client must perform a full TLS
+    handshake. This is the default because it requires no
+    configuration.
 
     Session tickets are an alternative to using a session cache,
     please see `GnuTLSSessionTickets`. Note that for TLS 1.3 GnuTLS
@@ -160,7 +160,7 @@ Enable Session Tickets for the server
 
     GnuTLSSessionTickets [on|off]
 
-Default: `on` with GnuTLS 3.6.4 and newer, `off` otherwise\
+Default: `off`
 Context: server config, virtual host
 
 Session tickets allow TLS session resumption without session state
@@ -173,13 +173,13 @@ to the issuing server only.
 If this option is set in the global configuration, virtual hosts
 without a `GnuTLSSessionTickets` setting will use the global setting.
 
-*Warning:* With GnuTLS version before 3.6.4 the master key that
-protects the tickets is generated only on server start, and there is
-no mechanism to roll over the key. If session tickets are enabled it
-is highly recommended to restart the server regularly to protect past
-sessions in case an attacker gains access to server memory. GnuTLS
-3.6.4 introduced an automatic TOTP-based key rollover, so this warning
-does not apply any more and tickets are enabled by default.
+*Warning:* The primary key used to encrypt the tickets is generated
+while the server loads its configuration. An attacker who is able to
+read this key from server RAM may be able to decrypt past TLS 1.2
+sessions and impersonate the server to clients trying to resume
+sessions using tickets. If you enable session tickets you should
+regularly `reload` the server to generate fresh keys. Many
+distributions automatically do this during log rotation.
 
 ### GnuTLSDHFile
 
@@ -800,8 +800,7 @@ ciphersuites. OCSP stapling will be enabled if the server certificate
 contains an OCSP URI, `conf/tls/site1_cert_chain.pem` contains the
 issuer certificate in addition to the server's, and
 [mod\_socache\_shmcb](http://httpd.apache.org/docs/current/en/mod/mod_socache_shmcb.html)
-is loaded. With Gnutls 3.6.4 or newer session tickets are enabled,
-too.
+is loaded.
 
 Virtual Hosts with Server Name Indication
 -----------------------------------------
