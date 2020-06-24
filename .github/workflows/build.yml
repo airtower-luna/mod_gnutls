@@ -35,6 +35,29 @@ jobs:
         run: |
           ip addr show
           cat /etc/hosts
+      - name: find usable IPs for tests
+        shell: python3 {0}
+        run: |
+          import socket
+          def try_connect(sockaddr):
+              af, socktype, proto, canonname, sa = sockaddr
+              try:
+                  s = socket.socket(af, socktype, proto)
+                  s.connect(sa)
+              except:
+                  return False
+              finally:
+                  s.close()
+              return True
+
+          test_ips = []
+          for name in ['localhost', socket.gethostname()]:
+              addrs = list(map(lambda t: t[-1][0], filter(try_connect, socket.getaddrinfo(name, 123, proto=socket.IPPROTO_UDP))))
+              print(f'{name}: {addrs}')
+              test_ips += addrs
+          # IPv6 addresses must be enclosed in square brackets
+          test_ips = [f'[{i}]' if ':' in i else i for i in test_ips]
+          print(f'::set-env name=test_ips::{" ".join(test_ips)}')
       - name: set prefix for container-specific artifacts
         # this is because upload-artifact doesn't like ":" in file names
         env:
@@ -44,7 +67,7 @@ jobs:
       - name: autoreconf
         run: autoreconf -fiv
       - name: configure
-        run: TEST_IP=127.0.0.1 APACHE_MUTEX=pthread ./configure
+        run: TEST_IP="${test_ips}" APACHE_MUTEX=pthread ./configure
       - name: store config.log
         uses: actions/upload-artifact@v1
         if: failure()
