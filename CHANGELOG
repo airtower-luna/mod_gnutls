@@ -15,7 +15,17 @@
 - Support session resumption using session tickets for proxy
   connections (TLS 1.3 connections only).
 
+- Disable session tickets by default. The GnuTLS built-in key rotation
+  for session tickets never actually changes the primary key, just
+  derives keys from it, so it does not provide forward secrecy in case
+  an attacker learns the primary key (by gaining access to server
+  RAM). A reload of the server is enough to generate a new key, so
+  consider enabling session tickets and reloading the server every few
+  hours, at least until a forward-secret rotation can be implemented.
+
 - Add ./configure option to disable building PDF documentation
+
+- Deprecate SRP and disable it by default.
 
 ** Version 0.10.0 (2020-02-03)
 
