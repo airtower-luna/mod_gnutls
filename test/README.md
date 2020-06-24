@@ -32,8 +32,8 @@ directories in `tests/`.
 The default configuration assumes that a loopback device with IPv4 and
 IPv6 support is available (`TEST_IP="[::1] 127.0.0.1"`) and that
 `TEST_HOST="localhost"` resolves to both of these addresses. If this
-does not apply to your system, you can pass different values to
-`./configure`, e.g. to use IPv4 only:
+does not apply to your system (e.g. most Docker containers), you can
+pass different values to `./configure`, e.g. to use IPv4 only:
 
 ```bash
 $ TEST_HOST="localhost" TEST_IP="127.0.0.1" ./configure

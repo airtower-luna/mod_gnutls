@@ -33,7 +33,7 @@ Prerequisites
 Installation
 ------------
 
- tar xzvf mod_gnutls-version.tar.bz2
+ tar xvjf mod_gnutls-version.tar.bz2
  cd mod_gnutls-version/
  autoreconf -fiv
  ./configure
