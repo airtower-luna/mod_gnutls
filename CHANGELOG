@@ -27,6 +27,10 @@
 
 - Deprecate SRP and disable it by default.
 
+- Make ./configure check if both [::1] and 127.0.0.1 are available,
+  disable either if not. This makes the build work out-of-the-box in
+  Docker containers, which by default use IPv4 only.
+
 ** Version 0.10.0 (2020-02-03)
 
 - Added support for stapling multiple OCSP responses (TLS 1.3
