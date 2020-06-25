@@ -43,7 +43,12 @@ if __name__ == "__main__":
                         help='the hostnames/IPs to check')
     parser.add_argument('--quiet', '-q', action='store_true',
                         help='disable debug output')
+    parser.add_argument('--hostname', '-H', action='store_true',
+                        help='append socket.gethostname() to hosts')
     args = parser.parse_args()
+
+    if args.hostname:
+        args.hosts.append(socket.gethostname())
 
     test_ips = []
     for name in args.hosts:

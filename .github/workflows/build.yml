@@ -37,7 +37,7 @@ jobs:
           cat /etc/hosts
       - name: find usable IPs for tests
         run: |
-          echo "::set-env name=test_ips::$(python3 test/check_test_ips.py localhost $(hostname))"
+          echo "::set-env name=test_ips::$(python3 test/check_test_ips.py -H localhost)"
       - name: set prefix for container-specific artifacts
         # this is because upload-artifact doesn't like ":" in file names
         env:
