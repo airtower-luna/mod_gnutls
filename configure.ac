@@ -57,6 +57,17 @@ AC_ARG_ENABLE(vpath-install,
        vpath_install=$enableval, vpath_install=no)
 AM_CONDITIONAL([ENABLE_VPATH_INSTALL], [test "$vpath_install" = "yes"])
 
+AC_ARG_ENABLE(clang-coverage,
+       AS_HELP_STRING([--enable-clang-coverage],
+               [Collect coverage information using clang profiling \
+	       instrumentation. Do not use for production!]),
+       coverage=$enableval, coverage=no)
+COVERAGE_CFLAGS=""
+AS_IF([test "${coverage}" != "no"], [
+	COVERAGE_CFLAGS="-fprofile-instr-generate -fcoverage-mapping"
+])
+AM_CONDITIONAL([ENABLE_COVERAGE], [test "$coverage" = "yes"])
+
 AC_ARG_ENABLE(srp,
        AS_HELP_STRING([--enable-srp],
                [enable SRP functionality if supported by libgnutls]),
@@ -223,7 +234,7 @@ AS_IF([test "${APACHE2}" = "no"], [
 
 AC_PATH_PROGS([HTTP_CLI], [curl], [no])
 
-MODULE_CFLAGS="${LIBGNUTLS_CFLAGS} ${GNUTLS_FEAT_CFLAGS} ${MSVA_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES} ${STRICT_CFLAGS}"
+MODULE_CFLAGS="${LIBGNUTLS_CFLAGS} ${GNUTLS_FEAT_CFLAGS} ${MSVA_CFLAGS} ${APXS_CFLAGS} ${AP_INCLUDES} ${APR_INCLUDES} ${APU_INCLUDES} ${STRICT_CFLAGS} ${COVERAGE_CFLAGS}"
 MODULE_LIBS="${LIBGNUTLS_LIBS}"
 
 AC_PATH_PROGS([SOFTHSM], [softhsm2-util], [no])

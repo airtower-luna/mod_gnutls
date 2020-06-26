@@ -234,6 +234,11 @@ make-test-dirs:
 .PHONY: make-test-dirs clean-softhsm2-db stop-gnupg-agent
 
 
+if ENABLE_COVERAGE
+coverage_raw_dir = outputs/coverage
+MOSTLYCLEANFILES += $(coverage_raw_dir)/*
+endif
+
 mostlyclean-local: clean-softhsm2-db stop-gnupg-agent
 	-rmdir $(pgp_identities:=/private-keys-v1.d) || true
 if USE_MSVA
@@ -249,6 +254,9 @@ endif
 # avoids this issue, and the timeout will expose actually unclean
 # stops.
 clean-local:
+if ENABLE_COVERAGE
+	-rmdir $(coverage_raw_dir) || true
+endif
 	-rmdir $(extra_dirs) || true
 if USE_MSVA
 	-rmdir $(msva_home) || true
@@ -351,6 +359,10 @@ AM_TESTS_ENVIRONMENT += export FLOCK="@FLOCK@"; \
 	export TEST_LOCK="$(test_lockfile)"; \
 	export BACKEND_LOCK="$(backend_lockfile)"; \
 	export OCSP_LOCK="$(ocsp_lockfile)";
+endif
+
+if ENABLE_COVERAGE
+AM_TESTS_ENVIRONMENT += export LLVM_PROFILE_FILE="$(coverage_raw_dir)/%p-%3m.profraw";
 endif
 
 # Echo AM_TESTS_ENVIRONMENT. This can be useful for debugging, e.g. if
