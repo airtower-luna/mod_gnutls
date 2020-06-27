@@ -124,3 +124,5 @@ jobs:
         with:
           name: coverage-report
           path: test/coverage/
+      - name: coverage summary
+        run: llvm-cov report src/.libs/mod_gnutls.so -instr-profile=test/outputs/coverage.profdata src/*.c src/*.h include/*.h
