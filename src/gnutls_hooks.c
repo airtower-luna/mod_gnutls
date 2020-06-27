@@ -893,16 +893,19 @@ typedef struct {
 int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc)
 {
     apr_array_header_t *names;
-    int rv = 0;
     char ** name;
 
-    /* Check ServerName First! */
-    if (strcasecmp(x->sni_name, s->server_hostname) == 0) {
+    /* Check ServerName first */
+    if (strcasecmp(x->sni_name, s->server_hostname) == 0)
+    {
         // We have a match, save this server configuration
         x->sc = tsc;
-        rv = 1;
-        /* Check any ServerAlias directives */
-    } else if(s->names->nelts) {
+        return 1;
+    }
+
+    /* Check any ServerAlias directives */
+    if(s->names->nelts)
+    {
         names = s->names;
         name = (char **) names->elts;
         for (int i = 0; i < names->nelts; ++i)
@@ -911,13 +914,15 @@ int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc)
                 continue;
             if (strcasecmp(x->sni_name, name[i]) == 0)
             {
-                // We have a match, save this server configuration
                 x->sc = tsc;
-                rv = 1;
+                return 1;
             }
         }
-        /* ServerAlias directives may contain wildcards, check those last. */
-    } else if(s->wild_names->nelts) {
+    }
+
+    /* ServerAlias directives may contain wildcards, check those last. */
+    if(s->wild_names->nelts)
+    {
         names = s->wild_names;
         name = (char **) names->elts;
         for (int i = 0; i < names->nelts; ++i)
@@ -927,11 +932,11 @@ int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc)
             if (ap_strcasecmp_match(x->sni_name, name[i]) == 0)
             {
                 x->sc = tsc;
-                rv = 1;
+                return 1;
             }
         }
     }
-    return rv;
+    return 0;
 }
 
 static int vhost_cb(void *baton, conn_rec *conn, server_rec * s)
