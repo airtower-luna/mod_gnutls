@@ -72,3 +72,55 @@ jobs:
           path: test/test-*.log
       - name: make distcheck
         run: VERBOSE=1 make distcheck
+
+  coverage:
+    runs-on: ubuntu-latest
+    container: debian:sid
+    name: coverage
+    steps:
+      - uses: actions/checkout@v2
+      - name: install dependencies
+        run: |
+          apt-get update
+          apt-get -y install python3-yaml apache2-bin apache2-dev curl gnutls-bin libapr1-dev libgnutls28-dev openssl pkg-config procps softhsm2 clang llvm
+      - name: network overview
+        run: |
+          ip addr show
+          cat /etc/hosts
+      - name: find usable IPs for tests
+        run: |
+          echo "::set-env name=test_ips::$(python3 test/check_test_ips.py -H localhost)"
+      - name: autoreconf
+        run: autoreconf -fiv
+      - name: configure
+        run: CC=clang TEST_IP="${test_ips}" APACHE_MUTEX=pthread ./configure --enable-clang-coverage
+      - name: store config.log
+        uses: actions/upload-artifact@v1
+        if: failure()
+        with:
+          name: coverage-config-log
+          path: config.log
+      - name: make
+        run: make
+      - name: make check
+        run: VERBOSE=1 make check
+      - name: store Apache logs
+        uses: actions/upload-artifact@v2
+        if: failure() || cancelled()
+        with:
+          name: coverage-apache-logs
+          path: test/logs/
+      - name: store test logs
+        uses: actions/upload-artifact@v2
+        if: failure() || cancelled()
+        with:
+          name: coverage-test-logs
+          path: test/test-*.log
+      - name: generate coverage report
+        working-directory: ./test
+        run: make coverage
+      - name: store coverage report
+        uses: actions/upload-artifact@v2
+        with:
+          name: coverage-report
+          path: test/coverage/
