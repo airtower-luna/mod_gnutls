@@ -167,6 +167,39 @@ VALGRIND_SUPPRESS="suppressions.valgrind extra.valgrind" make -e check
 ```
 
 
+## Coverage reports
+
+You can create test coverage reports using [clang's source-based code
+coverage](https://clang.llvm.org/docs/SourceBasedCodeCoverage.html). This
+requires two things:
+
+1. Use the clang compiler to build the module (e.g. `CC=clang`).
+2. Pass `--enable-clang-coverage` to `./configure`, which adds the
+   required `CFLAGS` to the build.
+
+This will build mod\_gnutls with clang profiling instrumentation, and
+generate profiling data during tests. **Do not use a profiling build
+for production!**
+
+The gathered profiling data can then be compiled into a coverage
+report using `make coverage` (in this directory). The coverage report
+will be in [`coverage/index.html`](coverage/index.html). So the full
+process to build a coverage report might be, including opening the
+report (in this example using Firefox):
+
+```bash
+CC=clang ./configure --enable-clang-coverage
+make check
+cd test
+make coverage
+firefox coverage/index.html
+```
+
+If you'd like to work with the profiling data yourself, you can find
+the raw data in `outputs/coverage/`, the indexed and merged data in
+`outputs/coverage.profdata`.
+
+
 ## Adding a Test
 
 Please add more tests!
