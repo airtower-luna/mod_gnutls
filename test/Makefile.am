@@ -236,6 +236,7 @@ make-test-dirs:
 
 if ENABLE_COVERAGE
 coverage_raw_dir = outputs/coverage
+coverage_out = coverage
 MOSTLYCLEANFILES += $(coverage_raw_dir)/*
 endif
 
@@ -256,6 +257,7 @@ endif
 clean-local:
 if ENABLE_COVERAGE
 	-rmdir $(coverage_raw_dir) || true
+	-rm -rf $(coverage_out) || true
 endif
 	-rmdir $(extra_dirs) || true
 if USE_MSVA
@@ -363,6 +365,14 @@ endif
 
 if ENABLE_COVERAGE
 AM_TESTS_ENVIRONMENT += export LLVM_PROFILE_FILE="$(coverage_raw_dir)/%p-%3m.profraw";
+
+outputs/coverage.profdata: $(coverage_raw_dir)/*.profraw
+	llvm-profdata merge -sparse $^ -o $@
+
+coverage/index.html: outputs/coverage.profdata
+	llvm-cov show ../src/.libs/mod_gnutls.so -instr-profile=$< -format=html $(srcdir)/../src/*.c $(srcdir)/../src/*.h $(srcdir)/../include/*.h -output-dir=$(dir $@)/
+
+coverage: coverage/index.html
 endif
 
 # Echo AM_TESTS_ENVIRONMENT. This can be useful for debugging, e.g. if
