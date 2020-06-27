@@ -262,7 +262,7 @@ AM_SUBST_NOTMAKE(MUTEX_CONF)
 AM_SUBST_NOTMAKE(PID_AFFIX)
 
 AC_MSG_CHECKING([which loopback addresses are usable])
-loopback_ips="$("${PYTHON}" test/check_test_ips.py -q ::1 127.0.0.1)"
+loopback_ips="$("${PYTHON}" "${srcdir}/test/check_test_ips.py" -q ::1 127.0.0.1)"
 AC_MSG_RESULT(${loopback_ips})
 
 # assign default values to TEST_HOST and TEST_IP if necessary
