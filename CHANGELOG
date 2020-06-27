@@ -1,4 +1,4 @@
-** Version 0.11.0 (UNRELEASED)
+** Version 0.11.0 (2020-06-27)
 
 - Change default for GnuTLSOCSPCheckNonce to "off", and send OCSP
   nonces only if it has been enabled. The reason for this change is
@@ -23,6 +23,9 @@
   RAM). A reload of the server is enough to generate a new key, so
   consider enabling session tickets and reloading the server every few
   hours, at least until a forward-secret rotation can be implemented.
+
+- Fix a bug that mostly prevented searching ServerAliases when
+  selecting the virtual host from SNI.
 
 - Add ./configure option to disable building PDF documentation
 
