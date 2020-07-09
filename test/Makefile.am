@@ -178,6 +178,15 @@ check-local: stop-gnupg-agent
 # Delete lock files for test servers on "mostlyclean" target.
 MOSTLYCLEANFILES += *.lock
 
+# Build certificate chain files. Note that intermediate tokens must be
+# listed explicitly, or the dependency chain will be broken because
+# the higher level pattern matches, too.
+chain_tokens = authority/server/x509-chain.pem \
+	authority/subca/x509-chain.pem \
+	authority/subca/server/x509-chain.pem
+check_DATA += $(chain_tokens)
+MOSTLYCLEANFILES += $(chain_tokens) authority/x509-chain.pem
+
 # rule to build MSVA trust database
 if USE_MSVA
 msva_home = msva.gnupghome
@@ -206,15 +215,6 @@ MOSTLYCLEANFILES += $(ocsp_index_data)
 %/ocsp_index.txt.attr:
 	@mkdir -m 0700 -p $(dir $@)
 	echo "unique_subject = no" > $@
-
-# Build certificate chain files. Note that intermediate tokens must be
-# listed explicitly, or the dependency chain will be broken because
-# the higher level pattern matches, too.
-chain_tokens = authority/server/x509-chain.pem \
-	authority/subca/x509-chain.pem \
-	authority/subca/server/x509-chain.pem
-check_DATA += $(chain_tokens)
-MOSTLYCLEANFILES += $(chain_tokens) authority/x509-chain.pem
 endif
 
 # SoftHSM token, note that the SoftHSM 2 token is a directory
