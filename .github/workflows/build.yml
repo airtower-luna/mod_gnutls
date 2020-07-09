@@ -16,6 +16,7 @@ jobs:
           - 'debian:buster'
           - 'debian:sid'
           - 'fedora:32'
+          - 'alpine:latest'
     runs-on: ubuntu-latest
     container: ${{ matrix.container }}
     name: ${{ matrix.container }}
@@ -31,6 +32,10 @@ jobs:
         run: |
           dnf -y group install "C Development Tools and Libraries"
           dnf -y install curl gnutls-devel gnutls-utils httpd-devel iproute python3-pyyaml redhat-rpm-config softhsm
+      - name: install dependencies (Alpine)
+        if: startsWith(matrix.container, 'alpine')
+        run: |
+          apk add apache2 apache2-dev apache2-proxy autoconf automake build-base gnutls-dev gnutls-utils libtool pkgconfig python3 py3-yaml
       - name: network overview
         run: |
           ip addr show
