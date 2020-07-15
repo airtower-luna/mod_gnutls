@@ -1,0 +1,3 @@
+Tests: simple-site
+Depends: @, curl, apache2, openssl, gnutls-bin
+Restrictions: allow-stderr, needs-root, breaks-testbed, isolation-container
