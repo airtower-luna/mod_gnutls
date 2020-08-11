@@ -160,8 +160,9 @@ int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog, apr_pool_t * ptem
     if (ret < 0)
     {
         ap_log_perror(APLOG_MARK, APLOG_EMERG, 0, plog,
-                      "gnutls_priority_init failed for default '%s': %s (%d)",
-                      MGS_DEFAULT_PRIORITY, gnutls_strerror(ret), ret);
+                      "gnutls_priority_init failed for default '"
+                      MGS_DEFAULT_PRIORITY "': %s (%d)",
+                      gnutls_strerror(ret), ret);
         return DONE;
     }
 
@@ -721,9 +722,8 @@ int mgs_hook_post_config(apr_pool_t *pconf,
         if (sc->priorities == NULL && sc->enabled == GNUTLS_ENABLED_TRUE) {
             ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
                          "No GnuTLSPriorities directive for host '%s:%d', "
-                         "using default '%s'.",
-                         s->server_hostname, s->addrs->host_port,
-                         MGS_DEFAULT_PRIORITY);
+                         "using default '" MGS_DEFAULT_PRIORITY "'.",
+                         s->server_hostname, s->addrs->host_port);
             sc->priorities = mgs_get_default_prio();
         }
 

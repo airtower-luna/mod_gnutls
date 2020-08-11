@@ -173,9 +173,8 @@ apr_status_t load_proxy_x509_credentials(apr_pool_t *pconf,
     {
         ap_log_error(APLOG_MARK, APLOG_INFO, 0, s,
                      "No GnuTLSProxyPriorities directive for host '%s:%d', "
-                     "using default '%s'.",
-                     s->server_hostname, s->addrs->host_port,
-                     MGS_DEFAULT_PRIORITY);
+                     "using default '" MGS_DEFAULT_PRIORITY "'.",
+                     s->server_hostname, s->addrs->host_port);
         sc->proxy_priorities = mgs_get_default_prio();
     }
     else
