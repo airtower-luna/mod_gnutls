@@ -1,5 +1,5 @@
 /*
- *  Copyright 2016-2019 Fiona Klute
+ *  Copyright 2016-2020 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@
 #define __MOD_GNUTLS_UTIL_H__
 
 /** Default GnuTLS priority string for mod_gnutls */
-#define MGS_DEFAULT_PRIORITY "NORMAL"
+#define MGS_DEFAULT_PRIORITY "NORMAL:-RSA:-VERS-TLS1.0:-VERS-TLS1.1"
 
 /** maximum allowed length of one header line */
 #define HTTP_HDR_LINE_MAX 1024

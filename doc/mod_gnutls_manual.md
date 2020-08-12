@@ -205,9 +205,9 @@ security implications.
 Set the allowed protocol versions, ciphers, key exchange algorithms,
 MACs and compression methods
 
-    GnuTLSPriorities NORMAL:+CIPHER_0:+CIPHER_1:...:+CIPHER_N
+    GnuTLSPriorities NORMAL:+CIPHER_0:-CIPHER_1:...:+CIPHER_N
 
-Default: `NORMAL`\
+Default: `NORMAL:-RSA:-VERS-TLS1.0:-VERS-TLS1.1`\
 Context: server config, virtual host
 
 Sets the allowed protocol version(s), ciphers, key exchange methods,
@@ -215,7 +215,10 @@ message authentication codes, and other TLS parameters for the server.
 The parameter is a GnuTLS priority string as described in the
 [the GnuTLS documentation](https://gnutls.org/manual/html_node/Priority-Strings.html).
 
-For example, to disable TLS 1.0 use `NORMAL:-VERS-TLS1.0`.
+Plain RSA, without (EC-)DH, is disabled by default because it doesn't
+provide forward secrecy, TLS 1.0 and 1.1 have been deprecated as
+insecure for a long time and are now disabled in most modern web
+browsers.
 
 ### GnuTLSP11Module
 
@@ -514,9 +517,9 @@ apache user.
 Set the allowed ciphers, key exchange algorithms, MACs and compression
 methods for proxy connections
 
-    GnuTLSProxyPriorities NORMAL:+CIPHER_0:+CIPHER_1:...:+CIPHER_N
+    GnuTLSProxyPriorities NORMAL:+CIPHER_0:-CIPHER_1:...:+CIPHER_N
 
-Default: `NORMAL`\
+Default: `NORMAL:-RSA:-VERS-TLS1.0:-VERS-TLS1.1`\
 Context: server config, virtual host
 
 Sets the allowed protocol version(s), ciphers, key exchange methods,
@@ -795,10 +798,11 @@ Listen 192.0.2.1:443
 </VirtualHost>
 ```
 
-This gives you an HTTPS site using the GnuTLS `NORMAL` set of
-ciphersuites. OCSP stapling will be enabled if the server certificate
-contains an OCSP URI, `conf/tls/site1_cert_chain.pem` contains the
-issuer certificate in addition to the server's, and
+This gives you an HTTPS site using the default set of cipher suites
+(see [`GnuTLSPriorities`](#gnutlspriorities)). OCSP stapling will be
+enabled if the server certificate contains an OCSP URI,
+`conf/tls/site1_cert_chain.pem` contains the issuer certificate in
+addition to the server's, and
 [mod\_socache\_shmcb](http://httpd.apache.org/docs/current/en/mod/mod_socache_shmcb.html)
 is loaded.
 
