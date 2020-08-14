@@ -1,5 +1,5 @@
 import re
-from mgstest import require_match
+from mgstest import require_match, TestExpectationFailed
 from pathlib import Path
 
 
@@ -15,9 +15,8 @@ def prepare_env():
 
 
 def post_check(conn_log, response_log):
-    conn_opened = re.compile(r'TLS connection opened.')
-    conn_closed = re.compile(r'TLS connection closed.')
-    session_resumed = re.compile(r'TLS session resumed.')
+    conn_opened = re.compile(r'tid (\d+)\].* TLS connection opened.')
+    session_resumed = re.compile(r'tid (\d+)\].* TLS session resumed.')
 
     print('Checking if the backend server log contains session resumption')
     with LOGFILE.open() as log:
@@ -25,10 +24,12 @@ def post_check(conn_log, response_log):
         log.seek(LOGFILE_POSITION)
 
         require_match(conn_opened, log)
-        require_match(conn_closed, log)
         print('Initial session found.')
 
-        require_match(session_resumed, log)
-        require_match(conn_opened, log)
-        require_match(conn_closed, log)
+        id1 = require_match(session_resumed, log).group(1)
+        id2 = require_match(conn_opened, log).group(1)
+        if id1 != id2:
+            raise TestExpectationFailed(
+                'thread ID mismatch between resume and open message: '
+                f'{id1} != {id2}')
         print('Resumed session found.')
