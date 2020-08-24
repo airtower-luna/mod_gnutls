@@ -1,10 +1,9 @@
 EXTRA_DIST = \
 	00_basic/apache.conf 00_basic/test.yml \
-	01_serverwide_priorities/apache.conf 01_serverwide_priorities/test.yml \
+	01_priorities_config/apache.conf 01_priorities_config/test.yml \
 	02_cache_in_vhost/apache.conf 02_cache_in_vhost/fail.server 02_cache_in_vhost/test.yml \
 	03_cachetimeout_in_vhost/apache.conf 03_cachetimeout_in_vhost/test.yml \
 	04_basic_nosni/apache.conf 04_basic_nosni/test.yml \
-	05_mismatched-priorities/apache.conf 05_mismatched-priorities/test.yml \
 	06_verify_sni_a/apache.conf 06_verify_sni_a/test.yml \
 	07_verify_sni_b/apache.conf 07_verify_sni_b/test.yml \
 	08_verify_no_sni_fallback_to_first_vhost/apache.conf 08_verify_no_sni_fallback_to_first_vhost/test.yml \

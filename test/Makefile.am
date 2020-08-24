@@ -17,11 +17,10 @@ test-%.bash: test-template.bash.in | tests/%/
 	chmod a+x $@
 
 test_scripts = test-00_basic.bash \
-	test-01_serverwide_priorities.bash \
+	test-01_priorities_config.bash \
 	test-02_cache_in_vhost.bash \
 	test-03_cachetimeout_in_vhost.bash \
 	test-04_basic_nosni.bash \
-	test-05_mismatched-priorities.bash \
 	test-06_verify_sni_a.bash \
 	test-07_verify_sni_b.bash \
 	test-08_verify_no_sni_fallback_to_first_vhost.bash \
