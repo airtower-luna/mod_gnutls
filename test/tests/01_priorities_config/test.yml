@@ -19,7 +19,7 @@
     client that allows only TLS 1.3 can't connect.
   gnutls_params:
     - x509cafile=authority/x509.pem
-    - priority=NORMAL:-VERS-TLS-ALL:+VERS-TLS1.3
+    - priority=NORMAL:-VERS-ALL:+VERS-TLS1.3
   actions:
     - !request
       path: /test.txt
@@ -33,7 +33,7 @@
   gnutls_params:
     - x509cafile=authority/x509.pem
     - sni-hostname=test.example.com
-    - priority=NORMAL:-VERS-TLS-ALL:+VERS-TLS1.3
+    - priority=NORMAL:-VERS-ALL:+VERS-TLS1.3
   actions:
     - !request
       path: /test.txt
@@ -52,7 +52,7 @@
   gnutls_params:
     - x509cafile=authority/x509.pem
     - sni-hostname=test.example.com
-    - priority=NORMAL:-VERS-TLS-ALL:+VERS-TLS1.2
+    - priority=NORMAL:-VERS-ALL:+VERS-TLS1.2
   actions:
     - !request
       path: /test.txt
