@@ -30,7 +30,7 @@ jobs:
       - name: configure
         run: APACHE_MUTEX=pthread ./configure --enable-valgrind-test
       - name: store config.log
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v2
         if: failure()
         with:
           name: buster-config-log
@@ -40,13 +40,13 @@ jobs:
       - name: make check
         run: VERBOSE=1 make check
       - name: store Apache and Valgrind logs
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v2
         if: failure() || cancelled()
         with:
           name: buster-apache-logs
           path: test/logs/
       - name: store test log if cancelled
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v2
         if: cancelled()
         with:
           name: buster-test-log
