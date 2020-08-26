@@ -30,8 +30,7 @@ jobs:
       - name: install dependencies (Fedora)
         if: startsWith(matrix.container, 'fedora')
         run: |
-          dnf -y group install "C Development Tools and Libraries"
-          dnf -y install curl gnutls-devel gnutls-utils httpd-devel iproute python3-pyyaml redhat-rpm-config softhsm
+          dnf -y install bzip2 curl gcc gnutls-devel gnutls-utils httpd-devel iproute libtool make pkgconf-pkg-config python3-pyyaml redhat-rpm-config softhsm
       - name: install dependencies (Alpine)
         if: startsWith(matrix.container, 'alpine')
         run: |
