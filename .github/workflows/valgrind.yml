@@ -39,15 +39,11 @@ jobs:
         run: make
       - name: make check
         run: VERBOSE=1 make check
-      - name: store Apache and Valgrind logs
+      - name: store test logs
         uses: actions/upload-artifact@v2
         if: failure() || cancelled()
         with:
           name: buster-apache-logs
-          path: test/logs/
-      - name: store test log if cancelled
-        uses: actions/upload-artifact@v2
-        if: cancelled()
-        with:
-          name: buster-test-log
-          path: test/test-00_basic.log
+          path: |
+            test/test-*.log
+            test/logs/

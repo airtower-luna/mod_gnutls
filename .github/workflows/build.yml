@@ -62,18 +62,14 @@ jobs:
         run: make
       - name: make check
         run: VERBOSE=1 make check
-      - name: store Apache logs
-        uses: actions/upload-artifact@v2
-        if: failure() || cancelled()
-        with:
-          name: ${{ env.artifact_prefix }}-apache-logs
-          path: test/logs/
       - name: store test logs
         uses: actions/upload-artifact@v2
         if: failure() || cancelled()
         with:
           name: ${{ env.artifact_prefix }}-test-logs
-          path: test/test-*.log
+          path: |
+            test/test-*.log
+            test/logs/
       - name: make distcheck
         run: VERBOSE=1 make distcheck
 
@@ -108,18 +104,14 @@ jobs:
         run: make
       - name: make check
         run: VERBOSE=1 make check
-      - name: store Apache logs
-        uses: actions/upload-artifact@v2
-        if: failure() || cancelled()
-        with:
-          name: coverage-apache-logs
-          path: test/logs/
       - name: store test logs
         uses: actions/upload-artifact@v2
         if: failure() || cancelled()
         with:
           name: coverage-test-logs
-          path: test/test-*.log
+          path: |
+            test/test-*.log
+            test/logs/
       - name: generate coverage report
         working-directory: ./test
         run: make coverage
