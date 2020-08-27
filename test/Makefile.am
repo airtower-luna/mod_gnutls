@@ -284,7 +284,7 @@ apache-conf/required-modules.conf: required-modules.py
 	APACHE2=@APACHE2@ AP_LIBEXECDIR=@AP_LIBEXECDIR@ $(PYTHON) $< >$@
 
 # Documentation for the test system
-test_doc = README.md sample_fail.yml sample_test.yml
+test_doc = README.md sample_fail.yaml sample_test.yaml
 
 EXTRA_DIST += $(apache_data) $(cert_templates) $(shared_identities:=/uid.in) \
 	authority/server/crl.template $(test_doc)

@@ -66,11 +66,11 @@ Test directories usually contain the following files:
 
 * `apache.conf` -- Apache configuration to be used
 
-* `test.yml` -- Defines the client connection(s) including parameters
+* `test.yaml` -- Defines the client connection(s) including parameters
   for `gnutls-cli`, the request(s), and expected response(s). Please
   see the module documentation of [mgstest.tests](./mgstest/tests.py)
-  for details, and [`sample_test.yml`](./sample_test.yml) and
-  [`sample_fail.yml`](./sample_fail.yml) for examples.
+  for details, and [`sample_test.yaml`](./sample_test.yaml) and
+  [`sample_fail.yaml`](./sample_fail.yaml) for examples.
 
 * `backend.conf` [optional] -- Apache configuration for the proxy
   backend server, if any

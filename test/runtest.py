@@ -102,7 +102,7 @@ def main(args):
 
     # Load test config
     try:
-        with open(os.path.join(testdir, 'test.yml'), 'r') as conf_file:
+        with open(os.path.join(testdir, 'test.yaml'), 'r') as conf_file:
             test_conf = yaml.load(conf_file, Loader=yaml.Loader)
     except FileNotFoundError:
         test_conf = None
