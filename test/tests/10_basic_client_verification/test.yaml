@@ -1,13 +1,27 @@
-!connection
-gnutls_params:
-  - x509cafile=authority/x509.pem
-  - x509keyfile=authority/client/secret.key
-  - x509certfile=authority/client/x509.pem
-actions:
-  - !request
-    path: /test.txt
-    expect:
-      status: 200
-      body:
-        exactly: |
-          test
+- !connection
+  description: >-
+    The server requires authentication, a client presenting a valid
+    certificate gets a good response.
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+    - x509keyfile=authority/client/secret.key
+    - x509certfile=authority/client/x509.pem
+  actions:
+    - !request
+      path: /test.txt
+      expect:
+        status: 200
+        body:
+          exactly: |
+            test
+- !connection
+  description: >-
+    The server requires authentication, a client without a certificate
+    is rejected.
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+  actions:
+    - !request
+      path: /test.txt
+      expect:
+        reset: yes
