@@ -15,7 +15,6 @@ EXTRA_DIST = \
 	15_basic_msva/apache.conf 15_basic_msva/hooks.py 15_basic_msva/test.yaml \
 	16_view-status/apache.conf 16_view-status/test.yaml \
 	17_cgi_vars_large_cert/apache.conf 17_cgi_vars_large_cert/test.yaml \
-	18_client_verification_wrong_cert/apache.conf 18_client_verification_wrong_cert/test.yaml \
 	19_TLS_reverse_proxy/apache.conf 19_TLS_reverse_proxy/backend.conf 19_TLS_reverse_proxy/test.yaml \
 	20_TLS_reverse_proxy_client_auth/apache.conf 20_TLS_reverse_proxy_client_auth/backend.conf 20_TLS_reverse_proxy_client_auth/test.yaml \
 	21_TLS_reverse_proxy_wrong_cert/apache.conf 21_TLS_reverse_proxy_wrong_cert/backend.conf 21_TLS_reverse_proxy_wrong_cert/test.yaml \

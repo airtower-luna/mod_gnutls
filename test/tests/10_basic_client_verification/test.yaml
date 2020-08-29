@@ -14,6 +14,7 @@
         body:
           exactly: |
             test
+
 - !connection
   description: >-
     The server requires authentication, a client without a certificate
@@ -25,3 +26,21 @@
       path: /test.txt
       expect:
         reset: yes
+
+- !connection
+  description: >-
+    The server requires authentication, a client with an untrusted
+    certificate receives a 403 Forbidden response.
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+    - x509certfile=rogueca/rogueclient/x509.pem
+    - x509keyfile=rogueca/rogueclient/secret.key
+  actions:
+    - !request
+      path: /test.txt
+      expect:
+        status: 403
+        body:
+          contains:
+            - 'Forbidden'
+            - "You don't have permission to access this resource."
