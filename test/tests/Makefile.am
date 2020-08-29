@@ -8,7 +8,7 @@ EXTRA_DIST = \
 	07_verify_sni_b/apache.conf 07_verify_sni_b/test.yaml \
 	08_verify_no_sni_fallback_to_first_vhost/apache.conf 08_verify_no_sni_fallback_to_first_vhost/test.yaml \
 	09_verify_no_sni_fails_with_wrong_order/apache.conf 09_verify_no_sni_fails_with_wrong_order/test.yaml \
-	10_basic_client_verification/apache.conf 10_basic_client_verification/test.yaml \
+	10_client_verification/apache.conf 10_client_verification/test.yaml \
 	12_cgi_variables/apache.conf 12_cgi_variables/test.yaml \
 	13_cgi_variables_no_client_cert/apache.conf 13_cgi_variables_no_client_cert/test.yaml \
 	14_resume_session/apache.conf 14_resume_session/hooks.py 14_resume_session/test.yaml \
