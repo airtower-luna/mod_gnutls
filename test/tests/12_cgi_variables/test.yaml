@@ -1,24 +1,51 @@
-!connection
-gnutls_params:
-  - x509cafile=authority/x509.pem
-  - x509keyfile=authority/client/secret.key
-  - x509certfile=authority/client/x509.pem
-actions:
-  - !request
-    path: /dump.cgi
-    expect:
-      status: 200
-      body:
-        contains:
-          - |
+- !connection
+  description: >-
+    The server requests but does not require client
+    authentication. The client authenticates, and the CGI script can
+    include certificate details in the output using environment
+    variables.
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+    - x509keyfile=authority/client/secret.key
+    - x509certfile=authority/client/x509.pem
+  actions:
+    - !request
+      path: /dump.cgi
+      expect:
+        status: 200
+        body:
+          contains:
+            - |
+              ----Certificate:----
+              -----BEGIN CERTIFICATE-----
+            - |
+              -----END CERTIFICATE-----
+
+
+              ----Verification Status:----
+              SUCCESS
+
+              ----SubjectAltName:----
+              RFC822NAME:test0@modgnutls.test
+
+- !connection
+  description: >-
+    The server requests but does not require client
+    authentication. The client does not authenticate, and the CGI
+    script can note that in the output using environment variables.
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+  actions:
+    - !request
+      path: /dump.cgi
+      expect:
+        status: 200
+        body:
+          contains: |
             ----Certificate:----
-            -----BEGIN CERTIFICATE-----
-          - |
-            -----END CERTIFICATE-----
 
 
             ----Verification Status:----
-            SUCCESS
+            NONE
 
             ----SubjectAltName:----
-            RFC822NAME:test0@modgnutls.test

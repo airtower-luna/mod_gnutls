@@ -10,7 +10,6 @@ EXTRA_DIST = \
 	09_verify_no_sni_fails_with_wrong_order/apache.conf 09_verify_no_sni_fails_with_wrong_order/test.yaml \
 	10_client_verification/apache.conf 10_client_verification/test.yaml \
 	12_cgi_variables/apache.conf 12_cgi_variables/test.yaml \
-	13_cgi_variables_no_client_cert/apache.conf 13_cgi_variables_no_client_cert/test.yaml \
 	14_resume_session/apache.conf 14_resume_session/hooks.py 14_resume_session/test.yaml \
 	15_basic_msva/apache.conf 15_basic_msva/hooks.py 15_basic_msva/test.yaml \
 	16_view-status/apache.conf 16_view-status/test.yaml \

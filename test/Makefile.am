@@ -27,7 +27,6 @@ test_scripts = test-00_basic.bash \
 	test-09_verify_no_sni_fails_with_wrong_order.bash \
 	test-10_client_verification.bash \
 	test-12_cgi_variables.bash \
-	test-13_cgi_variables_no_client_cert.bash \
 	test-14_resume_session.bash
 if USE_MSVA
 test_scripts += test-15_basic_msva.bash
