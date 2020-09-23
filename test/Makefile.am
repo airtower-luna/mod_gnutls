@@ -27,11 +27,9 @@ test_scripts = test-00_basic.bash \
 	test-09_verify_no_sni_fails_with_wrong_order.bash \
 	test-10_client_verification.bash \
 	test-12_cgi_variables.bash \
-	test-14_resume_session.bash
-if USE_MSVA
-test_scripts += test-15_basic_msva.bash
-endif
-test_scripts += test-16_view-status.bash \
+	test-14_resume_session.bash \
+	test-15_basic_msva.bash \
+	test-16_view-status.bash \
 	test-17_cgi_vars_large_cert.bash \
 	test-19_TLS_reverse_proxy.bash \
 	test-20_TLS_reverse_proxy_client_auth.bash \
@@ -317,7 +315,6 @@ AM_TESTS_ENVIRONMENT = export APACHE2=@APACHE2@; \
 	export TEST_IP="@TEST_IP@"; \
 	export TEST_HOST="@TEST_HOST@"; \
 	export TEST_PORT="$(TEST_PORT)"; \
-	export MSVA_PORT="$(MSVA_PORT)"; \
 	export TEST_SERVICE_MAX_WAIT="$(TEST_SERVICE_MAX_WAIT)"; \
 	export TEST_SERVICE_WAIT="$(TEST_SERVICE_WAIT)"; \
 	export TEST_QUERY_TIMEOUT="@TEST_QUERY_TIMEOUT@"; \
@@ -325,6 +322,10 @@ AM_TESTS_ENVIRONMENT = export APACHE2=@APACHE2@; \
 	export BACKEND_PORT="$(BACKEND_PORT)"; \
 	export TEST_HTTP_PORT="$(TEST_HTTP_PORT)"; \
 	export HTTP_CLI="@HTTP_CLI@";
+
+if USE_MSVA
+AM_TESTS_ENVIRONMENT += export MSVA_PORT="$(MSVA_PORT)";
+endif
 
 if HAVE_SOFTHSM
 AM_TESTS_ENVIRONMENT += export SOFTHSM="@SOFTHSM@"; \
