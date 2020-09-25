@@ -1,10 +1,15 @@
 !connection
 gnutls_params:
   - x509cafile=authority/x509.pem
+  - verify-hostname=meow.test
   - disable-sni
 actions:
   - !request
     path: /test.txt
+    headers:
+      Host: meow.test
     expect:
-      reset: yes
-
+      status: 200
+      body:
+        exactly: |
+          test

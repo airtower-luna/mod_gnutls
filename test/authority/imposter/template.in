@@ -1,5 +1,0 @@
-serial=4
-cn=imposter.example
-tls_www_server
-signing_key
-dns_name="imposter.example"

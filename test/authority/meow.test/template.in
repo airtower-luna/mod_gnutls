@@ -1,0 +1,7 @@
+serial=405072209
+cn=meow.test
+tls_www_server
+signing_key
+dns_name="meow.test"
+dns_name="*.meow.test"
+__OCSP_URI__

@@ -80,7 +80,7 @@ noinst_PYTHON = https-test-client.py mgstest/http.py mgstest/__init__.py \
 # the test suite
 shared_identities = authority authority/client
 pgp_identities = $(shared_identities)
-x509_only_identities = authority/server authority/imposter \
+x509_only_identities = authority/server authority/meow.test \
 	authority/subca authority/subca/server \
 	rogueca rogueca/imposter rogueca/rogueclient
 if ENABLE_OCSP_TEST
@@ -122,14 +122,14 @@ check_DATA = $(tokens) authority/server/crl.pem
 MOSTLYCLEANFILES += cache/* logs/* outputs/* authority/server/crl.pem
 
 cert_templates = authority/template.in authority/client/template.in \
-	authority/imposter/template.in authority/ocsp-responder/template \
+	authority/meow.test/template.in authority/ocsp-responder/template \
 	authority/server/template.in \
 	authority/subca/template.in authority/subca/server/template.in \
 	authority/subca/ocsp-responder/template \
 	rogueca/template rogueca/imposter/template.in \
 	rogueca/rogueclient/template.in
 generated_templates = authority/template authority/client/template \
-	authority/imposter/template authority/server/template \
+	authority/meow.test/template authority/server/template \
 	rogueca/imposter/template rogueca/rogueclient/template
 
 # Delete X.509 private keys on full clean. Note that unless you need
