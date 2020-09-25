@@ -82,7 +82,7 @@ shared_identities = authority authority/client
 pgp_identities = $(shared_identities)
 x509_only_identities = authority/server authority/imposter \
 	authority/subca authority/subca/server \
-	rogueca rogueca/rogueclient
+	rogueca rogueca/imposter rogueca/rogueclient
 if ENABLE_OCSP_TEST
 x509_only_identities += authority/ocsp-responder authority/subca/ocsp-responder
 endif
@@ -126,10 +126,11 @@ cert_templates = authority/template.in authority/client/template.in \
 	authority/server/template.in \
 	authority/subca/template.in authority/subca/server/template.in \
 	authority/subca/ocsp-responder/template \
-	rogueca/template rogueca/rogueclient/template.in
+	rogueca/template rogueca/imposter/template.in \
+	rogueca/rogueclient/template.in
 generated_templates = authority/template authority/client/template \
-	authority/imposter/template rogueca/rogueclient/template \
-	authority/server/template
+	authority/imposter/template authority/server/template \
+	rogueca/imposter/template rogueca/rogueclient/template
 
 # Delete X.509 private keys on full clean. Note that unless you need
 # to generate fresh keys, the "mostlyclean" target should be
