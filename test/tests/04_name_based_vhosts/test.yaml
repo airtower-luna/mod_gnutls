@@ -1,0 +1,14 @@
+- !connection
+  description: >-
+    Connection to the default (first) vhost must work without SNI.
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+    - disable-sni
+  actions:
+    - !request
+      path: /test.txt
+      expect:
+        status: 200
+        body:
+          exactly: |
+            test

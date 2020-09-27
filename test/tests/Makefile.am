@@ -3,7 +3,7 @@ EXTRA_DIST = \
 	01_priorities_config/apache.conf 01_priorities_config/test.yaml \
 	02_cache_in_vhost/apache.conf 02_cache_in_vhost/fail.server 02_cache_in_vhost/test.yaml \
 	03_cachetimeout_in_vhost/apache.conf 03_cachetimeout_in_vhost/test.yaml \
-	04_basic_nosni/apache.conf 04_basic_nosni/test.yaml \
+	04_name_based_vhosts/apache.conf 04_name_based_vhosts/test.yaml \
 	06_verify_sni_a/apache.conf 06_verify_sni_a/test.yaml \
 	07_verify_sni_b/apache.conf 07_verify_sni_b/test.yaml \
 	08_verify_no_sni_fallback_to_first_vhost/apache.conf 08_verify_no_sni_fallback_to_first_vhost/test.yaml \
