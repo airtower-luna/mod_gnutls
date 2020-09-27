@@ -38,7 +38,6 @@ test_scripts = test-00_basic.bash \
 	test-27_OCSP_server.bash \
 	test-28_HTTP2_support.bash \
 	test-30_ip_based_vhosts.bash \
-	test-32_vhost_SNI_serveralias_mismatch.bash \
 	test-33_vhost_SNI_serveralias_missinghost.bash \
 	test-34_TLS_reverse_proxy_h2.bash \
 	test-35_client_reauth.bash \

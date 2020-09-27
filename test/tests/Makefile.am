@@ -21,7 +21,6 @@ EXTRA_DIST = \
 	27_OCSP_server/apache.conf 27_OCSP_server/hooks.py 27_OCSP_server/ocsp.conf 27_OCSP_server/test.yaml \
 	28_HTTP2_support/apache.conf 28_HTTP2_support/hooks.py \
 	30_ip_based_vhosts/apache.conf 30_ip_based_vhosts/hooks.py 30_ip_based_vhosts/test.yaml \
-	32_vhost_SNI_serveralias_mismatch/apache.conf 32_vhost_SNI_serveralias_mismatch/test.yaml \
 	33_vhost_SNI_serveralias_missinghost/apache.conf 33_vhost_SNI_serveralias_missinghost/test.yaml \
 	34_TLS_reverse_proxy_h2/apache.conf 34_TLS_reverse_proxy_h2/hooks.py 34_TLS_reverse_proxy_h2/backend.conf 34_TLS_reverse_proxy_h2/test.yaml \
 	35_client_reauth/apache.conf 35_client_reauth/test.yaml \

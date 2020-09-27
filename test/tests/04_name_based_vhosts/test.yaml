@@ -12,6 +12,7 @@
         body:
           exactly: |
             test
+
 - !connection
   description: >-
     Connection to the default vhost must work with SNI.
@@ -25,6 +26,7 @@
         body:
           exactly: |
             test
+
 - !connection
   description: >-
     Connection to the second vhost must work with SNI.
@@ -42,6 +44,7 @@
         body:
           exactly: |
             test
+
 - !connection
   description: >-
     Send SNI for first vhost (localhost), but a Host header for the
@@ -58,6 +61,7 @@
         body:
           - 'Misdirected Request'
           - 'Server Name Indication (SNI)'
+
 - !connection
   description: >-
     Check if the third vhost is available using its non-wildcard
@@ -75,6 +79,7 @@
         body:
           exactly: |
             test
+
 - !connection
   description: >-
     Check if the third vhost is available using its wildcard
@@ -92,3 +97,23 @@
         body:
           exactly: |
             test
+
+- !connection
+  description: >-
+    Send SNI and Host header that are different, but both match the
+    wildcard ServerAlias of the third vhost (*.example.test). Expect
+    error 421.
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+    - sni-hostname=www.example.test
+  actions:
+    - !request
+      path: /test.txt
+      headers:
+        Host: mismatched.example.test
+      expect:
+        status: 421
+        body:
+          contains:
+            - 'Misdirected Request'
+            - 'Server Name Indication (SNI)'
