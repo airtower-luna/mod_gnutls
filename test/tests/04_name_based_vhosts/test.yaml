@@ -117,3 +117,22 @@
           contains:
             - 'Misdirected Request'
             - 'Server Name Indication (SNI)'
+
+- !connection
+  description: >-
+    Send SNI for the wildcard ServerAlias of the third vhost, but no
+    Host header (HTTP 1.0). Expect error 421.
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+    - sni-hostname=example.virtual.host
+  actions:
+    - !request10
+      path: /test.txt
+      headers:
+        Connection: close
+      expect:
+        status: 421
+        body:
+          contains:
+            - 'Misdirected Request'
+            - 'Server Name Indication (SNI)'
