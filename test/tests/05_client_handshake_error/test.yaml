@@ -1,0 +1,24 @@
+- !connection
+  description: >-
+    The client doesn't trust the issuer CA, so the handshake must
+    fail.
+  gnutls_params:
+    - x509cafile=rogueca/x509.pem
+  actions:
+    - !request
+      path: /test.txt
+      expect:
+        reset: yes
+- !connection
+  description: >-
+    The server must still be operational after the failed handshake.
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+  actions:
+    - !request
+      path: /test.txt
+      expect:
+        status: 200
+        body:
+          exactly: |
+            test

@@ -4,6 +4,7 @@ EXTRA_DIST = \
 	02_cache_in_vhost/apache.conf 02_cache_in_vhost/fail.server 02_cache_in_vhost/test.yaml \
 	03_cachetimeout_in_vhost/apache.conf 03_cachetimeout_in_vhost/test.yaml \
 	04_name_based_vhosts/apache.conf 04_name_based_vhosts/test.yaml \
+	05_client_handshake_error/apache.conf 05_client_handshake_error/test.yaml \
 	10_client_verification/apache.conf 10_client_verification/test.yaml \
 	12_cgi_variables/apache.conf 12_cgi_variables/test.yaml \
 	14_resume_session/apache.conf 14_resume_session/hooks.py 14_resume_session/test.yaml \

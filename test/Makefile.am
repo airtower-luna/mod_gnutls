@@ -21,6 +21,7 @@ test_scripts = test-00_basic.bash \
 	test-02_cache_in_vhost.bash \
 	test-03_cachetimeout_in_vhost.bash \
 	test-04_name_based_vhosts.bash \
+	test-05_client_handshake_error.bash \
 	test-10_client_verification.bash \
 	test-12_cgi_variables.bash \
 	test-14_resume_session.bash \
