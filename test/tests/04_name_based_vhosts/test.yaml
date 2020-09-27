@@ -58,3 +58,37 @@
         body:
           - 'Misdirected Request'
           - 'Server Name Indication (SNI)'
+- !connection
+  description: >-
+    Check if the third vhost is available using its non-wildcard
+    ServerAlias.
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+    - sni-hostname=www.domain.test
+  actions:
+    - !request
+      path: /vhost2/test.txt
+      headers:
+        Host: www.domain.test
+      expect:
+        status: 200
+        body:
+          exactly: |
+            test
+- !connection
+  description: >-
+    Check if the third vhost is available using its wildcard
+    ServerAlias.
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+    - sni-hostname=hello.example.test
+  actions:
+    - !request
+      path: /vhost2/test.txt
+      headers:
+        Host: hello.example.test
+      expect:
+        status: 200
+        body:
+          exactly: |
+            test
