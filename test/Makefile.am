@@ -37,7 +37,6 @@ test_scripts = test-00_basic.bash \
 	test-26_redirect_HTTP_to_HTTPS.bash \
 	test-27_OCSP_server.bash \
 	test-28_HTTP2_support.bash \
-	test-29_force_handshake_vhost.bash \
 	test-30_ip_based_vhosts.bash \
 	test-31_vhost_SNI_serveralias_match.bash \
 	test-32_vhost_SNI_serveralias_mismatch.bash \

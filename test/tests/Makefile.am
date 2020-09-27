@@ -20,7 +20,6 @@ EXTRA_DIST = \
 	26_redirect_HTTP_to_HTTPS/apache.conf 26_redirect_HTTP_to_HTTPS/test.yaml \
 	27_OCSP_server/apache.conf 27_OCSP_server/hooks.py 27_OCSP_server/ocsp.conf 27_OCSP_server/test.yaml \
 	28_HTTP2_support/apache.conf 28_HTTP2_support/hooks.py \
-	29_force_handshake_vhost/apache.conf 29_force_handshake_vhost/test.yaml \
 	30_ip_based_vhosts/apache.conf 30_ip_based_vhosts/hooks.py 30_ip_based_vhosts/test.yaml \
 	31_vhost_SNI_serveralias_match/apache.conf 31_vhost_SNI_serveralias_match/test.yaml \
 	32_vhost_SNI_serveralias_mismatch/apache.conf 32_vhost_SNI_serveralias_mismatch/test.yaml \
