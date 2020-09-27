@@ -45,7 +45,7 @@
 - !connection
   description: >-
     Send SNI for first vhost (localhost), but a Host header for the
-    second one (vhost.example.com). Expect error 421.
+    second one (meow.test). Expect error 421.
   gnutls_params:
     - x509cafile=authority/x509.pem
   actions:
