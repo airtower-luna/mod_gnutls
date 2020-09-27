@@ -6,7 +6,37 @@
     - disable-sni
   actions:
     - !request
-      path: /test.txt
+      path: /vhost0/test.txt
+      expect:
+        status: 200
+        body:
+          exactly: |
+            test
+- !connection
+  description: >-
+    Connection to the default vhost must work with SNI.
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+  actions:
+    - !request
+      path: /vhost0/test.txt
+      expect:
+        status: 200
+        body:
+          exactly: |
+            test
+- !connection
+  description: >-
+    Connection to the second vhost must work with SNI.
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+    - verify-hostname=meow.test
+    - sni-hostname=meow.test
+  actions:
+    - !request
+      path: /meow/test.txt
+      headers:
+        Host: meow.test
       expect:
         status: 200
         body:
