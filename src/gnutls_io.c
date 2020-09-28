@@ -36,14 +36,6 @@ APLOG_USE_MODULE(gnutls);
  *
  */
 
-#define HTTP_ON_HTTPS_PORT \
-    "GET /" CRLF
-
-#define HTTP_ON_HTTPS_PORT_BUCKET(alloc) \
-    apr_bucket_immortal_create(HTTP_ON_HTTPS_PORT, \
-                               sizeof(HTTP_ON_HTTPS_PORT) - 1, \
-                               alloc)
-
 #define IS_PROXY_STR(c) \
     ((c->is_proxy == GNUTLS_ENABLED_TRUE) ? "proxy " : "")
 
@@ -55,34 +47,18 @@ APLOG_USE_MODULE(gnutls);
 
 
 
-static apr_status_t gnutls_io_filter_error(ap_filter_t * f,
-        apr_bucket_brigade * bb,
-        apr_status_t status) {
-    mgs_handle_t *ctxt = (mgs_handle_t *) f->ctx;
-    apr_bucket *bucket;
-
-    switch (status) {
-    case HTTP_BAD_REQUEST:
-        /* log the situation */
-        ap_log_cerror(APLOG_MARK, APLOG_INFO, 0, f->c,
-                      "GnuTLS handshake failed: HTTP spoken on HTTPS port; "
-                      "trying to send HTML error page");
-        ctxt->status = -1;
-
-        /* fake the request line */
-        bucket = HTTP_ON_HTTPS_PORT_BUCKET(f->c->bucket_alloc);
-        break;
-
-    default:
-        return status;
-    }
-
+/**
+ * Helper function, used mostly for error conditions: Insert an EOS (end
+ * of stream) bucket into the bucket brigade.
+ */
+static inline void gnutls_io_filter_eos(ap_filter_t *f,
+                                        apr_bucket_brigade *bb)
+{
+    apr_bucket *bucket = apr_bucket_eos_create(f->c->bucket_alloc);
     APR_BRIGADE_INSERT_TAIL(bb, bucket);
-    bucket = apr_bucket_eos_create(f->c->bucket_alloc);
-    APR_BRIGADE_INSERT_TAIL(bb, bucket);
-
-    return APR_SUCCESS;
 }
+
+
 
 static int char_buffer_read(mgs_char_buffer_t * buffer, char *in, int inl) {
     if (!buffer->length) {
@@ -559,9 +535,7 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
     apr_size_t len = sizeof (ctxt->input_buffer);
 
     if (f->c->aborted) {
-        apr_bucket *bucket =
-                apr_bucket_eos_create(f->c->bucket_alloc);
-        APR_BRIGADE_INSERT_TAIL(bb, bucket);
+        gnutls_io_filter_eos(f, bb);
         ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, ctxt->c,
                       "%s: %sconnection aborted",
                       __func__, IS_PROXY_STR(ctxt));
@@ -581,9 +555,7 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
         ap_log_cerror(APLOG_MARK, APLOG_TRACE1, 0, ctxt->c,
                       "%s: %sconnection failed, cannot provide data!",
                       __func__, IS_PROXY_STR(ctxt));
-        apr_bucket *bucket =
-                apr_bucket_eos_create(f->c->bucket_alloc);
-        APR_BRIGADE_INSERT_TAIL(bb, bucket);
+        gnutls_io_filter_eos(f, bb);
         return APR_ECONNABORTED;
     }
 
@@ -648,11 +620,12 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
             return APR_EAGAIN;
 
         /* Close TLS session and free resources on EOF,
-         * gnutls_io_filter_error will add an EOS bucket */
+         * gnutls_io_filter_eos will add an EOS bucket */
         if (APR_STATUS_IS_EOF(status))
             mgs_bye(ctxt);
 
-        return gnutls_io_filter_error(f, bb, status);
+        gnutls_io_filter_eos(f, bb);
+        return status;
     }
 
     /* Create a transient bucket out of the decrypted data. */
@@ -729,8 +702,7 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
              * client. By pretending we could send the request
              * mod_proxy continues its processing and sends a proper
              * "proxy error" message when there's no response to read. */
-            apr_bucket *bucket = apr_bucket_eos_create(f->c->bucket_alloc);
-            APR_BRIGADE_INSERT_TAIL(bb, bucket);
+            gnutls_io_filter_eos(f, bb);
             return APR_SUCCESS;
         }
         /* No final else here, the "ctxt->status < 0" check below will
