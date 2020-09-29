@@ -198,7 +198,10 @@ containing them in PKCS \#3 encoding using this option. Please see the
 "[Parameter
 generation](https://gnutls.org/manual/html_node/Parameter-generation.html)"
 section of the GnuTLS documentation for a short discussion of the
-security implications.
+security implications. Note that to use a custom group for DHE you
+must also explicitly disable [RFC
+7919](https://tools.ietf.org/html/rfc7919) group negotiation using
+[`GnuTLSPriorities`](#gnutlspriorities).
 
 ### GnuTLSPriorities
 
