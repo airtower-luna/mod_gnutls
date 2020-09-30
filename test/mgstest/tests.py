@@ -372,7 +372,7 @@ class TestReq10(TestRequest):
                                 bufsize=0)
         try:
             outs, errs = proc.communicate(input=req, timeout=timeout)
-        except TimeoutExpired:
+        except subprocess.TimeoutExpired:
             proc.kill()
             outs, errs = proc.communicate()
 
