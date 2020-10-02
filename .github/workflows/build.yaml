@@ -41,13 +41,13 @@ jobs:
           cat /etc/hosts
       - name: find usable IPs for tests
         run: |
-          echo "::set-env name=test_ips::$(python3 test/check_test_ips.py -H localhost)"
+          echo "test_ips=$(python3 test/check_test_ips.py -H localhost)" >> ${GITHUB_ENV}
       - name: set prefix for container-specific artifacts
         # this is because upload-artifact doesn't like ":" in file names
         env:
           CONTAINER_NAME: ${{ matrix.container }}
         run: |
-          echo "::set-env name=artifact_prefix::$(echo ${CONTAINER_NAME} | sed s/:/-/)"
+          echo "artifact_prefix=$(echo ${CONTAINER_NAME} | sed s/:/-/)" >> ${GITHUB_ENV}
       - name: autoreconf
         run: autoreconf -fiv
       - name: configure
@@ -89,7 +89,7 @@ jobs:
           cat /etc/hosts
       - name: find usable IPs for tests
         run: |
-          echo "::set-env name=test_ips::$(python3 test/check_test_ips.py -H localhost)"
+          echo "test_ips=$(python3 test/check_test_ips.py -H localhost)" >> ${GITHUB_ENV}
       - name: autoreconf
         run: autoreconf -fiv
       - name: configure
