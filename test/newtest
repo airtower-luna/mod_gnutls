@@ -11,7 +11,10 @@ while [ "$confirmed" -eq 0 ]; do
     fi
 
     tname="${TEST_NAME// /_}"
-    newnum="$(( $(ls -d tests/* | sed 's|^[^/]*/\([0-9]*\)_.*|\1|' | sort -n | tail -n 1 | sed s/^0//) + 1))"
+    declare -i newnum=0
+    while [ -d tests/$(printf "%02d_*" "${newnum}") ]; do
+	newnum=$((newnum + 1))
+    done
     newname="$(printf "%02d_%s" "${newnum}" "$tname")"
 
     read -p "your new test will be named tests/$newname. OK? [Y/n]"
