@@ -1,16 +1,13 @@
 #!/bin/bash
 
-TEST_NAME="$1"
+tname="${1// /_}"
 
 confirmed=0
 
 while [ "$confirmed" -eq 0 ]; do
-
-    if [ -z "${TEST_NAME}" ]; then
-	read -e -p "describe your new test briefly: " -i "$tname" TEST_NAME
-    fi
-
+    read -e -p "describe your new test briefly: " -i "${tname}" TEST_NAME
     tname="${TEST_NAME// /_}"
+
     declare -i newnum=0
     while [ -d tests/$(printf "%02d_*" "${newnum}") ]; do
 	newnum=$((newnum + 1))
