@@ -1,0 +1,44 @@
+name: Analysis
+on:
+  pull_request:
+  push:
+    # don't run on packaging branches
+    branches-ignore:
+      - 'for-debian'
+      - 'debian/**'
+      - 'pristine-tar'
+    paths:
+      - '**'
+      - '!doc/**'
+      - '!**.md'
+
+jobs:
+  clang:
+    runs-on: ubuntu-20.04
+    container: debian:sid
+    name: clang-analyzer
+    steps:
+      - uses: actions/checkout@v2
+      - name: install dependencies
+        run: |
+          apt-get update
+          apt-get -y install python3-yaml apache2-bin apache2-dev curl gnutls-bin libapr1-dev libgnutls28-dev openssl pkg-config procps clang clang-tools llvm libmsv-dev
+      - name: find usable IPs for tests
+        run: |
+          echo "test_ips=$(python3 test/check_test_ips.py -H localhost)" >> ${GITHUB_ENV}
+      - name: autoreconf
+        run: autoreconf -fiv
+      - name: configure
+        run: scan-build --use-cc=clang ./configure --enable-msva TEST_IP="${test_ips}" APACHE_MUTEX=pthread
+      - name: store config.log
+        uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: scan-build-config-log
+          path: config.log
+      - name: make
+        run: scan-build -sarif -o sarif-output --use-cc=clang make
+      - name: Upload SARIF results
+        uses: github/codeql-action/upload-sarif@v1
+        with:
+          sarif_file: 'sarif-output/'
