@@ -1738,7 +1738,6 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
             char cert_pem_buf[10 * 1024];
             size_t len = sizeof (cert_pem_buf);
 
-            rv = 0;
             if (gnutls_x509_crt_export(cert.x509[0], GNUTLS_X509_FMT_PEM, cert_pem_buf, &len) >= 0) {
                 /* FIXME : put together a name from the cert we received, instead of hard-coding this value: */
                 q.peername = mgs_x509_construct_uid(r, cert.x509[0]);
