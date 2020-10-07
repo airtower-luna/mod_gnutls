@@ -22,14 +22,14 @@ jobs:
       - name: install dependencies
         run: |
           apt-get update
-          apt-get -y install python3-yaml apache2-bin apache2-dev curl gnutls-bin libapr1-dev libgnutls28-dev openssl pkg-config procps clang clang-tools llvm libmsv-dev
+          apt-get -y install python3-yaml apache2-bin apache2-dev curl gnutls-bin libapr1-dev libgnutls28-dev openssl pkg-config procps clang-10 clang-tools-10 libmsv-dev
       - name: find usable IPs for tests
         run: |
           echo "test_ips=$(python3 test/check_test_ips.py -H localhost)" >> ${GITHUB_ENV}
       - name: autoreconf
         run: autoreconf -fiv
       - name: configure
-        run: scan-build --use-cc=clang ./configure --enable-msva TEST_IP="${test_ips}" APACHE_MUTEX=pthread
+        run: scan-build-10 --use-cc=clang-10 ./configure --enable-msva TEST_IP="${test_ips}" APACHE_MUTEX=pthread
       - name: store config.log
         uses: actions/upload-artifact@v2
         if: failure()
@@ -37,7 +37,7 @@ jobs:
           name: scan-build-config-log
           path: config.log
       - name: make
-        run: scan-build -sarif -o sarif-output --use-cc=clang make
+        run: scan-build-10 -sarif -o sarif-output --use-cc=clang-10 make
       - name: Find output directory
         run: |
           echo "SARIF_DIR=$(ls -d sarif-output/*)" >> ${GITHUB_ENV}
