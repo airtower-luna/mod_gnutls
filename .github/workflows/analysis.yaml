@@ -38,7 +38,10 @@ jobs:
           path: config.log
       - name: make
         run: scan-build -sarif -o sarif-output --use-cc=clang make
+      - name: Find output directory
+        run: |
+          echo "SARIF_DIR=$(ls -d sarif-output/*)" >> ${GITHUB_ENV}
       - name: Upload SARIF results
         uses: github/codeql-action/upload-sarif@v1
         with:
-          sarif_file: 'sarif-output/'
+          sarif_file: ${{ env.SARIF_DIR }}
