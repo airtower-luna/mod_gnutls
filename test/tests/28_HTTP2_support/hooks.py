@@ -4,6 +4,7 @@ import subprocess
 from mgstest import require_apache_modules, require_match
 from unittest import SkipTest
 
+
 def prepare_env():
     require_apache_modules('mod_http2.so')
     curl = os.environ['HTTP_CLI']
@@ -13,6 +14,7 @@ def prepare_env():
                           check=True, text=True)
     if not re.search(r'\bHTTP2\b', proc.stdout):
         raise SkipTest(f'{curl} does not support HTTP/2!')
+
 
 def run_connection(testname, conn_log, response_log):
     """Check if HTTP/2 connections using mod_gnutls and mod_http2 work."""
@@ -30,6 +32,7 @@ def run_connection(testname, conn_log, response_log):
     print(proc.stdout)
     print(proc.stdout, file=response_log)
     proc.check_returncode()
+
 
 def post_check(conn_log, response_log):
     print('Checking for HTTP/2 in logged header:')

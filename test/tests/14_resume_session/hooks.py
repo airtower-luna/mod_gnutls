@@ -1,6 +1,7 @@
 import re
 from mgstest import require_match
 
+
 def post_check(conn_log, response_log):
     print('Checking if the session was resumed successfully...')
     # NOTE: The "Resume Handshake was completed" message appears after

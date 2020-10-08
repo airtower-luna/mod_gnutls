@@ -1,6 +1,7 @@
 from mgstest import require_match, TestExpectationFailed
 import re
 
+
 def post_check(conn_log, response_log):
     """Compare the TLS session information reported by gnutls-cli and the
     mod_gnutls status listing."""

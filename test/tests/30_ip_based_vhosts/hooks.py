@@ -1,6 +1,7 @@
 import os
 from unittest import SkipTest
 
+
 def prepare_env():
     addrs = os.environ['TEST_IP'].split()
     if len(addrs) < 2:

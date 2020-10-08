@@ -12,6 +12,7 @@ CRLF = b'\r\n\r\n'
 
 class TLSRecord:
     header = struct.Struct('!BHH')
+
     def __init__(self, data):
         self.type, self.legacy_proto, self.length = \
             self.header.unpack(data[:5])
@@ -47,7 +48,8 @@ def test_immediate_plaintext(host, port, req):
 def test_plaintext_after_https(host, port, req, context):
     """Send an HTTPS request and then plaintext on the same TCP connection"""
     with contextlib.ExitStack() as stack:
-        s = stack.enter_context(socket.socket(socket.AF_INET, socket.SOCK_STREAM))
+        s = stack.enter_context(
+            socket.socket(socket.AF_INET, socket.SOCK_STREAM))
         s.connect((host, port))
 
         # Duplicate s so we can still use it.
@@ -63,7 +65,7 @@ def test_plaintext_after_https(host, port, req, context):
         # Read header
         buf = bytearray(2048)
         pos = 0
-        while not CRLF in buf:
+        while CRLF not in buf:
             received = tls_sock.recv_into(memoryview(buf)[pos:])
             # If we get 0 it means the connection ended before the
             # header was complete.

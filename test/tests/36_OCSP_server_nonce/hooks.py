@@ -42,11 +42,9 @@ def post_check(conn_log, response_log):
 
         while ocsp_request is None:
             log_match = require_match(
-                    re.compile(r"Received OCSP request: '([^']*)'"),
-                    log
-                )
+                re.compile(r"Received OCSP request: '([^']*)'"), log)
             test_request = OCSPRequest.parse_str(
-                            base64.b64decode(log_match.group(1)))
+                base64.b64decode(log_match.group(1)))
             print(repr(test_request))
             if ocsp_response.matches_request(test_request):
                 print("Request matches response")
