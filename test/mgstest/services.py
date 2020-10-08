@@ -14,11 +14,8 @@
 
 """Handling services needed for mod_gnutls tests"""
 
-import errno
 import os
-import signal
 import subprocess
-import sys
 
 from contextlib import contextmanager
 from pathlib import Path
