@@ -37,6 +37,7 @@ tokendir_re = re.compile(r'^directories\.tokendir\s*=\s*(.*)$')
 
 test_label = 'test_server'
 
+
 class ObjectType(Enum):
     """Types that may occur in PKCS#11 URIs (type=...).
 
@@ -65,6 +66,7 @@ class ObjectType(Enum):
         'ObjectType.PRIVATE'
         """
         return f'{self.__class__.__name__!s}.{self.name}'
+
 
 class Token:
     """Represents a PKCS#11 token."""
@@ -113,9 +115,10 @@ class Token:
     @property
     def token_url(self):
         if not self._token_url:
-            proc = subprocess.run(self.p11tool + ['--list-token-urls'],
-                                  stdout=subprocess.PIPE, check=True, text=True,
-                                  env={'SOFTHSM2_CONF': self.config})
+            proc = subprocess.run(
+                self.p11tool + ['--list-token-urls'],
+                stdout=subprocess.PIPE, check=True, text=True,
+                env={'SOFTHSM2_CONF': self.config})
             url_re = re.compile(f'^pkcs11:.*token={self.label}\\b.*$')
             for line in proc.stdout.splitlines():
                 if url_re.fullmatch(line):
@@ -129,31 +132,31 @@ class Token:
 
     def store_key(self, keyfile, label):
         """Store a private key in this token."""
-        subprocess.run(self.p11tool +
-                       ['--login', '--write', '--label', label,
-	                '--load-privkey', keyfile, self.token_url],
-                       check=True, text=True, env=self.p11tool_env)
+        subprocess.run(
+            self.p11tool + ['--login', '--write', '--label', label,
+                            '--load-privkey', keyfile, self.token_url],
+            check=True, text=True, env=self.p11tool_env)
         self._object_listing = None
 
     def store_cert(self, certfile, label):
         """Store a certificate in this token."""
-        subprocess.run(self.p11tool +
-                       ['--login', '--write', '--no-mark-private',
-                        '--label', label,
-	                '--load-certificate', certfile, self.token_url],
-                       check=True, text=True, env=self.p11tool_env)
+        subprocess.run(
+            self.p11tool + ['--login', '--write', '--no-mark-private',
+                            '--label', label,
+                            '--load-certificate', certfile, self.token_url],
+            check=True, text=True, env=self.p11tool_env)
         self._object_listing = None
 
     def get_object_url(self, label, type):
         """Get the PKCS#11 URL for an object in this token, selected by
         label."""
         if not self._object_listing:
-            proc = subprocess.run(self.p11tool +
-                                  ['--login', '--list-all', self.token_url],
-                                  stdout=subprocess.PIPE,
-                                  check=True, text=True, env=self.p11tool_env)
+            proc = subprocess.run(
+                self.p11tool + ['--login', '--list-all', self.token_url],
+                stdout=subprocess.PIPE,
+                check=True, text=True, env=self.p11tool_env)
             self._object_listing = proc.stdout.splitlines()
-        object_re = re.compile(f'^\s*URL:\s+(.*object={label}.*)$')
+        object_re = re.compile(f'^\\s*URL:\\s+(.*object={label}.*)$')
         for line in self._object_listing:
             m = object_re.fullmatch(line)
             if m and str(type) in m.group(1):
@@ -171,6 +174,7 @@ class Token:
             'P11_KEY_URL': self.get_object_url(test_label, ObjectType.PRIVATE)
         }
 
+
 def find_softhsm_bin():
     """Find the SoftHSM Util binary to use.
 
@@ -182,6 +186,7 @@ def find_softhsm_bin():
     if softhsm and softhsm != 'no':
         return softhsm
     return shutil.which('softhsm2-util')
+
 
 def find_softhsm_lib(libname=softhsm_libname, searchpath=softhsm_searchpath):
     """Get the path to the SoftHSM PKCS#11 module.
@@ -197,6 +202,7 @@ def find_softhsm_lib(libname=softhsm_libname, searchpath=softhsm_searchpath):
         lib = p.joinpath(libname)
         if lib.is_file():
             return str(lib)
+
 
 def tmp_softhsm_conf(db):
     """Create a temporary SOFTHSM2_CONF file, using an absolute path for
