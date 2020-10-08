@@ -252,17 +252,19 @@ class TestRequest(yaml.YAMLObject):
     def check_headers(self, headers):
         """
         >>> r1 = TestRequest(path='/test.txt',
-        ...                  expect={ 'headers': {'X-Forbidden-Header': None,
-        ...                                       'X-Required-Header': 'Hi!' }})
+        ...                  expect={'headers': {'X-Forbidden-Header': None,
+        ...                                      'X-Required-Header': 'Hi!'}})
         >>> r1.check_headers({ 'X-Required-Header': 'Hi!' })
         >>> r1.check_headers({ 'X-Required-Header': 'Hello!' })
         Traceback (most recent call last):
         ...
-        mgstest.TestExpectationFailed: Unexpected value in header X-Required-Header: 'Hello!', expected 'Hi!'
+        mgstest.TestExpectationFailed: Unexpected value in header \
+X-Required-Header: 'Hello!', expected 'Hi!'
         >>> r1.check_headers({ 'X-Forbidden-Header': 'Hi!' })
         Traceback (most recent call last):
         ...
-        mgstest.TestExpectationFailed: Unexpected value in header X-Forbidden-Header: 'Hi!', expected None
+        mgstest.TestExpectationFailed: Unexpected value in header \
+X-Forbidden-Header: 'Hi!', expected None
         """
         for name, expected in self.expect['headers'].items():
             value = headers.get(name)
@@ -274,19 +276,23 @@ class TestRequest(yaml.YAMLObject):
 
     def check_body(self, body):
         """
-        >>> r1 = TestRequest(path='/test.txt', method='GET', headers={}, expect={'status': 200, 'body': {'exactly': 'test\\n'}})
+        >>> r1 = TestRequest(path='/test.txt', method='GET', headers={}, \
+expect={'status': 200, 'body': {'exactly': 'test\\n'}})
         >>> r1.check_body('test\\n')
         >>> r1.check_body('xyz\\n')
         Traceback (most recent call last):
         ...
         mgstest.TestExpectationFailed: Unexpected body: 'xyz\\n' != 'test\\n'
-        >>> r2 = TestRequest(path='/test.txt', method='GET', headers={}, expect={'status': 200, 'body': {'contains': ['tes', 'est']}})
+        >>> r2 = TestRequest(path='/test.txt', method='GET', headers={}, \
+expect={'status': 200, 'body': {'contains': ['tes', 'est']}})
         >>> r2.check_body('test\\n')
         >>> r2.check_body('est\\n')
         Traceback (most recent call last):
         ...
-        mgstest.TestExpectationFailed: Unexpected body: 'est\\n' does not contain 'tes'
-        >>> r3 = TestRequest(path='/test.txt', method='GET', headers={}, expect={'status': 200, 'body': {'contains': 'test'}})
+        mgstest.TestExpectationFailed: Unexpected body: 'est\\n' \
+does not contain 'tes'
+        >>> r3 = TestRequest(path='/test.txt', method='GET', headers={}, \
+expect={'status': 200, 'body': {'contains': 'test'}})
         >>> r3.check_body('test\\n')
         """
         if 'exactly' in self.expect['body'] \
@@ -299,7 +305,7 @@ class TestRequest(yaml.YAMLObject):
                 self.expect['body']['contains'] = [
                     self.expect['body']['contains']]
             for s in self.expect['body']['contains']:
-                if not s in body:
+                if s not in body:
                     raise TestExpectationFailed(
                         f'Unexpected body: {body!r} does not contain '
                         f'{s!r}')
@@ -322,10 +328,12 @@ class TestRequest(yaml.YAMLObject):
         connection being reset. That usually means the underlying TLS
         connection failed.
 
-        >>> r1 = TestRequest(path='/test.txt', method='GET', headers={}, expect={'status': 200, 'body': {'contains': 'test'}})
+        >>> r1 = TestRequest(path='/test.txt', method='GET', headers={}, \
+expect={'status': 200, 'body': {'contains': 'test'}})
         >>> r1.expects_conn_reset()
         False
-        >>> r2 = TestRequest(path='/test.txt', method='GET', headers={}, expect={'reset': True})
+        >>> r2 = TestRequest(path='/test.txt', method='GET', headers={}, \
+expect={'reset': True})
         >>> r2.expects_conn_reset()
         True
         """
@@ -443,7 +451,7 @@ class Resume(yaml.YAMLObject):
     yaml_tag = '!resume'
 
     def run(self, conn, command):
-        if not '--inline-commands' in command:
+        if '--inline-commands' not in command:
             raise ValueError('gnutls_params must include "inline-commands" '
                              'to use the resume action!')
         if not type(conn) is HTTPSubprocessConnection:
