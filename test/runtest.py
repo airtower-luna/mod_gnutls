@@ -31,7 +31,6 @@ from mgstest.services import ApacheService, TestService
 from mgstest.tests import run_test_conf
 
 
-
 def find_testdir(number, dir):
     """Find the configuration directory for a test based on its
     number. The given directory must contain exactly one directory
@@ -52,17 +51,16 @@ def find_testdir(number, dir):
                                           f'{found.name} and {entry.name}')
                     else:
                         found = entry
-        if found == None:
+        if found is None:
             raise LookupError('No test directory found for test number '
                               f'{number}!')
         else:
             return (found.path, found.name)
 
+
 def temp_logfile():
     return tempfile.SpooledTemporaryFile(max_size=4096, mode='w+',
                                          prefix='mod_gnutls', suffix=".log")
-
-
 
 
 def check_ocsp_responder():
@@ -74,6 +72,7 @@ def check_ocsp_responder():
                '--load-cert', check_cert]
     return subprocess.run(command).returncode == 0
 
+
 def check_msva():
     # Check if MSVA is up
     cert_file = 'authority/client/x509.pem'
@@ -83,7 +82,6 @@ def check_msva():
         command = ['msva-query-agent', 'https', uid, 'x509pem', 'client']
         with open(cert_file, 'r') as cert:
             return subprocess.run(command, stdin=cert).returncode == 0
-
 
 
 def main(args):
@@ -165,7 +163,8 @@ def main(args):
     with contextlib.ExitStack() as service_stack:
         if cleanup_callback:
             service_stack.callback(cleanup_callback)
-        service_stack.enter_context(lockfile('test.lock', nolock='MGS_NETNS_ACTIVE' in os.environ))
+        service_stack.enter_context(
+            lockfile('test.lock', nolock='MGS_NETNS_ACTIVE' in os.environ))
         service_stack.enter_context(ocsp.run())
         service_stack.enter_context(backend.run())
         service_stack.enter_context(msva.run())
@@ -220,7 +219,6 @@ def main(args):
                   f'{errors[1]} suppressed')
             if errors[0] > 0:
                 sys.exit(ord('V'))
-
 
 
 if __name__ == "__main__":
