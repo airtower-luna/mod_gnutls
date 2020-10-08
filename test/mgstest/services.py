@@ -21,6 +21,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from time import sleep
 
+
 class TestService:
     """A generic service used in the mod_gnutls test environment."""
 
@@ -146,7 +147,6 @@ class TestService:
             self.wait()
 
 
-
 class ApacheService(TestService):
     """An Apache HTTPD instance used in the mod_gnutls test
     environment."""
@@ -167,7 +167,7 @@ class ApacheService(TestService):
                          '--keep-debuginfo=yes',
                          '--track-origins=yes', '--vgdb=no',
                          f'--log-file={valgrind_log}'] \
-                         + suppress + start_cmd
+                + suppress + start_cmd
         if not check:
             check = self.pidfile_check
         super(ApacheService, self).__init__(start=start_cmd,

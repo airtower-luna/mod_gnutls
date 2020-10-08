@@ -24,6 +24,7 @@ import sys
 from http.client import HTTPConnection
 from threading import Thread
 
+
 class HTTPSubprocessConnection(HTTPConnection):
     """An HTTPConnection that transports data through a subprocess instead
     of a socket. The mod_gnutls test suite uses it to transport data
@@ -66,7 +67,8 @@ class HTTPSubprocessConnection(HTTPConnection):
         s_local.settimeout(self.timeout)
 
         if self._output_filter:
-            self._sproc = subprocess.Popen(self.command, stdout=subprocess.PIPE,
+            self._sproc = subprocess.Popen(self.command,
+                                           stdout=subprocess.PIPE,
                                            stderr=subprocess.PIPE,
                                            stdin=s_remote, close_fds=True,
                                            bufsize=0)
@@ -111,7 +113,6 @@ class HTTPSubprocessConnection(HTTPConnection):
         # close the connection in the super class, which also calls
         # self.sock.close()
         super().close()
-
 
 
 def _stderr_writer(stream, copy=None):

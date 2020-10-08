@@ -71,6 +71,7 @@ hooks = [
     'post_check'
 ]
 
+
 class Plugin:
     """Represents a set of hooks.
 
@@ -91,12 +92,14 @@ class Plugin:
             else:
                 setattr(self, hook, None)
 
+
 def load_module_file(file_path, module_name):
     """Load a module from a file path."""
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
 
 def load_hooks_plugin(file_path, module_name='mgstest.plugin'):
     """Load a hooks plugin module from the given path, if it

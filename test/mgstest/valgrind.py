@@ -19,6 +19,7 @@ import re
 err_re = re.compile(r'^==\d+== ERROR SUMMARY: (\d+) errors from '
                     r'\d+ contexts \(suppressed: (\d+) from \d+\)')
 
+
 def error_summary(log):
     """Read all available error summaries from the given log (open text
     file).

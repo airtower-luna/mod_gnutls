@@ -111,6 +111,7 @@ from string import Template
 from . import TestExpectationFailed
 from .http import HTTPSubprocessConnection
 
+
 class Transports(Enum):
     """Transports supported by TestConnection."""
     GNUTLS = auto()
@@ -118,6 +119,7 @@ class Transports(Enum):
 
     def __repr__(self):
         return f'{self.__class__.__name__!s}.{self.name}'
+
 
 class TestConnection(yaml.YAMLObject):
     """An HTTP connection in a test. It includes parameters for the
@@ -197,7 +199,6 @@ class TestConnection(yaml.YAMLObject):
         return conn
 
 
-
 class TestRequest(yaml.YAMLObject):
     """Test action that sends an HTTP/1.1 request.
 
@@ -213,6 +214,7 @@ class TestRequest(yaml.YAMLObject):
 
     """
     yaml_tag = '!request'
+
     def __init__(self, path, method='GET', body=None, headers=dict(),
                  expect=dict(status=200)):
         self.method = method
@@ -338,7 +340,6 @@ class TestRequest(yaml.YAMLObject):
         return req
 
 
-
 class TestReq10(TestRequest):
     """Test action that sends a request using a minimal (and likely
     incomplete) HTTP/1.0 test client for the one test case that
@@ -427,7 +428,6 @@ class TestReq10(TestRequest):
             self.check_body(body)
 
 
-
 class Resume(yaml.YAMLObject):
     """Test action to close and resume the TLS session.
 
@@ -441,6 +441,7 @@ class Resume(yaml.YAMLObject):
 
     """
     yaml_tag = '!resume'
+
     def run(self, conn, command):
         if not '--inline-commands' in command:
             raise ValueError('gnutls_params must include "inline-commands" '
@@ -449,7 +450,6 @@ class Resume(yaml.YAMLObject):
             raise TypeError('Resume action works only with '
                             'HTTPSubprocessConnection.')
         conn.sock.send(b'^resume^\n')
-
 
 
 def filter_cert_log(in_stream, out_stream):
@@ -505,14 +505,12 @@ def filter_cert_log(in_stream, out_stream):
     out_stream.close()
 
 
-
 def format_response(resp, body):
     """Format an http.client.HTTPResponse for logging."""
     s = f'{resp.status} {resp.reason}\n'
     s = s + '\n'.join(f'{name}: {value}' for name, value in resp.getheaders())
     s = s + '\n\n' + body
     return s
-
 
 
 def subst_env(text):
@@ -538,7 +536,6 @@ def subst_env(text):
         return None
     t = Template(text)
     return t.substitute(os.environ)
-
 
 
 def run_test_conf(test_config, timeout=5.0, conn_log=None, response_log=None):

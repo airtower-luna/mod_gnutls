@@ -24,11 +24,11 @@ import sys
 from contextlib import contextmanager
 from unittest import SkipTest
 
+
 class TestExpectationFailed(Exception):
     """Raise if a test failed. The constructor should be called with a
     string describing the problem."""
     pass
-
 
 
 @contextmanager
@@ -58,7 +58,6 @@ def lockfile(file, nolock=False):
                 print(f'Unlocked {file}.', file=sys.stderr)
 
 
-
 def first_line_match(regexp, file):
     """Return the first match of the regular expression in file (by line),
     or None. Technically applicable to any iterable containing
@@ -69,7 +68,6 @@ def first_line_match(regexp, file):
         if m:
             return m
     return None
-
 
 
 def require_match(regexp, file, error_message=None):
@@ -90,7 +88,6 @@ def require_match(regexp, file, error_message=None):
         raise TestExpectationFailed(error_message)
     else:
         raise TestExpectationFailed(f'No match found for {regexp.pattern}!')
-
 
 
 def require_apache_modules(*modules):

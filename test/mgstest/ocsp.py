@@ -133,7 +133,7 @@ class OCSPResponse(OCSPMessage):
     @classmethod
     def parse_file(cls, der_filename):
         command = ['ocsptool', '--response-info',
-                    '--infile', der_filename]
+                   '--infile', der_filename]
         output = subprocess.check_output(command).decode()
         return cls.parse_ocsptool_output(output)
 
