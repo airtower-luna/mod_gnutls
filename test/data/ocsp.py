@@ -49,13 +49,16 @@ RESPONSE_TYPE = 'application/ocsp-response'
 def stdout(data):
     sys.stdout.buffer.write(data)
 
+
 def stdout_line(line):
     stdout(line.encode('utf-8'))
     stdout(b'\n')
 
+
 def stdout_status(status, content_type='text/plain'):
     stdout_line(f'Status: {status.value} {status.phrase}')
     stdout_line(f'Content-Type: {content_type}\n')
+
 
 def stdout_response(status, response):
     stdout_status(status, content_type=RESPONSE_TYPE)
@@ -68,6 +71,7 @@ def handle_get():
     # request from the PATH_INFO CGI variable.
     stdout_status(HTTPStatus.METHOD_NOT_ALLOWED)
     stdout_line('OCSP GET request not implemented.')
+
 
 def handle_post():
     content_type = os.getenv('CONTENT_TYPE')
@@ -82,13 +86,14 @@ def handle_post():
         print(f'Received OCSP request: \'{base64.b64encode(req).decode()}\'',
               file=sys.stderr, flush=True)
         openssl = os.getenv('OPENSSL') or shutil.which('openssl')
-        openssl_run = subprocess.run([openssl, 'ocsp',
-            '-index', os.getenv('OCSP_INDEX'),
-            '-CA', os.getenv('CA_CERT'),
-            '-rsigner', os.getenv('OCSP_CERT'),
-            '-rkey', os.getenv('OCSP_KEY'),
-            '-nmin', os.getenv('OCSP_VALID_MIN', '5'),
-            '-reqin', '-', '-respout', '-'],
+        openssl_run = subprocess.run(
+            [openssl, 'ocsp',
+             '-index', os.getenv('OCSP_INDEX'),
+             '-CA', os.getenv('CA_CERT'),
+             '-rsigner', os.getenv('OCSP_CERT'),
+             '-rkey', os.getenv('OCSP_KEY'),
+             '-nmin', os.getenv('OCSP_VALID_MIN', '5'),
+             '-reqin', '-', '-respout', '-'],
             input=req, capture_output=True)
 
         if openssl_run.returncode == 0:
