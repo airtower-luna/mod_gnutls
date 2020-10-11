@@ -132,16 +132,13 @@ apr_status_t load_proxy_x509_credentials(apr_pool_t *pconf,
     if (sc == NULL)
         return APR_EGENERAL;
 
-    apr_status_t ret = APR_EINIT;
-    int err = GNUTLS_E_SUCCESS;
-
     /* Cleanup function for the GnuTLS structures allocated below */
     apr_pool_cleanup_register(pconf, sc, cleanup_proxy_x509_credentials,
                               apr_pool_cleanup_null);
 
     /* Function pool, gets destroyed before exit. */
     apr_pool_t *pool;
-    ret = apr_pool_create(&pool, ptemp);
+    apr_status_t ret = apr_pool_create(&pool, ptemp);
     if (ret != APR_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, ret, s,
@@ -150,7 +147,7 @@ apr_status_t load_proxy_x509_credentials(apr_pool_t *pconf,
     }
 
     /* allocate credentials structures */
-    err = gnutls_certificate_allocate_credentials(&sc->proxy_x509_creds);
+    int err = gnutls_certificate_allocate_credentials(&sc->proxy_x509_creds);
     if (err != GNUTLS_E_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
