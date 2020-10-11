@@ -71,4 +71,17 @@ jobs:
         run: bear make -j4
       - name: cppcheck
         run: |
-          cppcheck --project=compile_commands.json -DAF_UNIX=1 --enable=warning,style,unusedFunction
+          cppcheck --project=compile_commands.json -DAF_UNIX=1 --enable=warning,style,unusedFunction --xml 2>cppcheck.xml
+      - uses: airtower-luna/convert-to-sarif@main
+        with:
+          tool: 'CppCheck'
+          input_file: 'cppcheck.xml'
+          sarif_file: 'cppcheck.sarif'
+      - name: define CONTAINER_WORKSPACE
+        run: |
+          echo "CONTAINER_WORKSPACE=${PWD}" >> ${GITHUB_ENV}
+      - name: upload SARIF results
+        uses: github/codeql-action/upload-sarif@v1
+        with:
+          sarif_file: 'cppcheck.sarif'
+          checkout_path: ${{ env.CONTAINER_WORKSPACE }}
