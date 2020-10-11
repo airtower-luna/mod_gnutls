@@ -102,7 +102,6 @@ static apr_status_t brigade_consume(apr_bucket_brigade * bb,
         apr_bucket *b = APR_BRIGADE_FIRST(bb);
         const char *str;
         apr_size_t str_len;
-        apr_size_t consume;
 
         /* Justin points out this is an http-ism that might
          * not fit if brigade_consume is added to APR.  Perhaps
@@ -139,9 +138,8 @@ static apr_status_t brigade_consume(apr_bucket_brigade * bb,
             block = APR_NONBLOCK_READ;
 
             /* Assure we don't overflow. */
-            consume =
-                    (str_len + actual >
-                    *len) ? *len - actual : str_len;
+            apr_size_t consume =
+                (str_len + actual > *len) ? *len - actual : str_len;
 
             memcpy(c, str, consume);
 
@@ -176,7 +174,6 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
 {
     apr_size_t wanted = *len;
     apr_size_t bytes = 0;
-    int rc;
 
     *len = 0;
 
@@ -220,7 +217,8 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
     while (1)
     {
         /* Note: The pull function sets ctxt->input_rc */
-        rc = gnutls_record_recv(ctxt->session, buf + bytes, wanted - bytes);
+        int rc = gnutls_record_recv(ctxt->session,
+                                    buf + bytes, wanted - bytes);
 
         if (rc > 0) {
             *len += rc;
@@ -310,13 +308,14 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
 static apr_status_t gnutls_io_input_getline(mgs_handle_t * ctxt,
         char *buf, apr_size_t * len) {
     const char *pos = NULL;
-    apr_status_t status;
     apr_size_t tmplen = *len, buflen = *len, offset = 0;
 
     *len = 0;
 
-    while (tmplen > 0) {
-        status = gnutls_io_input_read(ctxt, buf + offset, &tmplen);
+    while (tmplen > 0)
+    {
+        apr_status_t status =
+            gnutls_io_input_read(ctxt, buf + offset, &tmplen);
 
         if (status != APR_SUCCESS) {
             return status;
@@ -958,7 +957,6 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
                            void *buffer, size_t len)
 {
     mgs_handle_t *ctxt = ptr;
-    apr_status_t rc;
     apr_size_t in = len;
     apr_read_type_e block = ctxt->input_block;
 
@@ -979,9 +977,9 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
 
     if (APR_BRIGADE_EMPTY(ctxt->input_bb))
     {
-        rc = ap_get_brigade(ctxt->input_filter->next,
-                            ctxt->input_bb, AP_MODE_READBYTES,
-                            ctxt->input_block, in);
+        apr_status_t rc = ap_get_brigade(ctxt->input_filter->next,
+                                         ctxt->input_bb, AP_MODE_READBYTES,
+                                         ctxt->input_block, in);
 
         /* Not a problem, there was simply no data ready yet.
          */

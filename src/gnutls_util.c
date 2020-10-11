@@ -99,12 +99,12 @@ const char* read_line(apr_pool_t *p, apr_bucket_brigade *sockb,
 apr_status_t datum_from_file(apr_pool_t *p, const char* filename,
                              gnutls_datum_t *datum)
 {
-    apr_status_t rv = APR_EINIT;
     apr_file_t *file;
     apr_finfo_t finfo;
     apr_size_t br = 0;
-    rv = apr_file_open(&file, filename,
-                       APR_READ | APR_BINARY, APR_OS_DEFAULT, p);
+
+    apr_status_t rv = apr_file_open(&file, filename,
+                                    APR_READ | APR_BINARY, APR_OS_DEFAULT, p);
     if (rv != APR_SUCCESS)
         return rv;
 

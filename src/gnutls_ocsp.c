@@ -1124,10 +1124,8 @@ static apr_status_t mgs_async_ocsp_update(int state,
         ocsp_response.data = apr_palloc(pool, OCSP_RESP_SIZE_MAX);
         ocsp_response.size = OCSP_RESP_SIZE_MAX;
 
-        apr_status_t rv = mgs_cache_fetch(sc->ocsp_cache, server,
-                                          ocsp_data->fingerprint,
-                                          &ocsp_response,
-                                          pool);
+        rv = mgs_cache_fetch(sc->ocsp_cache, server, ocsp_data->fingerprint,
+                             &ocsp_response, pool);
 
         if (rv != APR_SUCCESS || (IS_FAILURE_RESPONSE(&ocsp_response)))
         {

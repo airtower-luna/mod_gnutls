@@ -576,7 +576,6 @@ int mgs_hook_post_config(apr_pool_t *pconf,
 {
     int rv;
     server_rec *s;
-    mgs_srvconf_rec *sc;
     mgs_srvconf_rec *sc_base;
 
     s = base_server;
@@ -645,7 +644,8 @@ int mgs_hook_post_config(apr_pool_t *pconf,
 
     for (s = base_server; s; s = s->next)
     {
-        sc = (mgs_srvconf_rec *) ap_get_module_config(s->module_config, &gnutls_module);
+        mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+            ap_get_module_config(s->module_config, &gnutls_module);
         sc->s = s;
         sc->cache_enable = sc_base->cache_enable;
         sc->cache = sc_base->cache;
@@ -941,13 +941,10 @@ int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc)
 
 static int vhost_cb(void *baton, conn_rec *conn, server_rec * s)
 {
-    mgs_srvconf_rec *tsc;
     vhost_cb_rec *x = baton;
-    int ret;
-
+    mgs_srvconf_rec *tsc = (mgs_srvconf_rec *)
+        ap_get_module_config(s->module_config, &gnutls_module);
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
-    tsc = (mgs_srvconf_rec *) ap_get_module_config(s->module_config,
-            &gnutls_module);
 
     if (tsc->enabled != GNUTLS_ENABLED_TRUE) {
         return 0;
@@ -956,7 +953,8 @@ static int vhost_cb(void *baton, conn_rec *conn, server_rec * s)
     if (tsc->certs_x509_chain_num > 0) {
         /* this check is there to warn administrator of any missing hostname
          * in the certificate. */
-        ret = gnutls_x509_crt_check_hostname(tsc->certs_x509_crt_chain[0], s->server_hostname);
+        int ret = gnutls_x509_crt_check_hostname(tsc->certs_x509_crt_chain[0],
+                                                 s->server_hostname);
         if (0 == ret)
             ap_log_cerror(APLOG_MARK, APLOG_DEBUG, 0, conn,
                           "GnuTLS: the certificate doesn't match requested "
@@ -1607,7 +1605,6 @@ static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, in
     /* export all the alternative names (DNS, RFC822 and URI) */
     for (int i = 0; !(ret < 0); i++)
     {
-        const char *san, *sanlabel;
         len = 0;
         ret = gnutls_x509_crt_get_subject_alt_name(cert, i,
                 NULL, &len,
@@ -1623,6 +1620,7 @@ static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, in
                     NULL);
             tmp2[len] = 0;
 
+            const char *san, *sanlabel;
             sanlabel = apr_psprintf(r->pool, "%s%u", MGS_SIDE("_S_AN"), i);
             if (ret == GNUTLS_SAN_DNSNAME) {
                 san = apr_psprintf(r->pool, "DNSNAME:%s", tmp2);
