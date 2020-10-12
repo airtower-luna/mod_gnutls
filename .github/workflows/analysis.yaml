@@ -85,3 +85,27 @@ jobs:
         with:
           sarif_file: 'cppcheck.sarif'
           checkout_path: ${{ env.CONTAINER_WORKSPACE }}
+
+  codeql:
+    runs-on: ubuntu-20.04
+    name: CodeQL
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+      # For pull requests get the head of the branch, instead of a
+      # temporary merge
+      - run: git checkout HEAD^2
+        if: ${{ github.event_name == 'pull_request' }}
+      - name: install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev libmsv-dev pkg-config procps
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v1
+        with:
+          languages: cpp
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v1
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v1
