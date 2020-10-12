@@ -20,6 +20,12 @@ jobs:
     name: clang-analyzer
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+      # For pull requests get the head of the branch, instead of a
+      # temporary merge
+      - run: git checkout HEAD^2
+        if: ${{ github.event_name == 'pull_request' }}
       - name: install dependencies
         run: |
           export DEBIAN_FRONTEND=noninteractive
@@ -58,6 +64,10 @@ jobs:
     name: cppcheck
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+      - run: git checkout HEAD^2
+        if: ${{ github.event_name == 'pull_request' }}
       - name: install dependencies
         run: |
           export DEBIAN_FRONTEND=noninteractive
@@ -93,8 +103,6 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 2
-      # For pull requests get the head of the branch, instead of a
-      # temporary merge
       - run: git checkout HEAD^2
         if: ${{ github.event_name == 'pull_request' }}
       - name: install dependencies
