@@ -82,7 +82,7 @@ jobs:
       - name: cppcheck
         run: |
           cppcheck --project=compile_commands.json -DAF_UNIX=1 --enable=warning,style,unusedFunction --xml 2>cppcheck.xml
-      - uses: airtower-luna/convert-to-sarif@main
+      - uses: airtower-luna/convert-to-sarif@v0.2.0
         with:
           tool: 'CppCheck'
           input_file: 'cppcheck.xml'
