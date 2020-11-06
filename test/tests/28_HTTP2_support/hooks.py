@@ -9,7 +9,7 @@ def prepare_env():
     require_apache_modules('mod_http2.so')
     curl = os.environ['HTTP_CLI']
     if curl == 'no':
-        raise SkipTest(f'curl not found!')
+        raise SkipTest('curl not found!')
     proc = subprocess.run([curl, '-V'], stdout=subprocess.PIPE,
                           check=True, text=True)
     if not re.search(r'\bHTTP2\b', proc.stdout):
