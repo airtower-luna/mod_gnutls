@@ -17,6 +17,7 @@
 
 import asyncio
 import contextlib
+import itertools
 import os
 import os.path
 import subprocess
@@ -206,6 +207,10 @@ async def main(args):
                           float(os.environ.get('TEST_QUERY_TIMEOUT', 5.0)),
                           conn_log=args.log_connection,
                           response_log=args.log_responses)
+
+        await asyncio.wait(
+            {asyncio.create_task(s.stop())
+             for s in itertools.chain([apache], bg_services)})
 
     # run extra checks the test's hooks.py might define
     if plugin.post_check:
