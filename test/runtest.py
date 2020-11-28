@@ -64,25 +64,27 @@ def temp_logfile():
                                          prefix='mod_gnutls', suffix=".log")
 
 
-def check_ocsp_responder():
+async def check_ocsp_responder():
     # Check if OCSP responder works
     issuer_cert = 'authority/x509.pem'
     check_cert = 'authority/server/x509.pem'
-    command = ['ocsptool', '--ask', '--nonce',
-               '--load-issuer', issuer_cert,
-               '--load-cert', check_cert]
-    return subprocess.run(command).returncode == 0
+    proc = await asyncio.create_subprocess_exec(
+        'ocsptool', '--ask', '--nonce',
+        '--load-issuer', issuer_cert, '--load-cert', check_cert)
+    return (await proc.wait()) == 0
 
 
-def check_msva():
+async def check_msva():
     # Check if MSVA is up
     cert_file = 'authority/client/x509.pem'
     uid_file = 'authority/client/uid'
     with open(uid_file, 'r') as file:
         uid = file.read().strip()
-        command = ['msva-query-agent', 'https', uid, 'x509pem', 'client']
-        with open(cert_file, 'r') as cert:
-            return subprocess.run(command, stdin=cert).returncode == 0
+    with open(cert_file, 'r') as cert:
+        proc = await asyncio.create_subprocess_exec(
+            'msva-query-agent', 'https', uid, 'x509pem', 'client',
+            stdin=cert)
+        return (await proc.wait()) == 0
 
 
 async def main(args):

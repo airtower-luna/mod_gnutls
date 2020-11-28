@@ -50,7 +50,7 @@ class TestService:
         else:
             self.process_env = None
 
-        # check: function to check if the service is up and working
+        # check: coroutine to check if the service is up and working
         self.check = check
 
         # sleep step for waiting (sec)
@@ -122,7 +122,7 @@ class TestService:
         while not timeout or slept < timeout:
             if self.process and self.process.returncode is not None:
                 return self.process.returncode
-            if self.check():
+            if await self.check():
                 return None
             else:
                 await asyncio.sleep(self._step)
@@ -180,7 +180,7 @@ class ApacheService(TestService):
     def config_exists(self):
         return self.config.is_file()
 
-    def pidfile_check(self):
+    async def pidfile_check(self):
         """Default check method for ApacheService, waits for the PID file to
         be present."""
         return self.pidfile.is_file()
