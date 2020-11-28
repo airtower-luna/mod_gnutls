@@ -78,7 +78,7 @@ jobs:
       - name: configure
         run: ./configure APACHE_MUTEX=pthread
       - name: make and create compile_commands.json
-        run: bear make -j4
+        run: bear -- make -j4
       - name: cppcheck
         run: |
           cppcheck --project=compile_commands.json -DAF_UNIX=1 --enable=warning,style,unusedFunction --xml 2>cppcheck.xml
