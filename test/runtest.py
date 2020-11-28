@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import contextlib
 import os
 import os.path
@@ -84,7 +85,7 @@ def check_msva():
             return subprocess.run(command, stdin=cert).returncode == 0
 
 
-def main(args):
+async def main(args):
     # The Automake environment always provides srcdir, the default is
     # for manual use.
     srcdir = os.path.realpath(os.environ.get('srcdir', '.'))
@@ -160,25 +161,24 @@ def main(args):
         os.environ['MONKEYSPHERE_VALIDATION_AGENT_SOCKET'] = \
             f'http://127.0.0.1:{os.environ["MSVA_PORT"]}'
 
-    with contextlib.ExitStack() as service_stack:
+    async with contextlib.AsyncExitStack() as service_stack:
         if cleanup_callback:
             service_stack.callback(cleanup_callback)
         service_stack.enter_context(
             lockfile('test.lock', nolock='MGS_NETNS_ACTIVE' in os.environ))
-        service_stack.enter_context(ocsp.run())
-        service_stack.enter_context(backend.run())
-        service_stack.enter_context(msva.run())
 
         # TEST_SERVICE_MAX_WAIT is in milliseconds
         wait_timeout = \
             int(os.environ.get('TEST_SERVICE_MAX_WAIT', 10000)) / 1000
-        for s in bg_services:
-            if s.condition():
-                s.wait_ready(timeout=wait_timeout)
+        await asyncio.wait(
+            {asyncio.create_task(
+                service_stack.enter_async_context(
+                    s.run(ready_timeout=wait_timeout)))
+             for s in bg_services})
 
         # special case: expected to fail in a few cases
-        service_stack.enter_context(apache.run())
-        failed = apache.wait_ready()
+        await service_stack.enter_async_context(apache.run())
+        failed = await apache.wait_ready()
         if os.path.exists(os.path.join(testdir, 'fail.server')):
             if failed:
                 print('Apache server failed to start as expected',
@@ -251,4 +251,4 @@ if __name__ == "__main__":
     with contextlib.ExitStack() as stack:
         stack.enter_context(contextlib.closing(args.log_connection))
         stack.enter_context(contextlib.closing(args.log_responses))
-        main(args)
+        asyncio.run(main(args))

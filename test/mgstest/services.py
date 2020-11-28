@@ -14,12 +14,11 @@
 
 """Handling services needed for mod_gnutls tests"""
 
+import asyncio
 import os
-import subprocess
 
-from contextlib import contextmanager
+from contextlib import asynccontextmanager
 from pathlib import Path
-from time import sleep
 
 
 class TestService:
@@ -57,50 +56,50 @@ class TestService:
         # sleep step for waiting (sec)
         self._step = int(os.environ.get('TEST_SERVICE_WAIT', 250)) / 1000
 
-    def start(self):
+    async def start(self):
         """Start the service"""
         if not self.condition():
             # skip
             return
         print(f'Starting: {self.start_command}')
-        self.process = subprocess.Popen(self.start_command,
-                                        env=self.process_env,
-                                        close_fds=True)
+        self.process = await asyncio.create_subprocess_exec(
+            *self.start_command, env=self.process_env, close_fds=True)
         self.returncode = None
 
-    def stop(self):
+    async def stop(self):
         """Order the service to stop"""
         if not self.condition():
             # skip
             return
-        if not self.process or self.process.poll():
+        if not self.process or self.process.returncode is not None:
             # process either never started or already stopped
             return
 
         if self.stop_command:
             print(f'Stopping: {self.stop_command}')
-            subprocess.run(self.stop_command, check=True, env=self.process_env)
+            stop = await asyncio.create_subprocess_exec(
+                *self.stop_command, env=self.process_env)
+            await stop.wait()
         else:
             print(f'Stopping (SIGTERM): {self.start_command}')
             self.process.terminate()
 
-    def wait(self, timeout=None):
+    async def wait(self, timeout=None):
         """Wait for the process to terminate.
 
         Sets returncode to the process' return code and returns it.
 
-        WARNING: Calling this method without a timeout or calling
-        stop() first will hang. An expired timeout will raise a
-        subprocess.TimeoutExpired exception.
+        WARNING: Calling this method without calling stop() first will
+        hang, unless the service stops on its own.
 
         """
         if self.process:
-            self.process.wait(timeout=timeout)
+            await self.process.wait()
             self.returncode = self.process.returncode
             self.process = None
             return self.returncode
 
-    def wait_ready(self, timeout=None):
+    async def wait_ready(self, timeout=None):
         """Wait for the started service to be ready.
 
         The function passed to the constructor as "check" is called to
@@ -113,38 +112,39 @@ class TestService:
         Raises a TimeoutError if the given timeout has been exceeded.
 
         """
+        if not self.condition():
+            # skip
+            return None
         if not self.check:
             return None
 
         slept = 0
         while not timeout or slept < timeout:
-            if self.process and self.process.poll():
+            if self.process and self.process.returncode is not None:
                 return self.process.returncode
             if self.check():
                 return None
             else:
-                sleep(self._step)
+                await asyncio.sleep(self._step)
                 slept = slept + self._step
         # TODO: A custom ServiceException or something would be nicer
         # here.
         raise TimeoutError('Waiting for service timed out!')
 
-    @contextmanager
-    def run(self):
+    @asynccontextmanager
+    async def run(self, ready_timeout=None):
         """Context manager to start and stop a service. Note that entering the
         context does not call TestService.wait_ready() on the service,
         you must do that separately if desired.
 
         """
         try:
-            self.start()
-            # TODO: with async execution we could also call
-            # wait_ready() here
+            await self.start()
+            await self.wait_ready(timeout=ready_timeout)
             yield self
         finally:
-            self.stop()
-            # TODO: this would really benefit from async execution
-            self.wait()
+            await self.stop()
+            await self.wait()
 
 
 class ApacheService(TestService):
