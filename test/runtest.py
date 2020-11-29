@@ -19,11 +19,11 @@ import asyncio
 import contextlib
 import itertools
 import os
-import os.path
 import subprocess
 import sys
 import tempfile
 import yaml
+from pathlib import Path
 from unittest import SkipTest
 
 import mgstest.hooks
@@ -40,24 +40,22 @@ def find_testdir(number, dir):
     raised.
 
     """
-    with os.scandir(dir) as it:
-        found = None
-        for entry in it:
-            if entry.is_dir():
-                num = int(entry.name.split('_', maxsplit=1)[0])
-                if number == num:
-                    if found:
-                        # duplicate numbers are an error
-                        raise LookupError('Multiple directories found for '
-                                          f'test number {number}: '
-                                          f'{found.name} and {entry.name}')
-                    else:
-                        found = entry
-        if found is None:
-            raise LookupError('No test directory found for test number '
-                              f'{number}!')
-        else:
-            return (found.path, found.name)
+    found = None
+    for entry in dir.iterdir():
+        if entry.is_dir():
+            num = int(entry.name.split('_', maxsplit=1)[0])
+            if number == num:
+                if found:
+                    # duplicate numbers are an error
+                    raise LookupError('Multiple directories found for '
+                                      f'test number {number}: '
+                                      f'{found.name} and {entry.name}')
+                else:
+                    found = entry
+    if found is None:
+        raise LookupError('No test directory found for test number '
+                          f'{number}!')
+    return found, found.name
 
 
 def temp_logfile():
@@ -91,27 +89,25 @@ async def check_msva():
 async def main(args):
     # The Automake environment always provides srcdir, the default is
     # for manual use.
-    srcdir = os.path.realpath(os.environ.get('srcdir', '.'))
+    srcdir = Path(os.environ.get('srcdir', '.')).resolve()
     # ensure environment srcdir is absolute
-    os.environ['srcdir'] = srcdir
+    os.environ['srcdir'] = str(srcdir)
 
     # Find the configuration directory for the test in
     # ${srcdir}/tests/, based on the test number.
-    testdir, testname = find_testdir(args.test_number,
-                                     os.path.join(srcdir, 'tests'))
+    testdir, testname = find_testdir(args.test_number, srcdir / 'tests')
     print(f'Found test {testname}, test dir is {testdir}')
     os.environ['TEST_NAME'] = testname
 
     # Load test config
     try:
-        with open(os.path.join(testdir, 'test.yaml'), 'r') as conf_file:
+        with open(testdir / 'test.yaml', 'r') as conf_file:
             test_conf = yaml.load(conf_file, Loader=yaml.Loader)
     except FileNotFoundError:
         test_conf = None
 
     # Load test case hooks (if any)
-    plugin_path = os.path.join(testdir, 'hooks.py')
-    plugin = mgstest.hooks.load_hooks_plugin(plugin_path)
+    plugin = mgstest.hooks.load_hooks_plugin(testdir / 'hooks.py')
 
     # PID file name varies depending on whether we're using
     # namespaces.
@@ -123,16 +119,16 @@ async def main(args):
 
     valgrind_log = None
     if args.valgrind:
-        valgrind_log = os.path.join('logs', f'valgrind-{testname}.log')
+        valgrind_log = Path('logs', f'valgrind-{testname}.log')
 
     # Define the available services
-    apache = ApacheService(config=os.path.join(testdir, 'apache.conf'),
+    apache = ApacheService(config=testdir / 'apache.conf',
                            pidfile=f'apache2{pidaffix}.pid',
                            valgrind_log=valgrind_log,
                            valgrind_suppress=args.valgrind_suppressions)
-    backend = ApacheService(config=os.path.join(testdir, 'backend.conf'),
+    backend = ApacheService(config=testdir / 'backend.conf',
                             pidfile=f'backend{pidaffix}.pid')
-    ocsp = ApacheService(config=os.path.join(testdir, 'ocsp.conf'),
+    ocsp = ApacheService(config=testdir / 'ocsp.conf',
                          pidfile=f'ocsp{pidaffix}.pid',
                          check=check_ocsp_responder)
     msva = TestService(start=['monkeysphere-validation-agent'],
@@ -182,7 +178,7 @@ async def main(args):
         # special case: expected to fail in a few cases
         await service_stack.enter_async_context(apache.run())
         failed = await apache.wait_ready()
-        if os.path.exists(os.path.join(testdir, 'fail.server')):
+        if (testdir / 'fail.server').is_file():
             if failed:
                 print('Apache server failed to start as expected',
                       file=sys.stderr)
