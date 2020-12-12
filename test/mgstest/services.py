@@ -21,6 +21,10 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 
+class ServiceTimeout(asyncio.TimeoutError):
+    pass
+
+
 class TestService:
     """A generic service used in the mod_gnutls test environment."""
 
@@ -110,7 +114,8 @@ class TestService:
         Returns: None if the service is ready, or the return code if
         the process has terminated.
 
-        Raises a TimeoutError if the given timeout has been exceeded.
+        Raises a ServiceTimeout exception if the given timeout expires
+        before the service is ready.
 
         """
         if not self.condition():
@@ -128,9 +133,7 @@ class TestService:
             else:
                 await asyncio.sleep(self._step)
                 slept = slept + self._step
-        # TODO: A custom ServiceException or something would be nicer
-        # here.
-        raise TimeoutError('Waiting for service timed out!')
+        raise ServiceTimeout('Waiting for service timed out!')
 
     @asynccontextmanager
     async def run(self, ready_timeout=None):
