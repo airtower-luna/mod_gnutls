@@ -90,11 +90,12 @@ class TestService:
         Sets returncode to the process' return code and returns it.
 
         WARNING: Calling this method without calling stop() first will
-        hang, unless the service stops on its own.
+        hang, unless the service stops on its own. An expired timeout
+        will raise an asyncio.TimeoutError.
 
         """
         if self.process:
-            await self.process.wait()
+            await asyncio.wait_for(self.process.wait(), timeout)
             self.returncode = self.process.returncode
             self.process = None
             return self.returncode
