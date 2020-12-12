@@ -134,9 +134,8 @@ class TestService:
 
     @asynccontextmanager
     async def run(self, ready_timeout=None):
-        """Context manager to start and stop a service. Note that entering the
-        context does not call TestService.wait_ready() on the service,
-        you must do that separately if desired.
+        """Context manager to start and stop a service. Yields when the
+        service is ready.
 
         """
         try:
