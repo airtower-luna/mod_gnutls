@@ -166,9 +166,7 @@ async def main(args):
         service_stack.enter_context(
             lockfile('test.lock', nolock='MGS_NETNS_ACTIVE' in os.environ))
 
-        # TEST_SERVICE_MAX_WAIT is in milliseconds
-        wait_timeout = \
-            int(os.environ.get('TEST_SERVICE_MAX_WAIT', 10000)) / 1000
+        wait_timeout = float(os.environ.get('TEST_SERVICE_MAX_WAIT', 10))
         await asyncio.gather(*(
             asyncio.create_task(
                 service_stack.enter_async_context(

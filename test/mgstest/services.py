@@ -51,7 +51,7 @@ class TestService:
         self.check = check
 
         # sleep step for waiting (sec)
-        self._step = int(os.environ.get('TEST_SERVICE_WAIT', 250)) / 1000
+        self._step = float(os.environ.get('TEST_SERVICE_WAIT', 0.25))
 
     async def start(self):
         """Start the service"""

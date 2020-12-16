@@ -298,10 +298,10 @@ if ENABLE_OCSP_TEST
 OCSP_PORT ?= 9936
 OCSP_URI_TEMPLATE = ocsp_uri = http://$(TEST_HOST):$(OCSP_PORT)/ocsp/
 endif
-# maximum time to wait for MSVA startup (milliseconds)
-TEST_SERVICE_MAX_WAIT ?= 10000
-# wait loop time for MSVA startup (milliseconds)
-TEST_SERVICE_WAIT ?= 400
+# maximum time to wait for service startup (seconds)
+TEST_SERVICE_MAX_WAIT ?= 10
+# wait loop time for service startup (seconds)
+TEST_SERVICE_WAIT ?= 0.3
 
 AM_TESTS_ENVIRONMENT = export APACHE2=@APACHE2@; \
 	export AP_LIBEXECDIR=@AP_LIBEXECDIR@; \
