@@ -163,8 +163,8 @@ async def main(args):
     async with contextlib.AsyncExitStack() as service_stack:
         if cleanup_callback:
             service_stack.callback(cleanup_callback)
-        service_stack.enter_context(
-            lockfile('test.lock', nolock='MGS_NETNS_ACTIVE' in os.environ))
+        if 'MGS_NETNS_ACTIVE' not in os.environ:
+            service_stack.enter_context(lockfile('test.lock'))
 
         wait_timeout = float(os.environ.get('TEST_SERVICE_MAX_WAIT', 10))
         await asyncio.gather(*(

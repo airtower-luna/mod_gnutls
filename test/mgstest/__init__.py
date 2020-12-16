@@ -32,30 +32,23 @@ class TestExpectationFailed(Exception):
 
 
 @contextmanager
-def lockfile(file, nolock=False):
+def lockfile(file):
     """Context manager for an optional file-based mutex.
 
-    Unless nolock=True the process must hold a lock on the given file
-    before entering the context. The lock is released when leaving the
-    context.
+    The process must hold a lock on the given file before entering the
+    context. The lock is released when leaving the context.
 
     """
-    if nolock:
+    with open(file, 'w') as lockfile:
         try:
-            yield None
+            print(f'Aquiring lock on {file}...', file=sys.stderr)
+            fcntl.flock(lockfile, fcntl.LOCK_EX)
+            print(f'Got lock on {file}.', file=sys.stderr)
+            yield lockfile
         finally:
-            pass
-    else:
-        with open(file, 'w') as lockfile:
-            try:
-                print(f'Aquiring lock on {file}...', file=sys.stderr)
-                fcntl.flock(lockfile, fcntl.LOCK_EX)
-                print(f'Got lock on {file}.', file=sys.stderr)
-                yield lockfile
-            finally:
-                print(f'Unlocking {file}...', file=sys.stderr)
-                fcntl.flock(lockfile, fcntl.LOCK_UN)
-                print(f'Unlocked {file}.', file=sys.stderr)
+            print(f'Unlocking {file}...', file=sys.stderr)
+            fcntl.flock(lockfile, fcntl.LOCK_UN)
+            print(f'Unlocked {file}.', file=sys.stderr)
 
 
 def first_line_match(regexp, file):
