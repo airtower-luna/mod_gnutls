@@ -29,7 +29,7 @@ class TestService:
     """A generic service used in the mod_gnutls test environment."""
 
     def __init__(self, start=None, stop=None, env=None,
-                 condition=None, check=None, pidfile=None):
+                 condition=None, check=None):
         # command to start the service
         self.start_command = start
         # command to stop the service (otherwise use SIGTERM)
@@ -42,9 +42,6 @@ class TestService:
         # will contain the return code of the child process after
         # successful wait()
         self.returncode = None
-        # PID file, if any. The process must delete its PID file when
-        # exiting.
-        self.pidfile = Path(pidfile) if pidfile else None
 
         # add environment variables for a subprocess only
         if env:
@@ -156,9 +153,11 @@ class ApacheService(TestService):
 
     apache2 = os.environ.get('APACHE2', 'apache2')
 
-    def __init__(self, config, env=None, pidfile=None, check=None,
+    def __init__(self, config, pidfile, env=None, check=None,
                  valgrind_log=None, valgrind_suppress=[]):
         self.config = Path(config).resolve()
+        # PID file, used by default to check if the server is up.
+        self.pidfile = Path(pidfile)
         base_cmd = [self.apache2, '-f', str(self.config), '-k']
         start_cmd = base_cmd + ['start', '-DFOREGROUND']
         if valgrind_log:
@@ -176,7 +175,6 @@ class ApacheService(TestService):
         super(ApacheService, self).__init__(start=start_cmd,
                                             stop=base_cmd + ['stop'],
                                             env=env,
-                                            pidfile=pidfile,
                                             condition=self.config_exists,
                                             check=check)
 
