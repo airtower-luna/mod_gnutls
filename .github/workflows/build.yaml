@@ -60,9 +60,9 @@ jobs:
           name: ${{ env.artifact_prefix }}-config-log
           path: config.log
       - name: make
-        run: make
+        run: make -j4
       - name: make check
-        run: VERBOSE=1 make check
+        run: VERBOSE=1 make -j4 check
       - name: store test logs
         uses: actions/upload-artifact@v2
         if: failure() || cancelled()
@@ -72,7 +72,7 @@ jobs:
             test/test-*.log
             test/logs/
       - name: make distcheck
-        run: VERBOSE=1 make distcheck
+        run: VERBOSE=1 make -j4 distcheck
 
   coverage:
     runs-on: ubuntu-latest
@@ -103,9 +103,9 @@ jobs:
           name: coverage-config-log
           path: config.log
       - name: make
-        run: make
+        run: make -j4
       - name: make check
-        run: VERBOSE=1 make check
+        run: VERBOSE=1 make -j4 check
       - name: store test logs
         uses: actions/upload-artifact@v2
         if: failure() || cancelled()
@@ -116,7 +116,7 @@ jobs:
             test/logs/
       - name: generate coverage report
         working-directory: ./test
-        run: make coverage
+        run: make -j4 coverage
       - name: store coverage report
         uses: actions/upload-artifact@v2
         with:
