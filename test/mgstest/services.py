@@ -21,10 +21,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 
-class ServiceTimeout(asyncio.TimeoutError):
-    pass
-
-
 class TestService:
     """A generic service used in the mod_gnutls test environment."""
 
@@ -85,23 +81,23 @@ class TestService:
             print(f'Stopping (SIGTERM): {self.start_command}')
             self.process.terminate()
 
-    async def wait(self, timeout=None):
+    async def wait(self):
         """Wait for the process to terminate.
 
         Sets returncode to the process' return code and returns it.
 
         WARNING: Calling this method without calling stop() first will
-        hang, unless the service stops on its own. An expired timeout
-        will raise an asyncio.TimeoutError.
+        hang, unless the service stops on its own. Wrap in
+        asyncio.wait_for() as needed.
 
         """
         if self.process:
-            await asyncio.wait_for(self.process.wait(), timeout)
+            await self.process.wait()
             self.returncode = self.process.returncode
             self.process = None
             return self.returncode
 
-    async def wait_ready(self, timeout=None):
+    async def wait_ready(self):
         """Wait for the started service to be ready.
 
         The function passed to the constructor as "check" is called to
@@ -111,9 +107,6 @@ class TestService:
         Returns: None if the service is ready, or the return code if
         the process has terminated.
 
-        Raises a ServiceTimeout exception if the given timeout expires
-        before the service is ready.
-
         """
         if not self.condition():
             # skip
@@ -121,16 +114,13 @@ class TestService:
         if not self.check:
             return None
 
-        slept = 0
-        while not timeout or slept < timeout:
+        while True:
             if self.process and self.process.returncode is not None:
                 return self.process.returncode
             if await self.check():
                 return None
             else:
                 await asyncio.sleep(self._step)
-                slept = slept + self._step
-        raise ServiceTimeout('Waiting for service timed out!')
 
     @asynccontextmanager
     async def run(self, ready_timeout=None):
@@ -140,7 +130,7 @@ class TestService:
         """
         try:
             await self.start()
-            await self.wait_ready(timeout=ready_timeout)
+            await asyncio.wait_for(self.wait_ready(), timeout=ready_timeout)
             yield self
         finally:
             await self.stop()
