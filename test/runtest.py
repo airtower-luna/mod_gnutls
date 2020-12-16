@@ -169,11 +169,11 @@ async def main(args):
         # TEST_SERVICE_MAX_WAIT is in milliseconds
         wait_timeout = \
             int(os.environ.get('TEST_SERVICE_MAX_WAIT', 10000)) / 1000
-        await asyncio.wait(
-            {asyncio.create_task(
+        await asyncio.gather(*(
+            asyncio.create_task(
                 service_stack.enter_async_context(
                     s.run(ready_timeout=wait_timeout)))
-             for s in bg_services})
+            for s in bg_services))
 
         # special case: expected to fail in a few cases
         await service_stack.enter_async_context(apache.run())
