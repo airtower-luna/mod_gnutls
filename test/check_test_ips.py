@@ -44,7 +44,7 @@ def try_connect(sockaddr):
     try:
         s = socket.socket(af, socktype, proto)
         s.connect(sa)
-    except:
+    except OSError:
         return False
     finally:
         s.close()
