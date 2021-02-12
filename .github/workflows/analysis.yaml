@@ -23,7 +23,7 @@ jobs:
         run: |
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
-          apt-get -y install git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev pkg-config procps clang-10 clang-tools-10 libmsv-dev
+          apt-get -y install git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev pkg-config procps clang clang-tools libmsv-dev
       - uses: actions/checkout@v2
         with:
           fetch-depth: 2
@@ -37,7 +37,7 @@ jobs:
       - name: autoreconf
         run: autoreconf -fiv
       - name: configure
-        run: scan-build-10 --use-cc=clang-10 ./configure --enable-msva TEST_IP="${test_ips}" APACHE_MUTEX=pthread
+        run: scan-build --use-cc=clang ./configure --enable-msva TEST_IP="${test_ips}" APACHE_MUTEX=pthread
       - name: store config.log
         uses: actions/upload-artifact@v2
         if: failure()
@@ -45,7 +45,7 @@ jobs:
           name: scan-build-config-log
           path: config.log
       - name: make
-        run: scan-build-10 -sarif -o sarif-output --use-cc=clang-10 make
+        run: scan-build -sarif -o sarif-output --use-cc=clang make
       - name: find output directory
         run: |
           echo "SARIF_DIR=$(ls -d sarif-output/*)" >> ${GITHUB_ENV}
