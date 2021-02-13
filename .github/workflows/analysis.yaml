@@ -25,12 +25,6 @@ jobs:
           apt-get update
           apt-get -y install git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev pkg-config procps clang clang-tools libmsv-dev
       - uses: actions/checkout@v2
-        with:
-          fetch-depth: 2
-      # For pull requests get the head of the branch, instead of a
-      # temporary merge
-      - run: git checkout HEAD^2
-        if: ${{ github.event_name == 'pull_request' }}
       - name: find usable IPs for tests
         run: |
           echo "test_ips=$(python3 test/check_test_ips.py -H localhost)" >> ${GITHUB_ENV}
@@ -69,10 +63,6 @@ jobs:
           apt-get update
           apt-get -y install git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev libmsv-dev pkg-config procps bear cppcheck
       - uses: actions/checkout@v2
-        with:
-          fetch-depth: 2
-      - run: git checkout HEAD^2
-        if: ${{ github.event_name == 'pull_request' }}
       - name: autoreconf
         run: autoreconf -fiv
       - name: configure
@@ -101,10 +91,6 @@ jobs:
     name: CodeQL
     steps:
       - uses: actions/checkout@v2
-        with:
-          fetch-depth: 2
-      - run: git checkout HEAD^2
-        if: ${{ github.event_name == 'pull_request' }}
       - name: install dependencies
         run: |
           sudo apt-get update
