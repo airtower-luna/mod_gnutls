@@ -1,17 +1,16 @@
 #!/usr/bin/python3
+import doctest
+import importlib
+import sys
+from pathlib import Path
 
 if __name__ == "__main__":
-    import doctest
-    import importlib
-    import sys
-    modules = [
-        'mgstest',
-        'mgstest.hooks',
-        'mgstest.http',
-        'mgstest.services',
-        'mgstest.softhsm',
-        'mgstest.tests'
-    ]
+    modules = set()
+    for p in Path('mgstest').glob('**/*.py'):
+        if p.stem == '__init__':
+            modules.add('.'.join(p.parts[:-1]))
+        else:
+            modules.add('.'.join((*p.parts[:-1], p.stem)))
 
     totals = (0, 0)
     for m in modules:
