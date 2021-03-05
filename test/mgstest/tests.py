@@ -254,13 +254,13 @@ class TestRequest(yaml.YAMLObject):
         >>> r1 = TestRequest(path='/test.txt',
         ...                  expect={'headers': {'X-Forbidden-Header': None,
         ...                                      'X-Required-Header': 'Hi!'}})
-        >>> r1.check_headers({ 'X-Required-Header': 'Hi!' })
-        >>> r1.check_headers({ 'X-Required-Header': 'Hello!' })
+        >>> r1.check_headers({'X-Required-Header': 'Hi!'})
+        >>> r1.check_headers({'X-Required-Header': 'Hello!'})
         Traceback (most recent call last):
         ...
         mgstest.TestExpectationFailed: Unexpected value in header \
 X-Required-Header: 'Hello!', expected 'Hi!'
-        >>> r1.check_headers({ 'X-Forbidden-Header': 'Hi!' })
+        >>> r1.check_headers({'X-Forbidden-Header': 'Hi!'})
         Traceback (most recent call last):
         ...
         mgstest.TestExpectationFailed: Unexpected value in header \
