@@ -250,22 +250,6 @@ class TestRequest(yaml.YAMLObject):
         self.check_response(resp, body)
 
     def check_headers(self, headers):
-        """
-        >>> r1 = TestRequest(path='/test.txt',
-        ...                  expect={'headers': {'X-Forbidden-Header': None,
-        ...                                      'X-Required-Header': 'Hi!'}})
-        >>> r1.check_headers({'X-Required-Header': 'Hi!'})
-        >>> r1.check_headers({'X-Required-Header': 'Hello!'})
-        Traceback (most recent call last):
-        ...
-        mgstest.TestExpectationFailed: Unexpected value in header \
-X-Required-Header: 'Hello!', expected 'Hi!'
-        >>> r1.check_headers({'X-Forbidden-Header': 'Hi!'})
-        Traceback (most recent call last):
-        ...
-        mgstest.TestExpectationFailed: Unexpected value in header \
-X-Forbidden-Header: 'Hi!', expected None
-        """
         for name, expected in self.expect['headers'].items():
             value = headers.get(name)
             expected = subst_env(expected)
@@ -275,26 +259,6 @@ X-Forbidden-Header: 'Hi!', expected None
                     f'expected {expected!r}')
 
     def check_body(self, body):
-        """
-        >>> r1 = TestRequest(path='/test.txt', method='GET', headers={}, \
-expect={'status': 200, 'body': {'exactly': 'test\\n'}})
-        >>> r1.check_body('test\\n')
-        >>> r1.check_body('xyz\\n')
-        Traceback (most recent call last):
-        ...
-        mgstest.TestExpectationFailed: Unexpected body: 'xyz\\n' != 'test\\n'
-        >>> r2 = TestRequest(path='/test.txt', method='GET', headers={}, \
-expect={'status': 200, 'body': {'contains': ['tes', 'est']}})
-        >>> r2.check_body('test\\n')
-        >>> r2.check_body('est\\n')
-        Traceback (most recent call last):
-        ...
-        mgstest.TestExpectationFailed: Unexpected body: 'est\\n' \
-does not contain 'tes'
-        >>> r3 = TestRequest(path='/test.txt', method='GET', headers={}, \
-expect={'status': 200, 'body': {'contains': 'test'}})
-        >>> r3.check_body('test\\n')
-        """
         if 'exactly' in self.expect['body'] \
            and body != self.expect['body']['exactly']:
             raise TestExpectationFailed(
@@ -327,15 +291,6 @@ expect={'status': 200, 'body': {'contains': 'test'}})
         """Returns True if running this request is expected to fail due to the
         connection being reset. That usually means the underlying TLS
         connection failed.
-
-        >>> r1 = TestRequest(path='/test.txt', method='GET', headers={}, \
-expect={'status': 200, 'body': {'contains': 'test'}})
-        >>> r1.expects_conn_reset()
-        False
-        >>> r2 = TestRequest(path='/test.txt', method='GET', headers={}, \
-expect={'reset': True})
-        >>> r2.expects_conn_reset()
-        True
         """
         if 'reset' in self.expect:
             return self.expect['reset']
