@@ -140,7 +140,7 @@ class TestTestConnection(unittest.TestCase):
                 HTTPStatus.OK, {'X-Required': 'Hi!'},
                 b'Hello World!\n'),
             mock_response(
-                HTTPStatus.METHOD_NOT_ALLOWED, {}, b'No such file!\n')]
+                HTTPStatus.METHOD_NOT_ALLOWED, {}, b'Cannot POST here!\n')]
 
         # note that this patches HTTPSubprocessConnection as imported
         # into mgstest.tests, not in the origin package
