@@ -1,14 +1,14 @@
 import unittest
+import unittest.mock
 import yaml
 from http import HTTPStatus
-from unittest.mock import Mock, call, patch
 
 from . import TestExpectationFailed
 from .tests import TestRequest
 
 
 def mock_response(status=HTTPStatus.OK, headers=dict(), body=b''):
-    response = Mock()
+    response = unittest.mock.Mock()
     response.status = status
     response.reason = status.phrase
     response.getheaders.return_value = [(k, v) for k, v in headers.items()]
@@ -21,7 +21,7 @@ class TestTestRequest(unittest.TestCase):
         """Check that TestRequest matches regular response correctly."""
         response = mock_response(
             HTTPStatus.OK, {'X-Required-Header': 'Hi!'}, b'Hello World!\n')
-        conn = Mock()
+        conn = unittest.mock.Mock()
         conn.getresponse.return_value = response
 
         r = TestRequest(path='/test.txt',
@@ -35,7 +35,7 @@ class TestTestRequest(unittest.TestCase):
 
     def test_run_unexpected_reset(self):
         """An unexpected exception breaks out of the TestRequest run."""
-        conn = Mock()
+        conn = unittest.mock.Mock()
         conn.request.side_effect = ConnectionResetError
         r = TestRequest(path='/test.txt',
                         expect={'status': 200})
@@ -46,7 +46,7 @@ class TestTestRequest(unittest.TestCase):
 
     def test_run_expected_reset(self):
         """If the TestRequest expects an exception, it gets caught."""
-        conn = Mock()
+        conn = unittest.mock.Mock()
         conn.request.side_effect = ConnectionResetError
         r = TestRequest(path='/test.txt',
                         expect={'reset': True})
@@ -107,6 +107,7 @@ class TestTestRequest(unittest.TestCase):
 class TestTestConnection(unittest.TestCase):
     def test_run(self):
         """TestConnection with a successful and a failing TestRequest."""
+
         test = """
         !connection
         gnutls_params:
@@ -143,7 +144,8 @@ class TestTestConnection(unittest.TestCase):
 
         # note that this patches HTTPSubprocessConnection as imported
         # into mgstest.tests, not in the origin package
-        with patch('mgstest.tests.HTTPSubprocessConnection', spec=True) as P:
+        with unittest.mock.patch(
+                'mgstest.tests.HTTPSubprocessConnection', spec=True) as P:
             # the mock provided by patch acts as class, get the instance
             instance = P.return_value
             instance.getresponse.side_effect = responses
@@ -153,7 +155,8 @@ class TestTestConnection(unittest.TestCase):
                 conn.run()
 
         instance.request.assert_has_calls([
-            call('GET', '/test.txt', body=None, headers={'X-Test': 'mgstest'}),
-            call('POST', '/test.txt', body=None, headers={})
+            unittest.mock.call(
+                'GET', '/test.txt', body=None, headers={'X-Test': 'mgstest'}),
+            unittest.mock.call('POST', '/test.txt', body=None, headers={})
         ])
         self.assertEqual(instance.request.call_count, 2)
