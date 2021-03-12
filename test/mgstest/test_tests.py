@@ -1,6 +1,7 @@
 import unittest
+import yaml
 from http import HTTPStatus
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 from . import TestExpectationFailed
 from .tests import TestRequest
@@ -101,3 +102,58 @@ class TestTestRequest(unittest.TestCase):
         r2 = TestRequest(path='/test.txt', method='GET', headers={},
                          expect={'reset': True})
         self.assertTrue(r2.expects_conn_reset())
+
+
+class TestTestConnection(unittest.TestCase):
+    def test_run(self):
+        """TestConnection with a successful and a failing TestRequest."""
+        test = """
+        !connection
+        gnutls_params:
+          - x509cafile=authority/x509.pem
+        actions:
+          - !request
+            path: /test.txt
+            headers:
+              X-Test: mgstest
+            expect:
+              status: 200
+              headers:
+                X-Required: 'Hi!'
+              body:
+                exactly: |
+                  Hello World!
+          - !request
+            method: POST
+            path: /test.txt
+            expect:
+              status: 200
+              body:
+                exactly: |
+                  Hello World!
+        """
+        conn = yaml.load(test, Loader=yaml.Loader)
+
+        responses = [
+            mock_response(
+                HTTPStatus.OK, {'X-Required': 'Hi!'},
+                b'Hello World!\n'),
+            mock_response(
+                HTTPStatus.METHOD_NOT_ALLOWED, {}, b'No such file!\n')]
+
+        # note that this patches HTTPSubprocessConnection as imported
+        # into mgstest.tests, not in the origin package
+        with patch('mgstest.tests.HTTPSubprocessConnection', spec=True) as P:
+            # the mock provided by patch acts as class, get the instance
+            instance = P.return_value
+            instance.getresponse.side_effect = responses
+            with self.assertRaisesRegex(
+                    TestExpectationFailed,
+                    r"Unexpected status: 405 != 200"):
+                conn.run()
+
+        instance.request.assert_has_calls([
+            call('GET', '/test.txt', body=None, headers={'X-Test': 'mgstest'}),
+            call('POST', '/test.txt', body=None, headers={})
+        ])
+        self.assertEqual(instance.request.call_count, 2)
