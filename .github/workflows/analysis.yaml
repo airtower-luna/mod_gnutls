@@ -2,11 +2,12 @@ name: Analysis
 on:
   pull_request:
   push:
-    # don't run on packaging branches
+    # don't run on packaging and dependabot branches
     branches-ignore:
       - 'for-debian'
       - 'debian/**'
       - 'pristine-tar'
+      - 'dependabot/**'
     paths:
       - '**'
       - '!doc/**'
