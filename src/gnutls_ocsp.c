@@ -196,9 +196,10 @@ static int mgs_create_ocsp_request(server_rec *s,
         return ret;
     }
 
-    /* GnuTLS doc says that the digest is "normally"
-     * GNUTLS_DIG_SHA1. */
-    ret = gnutls_ocsp_req_add_cert(r, GNUTLS_DIG_SHA256,
+    /* Use SHA1 for issuer name hash and issuer key hash, for
+     * compliance with "lightweight" OCSP profile specified in RFC
+     * 5019. */
+    ret = gnutls_ocsp_req_add_cert(r, GNUTLS_DIG_SHA1,
                                    issuer, req_data->cert);
 
     if (ret != GNUTLS_E_SUCCESS)
