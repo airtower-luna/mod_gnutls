@@ -998,7 +998,11 @@ apr_uri_t * mgs_cert_get_ocsp_uri(apr_pool_t *p, gnutls_x509_crt_t cert)
             ocsp_uri = apr_palloc(p, sizeof(apr_uri_t));
             rv = apr_uri_parse(p, ocsp_str, ocsp_uri);
             if (rv == APR_SUCCESS)
+            {
+                if (ocsp_uri->path == NULL)
+                    ocsp_uri->path = "/";
                 break;
+            }
             else
                 ocsp_uri = NULL;
         }
