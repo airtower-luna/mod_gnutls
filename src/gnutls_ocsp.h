@@ -43,14 +43,13 @@
 struct mgs_ocsp_data {
     /** The certificate the following elements refer to. */
     gnutls_x509_crt_t cert;
+    /** Issuer certificate, used for verifying OCSP responses. */
+    gnutls_x509_crt_t issuer;
     /** OCSP URI extracted from the certificate. NULL if unset. */
     apr_uri_t *uri;
     /** OCSP response file for the certificate. NULL if unset. Takes
      * precedence over uri. */
     char *response_file;
-    /** Trust list to verify OCSP responses for stapling. Should
-     * usually only contain the CA that signed the certificate. */
-    gnutls_x509_trust_list_t *trust;
     /** Certificate fingerprint, used as cache key for the OCSP
      * response. */
     gnutls_datum_t fingerprint;

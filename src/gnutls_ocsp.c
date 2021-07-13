@@ -183,24 +183,11 @@ static int mgs_create_ocsp_request(server_rec *s,
         return ret;
     }
 
-    /* issuer is set to a reference, so musn't be cleaned up */
-    gnutls_x509_crt_t issuer;
-    ret = gnutls_x509_trust_list_get_issuer(*req_data->trust, req_data->cert,
-                                            &issuer, 0);
-    if (ret != GNUTLS_E_SUCCESS)
-    {
-        ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
-                     "Could not get issuer from trust list: %s (%d)",
-                     gnutls_strerror(ret), ret);
-        gnutls_ocsp_req_deinit(r);
-        return ret;
-    }
-
     /* Use SHA1 for issuer name hash and issuer key hash, for
      * compliance with "lightweight" OCSP profile specified in RFC
      * 5019. */
     ret = gnutls_ocsp_req_add_cert(r, GNUTLS_DIG_SHA1,
-                                   issuer, req_data->cert);
+                                   req_data->issuer, req_data->cert);
 
     if (ret != GNUTLS_E_SUCCESS)
     {
@@ -287,14 +274,6 @@ int check_ocsp_response(server_rec *s, mgs_ocsp_data_t req_data,
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
 
-    if (req_data->trust == NULL)
-    {
-        ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
-                     "No OCSP trust list available for server \"%s\"!",
-                     s->server_hostname);
-        return GNUTLS_E_NO_CERTIFICATE_FOUND;
-    }
-
     gnutls_ocsp_resp_t resp;
     int ret = gnutls_ocsp_resp_init(&resp);
     if (ret != GNUTLS_E_SUCCESS)
@@ -323,7 +302,7 @@ int check_ocsp_response(server_rec *s, mgs_ocsp_data_t req_data,
     }
 
     unsigned int verify;
-    ret = gnutls_ocsp_resp_verify(resp, *(req_data->trust), &verify, 0);
+    ret = gnutls_ocsp_resp_verify_direct(resp, req_data->issuer, &verify, 0);
     if (ret != GNUTLS_E_SUCCESS)
     {
         ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, s,
@@ -938,37 +917,6 @@ int mgs_get_ocsp_response(mgs_handle_t *ctxt,
 
 
 
-int mgs_create_ocsp_trust_list(gnutls_x509_trust_list_t *tl,
-                               const gnutls_x509_crt_t *chain,
-                               const int num)
-{
-    int added = 0;
-    int ret = gnutls_x509_trust_list_init(tl, num);
-
-    if (ret == GNUTLS_E_SUCCESS)
-        added = gnutls_x509_trust_list_add_cas(*tl, chain, num, 0);
-
-    if (added != num)
-        ret = GNUTLS_E_CERTIFICATE_ERROR;
-
-    /* Clean up trust list in case of error */
-    if (ret != GNUTLS_E_SUCCESS)
-        gnutls_x509_trust_list_deinit(*tl, 0);
-
-    return ret;
-}
-
-
-
-apr_status_t mgs_cleanup_trust_list(void *data)
-{
-    gnutls_x509_trust_list_t *tl = (gnutls_x509_trust_list_t *) data;
-    gnutls_x509_trust_list_deinit(*tl, 0);
-    return APR_SUCCESS;
-}
-
-
-
 apr_uri_t * mgs_cert_get_ocsp_uri(apr_pool_t *p, gnutls_x509_crt_t cert)
 {
     apr_pool_t *tmp;
@@ -1173,23 +1121,7 @@ static const char* configure_cert_staple(mgs_ocsp_data_t ocsp,
     if (ocsp->fingerprint.data == NULL)
         return "Could not read fingerprint from certificate!";
 
-    ocsp->trust = apr_palloc(pconf,
-                             sizeof(gnutls_x509_trust_list_t));
-    /* Only the direct issuer may sign the OCSP response or an
-     * OCSP signer. */
-    int ret = mgs_create_ocsp_trust_list(
-        ocsp->trust, &(sc->certs_x509_crt_chain[idx + 1]), 1);
-    if (ret != GNUTLS_E_SUCCESS)
-    {
-        ap_log_error(APLOG_MARK, APLOG_ERR, APR_EGENERAL, server,
-                     "Could not create OCSP trust list: %s (%d)",
-                     gnutls_strerror(ret), ret);
-        return "Could not build trust list for OCSP stapling!";
-    }
-    /* deinit trust list when the config pool is destroyed */
-    apr_pool_cleanup_register(pconf, ocsp->trust,
-                              mgs_cleanup_trust_list,
-                              apr_pool_cleanup_null);
+    ocsp->issuer = sc->certs_x509_crt_chain[idx + 1];
     return NULL;
 }
 
