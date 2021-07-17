@@ -49,7 +49,7 @@ dist_check_SCRIPTS = netns_py.bash test-template.bash.in
 
 TEST_EXTENSIONS = .bash .py
 PY_LOG_COMPILER = $(PYTHON)
-TESTS = doctest-mgstest.py $(test_scripts)
+TESTS = doctest-mgstest.py unittest-mgstest.py $(test_scripts)
 
 check_PROGRAMS = pgpcrc
 pgpcrc_SOURCES = pgpcrc.c
@@ -66,9 +66,10 @@ endif
 # Python tools for tests
 noinst_PYTHON = https-test-client.py mgstest/http.py mgstest/__init__.py \
 	mgstest/hooks.py mgstest/ocsp.py mgstest/services.py \
-	mgstest/softhsm.py mgstest/tests.py mgstest/valgrind.py runtest.py \
-	softhsm-init.py	doctest-mgstest.py required-modules.py data/ocsp.py \
-	check_test_ips.py
+	mgstest/softhsm.py mgstest/tests.py mgstest/valgrind.py \
+	mgstest/test_tests.py runtest.py \
+	softhsm-init.py	doctest-mgstest.py unittest-mgstest.py \
+	required-modules.py data/ocsp.py check_test_ips.py
 
 # Identities in the miniature CA, server, and client environment for
 # the test suite
