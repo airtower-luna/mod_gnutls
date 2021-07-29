@@ -38,6 +38,7 @@ test_scripts = test-00_basic.bash \
 	test-26_redirect_HTTP_to_HTTPS.bash \
 	test-27_OCSP_server.bash \
 	test-28_HTTP2_support.bash \
+	test-29_OCSP_server_no_async.bash \
 	test-30_ip_based_vhosts.bash \
 	test-34_TLS_reverse_proxy_h2.bash \
 	test-35_client_reauth.bash \

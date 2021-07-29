@@ -815,7 +815,7 @@ int mgs_get_ocsp_response(mgs_handle_t *ctxt,
     ocsp_response->size = OCSP_RESP_SIZE_MAX;
 
     apr_status_t rv = mgs_cache_fetch(sc->ocsp_cache,
-                                      ctxt->c->base_server,
+                                      sc->s,
                                       req_data->fingerprint,
                                       ocsp_response,
                                       ctxt->c->pool);
@@ -828,7 +828,7 @@ int mgs_get_ocsp_response(mgs_handle_t *ctxt,
     {
         ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_EGENERAL, ctxt->c,
                       "Cached OCSP failure found for %s.",
-                      ctxt->c->base_server->server_hostname);
+                      sc->s->server_hostname);
         goto fail_cleanup;
     }
     else
@@ -852,7 +852,7 @@ int mgs_get_ocsp_response(mgs_handle_t *ctxt,
          * moment there's no good way to integrate that with the
          * Apache Mutex directive. */
         rv = mgs_cache_fetch(sc->ocsp_cache,
-                             ctxt->c->base_server,
+                             sc->s,
                              req_data->fingerprint,
                              ocsp_response,
                              ctxt->c->pool);
@@ -864,7 +864,7 @@ int mgs_get_ocsp_response(mgs_handle_t *ctxt,
             {
                 ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_EGENERAL, ctxt->c,
                               "Cached OCSP failure found for %s.",
-                              ctxt->c->base_server->server_hostname);
+                              sc->s->server_hostname);
                 goto fail_cleanup;
             }
             else
@@ -877,13 +877,13 @@ int mgs_get_ocsp_response(mgs_handle_t *ctxt,
         }
     }
 
-    rv = mgs_cache_ocsp_response(ctxt->c->base_server, req_data, NULL);
+    rv = mgs_cache_ocsp_response(sc->s, req_data, NULL);
     if (rv != APR_SUCCESS)
     {
         ap_log_cerror(APLOG_MARK, APLOG_ERR, rv, ctxt->c,
                       "Caching a fresh OCSP response failed");
         /* cache failure to rate limit retries */
-        mgs_cache_ocsp_failure(ctxt->c->base_server,
+        mgs_cache_ocsp_failure(sc->s,
                                req_data,
                                sc->ocsp_failure_timeout);
         apr_global_mutex_unlock(sc->ocsp_mutex);
@@ -893,7 +893,7 @@ int mgs_get_ocsp_response(mgs_handle_t *ctxt,
 
     /* retry reading from cache */
     rv = mgs_cache_fetch(sc->ocsp_cache,
-                         ctxt->c->base_server,
+                         sc->s,
                          req_data->fingerprint,
                          ocsp_response,
                          ctxt->c->pool);
