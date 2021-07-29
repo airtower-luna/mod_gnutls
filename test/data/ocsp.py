@@ -97,6 +97,9 @@ def handle_post():
             input=req, capture_output=True)
 
         if openssl_run.returncode == 0:
+            print('Sending OCSP response: '
+                  f'\'{base64.b64encode(openssl_run.stdout).decode()}\'',
+                  file=sys.stderr, flush=True)
             stdout_response(HTTPStatus.OK, openssl_run.stdout)
             sys.stderr.buffer.write(openssl_run.stderr)
         else:
