@@ -11,6 +11,10 @@ on:
       - '**'
       - '!doc/**'
       - '!**.md'
+
+permissions:
+  contents: read
+
 jobs:
   debian-buster:
     runs-on: ubuntu-latest
