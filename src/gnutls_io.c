@@ -253,7 +253,7 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
                         (rc == GNUTLS_E_AGAIN ? APR_EAGAIN : APR_EINTR);
             } else if (rc == GNUTLS_E_REHANDSHAKE) {
                 /* A client has asked for a new Hankshake. Currently, we don't do it */
-                ap_log_cerror(APLOG_MARK, APLOG_INFO,
+                ap_log_cerror(APLOG_MARK, APLOG_DEBUG,
                         ctxt->input_rc,
                         ctxt->c,
                         "GnuTLS: Error reading data. Client Requested a New Handshake."
@@ -261,7 +261,7 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
                         gnutls_strerror(rc));
             } else if (rc == GNUTLS_E_WARNING_ALERT_RECEIVED) {
                 rc = gnutls_alert_get(ctxt->session);
-                ap_log_cerror(APLOG_MARK, APLOG_INFO,
+                ap_log_cerror(APLOG_MARK, APLOG_DEBUG,
                         ctxt->input_rc,
                         ctxt->c,
                         "GnuTLS: Warning Alert From Client: "
@@ -269,7 +269,7 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
                         gnutls_alert_get_name(rc));
             } else if (rc == GNUTLS_E_FATAL_ALERT_RECEIVED) {
                 rc = gnutls_alert_get(ctxt->session);
-                ap_log_cerror(APLOG_MARK, APLOG_INFO,
+                ap_log_cerror(APLOG_MARK, APLOG_DEBUG,
                         ctxt->input_rc,
                         ctxt->c,
                         "GnuTLS: Fatal Alert From Client: "
@@ -280,13 +280,12 @@ static apr_status_t gnutls_io_input_read(mgs_handle_t * ctxt,
             } else {
                 /* Some Other Error. Report it. Die. */
                 if (gnutls_error_is_fatal(rc)) {
-                    ap_log_cerror(APLOG_MARK,
-                            APLOG_INFO,
-                            ctxt->input_rc,
-                            ctxt->c,
-                            "GnuTLS: Error reading data. (%d) '%s'",
-                            rc,
-                            gnutls_strerror(rc));
+                    ap_log_cerror(
+                        APLOG_MARK, APLOG_DEBUG,
+                        ctxt->input_rc,
+                        ctxt->c,
+                        "GnuTLS: Error reading data. (%d) '%s'",
+                        rc, gnutls_strerror(rc));
                 } else if (*len > 0) {
                     ctxt->input_rc = APR_SUCCESS;
                     break;
