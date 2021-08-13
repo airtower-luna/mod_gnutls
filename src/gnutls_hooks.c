@@ -1099,7 +1099,16 @@ static apr_status_t cleanup_gnutls_session(void *data)
 
     /* check if session needs closing */
     mgs_handle_t *ctxt = (mgs_handle_t *) data;
-    if (ctxt->session != NULL)
+    if (ctxt->session == NULL)
+        return APR_SUCCESS;
+
+    if (ctxt->c->aborted)
+    {
+        ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
+                      "%s: TLS %sconnection aborted, cleaning up.",
+                      __func__, IS_PROXY_STR(ctxt));
+    }
+    else
     {
         ap_log_cerror(APLOG_MARK, APLOG_WARNING, APR_ECONNABORTED, ctxt->c,
                       "%s: connection pool cleanup in progress but %sTLS "
@@ -1111,7 +1120,7 @@ static apr_status_t cleanup_gnutls_session(void *data)
             ret = gnutls_bye(ctxt->session, GNUTLS_SHUT_WR);
         while (ret == GNUTLS_E_INTERRUPTED || ret == GNUTLS_E_AGAIN);
         if (ret != GNUTLS_E_SUCCESS)
-            ap_log_cerror(APLOG_MARK, APLOG_INFO, APR_EGENERAL, ctxt->c,
+            ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_EGENERAL, ctxt->c,
                           "%s: error while closing TLS %sconnection: %s (%d)",
                           __func__, IS_PROXY_STR(ctxt),
                           gnutls_strerror(ret), ret);
@@ -1119,10 +1128,11 @@ static apr_status_t cleanup_gnutls_session(void *data)
             ap_log_cerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, ctxt->c,
                           "%s: TLS %sconnection closed.",
                           __func__, IS_PROXY_STR(ctxt));
-        /* De-Initialize Session */
-        gnutls_deinit(ctxt->session);
-        ctxt->session = NULL;
     }
+
+    /* De-Initialize Session */
+    gnutls_deinit(ctxt->session);
+    ctxt->session = NULL;
     return APR_SUCCESS;
 }
 

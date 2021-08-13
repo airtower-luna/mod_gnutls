@@ -777,7 +777,7 @@ apr_status_t mgs_filter_output(ap_filter_t * f, apr_bucket_brigade * bb) {
 
                 if (ret < 0) {
                     /* error sending output */
-                    ap_log_cerror(APLOG_MARK, APLOG_INFO, ctxt->output_rc,
+                    ap_log_cerror(APLOG_MARK, APLOG_DEBUG, ctxt->output_rc,
                                   ctxt->c,
                                   "GnuTLS: Error writing data. (%d) '%s'",
                                   ret, gnutls_strerror(ret));
