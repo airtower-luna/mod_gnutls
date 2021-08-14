@@ -1,8 +1,25 @@
-** Version 0.12.0 (UNRELEASED)
+** Version 0.12.0 (2021-08-14)
+
+- Three fixes that make mod_gnutls compatible with the Let's Encrypt
+  OCSP responder for OCSP stapling:
+
+  1. Support OCSP responses that are signed directly with the private
+     key of the CA and do not embed a signer certificate.
+
+  2. If the path part of OCSP URI provided in the certificate is
+     empty, use "/".
+
+  3. Use SHA1 for issuer name hash and issuer key hash in OCSP
+     requests. Support for that is required by RFC 5019 and referenced
+     in CAB Forum Baseline Requirements, too. This particular hash
+     doesn't need to be cryptographically secure.
 
 - Remove insecure algorithms that are still included in the GnuTLS
   priority set "NORMAL" from the default priorities: plain RSA key
   exchange, TLS 1.0, TLS 1.1
+
+- Fix virtual host references when retrieving OCSP responses for
+  stapling.
 
 - Share server instances for tests where reasonably possible with the
   same server configuration. Starting/stopping server instances is the
@@ -11,7 +28,7 @@
   some include a lot more client connections and requests to keep
   coverage at least as good as before.
 
-- Some minor cleanup of tests and logging infrastructure.
+- Various improvements to tests and logging infrastructure.
 
 ** Version 0.11.0 (2020-06-27)
 
