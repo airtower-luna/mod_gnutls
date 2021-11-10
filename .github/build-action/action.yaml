@@ -1,0 +1,55 @@
+name: Build mod_gnutls
+description: Shared mod_gnutls build action
+author: 'fiona.klute@gmx.de'
+
+inputs:
+  cc:
+    description: 'The compiler to use (CC)'
+    required: no
+    default: 'gcc'
+  configure-options:
+    description: 'Additional options to pass to ./configure'
+    required: no
+    default: ''
+  artifact-prefix:
+    description: 'Prefix for artifact names'
+    required: yes
+
+runs:
+  using: composite
+  steps:
+    - name: network overview
+      shell: bash
+      run: |
+        ip addr show
+        cat /etc/hosts
+    - name: find usable IPs for tests
+      shell: bash
+      run: |
+        echo "test_ips=$(python3 test/check_test_ips.py -H localhost)" >> ${GITHUB_ENV}
+    - name: autoreconf
+      shell: bash
+      run: autoreconf -fiv
+    - name: configure
+      shell: bash
+      run: CC="${{ inputs.cc }}" TEST_IP="${test_ips}" APACHE_MUTEX=pthread ./configure ${{ inputs.configure-options }}
+    - name: store config.log
+      uses: actions/upload-artifact@v2
+      if: failure()
+      with:
+        name: ${{ inputs.artifact-prefix }}-config-log
+        path: config.log
+    - name: make
+      shell: bash
+      run: make -j4
+    - name: make check
+      shell: bash
+      run: VERBOSE=1 make -j4 check
+    - name: store test logs
+      uses: actions/upload-artifact@v2
+      if: failure() || cancelled()
+      with:
+        name: ${{ inputs.artifact-prefix }}-test-logs
+        path: |
+          test/test-*.log
+          test/logs/

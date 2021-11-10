@@ -40,41 +40,16 @@ jobs:
         if: startsWith(matrix.container, 'alpine')
         run: |
           apk add apache2 apache2-dev apache2-proxy autoconf automake build-base gnutls-dev gnutls-utils libtool pkgconfig python3 py3-yaml
-      - name: network overview
-        run: |
-          ip addr show
-          cat /etc/hosts
-      - name: find usable IPs for tests
-        run: |
-          echo "test_ips=$(python3 test/check_test_ips.py -H localhost)" >> ${GITHUB_ENV}
       - name: set prefix for container-specific artifacts
         # this is because upload-artifact doesn't like ":" in file names
         env:
           CONTAINER_NAME: ${{ matrix.container }}
         run: |
           echo "artifact_prefix=$(echo ${CONTAINER_NAME} | sed s/:/-/)" >> ${GITHUB_ENV}
-      - name: autoreconf
-        run: autoreconf -fiv
-      - name: configure
-        run: TEST_IP="${test_ips}" APACHE_MUTEX=pthread ./configure
-      - name: store config.log
-        uses: actions/upload-artifact@v2
-        if: failure()
+      - name: build mod_gnutls and run tests
+        uses: ./.github/build-action/
         with:
-          name: ${{ env.artifact_prefix }}-config-log
-          path: config.log
-      - name: make
-        run: make -j4
-      - name: make check
-        run: VERBOSE=1 make -j4 check
-      - name: store test logs
-        uses: actions/upload-artifact@v2
-        if: failure() || cancelled()
-        with:
-          name: ${{ env.artifact_prefix }}-test-logs
-          path: |
-            test/test-*.log
-            test/logs/
+          artifact-prefix: ${{ env.artifact_prefix }}
       - name: make distcheck
         run: VERBOSE=1 make -j4 distcheck
 
@@ -89,35 +64,12 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
           apt-get -y install python3-yaml apache2-bin apache2-dev curl gnutls-bin libapr1-dev libgnutls28-dev openssl pkg-config procps iproute2 softhsm2 clang llvm
-      - name: network overview
-        run: |
-          ip addr show
-          cat /etc/hosts
-      - name: find usable IPs for tests
-        run: |
-          echo "test_ips=$(python3 test/check_test_ips.py -H localhost)" >> ${GITHUB_ENV}
-      - name: autoreconf
-        run: autoreconf -fiv
-      - name: configure
-        run: CC=clang TEST_IP="${test_ips}" APACHE_MUTEX=pthread ./configure --enable-clang-coverage
-      - name: store config.log
-        uses: actions/upload-artifact@v2
-        if: failure()
+      - name: build mod_gnutls with coverage support
+        uses: ./.github/build-action/
         with:
-          name: coverage-config-log
-          path: config.log
-      - name: make
-        run: make -j4
-      - name: make check
-        run: VERBOSE=1 make -j4 check
-      - name: store test logs
-        uses: actions/upload-artifact@v2
-        if: failure() || cancelled()
-        with:
-          name: coverage-test-logs
-          path: |
-            test/test-*.log
-            test/logs/
+          cc: clang
+          configure-options: --enable-clang-coverage
+          artifact-prefix: coverage
       - name: generate coverage report
         working-directory: ./test
         run: make -j4 coverage
