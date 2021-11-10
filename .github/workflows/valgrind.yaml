@@ -16,9 +16,9 @@ permissions:
   contents: read
 
 jobs:
-  debian-buster:
+  debian-bullseye:
     runs-on: ubuntu-latest
-    container: debian:buster
+    container: debian:bullseye
     steps:
       - uses: actions/checkout@v2
       - name: network overview
@@ -41,7 +41,7 @@ jobs:
         uses: actions/upload-artifact@v2
         if: failure()
         with:
-          name: buster-config-log
+          name: bullseye-config-log
           path: config.log
       - name: make
         run: make -j4
@@ -51,7 +51,7 @@ jobs:
         uses: actions/upload-artifact@v2
         if: failure() || cancelled()
         with:
-          name: buster-apache-logs
+          name: bullseye-apache-logs
           path: |
             test/test-*.log
             test/logs/
