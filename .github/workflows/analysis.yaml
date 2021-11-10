@@ -21,7 +21,7 @@ jobs:
 
   clang:
     runs-on: ubuntu-20.04
-    container: debian:sid
+    container: debian:bullseye
     name: clang-analyzer
     steps:
       - name: install dependencies
@@ -59,7 +59,7 @@ jobs:
 
   cppcheck:
     runs-on: ubuntu-20.04
-    container: debian:sid
+    container: debian:bullseye
     name: cppcheck
     steps:
       - name: install dependencies
