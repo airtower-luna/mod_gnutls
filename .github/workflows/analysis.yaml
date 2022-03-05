@@ -29,7 +29,7 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
           apt-get -y install git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev pkg-config procps clang clang-tools libmsv-dev
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: find usable IPs for tests
         run: |
           echo "test_ips=$(python3 test/check_test_ips.py -H localhost)" >> ${GITHUB_ENV}
@@ -67,7 +67,7 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
           apt-get -y install git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev libmsv-dev pkg-config procps bear cppcheck
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: autoreconf
         run: autoreconf -fiv
       - name: configure
@@ -95,7 +95,7 @@ jobs:
     runs-on: ubuntu-20.04
     name: CodeQL
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: install dependencies
         run: |
           sudo apt-get update
