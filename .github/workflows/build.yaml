@@ -39,7 +39,7 @@ jobs:
       - name: install dependencies (Alpine)
         if: startsWith(matrix.container, 'alpine')
         run: |
-          apk add apache2 apache2-dev apache2-proxy autoconf automake build-base gnutls-dev gnutls-utils libtool pkgconfig python3 py3-yaml
+          apk add apache2 apache2-dev apache2-proxy autoconf automake bash build-base gnutls-dev gnutls-utils libtool pkgconfig python3 py3-yaml
       - name: set prefix for container-specific artifacts
         # this is because upload-artifact doesn't like ":" in file names
         env:
