@@ -5,3 +5,8 @@ updates:
     schedule:
       interval: 'weekly'
       day: 'saturday'
+  - package-ecosystem: 'github-actions'
+    directory: '/.github/build-action/'
+    schedule:
+      interval: 'weekly'
+      day: 'saturday'
