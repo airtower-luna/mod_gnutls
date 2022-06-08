@@ -34,7 +34,7 @@ runs:
       shell: bash
       run: CC="${{ inputs.cc }}" TEST_IP="${test_ips}" APACHE_MUTEX=pthread ./configure ${{ inputs.configure-options }}
     - name: store config.log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       if: failure()
       with:
         name: ${{ inputs.artifact-prefix }}-config-log
@@ -46,7 +46,7 @@ runs:
       shell: bash
       run: VERBOSE=1 make -j4 check
     - name: store test logs
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       if: failure() || cancelled()
       with:
         name: ${{ inputs.artifact-prefix }}-test-logs
