@@ -1,7 +1,7 @@
-AC_INIT(mod_gnutls, 0.12.0)
+AC_PREREQ([2.69])
+AC_INIT([mod_gnutls],[0.12.0])
 OOO_CONFIG_NICE(config.nice)
 MOD_GNUTLS_VERSION=AC_PACKAGE_VERSION
-AC_PREREQ(2.53)
 AC_CONFIG_SRCDIR([src/mod_gnutls.c])
 AC_CONFIG_AUX_DIR(config)
 
@@ -9,17 +9,17 @@ AM_MAINTAINER_MODE([enable])
 AC_CANONICAL_TARGET
 # mod_gnutls test suite requires GNU make
 AM_INIT_AUTOMAKE([-Wno-portability])
-AM_CONFIG_HEADER(include/mod_gnutls_config.h:config.in)
+AC_CONFIG_HEADERS([include/mod_gnutls_config.h:config.in])
 
 LT_INIT([disable-static])
 
 AC_SUBST(MOD_GNUTLS_VERSION)
 
 AC_PROG_CC
-AC_PROG_CC_C99
-AC_PROG_LD
+m4_version_prereq([2.70], [:], [AC_PROG_CC_C99])
+LT_PATH_LD
 AC_PROG_INSTALL
-AC_PROG_LIBTOOL
+LT_INIT
 
 AC_CONFIG_MACRO_DIR([m4])
 
