@@ -1,3 +1,17 @@
+** Version 0.12.1 (2023-02-23)
+
+- Security fix: Remove an infinite loop in blocking read on transport
+  timeout. Mod_gnutls versions from 0.9.0 to 0.12.0 (including) did
+  not properly fail blocking read operations on TLS connections when
+  the transport hit timeouts. Instead it entered an endless loop
+  retrying the read operation, consuming CPU resources. This could be
+  exploited for denial of service attacks. If trace level logging was
+  enabled, it would also produce an excessive amount of log output
+  during the loop, consuming disk space.
+
+- Replace obsolete Autoconf macros. Generating ./configure now
+  requires Autoconf 2.69 (present in Debian Bullseye).
+
 ** Version 0.12.0 (2021-08-14)
 
 - Three fixes that make mod_gnutls compatible with the Let's Encrypt
