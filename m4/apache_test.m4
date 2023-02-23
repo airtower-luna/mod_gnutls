@@ -12,7 +12,7 @@ AC_DEFUN([TEST_APACHE_VERSION],
     if test $releasetest -eq 20; then
         CFLAGS="$CFLAGS $APU_INCLUDES $APR_INCLUDES"
     fi
-    AC_TRY_RUN([
+    AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -63,7 +63,7 @@ int main (int argc, char *argv[])
     }
 }
 
-],, no_apache=yes,[echo $ac_n "cross compiling; assumed OK... $ac_c"])
+]])], [], [no_apache=yes], [echo $ac_n "cross compiling; assumed OK... $ac_c"])
     CFLAGS="$ac_save_CFLAGS"
 
     if test "x$no_apache" = x ; then
@@ -77,7 +77,7 @@ int main (int argc, char *argv[])
             if test $releasetest -eq 20; then
                 CFLAGS="$CFLAGS $APU_INCLUDES $APR_INCLUDES"
             fi
-            AC_TRY_LINK([
+            AC_LINK_IFELSE([AC_LANG_PROGRAM([[
 #include <stdio.h>
 #include "httpd.h"
 
@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
 { return 0; }
 #undef main
 #define main K_and_R_C_main
-],                [ return 0; ],
+]], [[ return 0; ]])],
                 [ echo "*** The test program compiled, but failed to run. Check config.log" ],
                 [ echo "*** The test program failed to compile or link. Check config.log" ])
             CFLAGS="$ac_save_CFLAGS"

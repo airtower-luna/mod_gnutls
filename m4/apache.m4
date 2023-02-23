@@ -7,14 +7,14 @@ AC_DEFUN([CHECK_APACHE],
 [dnl
 AC_ARG_WITH(
     apxs,
-    [AC_HELP_STRING([--with-apxs=PATH],[Path to apxs])],
+    [AS_HELP_STRING([--with-apxs=PATH],[Path to apxs])],
     apxs_prefix="$withval",
     apxs_prefix="/usr"
     )
 
 AC_ARG_ENABLE(
         apachetest,
-        [AC_HELP_STRING([--disable-apxstest],[Do not try to compile and run apache version test program])],
+        [AS_HELP_STRING([--disable-apxstest],[Do not try to compile and run apache version test program])],
         ,
         enable_apachetest=yes
     )
