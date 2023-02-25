@@ -20,7 +20,7 @@ jobs:
         container:
           - 'debian:bullseye'
           - 'debian:sid'
-          - 'fedora:35'
+          - 'fedora:37'
           - 'alpine:latest'
     runs-on: ubuntu-latest
     container: ${{ matrix.container }}
