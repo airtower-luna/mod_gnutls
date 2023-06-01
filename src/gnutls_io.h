@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Fiona Klute
+ * Copyright 2020-2023 Fiona Klute
  *
  * Initial function definitions and documentation copied from
  * mod_gnutls.h.in under the same license, copyright notice:
@@ -33,14 +33,15 @@
 #include "mod_gnutls.h"
 
 /**
- * mgs_filter_input will filter the input data
- * by decrypting it using GnuTLS and passes it cleartext.
+ * mgs_filter_input will filter the input data by decrypting it using
+ * GnuTLS and passes it cleartext. Implements `ap_in_filter_func()`.
  *
  * @param f     the filter info record
  * @param bb    the bucket brigade, where to store the result to
- * @param mode  what shall we read?
- * @param block a block index we shall read from?
- * @return result status
+ * @param mode  the read mode (e.g. speculative, bytes, line)
+ * @param block blocking or non-blocking read?
+ * @param readbytes number of bytes to read (maximum)
+ * @return result APR status code
  */
 apr_status_t mgs_filter_input(ap_filter_t * f,
                               apr_bucket_brigade * bb,
@@ -49,8 +50,8 @@ apr_status_t mgs_filter_input(ap_filter_t * f,
                               apr_off_t readbytes);
 
 /**
- * mgs_filter_output will filter the encrypt
- * the incoming bucket using GnuTLS and passes it onto the next filter.
+ * mgs_filter_output will encrypt the incoming bucket using GnuTLS and
+ * passes it onto the next filter. Implements `ap_out_filter_func()`.
  *
  * @param f     the filter info record
  * @param bb    the bucket brigade, where to store the result to
@@ -60,25 +61,57 @@ apr_status_t mgs_filter_output(ap_filter_t * f,
                                apr_bucket_brigade * bb);
 
 /**
- * mgs_transport_read is called from GnuTLS to provide encrypted
+ * Pull function for GnuTLS, called from GnuTLS to read encrypted
  * data from the client.
  *
- * @param ptr     pointer to the filter context
- * @param buffer  place to put data
- * @param len     maximum size
- * @return size   length of the data stored in buffer
+ * Generic errnos used for `gnutls_transport_set_errno()`:
+ * * `EAGAIN`: no data available at the moment, try again (maybe later)
+ * * `EINTR`: read was interrupted, try again
+ * * `EIO`: Unknown I/O error
+ * * `ECONNABORTED`: Input BB does not exist (`NULL`)
+ *
+ * The reason we are not using `APR_TO_OS_ERROR` to map `apr_status_t`
+ * to errnos is this warning [in the APR documentation][apr-warn]:
+ *
+ * > If the statcode was not created by apr_get_os_error or
+ * > APR_FROM_OS_ERROR, the results are undefined.
+ *
+ * We cannot know if this applies to any error we might encounter.
+ *
+ * @param ptr GnuTLS session data pointer (the mod_gnutls context
+ * structure)
+ *
+ * @param buffer buffer for the read data
+ *
+ * @param len maximum number of bytes to read (must fit into the
+ * buffer)
+ *
+ * @return The number of bytes read (may be zero on EOF), or `-1` on
+ * error. Note that some errors may warrant another try (see above).
+ *
+ * [apr-warn]: https://apr.apache.org/docs/apr/1.4/group__apr__errno.html#ga2385cae04b04afbdcb65f1a45c4d8506 "Apache Portable Runtime: Error Codes"
  */
 ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
                            void *buffer, size_t len);
 
 /**
- * mgs_transport_write is called from GnuTLS to
- * write data to the client.
+ * Push function for GnuTLS, used to send encrypted data to the client.
  *
- * @param ptr     pointer to the filter context
- * @param buffer  buffer to write to the client
- * @param len     size of the buffer
- * @return size   length of the data written
+ * `gnutls_transport_set_errno()` will be called with `EAGAIN` or
+ * `EINTR` on recoverable errors, or `EIO` in case of unexpected
+ * errors. See the description of mgs_transport_read() for details on
+ * possible error codes.
+ *
+ * @param ptr GnuTLS session data pointer (the mod_gnutls context
+ * structure)
+ *
+ * @param buffer buffer containing the data to send
+ *
+ * @param len length of the data
+ * buffer)
+ *
+ * @return The number of written bytes, or `-1` on error. Note that
+ * some errors may warrant another try (see above).
  */
 ssize_t mgs_transport_write(gnutls_transport_ptr_t ptr,
                             const void *buffer, size_t len);

@@ -2,7 +2,7 @@
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2008, 2014 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
- *  Copyright 2015-2020 Fiona Klute
+ *  Copyright 2015-2023 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -210,7 +210,7 @@ char* ssl_var_lookup(apr_pool_t *p, server_rec *s __attribute__((unused)),
  * @param proxy Is this a proxy connection?
  * @param enable Should TLS be enabled on this connection?
  *
- * @param `true` (1) if successful, `false` (0) otherwise
+ * @return `true` (1) if successful, `false` (0) otherwise
  */
 int ssl_engine_set(conn_rec *c,
                    ap_conf_vector_t *dir_conf __attribute__((unused)),
