@@ -3,7 +3,7 @@
  *  Copyright 2008, 2014 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
  *  Copyright 2013-2014 Daniel Kahn Gillmor
- *  Copyright 2015-2020 Fiona Klute
+ *  Copyright 2015-2023 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -469,7 +469,7 @@ static int cert_retrieve_fn(gnutls_session_t session,
  * Try to estimate a GnuTLS security parameter based on the given
  * private key. Any errors are logged.
  *
- * @param s The `server_rec` to use for logging
+ * @param server The `server_rec` to use for logging
  *
  * @param key The private key to use
  *

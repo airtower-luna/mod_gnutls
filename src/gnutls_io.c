@@ -2,7 +2,7 @@
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2008 Nikos Mavrogiannopoulos
  *  Copyright 2011 Dash Shendy
- *  Copyright 2015-2022 Fiona Klute
+ *  Copyright 2015-2023 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -927,36 +927,6 @@ int mgs_transport_read_ready(gnutls_transport_ptr_t ptr,
     }
 }
 
-/**
- * Pull function for GnuTLS
- *
- * Generic errnos used for `gnutls_transport_set_errno()`:
- * * `EAGAIN`: no data available at the moment, try again (maybe later)
- * * `EINTR`: read was interrupted, try again
- * * `EIO`: Unknown I/O error
- * * `ECONNABORTED`: Input BB does not exist (`NULL`)
- *
- * The reason we are not using `APR_TO_OS_ERROR` to map `apr_status_t`
- * to errnos is this warning [in the APR documentation][apr-warn]:
- *
- * > If the statcode was not created by apr_get_os_error or
- * > APR_FROM_OS_ERROR, the results are undefined.
- *
- * We cannot know if this applies to any error we might encounter.
- *
- * @param ptr GnuTLS session data pointer (the mod_gnutls context
- * structure)
- *
- * @param buffer buffer for the read data
- *
- * @param len maximum number of bytes to read (must fit into the
- * buffer)
- *
- * @return The number of bytes read (may be zero on EOF), or `-1` on
- * error. Note that some errors may warrant another try (see above).
- *
- * [apr-warn]: https://apr.apache.org/docs/apr/1.4/group__apr__errno.html#ga2385cae04b04afbdcb65f1a45c4d8506 "Apache Portable Runtime: Error Codes"
- */
 ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
                            void *buffer, size_t len)
 {
@@ -1059,25 +1029,6 @@ ssize_t mgs_transport_read(gnutls_transport_ptr_t ptr,
     return -1;
 }
 
-/**
- * Push function for GnuTLS
- *
- * `gnutls_transport_set_errno()` will be called with `EAGAIN` or
- * `EINTR` on recoverable errors, or `EIO` in case of unexpected
- * errors. See the description of mgs_transport_read() for details on
- * possible error codes.
- *
- * @param ptr GnuTLS session data pointer (the mod_gnutls context
- * structure)
- *
- * @param buffer buffer containing the data to send
- *
- * @param len length of the data
- * buffer)
- *
- * @return The number of written bytes, or `-1` on error. Note that
- * some errors may warrant another try (see above).
- */
 ssize_t mgs_transport_write(gnutls_transport_ptr_t ptr,
                             const void *buffer, size_t len)
 {

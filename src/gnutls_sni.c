@@ -1,5 +1,5 @@
 /*
- *  Copyright 2018 Fiona Klute
+ *  Copyright 2018-2023 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ static inline uint16_t read_uint16(const unsigned char *data)
 
 /**
  * Check if the string contains only alphanumeric characters, `-`, and
- * `.`. APR port of GnuTLS' _gnutls_dnsname_is_valid() (from
+ * dots. APR port of GnuTLS' `_gnutls_dnsname_is_valid()` (from
  * lib/str.h).
  *
  * @param str the string to check

@@ -1,7 +1,7 @@
 /*
  *  Copyright 2004-2005 Paul Querna
  *  Copyright 2014 Nikos Mavrogiannopoulos
- *  Copyright 2015-2020 Fiona Klute
+ *  Copyright 2015-2023 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -85,8 +85,8 @@ int mgs_cache_post_config(apr_pool_t *pconf, apr_pool_t *ptemp,
  * (Re-)Initialize the cache in a child process after forking.
  *
  * @param p child memory pool provided by Apache
- * @param s default server of the Apache configuration, head of the
- * server list
+ * @param server default server of the Apache configuration, head of
+ * the server list
  * @param cache the cache to reinit
  * @param mutex_name name of the mutex associated with the cache for
  * logging purposes
@@ -121,7 +121,7 @@ char *mgs_time2sz(time_t t, char *str, int strsize);
  * Store function for the mod_gnutls object caches.
  *
  * @param cache the cache to store the entry in
- * @param s server associated with the cache entry
+ * @param server server associated with the cache entry
  * @param key key for the cache entry
  * @param data data to be cached
  * @param expiry expiration time

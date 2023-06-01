@@ -1,5 +1,5 @@
 /*
- *  Copyright 2016-2020 Fiona Klute
+ *  Copyright 2016-2023 Fiona Klute
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -154,12 +154,20 @@ const char *mgs_store_ocsp_response_path(cmd_parms *parms,
 
 
 /**
- * Create an OCSP request for the certificate of the given server. The
- * DER encoded request is stored in 'req' (must be released with
- * gnutls_free() when no longer needed), its nonce in 'nonce' (same,
- * if not NULL).
+ * Create an OCSP request for the certificate of the given server.
  *
  * @param s server reference for logging
+ *
+ * @param req_data data structure defining the certificate to generate
+ * a request for
+ *
+ * @param req The DER encoded request is stored in this
+ * `gnutls_datum_t`, data must be released with gnutls_free() when no
+ * longer needed.
+ *
+ * @param nonce The nonce of the generated request, for validating the
+ * response. If `NULL`, no nonce will be sent. Data must be released
+ * with gnutls_free() when no longer needed.
  *
  * @return GNUTLS_E_SUCCESS, or a GnuTLS error code.
  */
