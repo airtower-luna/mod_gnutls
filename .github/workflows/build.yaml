@@ -69,7 +69,9 @@ jobs:
         uses: ./.github/build-action/
         with:
           cc: clang
-          configure-options: --enable-clang-coverage
+          configure-options: >-
+            --enable-clang-coverage
+            CFLAGS="-Wno-null-pointer-subtraction"
           artifact-prefix: coverage
       - name: generate coverage report
         working-directory: ./test
