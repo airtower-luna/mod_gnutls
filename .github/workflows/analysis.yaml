@@ -20,7 +20,7 @@ permissions:
 jobs:
 
   clang:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     container: debian:bullseye
     name: clang-analyzer
     steps:
@@ -58,7 +58,7 @@ jobs:
           checkout_path: ${{ env.CONTAINER_WORKSPACE }}
 
   cppcheck:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     container: debian:bullseye
     name: cppcheck
     steps:
@@ -92,7 +92,7 @@ jobs:
           checkout_path: ${{ env.CONTAINER_WORKSPACE }}
 
   codeql:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     name: CodeQL
     steps:
       - uses: actions/checkout@v3
