@@ -17,9 +17,9 @@ permissions:
   contents: read
 
 jobs:
-  debian-bullseye:
+  debian-bookworm:
     runs-on: ubuntu-latest
-    container: debian:bullseye
+    container: debian:bookworm
     steps:
       - uses: actions/checkout@v3
       - name: install dependencies
