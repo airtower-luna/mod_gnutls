@@ -18,9 +18,9 @@ jobs:
       fail-fast: false
       matrix:
         container:
-          - 'debian:bullseye'
+          - 'debian:bookworm'
           - 'debian:sid'
-          - 'fedora:37'
+          - 'fedora:38'
           - 'alpine:latest'
     runs-on: ubuntu-latest
     container: ${{ matrix.container }}
@@ -56,7 +56,7 @@ jobs:
 
   coverage:
     runs-on: ubuntu-latest
-    container: debian:bullseye
+    container: debian:bookworm
     name: coverage
     steps:
       - uses: actions/checkout@v3
