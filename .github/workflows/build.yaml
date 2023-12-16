@@ -77,7 +77,7 @@ jobs:
         working-directory: ./test
         run: make -j4 coverage
       - name: store coverage report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: test/coverage/
