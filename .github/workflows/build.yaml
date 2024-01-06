@@ -20,7 +20,7 @@ jobs:
         container:
           - 'debian:bookworm'
           - 'debian:sid'
-          - 'fedora:38'
+          - 'fedora:39'
           - 'alpine:latest'
     runs-on: ubuntu-latest
     container: ${{ matrix.container }}
