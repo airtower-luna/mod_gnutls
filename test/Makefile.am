@@ -381,5 +381,5 @@ if USE_PANDOC
 noinst_DATA = README.html
 MOSTLYCLEANFILES += $(noinst_DATA)
 %.html: %.md $(srcdir)/../doc/style.css
-	$(PANDOC) --css $(filter %.css,$^) --metadata pagetitle="$(<)" --self-contained -f markdown -o $@ $<
+	$(PANDOC) --css $(filter %.css,$^) --metadata pagetitle="$(<)" --embed-resources --standalone -f markdown -o $@ $<
 endif
