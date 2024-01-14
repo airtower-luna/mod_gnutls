@@ -32,7 +32,7 @@ endif
 
 %.html: %.md %.yaml style.css
 if USE_PANDOC
-	$(PANDOC) --css $(filter %.css,$^) --toc --self-contained -f markdown -o $@ $(filter-out %.css,$^)
+	$(PANDOC) --css $(filter %.css,$^) --toc --embed-resources --standalone -f markdown -o $@ $(filter-out %.css,$^)
 else
 if USE_MARKDOWN
 	$(MARKDOWN) $< > $@
