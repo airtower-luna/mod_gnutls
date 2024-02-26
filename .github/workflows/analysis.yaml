@@ -104,7 +104,11 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: cpp
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+      - name: autoreconf
+        run: autoreconf -fiv
+      - name: configure
+        run: ./configure --disable-pdf-doc
+      - name: make
+        run: make -j4
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
