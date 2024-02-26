@@ -36,7 +36,7 @@ jobs:
       - name: autoreconf
         run: autoreconf -fiv
       - name: configure
-        run: scan-build --use-cc=clang ./configure --enable-msva TEST_IP="${test_ips}" APACHE_MUTEX=pthread
+        run: scan-build --use-cc=clang ./configure --enable-msva TEST_IP="${test_ips}" APACHE_MUTEX=pthread CFLAGS=-Wno-error=null-pointer-subtraction
       - name: store config.log
         uses: actions/upload-artifact@v4
         if: failure()
