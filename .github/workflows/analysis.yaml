@@ -21,14 +21,14 @@ jobs:
 
   clang:
     runs-on: ubuntu-22.04
-    container: debian:bullseye
+    container: debian:bookworm
     name: clang-analyzer
     steps:
       - name: install dependencies
         run: |
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
-          apt-get -y install git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev pkg-config procps clang clang-tools libmsv-dev
+          apt-get -y install git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev pkgconf procps clang clang-tools libmsv-dev
       - uses: actions/checkout@v4
       - name: find usable IPs for tests
         run: |
@@ -59,14 +59,14 @@ jobs:
 
   cppcheck:
     runs-on: ubuntu-22.04
-    container: debian:bullseye
+    container: debian:bookworm
     name: cppcheck
     steps:
       - name: install dependencies
         run: |
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
-          apt-get -y install git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev libmsv-dev pkg-config procps bear cppcheck
+          apt-get -y install git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev libmsv-dev pkgconf procps bear cppcheck
       - uses: actions/checkout@v4
       - name: autoreconf
         run: autoreconf -fiv
@@ -99,7 +99,7 @@ jobs:
       - name: install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y install python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev libmsv-dev pkg-config procps
+          sudo apt-get -y install python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev libmsv-dev pkgconf procps
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
