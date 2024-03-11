@@ -3,7 +3,7 @@ AUTOMAKE_OPTIONS = foreign dist-bzip2 no-dist-gzip
 EXTRA_DIST = m4/outoforder.m4 m4/apache.m4 \
 		m4/apache_test.m4  \
 		include/mod_gnutls.h.in \
-		README CHANGELOG \
+		README.md CHANGELOG \
 		NOTICE LICENSE
 
 AM_DISTCHECK_CONFIGURE_FLAGS = "--enable-vpath-install" \
