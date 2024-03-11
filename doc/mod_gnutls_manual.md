@@ -3,7 +3,7 @@
 `mod_gnutls` is a module for the Apache web server that provides HTTPS
 (HTTP over Transport Layer Security (TLS)) using the GnuTLS library.
 More information about the module can be found at
-[the project's website](https://mod.gnutls.org/).
+[the project's website](https://github.com/airtower-luna/mod_gnutls).
 
 * * * * *
 

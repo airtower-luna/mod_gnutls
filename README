@@ -1,7 +1,7 @@
 mod_gnutls, Apache GnuTLS module
 ================================
 
-  https://mod.gnutls.org/
+  https://github.com/airtower-luna/mod_gnutls
 
 Mailing List:
 
