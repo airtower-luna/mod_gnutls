@@ -32,15 +32,15 @@ jobs:
         run: |
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
-          apt-get -y install python3-yaml apache2-bin apache2-dev curl gnutls-bin libapr1-dev libgnutls28-dev openssl pandoc pkg-config procps iproute2 softhsm2
+          apt-get -y install python3-yaml apache2-bin apache2-dev curl gnutls-bin libapr1-dev libgnutls28-dev openssl pandoc pkgconf procps iproute2 softhsm2
       - name: install dependencies (Fedora)
         if: startsWith(matrix.container, 'fedora')
         run: |
-          dnf -y install bzip2 curl gcc gnutls-devel gnutls-utils httpd-devel iproute libtool make pkgconf-pkg-config python3-pyyaml redhat-rpm-config softhsm
+          dnf -y install bzip2 curl gcc gnutls-devel gnutls-utils httpd-devel iproute libtool make pkgconf python3-pyyaml redhat-rpm-config softhsm
       - name: install dependencies (Alpine)
         if: startsWith(matrix.container, 'alpine')
         run: |
-          apk add apache2 apache2-dev apache2-proxy autoconf automake bash build-base gnutls-dev gnutls-utils libtool pkgconfig python3 py3-yaml
+          apk add apache2 apache2-dev apache2-proxy autoconf automake bash build-base gnutls-dev gnutls-utils libtool pkgconf python3 py3-yaml
       - name: set prefix for container-specific artifacts
         # this is because upload-artifact doesn't like ":" in file names
         env:
@@ -64,7 +64,7 @@ jobs:
         run: |
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
-          apt-get -y install python3-yaml apache2-bin apache2-dev curl gnutls-bin libapr1-dev libgnutls28-dev openssl pkg-config procps iproute2 softhsm2 clang llvm
+          apt-get -y install python3-yaml apache2-bin apache2-dev curl gnutls-bin libapr1-dev libgnutls28-dev openssl pkgconf procps iproute2 softhsm2 clang llvm
       - name: build mod_gnutls with coverage support
         uses: ./.github/build-action/
         with:
