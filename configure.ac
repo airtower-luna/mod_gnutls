@@ -183,7 +183,7 @@ AM_CONDITIONAL([ENABLE_NETNS], [test "$use_netns" != "no"])
 
 AC_ARG_ENABLE(msva,
        AS_HELP_STRING([--enable-msva],
-               [enable Monkeysphere client certificate verification]),
+               [enable Monkeysphere client certificate verification (deprecated)]),
        use_msva=$enableval, use_msva=no)
 AM_CONDITIONAL([USE_MSVA], [test "$use_msva" != "no"])
 
