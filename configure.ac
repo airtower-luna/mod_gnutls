@@ -1,5 +1,5 @@
 AC_PREREQ([2.69])
-AC_INIT([mod_gnutls],[0.12.1])
+AC_INIT([mod_gnutls],[0.12.2])
 OOO_CONFIG_NICE(config.nice)
 MOD_GNUTLS_VERSION=AC_PACKAGE_VERSION
 AC_CONFIG_SRCDIR([src/mod_gnutls.c])

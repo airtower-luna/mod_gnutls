@@ -1,3 +1,12 @@
+** Version 0.12.2 (2024-03-12)
+
+- Update project URL
+- Deprecate Monkeysphere integration
+- Convert README to Markdown
+- Replace leftover pkg-config references with pkgconf
+- Remove unused struct member (vhost_cb_rec in gnutls_hooks.c)
+- Small improvements for Doxygen API documentation build
+
 ** Version 0.12.1 (2023-02-23)
 
 - Security fix (CVE-2023-25824): Remove an infinite loop in blocking
