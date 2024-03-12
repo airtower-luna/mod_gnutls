@@ -30,7 +30,7 @@ CHECK_APACHE(,$AP_VERSION,
 )
 
 PKG_CHECK_MODULES([LIBGNUTLS], [gnutls >= 3.6.3])
-LIBGNUTLS_VERSION=`pkg-config --modversion gnutls`
+LIBGNUTLS_VERSION=`pkgconf --modversion gnutls`
 
 dnl Maybe use the binaries for tests, too?
 AC_ARG_WITH([gnutls-dev],
@@ -43,7 +43,7 @@ AC_ARG_WITH([gnutls-dev],
 		[
 			LIBGNUTLS_CFLAGS="-I${with_gnutls_dev}/lib/includes"
 			LIBGNUTLS_LIBS="-lgnutls -L${with_gnutls_dev}/lib/.libs -R${with_gnutls_dev}/lib/.libs"
-			LIBGNUTLS_VERSION=`PKG_CONFIG_PATH="${with_gnutls_dev}/lib" pkg-config --modversion gnutls`
+			LIBGNUTLS_VERSION=`PKG_CONFIG_PATH="${with_gnutls_dev}/lib" pkgconf --modversion gnutls`
 		],
 		[AC_MSG_ERROR([--with-gnutls-dev=DIR requires a directory!])])
 	], [])
@@ -183,7 +183,7 @@ AM_CONDITIONAL([ENABLE_NETNS], [test "$use_netns" != "no"])
 
 AC_ARG_ENABLE(msva,
        AS_HELP_STRING([--enable-msva],
-               [enable Monkeysphere client certificate verification]),
+               [enable Monkeysphere client certificate verification (deprecated)]),
        use_msva=$enableval, use_msva=no)
 AM_CONDITIONAL([USE_MSVA], [test "$use_msva" != "no"])
 

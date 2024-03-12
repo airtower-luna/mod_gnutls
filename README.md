@@ -18,7 +18,7 @@ Past maintainers and other contributors:
 * [GnuTLS](https://www.gnutls.org/) >= 3.6.3
 * [Apache HTTPD](https://httpd.apache.org/) >= 2.4.17
 * autotools, GNU make, & GCC or Clang
-* libmsv >= 0.1 (Optional, enable with ./configure --enable-msva)
+* libmsv >= 0.1 (deprecated, enable with ./configure --enable-msva)
 * Python 3 (for tests)
 * [PyYAML](https://pyyaml.org/)
 * [Pandoc](https://pandoc.org/) (for documentation, optional)
