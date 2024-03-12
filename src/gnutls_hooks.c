@@ -875,7 +875,6 @@ apr_port_t mgs_hook_default_port(const request_rec * r) {
 
 
 typedef struct {
-    mgs_handle_t *ctxt;
     mgs_srvconf_rec *sc;
     const char *sni_name;
 } vhost_cb_rec;
@@ -888,12 +887,11 @@ typedef struct {
  * @param tsc mod_gnutls server data for `s`
  *
  * @return true if a match, false otherwise
- *
  */
-int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc)
+int check_server_aliases(vhost_cb_rec *x, server_rec *s, mgs_srvconf_rec *tsc)
 {
     apr_array_header_t *names;
-    char ** name;
+    char **name;
 
     /* Check ServerName first */
     if (strcasecmp(x->sni_name, s->server_hostname) == 0)
@@ -939,16 +937,15 @@ int check_server_aliases(vhost_cb_rec *x, server_rec * s, mgs_srvconf_rec *tsc)
     return 0;
 }
 
-static int vhost_cb(void *baton, conn_rec *conn, server_rec * s)
+static int vhost_cb(void *baton, conn_rec *conn, server_rec *s)
 {
     vhost_cb_rec *x = baton;
     mgs_srvconf_rec *tsc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
 
-    if (tsc->enabled != GNUTLS_ENABLED_TRUE) {
+    if (tsc->enabled != GNUTLS_ENABLED_TRUE)
         return 0;
-    }
 
     if (tsc->certs_x509_chain_num > 0) {
         /* this check is there to warn administrator of any missing hostname
@@ -996,7 +993,6 @@ mgs_srvconf_rec *mgs_find_sni_server(mgs_handle_t *ctxt)
      * SNI. If a match is found, cbx.sc will contain the mod_gnutls
      * server config for the vhost. */
     vhost_cb_rec cbx = {
-        .ctxt = ctxt,
         .sc = NULL,
         .sni_name = ctxt->sni_name
     };
