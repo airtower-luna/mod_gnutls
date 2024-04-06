@@ -64,7 +64,9 @@ test_pki = custom_target(
   ],
   depends: [gen_ocsp_index],
   command: [
-    'make', '-C', '@OUTDIR@', '-f', meson.build_root() / '@INPUT0@',
+    'make', '--no-builtin-rules',
+    '-C', '@OUTDIR@',
+    '-f', meson.build_root() / '@INPUT0@',
     'authority/x509.pem',
     'authority/x509-chain.pem',
     'authority/client/x509.pem',
