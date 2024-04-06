@@ -4,6 +4,8 @@ option('pdf-doc', type: 'boolean', value: true,
        description: 'build PDF documentation')
 option('apxs-bin', type: 'string', value: 'apxs', description: 'path to apxs')
 
+option('test-host', type: 'string', value: 'localhost',
+       description: 'server hostname to use in tests, must resolve to test-ips')
 option('test-ips', type: 'array', value: ['[::1]', '127.0.0.1'],
        description: 'server addresses to use in tests')
 option('valgrind-test', type: 'boolean', value: false,
@@ -11,16 +13,6 @@ option('valgrind-test', type: 'boolean', value: false,
 
 # Maybe port these:
 # --with-gnutls-dev=DIR   Use GnuTLS libraries from a development (git) tree.
-# TEST_HOST   Host name to use for server instances started by "make check",
-#             must resolve to addresses in TEST_IP. The default is
-#             "localhost".
-# TEST_LOCK_WAIT
-#             Timeout in seconds to acquire locks for Apache instances in the
-#             test suite, or the previous instance to remove its PID file if
-#             flock is not used. Default is 30.
-# TEST_QUERY_TIMEOUT
-#             Timeout in seconds for HTTPS requests sent using gnutls-cli in
-#             the test suite. Default is 30.
 # SOFTHSM_LIB Absolute path of the SoftHSM PKCS #11 module to use. By default
 #             the test suite will search common library paths.
 # --disable-flock         Disable use of flock during tests (some exotic
