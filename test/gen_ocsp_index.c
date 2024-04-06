@@ -73,7 +73,7 @@ static int index_line(const char* filename)
     /* actually get the serial */
     gnutls_x509_crt_get_serial(cert, sno, &serial_size);
     /* print serial into the buffer byte for byte */
-    for (int i = 0; i < serial_size; i++)
+    for (size_t i = 0; i < serial_size; i++)
         snprintf(serial + (2 * i), 3, "%.2X", sno[i]);
     /* free binary serial */
     free(sno);

@@ -17,6 +17,7 @@
 """HTTP handling components for mod_gnutls tests."""
 
 import contextlib
+import os
 import socket
 import subprocess
 import sys
@@ -71,6 +72,7 @@ class HTTPSubprocessConnection(HTTPConnection):
                                            stdout=subprocess.PIPE,
                                            stderr=subprocess.PIPE,
                                            stdin=s_remote, close_fds=True,
+                                           cwd=os.environ.get('PWD'),
                                            bufsize=0)
             self._fthread = Thread(target=self._output_filter,
                                    args=(self._sproc.stdout, s_remote))
@@ -79,6 +81,7 @@ class HTTPSubprocessConnection(HTTPConnection):
             self._sproc = subprocess.Popen(self.command, stdout=s_remote,
                                            stderr=subprocess.PIPE,
                                            stdin=s_remote, close_fds=True,
+                                           cwd=os.environ.get('PWD'),
                                            bufsize=0)
         self._ethread = Thread(target=_stderr_writer,
                                args=(self._sproc.stderr, self._stderr_log))

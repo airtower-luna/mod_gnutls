@@ -99,3 +99,12 @@ rogueca/%/x509.pem: rogueca/%/template rogueca/%/secret.key rogueca/x509.pem
 		--load-ca-certificate authority/x509.pem \
 		--load-certificate $< \
 		--template "$(srcdir)/$(*)/crl.template"
+
+# The "find" command builds a list of all certificates directly below
+# the CA that aren't for the ocsp-responder.
+%/ocsp_index.txt: $(x509_tokens) gen_ocsp_index
+	./gen_ocsp_index $$(find $(*) -mindepth 2 -maxdepth 2 ! -path '*/ocsp-responder/*' -name x509.pem) > $@
+
+%/ocsp_index.txt.attr:
+	@mkdir -m 0700 -p $(dir $@)
+	echo "unique_subject = no" > $@
