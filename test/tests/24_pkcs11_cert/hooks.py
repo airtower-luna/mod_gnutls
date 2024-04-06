@@ -9,7 +9,7 @@ def prepare_env():
     if not mgstest.softhsm.find_softhsm_bin():
         raise SkipTest('SoftHSM not found.')
 
-    db = 'authority/server/softhsm2.db'
+    db = Path(os.environ.get('PWD', '.')) / 'authority/server/softhsm2.db'
     softhsm_conf = mgstest.softhsm.tmp_softhsm_conf(db)
 
     def cleanup():
@@ -20,7 +20,7 @@ def prepare_env():
         token = mgstest.softhsm.Token(config_file=softhsm_conf)
         for key, value in token.test_env.items():
             os.environ[key] = value
-    except:
+    except Exception:
         cleanup()
         raise
 

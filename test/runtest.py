@@ -65,8 +65,12 @@ def temp_logfile():
 
 async def check_ocsp_responder():
     # Check if OCSP responder works
-    issuer_cert = 'authority/x509.pem'
-    check_cert = 'authority/server/x509.pem'
+    issuer_cert = f'{os.environ.get("PWD", ".")}/authority/x509.pem'
+    check_cert = f'{os.environ.get("PWD", ".")}/authority/server/x509.pem'
+    print(
+        'ocsptool', '--ask', '--nonce',
+        '--load-issuer', issuer_cert, '--load-cert', check_cert,
+        file=sys.stderr)
     proc = await asyncio.create_subprocess_exec(
         'ocsptool', '--ask', '--nonce',
         '--load-issuer', issuer_cert, '--load-cert', check_cert)
@@ -122,20 +126,24 @@ async def main(args):
         valgrind_log = Path('logs', f'valgrind-{testname}.log')
 
     # Define the available services
-    apache = ApacheService(config=testdir / 'apache.conf',
-                           pidfile=f'apache2{pidaffix}.pid',
-                           valgrind_log=valgrind_log,
-                           valgrind_suppress=args.valgrind_suppressions)
-    backend = ApacheService(config=testdir / 'backend.conf',
-                            pidfile=f'backend{pidaffix}.pid')
-    ocsp = ApacheService(config=testdir / 'ocsp.conf',
-                         pidfile=f'ocsp{pidaffix}.pid',
-                         check=check_ocsp_responder)
-    msva = TestService(start=['monkeysphere-validation-agent'],
-                       env={'GNUPGHOME': 'msva.gnupghome',
-                            'MSVA_KEYSERVER_POLICY': 'never'},
-                       condition=lambda: 'USE_MSVA' in os.environ,
-                       check=check_msva)
+    apache = ApacheService(
+        config=testdir / 'apache.conf',
+        pidfile=f'{os.environ.get("PWD", ".")}/apache2{pidaffix}.pid',
+        valgrind_log=valgrind_log,
+        valgrind_suppress=args.valgrind_suppressions)
+    backend = ApacheService(
+        config=testdir / 'backend.conf',
+        pidfile=f'backend{pidaffix}.pid')
+    ocsp = ApacheService(
+        config=testdir / 'ocsp.conf',
+        pidfile=f'ocsp{pidaffix}.pid',
+        check=check_ocsp_responder)
+    msva = TestService(
+        start=['monkeysphere-validation-agent'],
+        env={'GNUPGHOME': 'msva.gnupghome',
+             'MSVA_KEYSERVER_POLICY': 'never'},
+        condition=lambda: 'USE_MSVA' in os.environ,
+        check=check_msva)
 
     # background services: must be ready before the main apache
     # instance is started

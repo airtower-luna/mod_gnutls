@@ -2,5 +2,5 @@
 title: mod_gnutls Manual
 section: 5
 header: mod_gnutls
-footer: __MOD_GNUTLS_VERSION__
+footer: @MOD_GNUTLS_VERSION@
 ...
