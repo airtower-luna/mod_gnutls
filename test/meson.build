@@ -35,6 +35,10 @@ env.set('OPENSSL', openssl.path())
 env.set('PYTHON', python.path())
 env.set('UNSHARE', 'unshare')
 env.set('HTTP_CLI', 'curl')
+if get_option('valgrind-test')
+  env.set('ENABLE_VALGRIND', 'true')
+  env.set('TEST_QUERY_TIMEOUT', '30')
+endif
 
 test_dirs = custom_target(
   'create directories used for tests',
