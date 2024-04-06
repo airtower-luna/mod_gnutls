@@ -6,19 +6,14 @@ option('apxs-bin', type: 'string', value: 'apxs', description: 'path to apxs')
 
 option('test-ips', type: 'array', value: ['[::1]', '127.0.0.1'],
        description: 'server addresses to use in tests')
+option('valgrind-test', type: 'boolean', value: false,
+       description: 'if enabled, server instances in tests run under valgrind')
 
 # Maybe port these:
 # --with-gnutls-dev=DIR   Use GnuTLS libraries from a development (git) tree.
-# APACHE_MUTEX
-#             Override the default mutex for the test environment. The value
-#             is used only when running without namespace isolation, tests
-#             running in their own namespaces always use "pthread".
 # TEST_HOST   Host name to use for server instances started by "make check",
 #             must resolve to addresses in TEST_IP. The default is
 #             "localhost".
-# TEST_IP     List of IP addresses to use for server instances started by
-#             "make check". The default is "[::1] 127.0.0.1". Note that IPv6
-#             addresses must be enclosed in square brackets.
 # TEST_LOCK_WAIT
 #             Timeout in seconds to acquire locks for Apache instances in the
 #             test suite, or the previous instance to remove its PID file if
@@ -33,9 +28,5 @@ option('test-ips', type: 'array', value: ['[::1]', '127.0.0.1'],
 # --disable-test-namespaces
 #                         Disable use of namespaces for tests (limits
 #                         parallelization)
-
-# Not sure about Valgrind, Meson has built-in support, but not sure if
-# we can integrate with that.
-# --enable-valgrind-test  Enable running tests with Valgrind (slow)
 
 # Drop entirely: SRP, MSVA

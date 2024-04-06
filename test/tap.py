@@ -9,8 +9,18 @@ testdir = srcdir / 'tests'
 async def run_test(c, num, name):
     netns = srcdir / 'netns_py.bash'
     runtest = srcdir / 'runtest.py'
+    valgrind_args = []
+    if os.environ.get('ENABLE_VALGRIND') == 'true':
+        valgrind_args = [
+            '--valgrind',
+            '--valgrind-suppressions',
+            str(srcdir / 'suppressions.valgrind'),
+        ]
+
     s = await asyncio.create_subprocess_exec(
-        str(netns), str(runtest), '--test-number', str(num),
+        str(netns), str(runtest),
+        *valgrind_args,
+        '--test-number', str(num),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE)
     await s.wait()
