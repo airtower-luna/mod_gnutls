@@ -108,14 +108,6 @@ static apr_status_t mgs_pool_free_credentials(void *arg)
         sc->anon_creds = NULL;
     }
 
-#ifdef ENABLE_SRP
-    if (sc->srp_creds)
-    {
-        gnutls_srp_free_server_credentials(sc->srp_creds);
-        sc->srp_creds = NULL;
-    }
-#endif
-
     if (sc->dh_params)
     {
         gnutls_dh_params_deinit(sc->dh_params);
@@ -195,37 +187,6 @@ int mgs_load_files(apr_pool_t *pconf, apr_pool_t *ptemp, server_rec *s)
             goto cleanup;
         }
     }
-
-    /* Load SRP parameters */
-#ifdef ENABLE_SRP
-    if (sc->srp_creds == NULL)
-    {
-        ret = gnutls_srp_allocate_server_credentials(&sc->srp_creds);
-        if (ret < 0) {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                         "GnuTLS: Failed to initialize" ": (%d) %s", ret,
-                         gnutls_strerror(ret));
-            ret = -1;
-            goto cleanup;
-        }
-    }
-
-    if (sc->srp_tpasswd_conf_file != NULL && sc->srp_tpasswd_file != NULL)
-    {
-        ret = gnutls_srp_set_server_credentials_file
-            (sc->srp_creds, sc->srp_tpasswd_file,
-             sc->srp_tpasswd_conf_file);
-
-        if (ret < 0 && sc->enabled == GNUTLS_ENABLED_TRUE) {
-            ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-                         "GnuTLS: Host '%s:%d' is missing a "
-                         "SRP password or conf File!",
-                         s->server_hostname, s->port);
-            ret = -1;
-            goto cleanup;
-        }
-    }
-#endif
 
     /* Load user provided DH parameters, if any */
     if (sc->dh_file)
@@ -556,35 +517,6 @@ const char *mgs_set_tickets(cmd_parms *parms,
     return NULL;
 }
 
-
-#ifdef ENABLE_SRP
-
-const char *mgs_set_srp_tpasswd_file(cmd_parms * parms, void *dummy __attribute__((unused)),
-        const char *arg) {
-    mgs_srvconf_rec *sc =
-	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
-						 module_config,
-						 &gnutls_module);
-
-    sc->srp_tpasswd_file = ap_server_root_relative(parms->pool, arg);
-
-    return NULL;
-}
-
-const char *mgs_set_srp_tpasswd_conf_file(cmd_parms * parms, void *dummy __attribute__((unused)),
-        const char *arg) {
-    mgs_srvconf_rec *sc =
-	(mgs_srvconf_rec *) ap_get_module_config(parms->server->
-						 module_config,
-						 &gnutls_module);
-
-    sc->srp_tpasswd_conf_file = ap_server_root_relative(parms->pool, arg);
-
-    return NULL;
-}
-
-#endif
-
 const char *mgs_set_cache(cmd_parms * parms,
                           void *dummy __attribute__((unused)),
                           const char *type, const char *arg)
@@ -867,9 +799,6 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
 
     sc->privkey_x509 = NULL;
     sc->anon_creds = NULL;
-#ifdef ENABLE_SRP
-    sc->srp_creds = NULL;
-#endif
     sc->certs = NULL;
     sc->certs_x509_chain = NULL;
     sc->certs_x509_crt_chain = NULL;
@@ -951,8 +880,6 @@ void *mgs_config_server_merge(apr_pool_t * p, void *BASE, void *ADD)
     gnutls_srvconf_merge(export_certificates_size, -1);
     gnutls_srvconf_merge(client_verify_method, mgs_cvm_unset);
     gnutls_srvconf_merge(client_verify_mode, -1);
-    gnutls_srvconf_merge(srp_tpasswd_file, NULL);
-    gnutls_srvconf_merge(srp_tpasswd_conf_file, NULL);
     gnutls_srvconf_merge(x509_cert_file, NULL);
 
     gnutls_srvconf_merge(x509_key_file, NULL);
@@ -984,7 +911,6 @@ void *mgs_config_server_merge(apr_pool_t * p, void *BASE, void *ADD)
     gnutls_srvconf_assign(ca_list_size);
     gnutls_srvconf_assign(certs);
     gnutls_srvconf_assign(anon_creds);
-    gnutls_srvconf_assign(srp_creds);
     gnutls_srvconf_assign(certs_x509_chain);
     gnutls_srvconf_assign(certs_x509_crt_chain);
     gnutls_srvconf_assign(certs_x509_chain_num);
