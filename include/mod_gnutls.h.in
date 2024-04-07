@@ -57,12 +57,6 @@ extern module AP_MODULE_DECLARE_DATA gnutls_module;
 /* Internal cache data, defined in gnutls_cache.h */
 typedef struct mgs_cache* mgs_cache_t;
 
-// TODO: Only one client verification method left, drop this.
-typedef enum {
-    mgs_cvm_unset,
-    mgs_cvm_cartel,
-} mgs_client_verification_method_e;
-
 
 /* Directory Configuration Record */
 typedef struct {
@@ -155,8 +149,6 @@ typedef struct {
     unsigned int ca_list_size;
 	/* Client Certificate Verification Mode */
     int client_verify_mode;
-	/* Client Certificate Verification Method */
-    mgs_client_verification_method_e client_verify_method;
 
     /* Enable OCSP stapling */
     unsigned char ocsp_staple;
@@ -308,9 +300,6 @@ const char *mgs_set_timeout(cmd_parms *parms, void *dummy, const char *arg);
 
 const char *mgs_set_client_verify(cmd_parms * parms, void *dummy,
                                   const char *arg);
-
-const char *mgs_set_client_verify_method(cmd_parms * parms, void *dummy,
-                                         const char *arg);
 
 const char *mgs_set_client_ca_file(cmd_parms * parms, void *dummy,
                                    const char *arg);
