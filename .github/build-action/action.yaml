@@ -19,28 +19,28 @@ runs:
   using: composite
   steps:
     - name: network overview
-      shell: bash
+      shell: sh
       run: |
         ip addr show
         cat /etc/hosts
     - name: find usable IPs for tests
-      shell: bash
+      shell: sh
       run: |
         echo "test_ips=$(python3 test/check_test_ips.py -H localhost)" >> ${GITHUB_ENV}
     - name: 'workaround for Meson versions < 1.1'
-      shell: bash
+      shell: sh
       run: ln -s meson.options meson_options.txt
     - name: meson setup
-      shell: bash
+      shell: sh
       run: meson setup -Dtest-ips="${TEST_IPS}" ${{ inputs.configure-options }} build
       env:
         CC: "${{ inputs.cc }}"
         TEST_IPS: "${{ env.test_ips }}"
     - name: meson compile
-      shell: bash
+      shell: sh
       run: meson compile -C build/
     - name: meson test
-      shell: bash
+      shell: sh
       run: meson test -C build/ --verbose
     - name: store test logs
       uses: actions/upload-artifact@v4

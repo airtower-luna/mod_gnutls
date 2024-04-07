@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 #
 # Mirror CGI script: Return the request body to the sender
 #
@@ -20,13 +20,13 @@ case "${REQUEST_METHOD}" in
     ("POST")
 	echo "Status: 200 OK"
 	# mirror the incoming content type
-	echo -e "Content-Type: ${CONTENT_TYPE}\n"
+	echo "Content-Type: ${CONTENT_TYPE}\n"
 	# return the incoming data
 	cat -
 	;;
     (*)
 	echo "Status: 405 Method Not Allowed"
-	echo -e "Content-Type: text/plain\n"
+	echo "Content-Type: text/plain\n"
 	echo "Unsupported HTTP method."
 	;;
 esac
