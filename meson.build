@@ -15,6 +15,8 @@ else
   conf_data.set('MOD_GNUTLS_DEBUG', 0)
 endif
 add_project_arguments('-Wno-error=deprecated-declarations', language: 'c')
+# unfortunately libapr has some of that in macros
+add_project_arguments('-Wno-error=null-pointer-subtraction', language: 'c')
 
 apr = dependency('apr-1')
 apr_util = dependency('apr-util-1')

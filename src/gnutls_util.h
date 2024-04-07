@@ -82,18 +82,18 @@ mgs_handle_t *init_gnutls_ctxt(conn_rec *c);
  *
  * @return `GNUTLS_E_SUCCESS` or a GnuTLS error code
  */
-int mgs_default_priority_init();
+int mgs_default_priority_init(void);
 
 /**
  * Get the global default priorities
  */
-gnutls_priority_t mgs_get_default_prio();
+gnutls_priority_t mgs_get_default_prio(void);
 
 /**
  * Deinitialize the global default priorities, must be in the cleanup
  * hook of the pre_config pool.
  */
-void mgs_default_priority_deinit();
+void mgs_default_priority_deinit(void);
 
 /**
  * Create a shallow copy of an APR array of `char *` into a new array

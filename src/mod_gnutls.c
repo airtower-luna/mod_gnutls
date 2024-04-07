@@ -406,13 +406,7 @@ static const command_rec mgs_config_cmds[] = {
                      ap_set_deprecated, NULL, OR_ALL, OPENPGP_REMOVED),
     AP_INIT_RAW_ARGS("GnuTLSPGPKeyFile",
                      ap_set_deprecated, NULL, OR_ALL, OPENPGP_REMOVED),
-#ifdef __clang__
-    /* Workaround for this clang bug:
-     * https://llvm.org/bugs/show_bug.cgi?id=21689 */
-    {},
-#else
-    { NULL },
-#endif
+    { 0 },
 };
 
 module AP_MODULE_DECLARE_DATA gnutls_module = {
