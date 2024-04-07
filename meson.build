@@ -30,7 +30,6 @@ apache2 = declare_dependency(
 mod_dir = run_command(apxs, '-q', 'LIBEXECDIR', check: true).stdout().strip()
 
 pandoc = find_program('pandoc', required: false)
-openssl = find_program('openssl', required: false)
 httpd = find_program('apache2', 'httpd', dirs: ['/usr/sbin'], required: true)
 
 incdir = include_directories('include')
