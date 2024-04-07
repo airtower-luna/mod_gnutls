@@ -10,30 +10,17 @@ More information about the module can be found at
 Compilation & Installation
 ==========================
 
-`mod_gnutls` uses the `./configure && make && make install` mechanism
-common to many Open Source programs.  Most of the dirty work is
-handled by either `./configure` or Apache's `apxs` utility. If you have
-built Apache modules before, there shouldn't be any surprises for you.
+`mod_gnutls` uses [Meson](https://mesonbuild.com/) to run build and
+tests, see the project options section in `meson configure` (or read
+`meson.options` in the source). Usually build & install commands will
+look smilar to this, with `build/` as the build directory:
 
-The interesting options you can pass to configure are:
-
-`--with-apxs=PATH` 
-:   This option is used to specify the location of the apxs utility that
-    was installed as part of apache. Specify the location of the
-    binary, not the directory it is located in.
-
-`--with-apu-config=PATH`
-:   Path to APR Utility Library config tool (`apu-1-config`)
-
-`--help`
-:   Provides a list of all available configure options.
-
-It is recommended to run `make check` before installation. If your
-system doesn't have a loopback device with IPv6 and IPv4 support or
-`localhost` does not resolve to at least one of `[::1]` and
-`127.0.0.1`, you may have to set the `TEST_HOST` or `TEST_IP`
-environment variables when running `./configure` to make the test
-suite work correctly.
+```sh
+meson setup build
+meson compile -C build/
+meson test -C build/
+meson install -C build/
+```
 
 * * * * *
 
