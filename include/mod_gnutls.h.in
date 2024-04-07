@@ -57,10 +57,10 @@ extern module AP_MODULE_DECLARE_DATA gnutls_module;
 /* Internal cache data, defined in gnutls_cache.h */
 typedef struct mgs_cache* mgs_cache_t;
 
+// TODO: Only one client verification method left, drop this.
 typedef enum {
     mgs_cvm_unset,
     mgs_cvm_cartel,
-    mgs_cvm_msva
 } mgs_client_verification_method_e;
 
 

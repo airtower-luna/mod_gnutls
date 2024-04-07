@@ -29,7 +29,7 @@ from unittest import SkipTest
 import mgstest.hooks
 import mgstest.valgrind
 from mgstest import lockfile, TestExpectationFailed
-from mgstest.services import ApacheService, TestService
+from mgstest.services import ApacheService
 from mgstest.tests import run_test_conf
 
 
@@ -77,19 +77,6 @@ async def check_ocsp_responder():
     return (await proc.wait()) == 0
 
 
-async def check_msva():
-    # Check if MSVA is up
-    cert_file = 'authority/client/x509.pem'
-    uid_file = 'authority/client/uid'
-    with open(uid_file, 'r') as file:
-        uid = file.read().strip()
-    with open(cert_file, 'r') as cert:
-        proc = await asyncio.create_subprocess_exec(
-            'msva-query-agent', 'https', uid, 'x509pem', 'client',
-            stdin=cert)
-        return (await proc.wait()) == 0
-
-
 async def main(args):
     # The Automake environment always provides srcdir, the default is
     # for manual use.
@@ -130,16 +117,10 @@ async def main(args):
         config=testdir / 'ocsp.conf',
         pidfile=f'ocsp-{testname}.pid',
         check=check_ocsp_responder)
-    msva = TestService(
-        start=['monkeysphere-validation-agent'],
-        env={'GNUPGHOME': 'msva.gnupghome',
-             'MSVA_KEYSERVER_POLICY': 'never'},
-        condition=lambda: 'USE_MSVA' in os.environ,
-        check=check_msva)
 
     # background services: must be ready before the main apache
     # instance is started
-    bg_services = [backend, ocsp, msva]
+    bg_services = [backend, ocsp]
 
     # If VERBOSE is enabled, log the HTTPD build configuration
     if 'VERBOSE' in os.environ:
@@ -155,10 +136,6 @@ async def main(args):
     except SkipTest as skip:
         print(f'Skipping: {skip!s}')
         sys.exit(77)
-
-    if 'USE_MSVA' in os.environ:
-        os.environ['MONKEYSPHERE_VALIDATION_AGENT_SOCKET'] = \
-            f'http://127.0.0.1:{os.environ["MSVA_PORT"]}'
 
     async with contextlib.AsyncExitStack() as service_stack:
         if cleanup_callback:

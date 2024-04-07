@@ -20,7 +20,6 @@ Past maintainers and other contributors:
 * [Meson](https://mesonbuild.com/) >= 1.1
 * GCC or Clang
 * GNU Make
-* libmsv >= 0.1 (deprecated, enable with ./configure --enable-msva)
 * Python 3 (for tests)
 * [PyYAML](https://pyyaml.org/)
 * [Pandoc](https://pandoc.org/) (for documentation, optional)

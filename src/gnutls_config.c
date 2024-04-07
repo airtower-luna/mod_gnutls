@@ -619,12 +619,6 @@ const char *mgs_set_client_verify_method(cmd_parms * parms, void *dummy __attrib
 
     if (strcasecmp("cartel", arg) == 0) {
 	sc->client_verify_method = mgs_cvm_cartel;
-    } else if (strcasecmp("msva", arg) == 0) {
-#ifdef ENABLE_MSVA
-	sc->client_verify_method = mgs_cvm_msva;
-#else
-	return "GnuTLSClientVerifyMethod: msva is not supported";
-#endif
     } else {
 	return "GnuTLSClientVerifyMethod: Invalid argument";
     }
