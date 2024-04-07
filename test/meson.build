@@ -59,7 +59,7 @@ else
 endif
 
 if curl.found()
-  env.set('HTTP_CLI', curl.path())
+  env.set('CURL', curl.path())
 endif
 
 if get_option('valgrind-test')
