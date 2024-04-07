@@ -113,14 +113,6 @@ async def main(args):
     # Load test case hooks (if any)
     plugin = mgstest.hooks.load_hooks_plugin(testdir / 'hooks.py')
 
-    # PID file name varies depending on whether we're using
-    # namespaces.
-    #
-    # TODO: Check if having the different names is really necessary.
-    pidaffix = ''
-    if 'USE_TEST_NAMESPACE' in os.environ:
-        pidaffix = f'-{testname}'
-
     valgrind_log = None
     if args.valgrind:
         valgrind_log = Path('logs', f'valgrind-{testname}.log')
@@ -128,15 +120,15 @@ async def main(args):
     # Define the available services
     apache = ApacheService(
         config=testdir / 'apache.conf',
-        pidfile=f'{os.environ.get("PWD", ".")}/apache2{pidaffix}.pid',
+        pidfile=f'{os.environ.get("PWD", ".")}/apache2-{testname}.pid',
         valgrind_log=valgrind_log,
         valgrind_suppress=args.valgrind_suppressions)
     backend = ApacheService(
         config=testdir / 'backend.conf',
-        pidfile=f'backend{pidaffix}.pid')
+        pidfile=f'backend-{testname}.pid')
     ocsp = ApacheService(
         config=testdir / 'ocsp.conf',
-        pidfile=f'ocsp{pidaffix}.pid',
+        pidfile=f'ocsp-{testname}.pid',
         check=check_ocsp_responder)
     msva = TestService(
         start=['monkeysphere-validation-agent'],
