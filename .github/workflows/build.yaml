@@ -54,7 +54,7 @@ jobs:
 
   coverage:
     runs-on: ubuntu-latest
-    container: debian:bookworm
+    container: debian:trixie
     name: coverage
     steps:
       - uses: actions/checkout@v4
