@@ -30,9 +30,9 @@ port = 9932
 suite_timeout = 30
 
 env = environment()
-env.set('srcdir', meson.source_root() / 'test')
-env.set('MESON_BUILD_ROOT', meson.build_root())
-env.set('PWD', meson.build_root() / 'test')
+env.set('srcdir', meson.project_source_root() / 'test')
+env.set('MESON_BUILD_ROOT', meson.project_build_root())
+env.set('PWD', meson.project_build_root() / 'test')
 env.set('TEST_HOST', get_option('test-host'))
 env.set('TEST_IP', get_option('test-ips'), separator: ' ')
 env.set('TEST_PORT', f'@port@')
@@ -109,7 +109,7 @@ test_pki = custom_target(
   command: [
     'make', '--no-builtin-rules',
     '-C', '@OUTDIR@',
-    '-f', meson.build_root() / '@INPUT0@',
+    '-f', meson.project_build_root() / '@INPUT0@',
     'authority/x509.pem',
     'authority/x509-chain.pem',
     'authority/client/x509.pem',
@@ -138,7 +138,7 @@ test_pki = custom_target(
 test('integration', python, args: [tap_py],
      env: env,
      protocol: 'tap',
-     workdir: meson.build_root() / 'test',
+     workdir: meson.project_build_root() / 'test',
      timeout: suite_timeout,
      depends: [test_pki, test_dirs, mod_gnutls, listen_conf, modules_conf])
 
