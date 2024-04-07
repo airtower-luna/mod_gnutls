@@ -76,4 +76,4 @@ if __name__ == "__main__":
             print(f'{name}: {addrs}', file=sys.stderr)
         test_ips += addrs
 
-    print(' '.join(f'[{i}]' if ':' in i else i for i in test_ips[:2]))
+    print(','.join(f'[{i}]' if ':' in i else i for i in test_ips[:2]))
