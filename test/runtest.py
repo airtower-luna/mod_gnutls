@@ -19,7 +19,6 @@ import asyncio
 import contextlib
 import itertools
 import os
-import subprocess
 import sys
 import tempfile
 import yaml
@@ -103,7 +102,7 @@ async def main(args):
 
     valgrind_log = None
     if args.valgrind:
-        valgrind_log = Path('logs', f'valgrind-{testname}.log')
+        valgrind_log = builddir / 'logs' / f'valgrind-{testname}.log'
 
     # Define the available services
     apache = ApacheService(
@@ -123,12 +122,6 @@ async def main(args):
     # instance is started
     bg_services = [backend, ocsp]
 
-    # If VERBOSE is enabled, log the HTTPD build configuration
-    if 'VERBOSE' in os.environ:
-        apache2 = os.environ.get('APACHE2', 'apache2')
-        subprocess.run([apache2, '-f', f'{srcdir}/base_apache.conf', '-V'],
-                       check=True)
-
     # This hook may modify the environment as needed for the test.
     cleanup_callback = None
     try:
@@ -145,11 +138,10 @@ async def main(args):
             service_stack.enter_context(lockfile('test.lock'))
 
         wait_timeout = float(os.environ.get('TEST_SERVICE_MAX_WAIT', 10))
-        await asyncio.gather(*(
-            asyncio.create_task(
-                service_stack.enter_async_context(
+        async with asyncio.TaskGroup() as tg:
+            for s in bg_services:
+                tg.create_task(service_stack.enter_async_context(
                     s.run(ready_timeout=wait_timeout)))
-            for s in bg_services))
 
         # special case: expected to fail in a few cases
         await service_stack.enter_async_context(apache.run())
@@ -180,9 +172,9 @@ async def main(args):
                           conn_log=args.log_connection,
                           response_log=args.log_responses)
 
-        await asyncio.wait(
-            {asyncio.create_task(s.stop())
-             for s in itertools.chain([apache], bg_services)})
+        async with asyncio.TaskGroup() as tg:
+            for s in itertools.chain((apache,), bg_services):
+                tg.create_task(s.stop())
 
     # run extra checks the test's hooks.py might define
     if plugin.post_check:

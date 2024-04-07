@@ -41,8 +41,8 @@ def test_immediate_plaintext(host, port, req):
     print(f'Received: {data!r}')
     record = TLSRecord(data)
     # Expect an unencrypted alert
-    assert(record.is_alert)
-    assert(record.length == 2)
+    assert record.is_alert
+    assert record.length == 2
 
 
 def test_plaintext_after_https(host, port, req, context):
@@ -69,24 +69,24 @@ def test_plaintext_after_https(host, port, req, context):
             received = tls_sock.recv_into(memoryview(buf)[pos:])
             # If we get 0 it means the connection ended before the
             # header was complete.
-            assert(received > 0)
+            assert received > 0
             pos += received
         print(f'Received HTTPS header: {bytes(memoryview(buf)[:pos])!r}')
         data_start = buf.index(CRLF) + len(CRLF)
 
         # Read body
         m = re.search(rb'\r\nContent-Length: (\d+)\r\n', buf)
-        assert(m is not None)
+        assert m is not None
         clen = int(m.group(1))
         while pos < (data_start + clen):
             received = tls_sock.recv_into(memoryview(buf)[pos:])
             # If we get 0 it means the connection ended before the
             # body was complete.
-            assert(received > 0)
+            assert received > 0
             pos += received
         body_data = bytes(memoryview(buf)[data_start:pos])
         print(f'Received HTTPS data: {body_data!r}')
-        assert(body_data == b'test\n')
+        assert body_data == b'test\n'
 
         print('Sending plaintext request')
         s.sendall(req)
@@ -95,13 +95,13 @@ def test_plaintext_after_https(host, port, req, context):
         print(f'Received: {data!r}')
         record = TLSRecord(data)
         # Expect application data (TLS 1.3 encrypted alert, hopefully)
-        assert(record.is_app_data)
-        assert(record.length > 2)
+        assert record.is_app_data
+        assert record.length > 2
 
         tls_sock.sendall(req)
         data = tls_sock.recv(clen)
         print(f'Received TLS data: {data!r}')
-        assert(len(data) == 0)
+        assert len(data) == 0
         print('Connection has been closed as expected.')
 
 

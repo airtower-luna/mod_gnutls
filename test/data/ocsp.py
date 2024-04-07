@@ -107,7 +107,7 @@ def handle_post():
                             f'{openssl_run.returncode}, stdout: '
                             f'{openssl_run.stdout}, stderr: '
                             f'{openssl_run.stderr}')
-    except:
+    except Exception:
         stdout_status(HTTPStatus.INTERNAL_SERVER_ERROR)
         raise
 

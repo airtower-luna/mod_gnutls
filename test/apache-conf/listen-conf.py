@@ -1,6 +1,5 @@
 import os
 import sys
-from textwrap import dedent
 
 assert 'TEST_IP' in os.environ
 
