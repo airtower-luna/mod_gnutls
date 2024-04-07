@@ -14,9 +14,12 @@ tap_py = testscripts[1]
 unittest = testscripts[2]
 
 # check permission to use namespaces
-namespace_test = run_command(
-  'unshare', '--net', '-r', 'sh', '-c', 'ip link set up lo && ip addr show',
-  check: false)
+unshare = find_program('unshare', required: false)
+if unshare.found()
+  namespace_test = run_command(
+    unshare, '--net', '-r', 'sh', '-c', 'ip link set up lo && ip addr show',
+    check: false)
+endif
 
 softhsm = find_program('softhsm2-util', required: false)
 
@@ -34,7 +37,8 @@ env.set('TEST_PORT', f'@port@')
 env.set('TEST_HTTP_PORT', '@0@'.format(port + 1))
 env.set('APACHE2', httpd.path())
 env.set('AP_LIBEXECDIR', mod_dir)
-if namespace_test.returncode() == 0
+if unshare.found() and namespace_test.returncode() == 0
+  env.set('UNSHARE', unshare.path())
   env.set('USE_TEST_NAMESPACE', '1')
 else
   suite_timeout = 90
@@ -49,7 +53,6 @@ if openssl.found()
   env.set('OPENSSL', openssl.path())
 endif
 env.set('PYTHON', python.path())
-env.set('UNSHARE', 'unshare')
 env.set('HTTP_CLI', 'curl')
 if get_option('valgrind-test')
   env.set('ENABLE_VALGRIND', 'true')

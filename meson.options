@@ -15,10 +15,5 @@ option('valgrind-test', type: 'boolean', value: false,
 # --with-gnutls-dev=DIR   Use GnuTLS libraries from a development (git) tree.
 # SOFTHSM_LIB Absolute path of the SoftHSM PKCS #11 module to use. By default
 #             the test suite will search common library paths.
-# --disable-flock         Disable use of flock during tests (some exotic
-#                         architectures don't support it)
-# --disable-test-namespaces
-#                         Disable use of namespaces for tests (limits
-#                         parallelization)
 
 # Drop entirely: SRP, MSVA
