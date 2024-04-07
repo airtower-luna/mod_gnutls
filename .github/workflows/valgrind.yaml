@@ -26,9 +26,9 @@ jobs:
         run: |
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
-          apt-get -y install python3-yaml apache2-bin apache2-dev curl gnutls-bin libapr1-dev libgnutls28-dev openssl pkgconf procps iproute2 softhsm2 valgrind
+          apt-get -y install meson make python3-yaml apache2-bin apache2-dev curl gnutls-bin libapr1-dev libgnutls28-dev openssl pkgconf procps iproute2 softhsm2 valgrind
       - name: build mod_gnutls and run tests with Valgrind
         uses: ./.github/build-action/
         with:
-          configure-options: --enable-valgrind-test
+          configure-options: -Dvalgrind-test=true -Dpdf-doc=false
           artifact-prefix: valgrind
