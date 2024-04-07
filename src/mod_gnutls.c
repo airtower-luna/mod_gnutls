@@ -253,8 +253,6 @@ int ssl_proxy_enable(conn_rec *c)
     return ssl_engine_set(c, NULL, 1, 1);
 }
 
-#define OPENPGP_REMOVED "OpenPGP support has been removed."
-
 static const command_rec mgs_config_cmds[] = {
     AP_INIT_FLAG("GnuTLSProxyEngine", mgs_set_proxy_engine,
     NULL,
@@ -276,10 +274,6 @@ static const command_rec mgs_config_cmds[] = {
     NULL,
     RSRC_CONF | OR_AUTHCFG,
     "Set Verification Requirements of the Client Certificate"),
-    AP_INIT_TAKE1("GnuTLSClientVerifyMethod", mgs_set_client_verify_method,
-    NULL,
-    RSRC_CONF,
-    "Set Verification Method of the Client Certificate"),
     AP_INIT_TAKE1("GnuTLSClientCAFile", mgs_set_client_ca_file,
     NULL,
     RSRC_CONF,
@@ -389,12 +383,6 @@ static const command_rec mgs_config_cmds[] = {
     AP_INIT_TAKE1("GnuTLSOCSPSocketTimeout", mgs_set_timeout,
                   NULL, RSRC_CONF,
                   "Socket timeout for OCSP requests"),
-    AP_INIT_RAW_ARGS("GnuTLSPGPKeyringFile",
-                     ap_set_deprecated, NULL, OR_ALL, OPENPGP_REMOVED),
-    AP_INIT_RAW_ARGS("GnuTLSPGPCertificateFile",
-                     ap_set_deprecated, NULL, OR_ALL, OPENPGP_REMOVED),
-    AP_INIT_RAW_ARGS("GnuTLSPGPKeyFile",
-                     ap_set_deprecated, NULL, OR_ALL, OPENPGP_REMOVED),
     { 0 },
 };
 

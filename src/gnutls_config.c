@@ -613,19 +613,6 @@ const char *mgs_set_timeout(cmd_parms * parms,
     return NULL;
 }
 
-const char *mgs_set_client_verify_method(cmd_parms * parms, void *dummy __attribute__((unused)),
-        const char *arg) {
-    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)ap_get_module_config(parms->server->module_config, &gnutls_module);
-
-    if (strcasecmp("cartel", arg) == 0) {
-	sc->client_verify_method = mgs_cvm_cartel;
-    } else {
-	return "GnuTLSClientVerifyMethod: Invalid argument";
-    }
-
-    return NULL;
-}
-
 const char *mgs_set_client_verify(cmd_parms * parms,
                                   void *dirconf,
                                   const char *arg) {
@@ -812,7 +799,6 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
     sc->ca_list_size = 0;
     sc->proxy_enabled = GNUTLS_ENABLED_UNSET;
     sc->export_certificates_size = -1;
-    sc->client_verify_method = mgs_cvm_unset;
 
     sc->proxy_x509_key_file = NULL;
     sc->proxy_x509_cert_file = NULL;
@@ -872,7 +858,6 @@ void *mgs_config_server_merge(apr_pool_t * p, void *BASE, void *ADD)
     gnutls_srvconf_merge(tickets, GNUTLS_ENABLED_UNSET);
     gnutls_srvconf_merge(proxy_enabled, GNUTLS_ENABLED_UNSET);
     gnutls_srvconf_merge(export_certificates_size, -1);
-    gnutls_srvconf_merge(client_verify_method, mgs_cvm_unset);
     gnutls_srvconf_merge(client_verify_mode, -1);
     gnutls_srvconf_merge(x509_cert_file, NULL);
 

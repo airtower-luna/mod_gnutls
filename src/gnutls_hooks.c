@@ -108,16 +108,6 @@ static void gnutls_debug_log_all(int level, const char *str) {
 #define _gnutls_log(...)
 #endif
 
-static const char* mgs_readable_cvm(mgs_client_verification_method_e m) {
-    switch(m) {
-    case mgs_cvm_unset:
-        return "unset";
-    case mgs_cvm_cartel:
-        return "cartel";
-    }
-    return "unknown";
-}
-
 /* Pre-Configuration HOOK: Runs First */
 int mgs_hook_pre_config(apr_pool_t * pconf, apr_pool_t * plog, apr_pool_t * ptemp __attribute__((unused))) {
 
@@ -647,8 +637,6 @@ int mgs_hook_post_config(apr_pool_t *pconf,
             sc->export_certificates_size = 0;
         if (sc->client_verify_mode == -1)
             sc->client_verify_mode = GNUTLS_CERT_IGNORE;
-        if (sc->client_verify_method == mgs_cvm_unset)
-            sc->client_verify_method = mgs_cvm_cartel;
 
         // TODO: None of the stuff below needs to be done if
         // sc->enabled == GNUTLS_ENABLED_FALSE, we could just continue
@@ -1698,25 +1686,12 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
                 (cert.x509[0]));
 
         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
-                      "GnuTLS: Verifying list of %d certificate(s) via method '%s'",
-                      ch_size, mgs_readable_cvm(ctxt->sc->client_verify_method));
-        switch(ctxt->sc->client_verify_method) {
-        case mgs_cvm_cartel:
-            rv = gnutls_x509_crt_list_verify(cert.x509, ch_size,
-                                             ctxt->sc->ca_list,
-                                             ctxt->sc->ca_list_size,
-                                             NULL, 0, 0, &status);
-            break;
-        default:
-            /* If this block is reached, that indicates a
-             * configuration error or bug in mod_gnutls (invalid value
-             * of ctxt->sc->client_verify_method). */
-            ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                          "GnuTLS: Failed to Verify X.509 Peer: method '%s' is not supported",
-                          mgs_readable_cvm(ctxt->sc->client_verify_method));
-            rv = GNUTLS_E_UNIMPLEMENTED_FEATURE;
-        }
-
+                      "GnuTLS: Verifying list of %d certificate(s)",
+                      ch_size);
+        rv = gnutls_x509_crt_list_verify(cert.x509, ch_size,
+                                         ctxt->sc->ca_list,
+                                         ctxt->sc->ca_list_size,
+                                         NULL, 0, 0, &status);
     } else {
         /* Unknown certificate type */
         rv = GNUTLS_E_UNIMPLEMENTED_FEATURE;
