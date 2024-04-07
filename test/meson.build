@@ -33,7 +33,9 @@ env.set('OCSP_URI_TEMPLATE',
 	  get_option('test-host'), port + 4))
 env.set('BACKEND_HOST', get_option('test-host'))
 env.set('BACKEND_PORT', '@0@'.format(port + 2))
-env.set('OPENSSL', openssl.path())
+if openssl.found()
+  env.set('OPENSSL', openssl.path())
+endif
 env.set('PYTHON', python.path())
 env.set('UNSHARE', 'unshare')
 env.set('HTTP_CLI', 'curl')
