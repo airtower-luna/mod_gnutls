@@ -30,9 +30,9 @@ port = 9932
 suite_timeout = 30
 
 env = environment()
-env.set('srcdir', meson.project_source_root() / 'test')
+env.set('srcdir', meson.current_source_dir())
+env.set('builddir', meson.current_build_dir())
 env.set('MESON_BUILD_ROOT', meson.project_build_root())
-env.set('PWD', meson.project_build_root() / 'test')
 env.set('TEST_HOST', get_option('test-host'))
 env.set('TEST_IP', get_option('test-ips'), separator: ' ')
 env.set('TEST_PORT', f'@port@')

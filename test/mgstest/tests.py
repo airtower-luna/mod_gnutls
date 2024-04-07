@@ -171,6 +171,7 @@ class TestConnection(yaml.YAMLObject):
 
         if self.transport == Transports.GNUTLS:
             conn = HTTPSubprocessConnection(command, self.host, self.port,
+                                            cwd=os.environ['builddir'],
                                             output_filter=filter_cert_log,
                                             stderr_log=conn_log,
                                             timeout=timeout)
