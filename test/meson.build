@@ -3,15 +3,18 @@ gen_ocsp_index = executable(
   dependencies: [gnutls])
 
 python = import('python').find_installation(modules: ['yaml'])
+
 testscripts = files(
   [
     'doctest-mgstest.py',
     'tap.py',
+    'test_ca.mk',
     'unittest-mgstest.py',
   ])
 doctest = testscripts[0]
 tap_py = testscripts[1]
-unittest = testscripts[2]
+test_ca = testscripts[2]
+unittest = testscripts[3]
 
 # check permission to use namespaces
 unshare = find_program('unshare', required: false)
@@ -85,8 +88,6 @@ test_dirs = custom_target(
   input: [],
   command: ['mkdir', '-p', '@OUTPUT@'])
 
-test_ca = files(['test_ca.mk'])[0]
-
 test_pki = custom_target(
   'build test PKI',
   build_always_stale: true,
@@ -109,7 +110,7 @@ test_pki = custom_target(
   command: [
     'make', '--no-builtin-rules',
     '-C', '@OUTDIR@',
-    '-f', meson.project_build_root() / '@INPUT0@',
+    '-f', meson.project_source_root() / 'test' / 'test_ca.mk',
     'authority/x509.pem',
     'authority/x509-chain.pem',
     'authority/client/x509.pem',
@@ -138,8 +139,9 @@ test_pki = custom_target(
 test('integration', python, args: [tap_py],
      env: env,
      protocol: 'tap',
-     workdir: meson.project_build_root() / 'test',
+     workdir: meson.current_build_dir(),
      timeout: suite_timeout,
+     verbose: true,
      depends: [test_pki, test_dirs, mod_gnutls, listen_conf, modules_conf])
 
 test('doctest', doctest,
