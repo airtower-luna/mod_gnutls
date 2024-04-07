@@ -10,10 +10,10 @@ option('test-ips', type: 'array', value: ['[::1]', '127.0.0.1'],
        description: 'server addresses to use in tests')
 option('valgrind-test', type: 'boolean', value: false,
        description: 'if enabled, server instances in tests run under valgrind')
+option('softhsm-lib', type: 'string',
+       description: 'SoftHSM PKCS #11 library to use. If unset, the test suite will search common library paths.')
 
 # Maybe port these:
 # --with-gnutls-dev=DIR   Use GnuTLS libraries from a development (git) tree.
-# SOFTHSM_LIB Absolute path of the SoftHSM PKCS #11 module to use. By default
-#             the test suite will search common library paths.
 
 # Drop entirely: SRP, MSVA

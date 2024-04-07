@@ -74,6 +74,10 @@ if softhsm.found()
 else
   softhsm_db = []
 endif
+softhsm_lib = get_option('softhsm-lib')
+if softhsm_lib != ''
+  env.set('SOFTHSM_LIB', softhsm_lib)
+endif
 
 test_dirs = custom_target(
   'create directories used for tests',
