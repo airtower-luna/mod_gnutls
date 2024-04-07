@@ -22,6 +22,7 @@ softhsm = find_program('softhsm2-util', required: false)
 
 subdir('apache-conf')
 port = 9932
+suite_timeout = 30
 
 env = environment()
 env.set('srcdir', meson.source_root() / 'test')
@@ -35,6 +36,8 @@ env.set('APACHE2', httpd.path())
 env.set('AP_LIBEXECDIR', mod_dir)
 if namespace_test.returncode() == 0
   env.set('USE_TEST_NAMESPACE', '1')
+else
+  suite_timeout = 90
 endif
 env.set('OCSP_URI_TEMPLATE',
 	'ocsp_uri = http://@0@:@1@/ocsp/'.format(
@@ -51,6 +54,7 @@ env.set('HTTP_CLI', 'curl')
 if get_option('valgrind-test')
   env.set('ENABLE_VALGRIND', 'true')
   env.set('TEST_QUERY_TIMEOUT', '30')
+  suite_timeout = 900
 endif
 if softhsm.found()
   env.set('SOFTHSM', softhsm.path())
@@ -119,7 +123,7 @@ test('integration', python, args: [tap_py],
      env: env,
      protocol: 'tap',
      workdir: meson.build_root() / 'test',
-     timeout: 90,
+     timeout: suite_timeout,
      depends: [test_pki, test_dirs, mod_gnutls, listen_conf, modules_conf])
 
 test('doctest', doctest,
