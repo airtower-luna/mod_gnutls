@@ -25,5 +25,3 @@ cp -a tests/00_basic "tests/${newname}"
 newscript="test-${newname}.bash"
 
 echo "You can now edit ${newname}."
-echo "Run the test with TESTS=\"${newscript}\" make -e check."
-echo "When ready, add ${newscript} to test_scripts in Makefile.am."
