@@ -17,7 +17,9 @@
             test
     - !request
       method: POST
-      path: /secret/mirror.cgi
+      path: /secret/mirror.py
+      headers:
+        'Content-Type': 'text/plain'
       body: |
         GNUTLS_E_GOT_APPLICATION_DATA can (randomly, depending on
         timing) happen with a request containing a body. According to
@@ -27,6 +29,8 @@
         is appropriate.
       expect:
         status: 200
+        headers:
+          'Content-Type': 'text/plain'
         body:
           exactly: |
             GNUTLS_E_GOT_APPLICATION_DATA can (randomly, depending on
