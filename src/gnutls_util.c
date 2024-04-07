@@ -163,21 +163,21 @@ mgs_handle_t *init_gnutls_ctxt(conn_rec *c)
 
 
 
-int mgs_default_priority_init()
+int mgs_default_priority_init(void)
 {
     return gnutls_priority_init(&default_prio, MGS_DEFAULT_PRIORITY, NULL);
 }
 
 
 
-gnutls_priority_t mgs_get_default_prio()
+gnutls_priority_t mgs_get_default_prio(void)
 {
     return default_prio;
 }
 
 
 
-void mgs_default_priority_deinit()
+void mgs_default_priority_deinit(void)
 {
     gnutls_priority_deinit(default_prio);
 }
