@@ -308,17 +308,6 @@ static const command_rec mgs_config_cmds[] = {
     NULL,
     RSRC_CONF,
     "TLS Server X509 Private Key file"),
-#ifdef ENABLE_SRP
-    AP_INIT_TAKE1("GnuTLSSRPPasswdFile", mgs_set_srp_tpasswd_file,
-    NULL,
-    RSRC_CONF,
-    "TLS Server SRP Password Conf file"),
-    AP_INIT_TAKE1("GnuTLSSRPPasswdConfFile",
-    mgs_set_srp_tpasswd_conf_file,
-    NULL,
-    RSRC_CONF,
-    "TLS Server SRP Parameters file"),
-#endif
     AP_INIT_TAKE1("GnuTLSCacheTimeout", mgs_set_timeout,
     NULL,
     RSRC_CONF,

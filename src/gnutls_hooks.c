@@ -329,14 +329,6 @@ static int reload_session_credentials(mgs_handle_t *ctxt)
     gnutls_credentials_set(ctxt->session, GNUTLS_CRD_ANON,
                            ctxt->sc->anon_creds);
 
-#ifdef ENABLE_SRP
-	/* Set SRP credentials */
-    if (ctxt->sc->srp_tpasswd_conf_file != NULL && ctxt->sc->srp_tpasswd_file != NULL) {
-        gnutls_credentials_set(ctxt->session, GNUTLS_CRD_SRP,
-                               ctxt->sc->srp_creds);
-    }
-#endif
-
     /* Enable session tickets */
     if (session_ticket_key.data != NULL &&
         ctxt->sc->tickets == GNUTLS_ENABLED_TRUE)
@@ -1382,15 +1374,6 @@ int mgs_hook_fixups(request_rec * r) {
 
     /* Compression support has been removed since GnuTLS 3.6.0 */
     apr_table_setn(env, "SSL_COMPRESS_METHOD", "NULL");
-
-#ifdef ENABLE_SRP
-    if (ctxt->sc->srp_tpasswd_conf_file != NULL && ctxt->sc->srp_tpasswd_file != NULL) {
-        tmp = gnutls_srp_server_get_username(ctxt->session);
-        apr_table_setn(env, "SSL_SRP_USER", (tmp != NULL) ? tmp : "");
-    } else {
-        apr_table_unset(env, "SSL_SRP_USER");
-    }
-#endif
 
     if (apr_table_get(env, "SSL_CLIENT_VERIFY") == NULL)
         apr_table_setn(env, "SSL_CLIENT_VERIFY", "NONE");

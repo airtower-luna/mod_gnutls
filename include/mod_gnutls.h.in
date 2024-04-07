@@ -107,9 +107,6 @@ typedef struct {
     char *priorities_str;
     char *proxy_priorities_str;
 
-    const char* srp_tpasswd_file;
-    const char* srp_tpasswd_conf_file;
-
 	/* Cache timeout value */
     int cache_timeout;
     /* Enable cache */
@@ -132,8 +129,6 @@ typedef struct {
     const char* proxy_x509_crl_file;
     /* GnuTLS priorities for proxy connections */
     gnutls_priority_t proxy_priorities;
-    /* SRP Certificate Structure*/
-    gnutls_srp_server_credentials_t srp_creds;
     /* Anonymous Certificate Structure */
     gnutls_anon_server_credentials_t anon_creds;
     /* Anonymous Client Certificate Structure, used for proxy
@@ -301,10 +296,6 @@ int mgs_pkcs11_reinit(server_rec * s);
 int mgs_load_files(apr_pool_t *pconf, apr_pool_t *ptemp, server_rec *s)
     __attribute__((nonnull));
 
-const char *mgs_set_srp_tpasswd_conf_file(cmd_parms * parms, void *dummy,
-                                        const char *arg);
-const char *mgs_set_srp_tpasswd_file(cmd_parms * parms, void *dummy,
-                                        const char *arg);
 const char *mgs_set_dh_file(cmd_parms * parms, void *dummy,
                                         const char *arg);
 const char *mgs_set_cert_file(cmd_parms * parms, void *dummy,

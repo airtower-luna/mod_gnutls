@@ -386,39 +386,6 @@ Takes an absolute or relative path to a PEM Encoded Certificate to use
 as a Certificate Authority with Client Certificate Authentication.
 This file may contain a list of trusted authorities.
 
-SRP Authentication
-------------------
-
-### GnuTLSSRPPasswdFile
-
-Set to the SRP password file for SRP ciphersuites
-
-    GnuTLSSRPPasswdFile FILEPATH
-
-Default: *none*\
-Context: server config, virtual host
-
-Takes an absolute or relative path to an SRP password file. This is
-the same format as used in libsrp.  You can generate such file using
-the command `srptool --passwd /etc/tpasswd --passwd-conf
-/etc/tpasswd.conf -u test` to set a password for user test.  This
-password file holds the username, a password verifier and the
-dependency to the SRP parameters.
-
-### GnuTLSSRPPasswdConfFile
-
-Set to the SRP password.conf file for SRP ciphersuites
-
-    GnuTLSSRPPasswdConfFile FILEPATH
-
-Default: *none*\
-Context: server config, virtual host
-
-Takes an absolute or relative path to an SRP password.conf file. This
-is the same format as used in `libsrp`.  You can generate such file
-using the command `srptool --create-conf /etc/tpasswd.conf`.  This
-file holds the SRP parameters and is associate with the password file
-(the verifiers depends on these parameters).
 
 TLS Proxy Configuration
 -----------------------
@@ -863,37 +830,23 @@ GnuTLSCacheTimeout 1200
 # to use that port on all available IP addresses.
 Listen 192.0.2.1:443
 Listen 192.0.2.2:443
-Listen 192.0.2.3:443
 
 <VirtualHost 192.0.2.1:443>
 	GnuTLSEnable on
 	GnuTLSPriorities SECURE128
 	DocumentRoot /www/site1.example.com/html
-	ServerName site1.example.com:443
+	ServerName site1.example.com
 	GnuTLSCertificateFile conf/tls/site1.crt
 	GnuTLSKeyFile conf/tls/site1.key
 </VirtualHost>
 
 <VirtualHost 192.0.2.2:443>
-    # This virtual host enables SRP authentication
 	GnuTLSEnable on
-	GnuTLSPriorities NORMAL:+SRP
+	GnuTLSPriorities NORMAL
 	DocumentRoot /www/site2.example.com/html
-	ServerName site2.example.com:443
-	GnuTLSSRPPasswdFile conf/tls/tpasswd.site2
-	GnuTLSSRPPasswdConfFile conf/tls/tpasswd.site2.conf
-</VirtualHost>
-
-<VirtualHost 192.0.2.3:443>
-	# This server enables SRP and X.509 authentication.
-	GnuTLSEnable on
-	GnuTLSPriorities NORMAL:+SRP:+SRP-RSA:+SRP-DSS
-	DocumentRoot /www/site3.example.com/html
-	ServerName site3.example.com:443
-	GnuTLSCertificateFile conf/tls/site3.crt
-	GnuTLSKeyFile conf/tls/site3.key
-	GnuTLSSRPPasswdFile conf/tls/tpasswd.site3
-	GnuTLSSRPPasswdConfFile conf/tls/tpasswd.site3.conf
+	ServerName site2.example.com
+	GnuTLSCertificateFile conf/tls/site2.crt
+	GnuTLSKeyFile conf/tls/site2.key
 </VirtualHost>
 ```
 
@@ -965,12 +918,6 @@ The SSL or TLS cipher suite name
 ---------------------
 
 The negotiated compression method (`NULL` or `DEFLATE`)
-
-`SSL_SRP_USER`
---------------
-
-The SRP username used for authentication (only set when
-`GnuTLSSRPPasswdFile` and `GnuTLSSRPPasswdConfFile` are configured).
 
 `SSL_CIPHER_USEKEYSIZE` & `SSL_CIPHER_ALGKEYSIZE`
 -------------------------------------------------
