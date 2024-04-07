@@ -1,8 +1,8 @@
-#!/bin/sh
+#!/usr/bin/python3
 #
 # Mirror CGI script: Return the request body to the sender
 #
-# Copyright 2020 Fiona Klute
+# Copyright 2024 Fiona Klute
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you
 # may not use this file except in compliance with the License.  You
@@ -15,18 +15,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
 # implied.  See the License for the specific language governing
 # permissions and limitations under the License.
+import os
+import sys
 
-case "${REQUEST_METHOD}" in
-    ("POST")
-	echo "Status: 200 OK"
-	# mirror the incoming content type
-	echo "Content-Type: ${CONTENT_TYPE}\n"
-	# return the incoming data
-	cat -
-	;;
-    (*)
-	echo "Status: 405 Method Not Allowed"
-	echo "Content-Type: text/plain\n"
-	echo "Unsupported HTTP method."
-	;;
-esac
+if os.environ['REQUEST_METHOD'] == 'POST':
+    # mirror the incoming content type
+    print('Status: 200 OK\n'
+          f'Content-Type: {os.environ["CONTENT_TYPE"]}\n')
+    for line in sys.stdin:
+        print(line, end='')
+else:
+    print('Status: 405 Method Not Allowed\n'
+          'Content-Type: text/plain\n\n'
+          'Unsupported HTTP method.')
