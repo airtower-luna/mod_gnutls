@@ -13,6 +13,11 @@ doctest = testscripts[0]
 tap_py = testscripts[1]
 unittest = testscripts[2]
 
+# check permission to use namespaces
+namespace_test = run_command(
+  'unshare', '--net', '-r', 'sh', '-c', 'ip link set up lo && ip addr show',
+  check: false)
+
 subdir('apache-conf')
 port = 9932
 
@@ -26,7 +31,9 @@ env.set('TEST_PORT', f'@port@')
 env.set('TEST_HTTP_PORT', '@0@'.format(port + 1))
 env.set('APACHE2', httpd.path())
 env.set('AP_LIBEXECDIR', mod_dir)
-env.set('USE_TEST_NAMESPACE', '1')
+if namespace_test.returncode() == 0
+  env.set('USE_TEST_NAMESPACE', '1')
+endif
 env.set('OCSP_PORT', '@0@'.format(port + 4))
 env.set('OCSP_URI_TEMPLATE',
 	'ocsp_uri = http://@0@:@1@/ocsp/'.format(
@@ -104,6 +111,7 @@ test('integration', python, args: [tap_py],
      env: env,
      protocol: 'tap',
      workdir: meson.build_root() / 'test',
+     timeout: 90,
      depends: [test_pki, test_dirs, mod_gnutls, listen_conf, modules_conf])
 
 test('doctest', doctest,
