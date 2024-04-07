@@ -22,6 +22,8 @@ if unshare.found()
 endif
 
 softhsm = find_program('softhsm2-util', required: false)
+openssl = find_program('openssl', required: false)
+curl = find_program('curl', required: false)
 
 subdir('apache-conf')
 port = 9932
@@ -35,30 +37,37 @@ env.set('TEST_HOST', get_option('test-host'))
 env.set('TEST_IP', get_option('test-ips'), separator: ' ')
 env.set('TEST_PORT', f'@port@')
 env.set('TEST_HTTP_PORT', '@0@'.format(port + 1))
+env.set('BACKEND_HOST', get_option('test-host'))
+env.set('BACKEND_PORT', '@0@'.format(port + 2))
 env.set('APACHE2', httpd.path())
 env.set('AP_LIBEXECDIR', mod_dir)
+env.set('PYTHON', python.path())
+
+env.set('OCSP_URI_TEMPLATE',
+	'ocsp_uri = http://@0@:@1@/ocsp/'.format(
+	  get_option('test-host'), port + 4))
+if openssl.found()
+  env.set('OCSP_PORT', '@0@'.format(port + 4))
+  env.set('OPENSSL', openssl.path())
+endif
+
 if unshare.found() and namespace_test.returncode() == 0
   env.set('UNSHARE', unshare.path())
   env.set('USE_TEST_NAMESPACE', '1')
 else
   suite_timeout = 90
 endif
-env.set('OCSP_URI_TEMPLATE',
-	'ocsp_uri = http://@0@:@1@/ocsp/'.format(
-	  get_option('test-host'), port + 4))
-env.set('BACKEND_HOST', get_option('test-host'))
-env.set('BACKEND_PORT', '@0@'.format(port + 2))
-if openssl.found()
-  env.set('OCSP_PORT', '@0@'.format(port + 4))
-  env.set('OPENSSL', openssl.path())
+
+if curl.found()
+  env.set('HTTP_CLI', curl.path())
 endif
-env.set('PYTHON', python.path())
-env.set('HTTP_CLI', 'curl')
+
 if get_option('valgrind-test')
   env.set('ENABLE_VALGRIND', 'true')
   env.set('TEST_QUERY_TIMEOUT', '30')
   suite_timeout = 900
 endif
+
 if softhsm.found()
   env.set('SOFTHSM', softhsm.path())
   softhsm_db = ['authority/server/softhsm2.db']
