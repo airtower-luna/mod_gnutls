@@ -1,6 +1,3 @@
-#!/usr/bin/python3
-# PYTHON_ARGCOMPLETE_OK
-
 # Copyright 2020 Fiona Klute
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

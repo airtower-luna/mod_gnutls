@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 import doctest
 import importlib
 import mgstest

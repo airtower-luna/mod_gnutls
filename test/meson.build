@@ -144,11 +144,11 @@ test('integration', python, args: [tap_py],
      verbose: true,
      depends: [test_pki, test_dirs, mod_gnutls, listen_conf, modules_conf])
 
-test('doctest', doctest,
+test('doctest', python, args: [doctest],
      env: env,
      depends: [test_pki, mod_gnutls])
 
-test('unittest', unittest,
+test('unittest', python, args: [unittest],
      env: env,
      depends: [test_pki, mod_gnutls])
 
