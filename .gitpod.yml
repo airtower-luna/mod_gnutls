@@ -1,8 +1,0 @@
-image:
-  file: .gitpod.Dockerfile
-tasks:
-  - init: |
-      autoreconf -fiv
-      APACHE_MUTEX=pthread ./configure
-      bear make -j4 || bear -- make -j4
-    prebuild: make check -j4

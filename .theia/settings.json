@@ -1,4 +1,0 @@
-{
-    "python.autoComplete.extraPaths": ["test/"],
-    "python.pythonPath": "/usr/bin/python3"
-}
