@@ -65,24 +65,25 @@ def temp_logfile():
 
 async def check_ocsp_responder():
     # Check if OCSP responder works
-    issuer_cert = f'{os.environ.get("PWD", ".")}/authority/x509.pem'
-    check_cert = f'{os.environ.get("PWD", ".")}/authority/server/x509.pem'
-    print(
+    builddir = Path(os.environ['builddir'])
+    issuer_cert = builddir / 'authority/x509.pem'
+    check_cert = builddir / 'authority/server/x509.pem'
+    command = [
         'ocsptool', '--ask', '--nonce',
-        '--load-issuer', issuer_cert, '--load-cert', check_cert,
-        file=sys.stderr)
-    proc = await asyncio.create_subprocess_exec(
-        'ocsptool', '--ask', '--nonce',
-        '--load-issuer', issuer_cert, '--load-cert', check_cert)
+        '--load-issuer', str(issuer_cert), '--load-cert', str(check_cert)]
+    print(' '.join(command), file=sys.stderr)
+    proc = await asyncio.create_subprocess_exec(*command)
     return (await proc.wait()) == 0
 
 
 async def main(args):
-    # The Automake environment always provides srcdir, the default is
-    # for manual use.
+    # Ensure environment directories are absolute. The build
+    # environment always provides directories, the defaults are for
+    # manual use.
     srcdir = Path(os.environ.get('srcdir', '.')).resolve()
-    # ensure environment srcdir is absolute
+    builddir = Path(os.environ.get('builddir', '.')).resolve()
     os.environ['srcdir'] = str(srcdir)
+    os.environ['builddir'] = str(builddir)
 
     # Find the configuration directory for the test in
     # ${srcdir}/tests/, based on the test number.
@@ -107,15 +108,15 @@ async def main(args):
     # Define the available services
     apache = ApacheService(
         config=testdir / 'apache.conf',
-        pidfile=f'{os.environ.get("PWD", ".")}/apache2-{testname}.pid',
+        pidfile=builddir / f'apache2-{testname}.pid',
         valgrind_log=valgrind_log,
         valgrind_suppress=args.valgrind_suppressions)
     backend = ApacheService(
         config=testdir / 'backend.conf',
-        pidfile=f'backend-{testname}.pid')
+        pidfile=builddir / f'backend-{testname}.pid')
     ocsp = ApacheService(
         config=testdir / 'ocsp.conf',
-        pidfile=f'ocsp-{testname}.pid',
+        pidfile=builddir / f'ocsp-{testname}.pid',
         check=check_ocsp_responder)
 
     # background services: must be ready before the main apache
