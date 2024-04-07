@@ -39,6 +39,20 @@
    ...
 }
 
+# There's a bunch of reports of leaks from getaddrinfo, but outside
+# the scope of mod_gnutls to fix. As of 2024-04-07 needed on Debian
+# Bookworm, but not on Sid.
+{
+   apr_getaddrinfo_leak
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   ...
+   fun:getaddrinfo
+   obj:/usr/lib/*/libapr-1.so.*
+   ...
+}
+
 # For some reason there's a leak from dlopen called by
 # p11_kit_module_load in the child processes.
 {
