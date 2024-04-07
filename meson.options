@@ -13,7 +13,8 @@ option('valgrind-test', type: 'boolean', value: false,
 option('softhsm-lib', type: 'string',
        description: 'SoftHSM PKCS #11 library to use. If unset, the test suite will search common library paths.')
 
-# Maybe port these:
-# --with-gnutls-dev=DIR   Use GnuTLS libraries from a development (git) tree.
+# Maybe add replacing GnuTLS with build from Git?
+# LIBGNUTLS_CFLAGS="-I${gnutls_dir}/lib/includes"
+# LIBGNUTLS_LIBS="-lgnutls -L${gnutls_dir}/lib/.libs -R${gnutls_dir}/lib/.libs"
 
 # Drop entirely: SRP, MSVA
