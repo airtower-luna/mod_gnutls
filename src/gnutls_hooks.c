@@ -1606,7 +1606,6 @@ static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, in
 
 
 
-/* TODO: Allow client sending a X.509 certificate chain */
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
     const gnutls_datum_t *cert_list;
     unsigned int cert_list_size;
@@ -1616,10 +1615,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
     int rv = GNUTLS_E_NO_CERTIFICATE_FOUND, ret;
     unsigned int ch_size = 0;
 
-    // TODO: union no longer needed here after removing its "pgp" component.
-    union {
-        gnutls_x509_crt_t x509[MAX_CHAIN_SIZE];
-    } cert;
+    gnutls_x509_crt_t cert[MAX_CHAIN_SIZE];
     apr_time_t expiration_time, cur_time;
 
     if (r == NULL || ctxt == NULL || ctxt->session == NULL)
@@ -1630,8 +1626,8 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
             gnutls_certificate_get_peers(ctxt->session, &cert_list_size);
 
     if (cert_list == NULL || cert_list_size == 0) {
-        /* It is perfectly OK for a client not to send a certificate if on REQUEST mode
-         */
+        /* It is perfectly OK for a client not to send a certificate
+         * in REQUEST mode */
         if (ctxt->sc->client_verify_mode == GNUTLS_CERT_REQUEST)
             return DECLINED;
 
@@ -1648,8 +1644,8 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
                 cert_list_size);
 
         for (ch_size = 0; ch_size < cert_list_size; ch_size++) {
-            gnutls_x509_crt_init(&cert.x509[ch_size]);
-            rv = gnutls_x509_crt_import(cert.x509[ch_size],
+            gnutls_x509_crt_init(&cert[ch_size]);
+            rv = gnutls_x509_crt_import(cert[ch_size],
                     &cert_list[ch_size],
                     GNUTLS_X509_FMT_DER);
             // When failure to import, leave the loop
@@ -1682,13 +1678,12 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
 
     if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_X509) {
         apr_time_ansi_put(&expiration_time,
-                gnutls_x509_crt_get_expiration_time
-                (cert.x509[0]));
+                          gnutls_x509_crt_get_expiration_time(cert[0]));
 
         ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
                       "GnuTLS: Verifying list of %d certificate(s)",
                       ch_size);
-        rv = gnutls_x509_crt_list_verify(cert.x509, ch_size,
+        rv = gnutls_x509_crt_list_verify(cert, ch_size,
                                          ctxt->sc->ca_list,
                                          ctxt->sc->ca_list_size,
                                          NULL, 0, 0, &status);
@@ -1710,9 +1705,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
         goto exit;
     }
 
-    /* TODO: X509 CRL Verification. */
-    /* May add later if anyone needs it.
-     */
+    /* TODO: Maybe add X509 CRL Verification if anyone needs it. */
     /* ret = gnutls_x509_crt_check_revocation(crt, crl_list, crl_list_size); */
 
     cur_time = apr_time_now();
@@ -1727,7 +1720,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
         gnutls_free(errmsg.data);
     }
 
-    mgs_add_common_cert_vars(r, cert.x509[0], 1, ctxt->sc->export_certificates_size);
+    mgs_add_common_cert_vars(r, cert[0], 1, ctxt->sc->export_certificates_size);
 
     {
         /* days remaining */
@@ -1754,7 +1747,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
 exit:
     if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_X509)
         for (unsigned int i = 0; i < ch_size; i++)
-            gnutls_x509_crt_deinit(cert.x509[i]);
+            gnutls_x509_crt_deinit(cert[i]);
 
     return ret;
 }
