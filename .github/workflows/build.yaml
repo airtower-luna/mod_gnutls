@@ -62,7 +62,7 @@ jobs:
         run: |
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
-          apt-get -y install python3-yaml apache2-bin apache2-dev curl gnutls-bin libapr1-dev libgnutls28-dev openssl make meson pkgconf procps iproute2 softhsm2 clang llvm
+          apt-get -y install python3-yaml apache2-bin apache2-dev curl gnutls-bin libapr1-dev libgnutls28-dev openssl make meson pkgconf procps iproute2 softhsm2 clang llvm gcovr
       - name: build mod_gnutls with coverage support
         uses: ./.github/build-action/
         with:
