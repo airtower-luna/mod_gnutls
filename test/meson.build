@@ -34,13 +34,13 @@ env.set('AP_LIBEXECDIR', mod_dir)
 if namespace_test.returncode() == 0
   env.set('USE_TEST_NAMESPACE', '1')
 endif
-env.set('OCSP_PORT', '@0@'.format(port + 4))
 env.set('OCSP_URI_TEMPLATE',
 	'ocsp_uri = http://@0@:@1@/ocsp/'.format(
 	  get_option('test-host'), port + 4))
 env.set('BACKEND_HOST', get_option('test-host'))
 env.set('BACKEND_PORT', '@0@'.format(port + 2))
 if openssl.found()
+  env.set('OCSP_PORT', '@0@'.format(port + 4))
   env.set('OPENSSL', openssl.path())
 endif
 env.set('PYTHON', python.path())
