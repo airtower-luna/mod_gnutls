@@ -30,9 +30,8 @@ jobs:
           apt-get update
           apt-get -y install meson make git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev pkgconf procps clang clang-tools
       - uses: actions/checkout@v4
-      - name: find usable IPs for tests
-        run: |
-          echo "test_ips=$(python3 test/check_test_ips.py -H localhost)" >> ${GITHUB_ENV}
+      - name: 'workaround for Meson versions < 1.1'
+        run: ln -s meson.options meson_options.txt
       - name: meson setup
         run: scan-build --use-cc=clang meson setup -Dpdf-doc=false build
       - name: meson compile
@@ -60,6 +59,8 @@ jobs:
           apt-get update
           apt-get -y install meson make git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev pkgconf procps cppcheck
       - uses: actions/checkout@v4
+      - name: 'workaround for Meson versions < 1.1'
+        run: ln -s meson.options meson_options.txt
       - name: meson setup
         run: meson setup -Dpdf-doc=false build
       - name: meson compile
@@ -94,6 +95,8 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: cpp
+      - name: 'workaround for Meson versions < 1.1'
+        run: ln -s meson.options meson_options.txt
       - name: meson setup
         run: meson setup -Dpdf-doc=false build
       - name: meson compile
