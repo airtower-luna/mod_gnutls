@@ -18,6 +18,8 @@ namespace_test = run_command(
   'unshare', '--net', '-r', 'sh', '-c', 'ip link set up lo && ip addr show',
   check: false)
 
+softhsm = find_program('softhsm2-util', required: false)
+
 subdir('apache-conf')
 port = 9932
 
@@ -49,6 +51,12 @@ env.set('HTTP_CLI', 'curl')
 if get_option('valgrind-test')
   env.set('ENABLE_VALGRIND', 'true')
   env.set('TEST_QUERY_TIMEOUT', '30')
+endif
+if softhsm.found()
+  env.set('SOFTHSM', softhsm.path())
+  softhsm_db = ['authority/server/softhsm2.db']
+else
+  softhsm_db = []
 endif
 
 test_dirs = custom_target(
@@ -91,7 +99,7 @@ test_pki = custom_target(
     'authority/server/x509-chain.pem',
     'authority/server/x509.pem',
     'authority/server/crl.pem',
-    'authority/server/softhsm2.db',
+    softhsm_db,
     'authority/subca/x509-chain.pem',
     'authority/subca/x509.pem',
     'authority/subca/ocsp-responder/x509.pem',
