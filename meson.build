@@ -33,6 +33,11 @@ apache2 = declare_dependency(
 mod_dir = run_command(apxs, '-q', 'LIBEXECDIR', check: true).stdout().strip()
 
 pandoc = find_program('pandoc', required: false)
+if pandoc.found()
+  pandoc_version = run_command(
+    pandoc, '--version', check: true, capture: true).stdout().split()[1]
+  message('Found Pandoc version:', pandoc_version)
+endif
 httpd = find_program('apache2', 'httpd', dirs: ['/usr/sbin'], required: true)
 
 incdir = include_directories('include')
