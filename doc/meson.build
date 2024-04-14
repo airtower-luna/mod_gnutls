@@ -2,6 +2,13 @@ pdflatex = find_program('pdflatex', required: false)
 doc_style = files('style.css')[0]
 
 if pandoc.found()
+  if pandoc_version.version_compare('>=2.19')
+    self_contained = ['--embed-resources', '--standalone']
+  else
+    # old Pandoc, use now deprecated option
+    self_contained = ['--self-contained']
+  endif
+
   doc_meta = configure_file(input: 'mod_gnutls_manual.yaml.in',
 			    output: 'mod_gnutls_manual.yaml',
 			    configuration : conf_data)
@@ -31,7 +38,7 @@ if pandoc.found()
       doc_style],
     command : [
       pandoc, '--css', '@INPUT2@',
-      '--toc', '--self-contained',
+      '--toc', self_contained,
       '-f', 'markdown',
       '-o', '@OUTPUT@',
       '@INPUT0@', '@INPUT1@'],
