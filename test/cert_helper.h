@@ -34,14 +34,4 @@
  */
 size_t read_cert(const char* filename, gnutls_datum_t* cert);
 
-
-
-/**
- * Transform a DER encoded X.509 certificate to PEM using GnuTLS
- * import/export functions. The caller is responsible for releasing
- * the returned data structure when it is no longer needed. A return
- * value of NULL indicates an error.
- */
-gnutls_datum_t* der_to_pem(const gnutls_datum_t* der);
-
 #endif /* _MGS_CERT_HELPER_H_ */
