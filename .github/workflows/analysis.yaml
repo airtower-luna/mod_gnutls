@@ -83,7 +83,7 @@ jobs:
           checkout_path: ${{ env.CONTAINER_WORKSPACE }}
 
   codeql:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     name: CodeQL
     steps:
       - uses: actions/checkout@v4
@@ -95,10 +95,6 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: cpp
-      - name: 'workarounds for ancient Meson (0.x)'
-        run: |
-          ln -s meson.options meson_options.txt
-          sed -i -e '/verbose: true,/d' test/meson.build
       - name: meson setup
         run: meson setup -Dpdf-doc=false build
       - name: meson compile
