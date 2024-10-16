@@ -220,3 +220,10 @@ def tmp_softhsm_conf(db):
             Path(conf.name).unlink()
             raise
         return conf.name
+
+
+if __name__ == '__main__':
+    import shlex
+    t = Token(os.environ['SOFTHSM2_CONF'])
+    for k, v in t.test_env.items():
+        print(f'{k}={shlex.quote(v)}')
