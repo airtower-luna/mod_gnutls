@@ -45,3 +45,12 @@ subdir('include')
 subdir('src')
 subdir('doc')
 subdir('test')
+
+run_target(
+  'cppcheck',
+  command: ['support/cppcheck-wrapper.sh'])
+
+run_target(
+  'cppcheck-xml',
+  command: ['support/cppcheck-wrapper.sh', '--xml',
+	    '--output-file=' + join_paths(meson.build_root(), 'cppcheck.xml')])
