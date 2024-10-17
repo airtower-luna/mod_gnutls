@@ -68,15 +68,13 @@ jobs:
         run: ln -s meson.options meson_options.txt
       - name: meson setup
         run: meson setup -Dpdf-doc=false build
-      - name: meson compile
-        run: meson compile -C build/
       - name: cppcheck
         run: |
-          cppcheck --project=build/compile_commands.json -DAF_UNIX=1 --enable=warning,style,unusedFunction --xml 2>cppcheck.xml
+          ninja -C build/ cppcheck-xml
       - uses: airtower-luna/convert-to-sarif@v1.0.4
         with:
           tool: 'CppCheck'
-          input_file: 'cppcheck.xml'
+          input_file: 'build/cppcheck.xml'
           sarif_file: 'cppcheck.sarif'
       - name: define CONTAINER_WORKSPACE
         run: |
