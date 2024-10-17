@@ -473,12 +473,12 @@ static gnutls_datum_t mgs_get_cert_fingerprint(apr_pool_t *p,
 
 static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
                                     apr_uri_t *uri,
-                                    gnutls_datum_t *request,
+                                    const gnutls_datum_t *request,
                                     gnutls_datum_t *response)
     __attribute__((nonnull));
 static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
                                     apr_uri_t *uri,
-                                    gnutls_datum_t *request,
+                                    const gnutls_datum_t *request,
                                     gnutls_datum_t *response)
 {
     mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
@@ -946,7 +946,7 @@ apr_uri_t * mgs_cert_get_ocsp_uri(apr_pool_t *p, gnutls_x509_crt_t cert)
         if (ret == GNUTLS_E_SUCCESS)
         {
             /* create NULL terminated string */
-            char *ocsp_str =
+            const char *ocsp_str =
                 apr_pstrndup(tmp, (const char*) ocsp_access_data.data,
                              ocsp_access_data.size);
             gnutls_free(ocsp_access_data.data);
