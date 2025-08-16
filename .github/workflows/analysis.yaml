@@ -44,14 +44,23 @@ jobs:
         run: |
           ninja -C build/ scan-build
       - name: find output file
-        id: sarif-output
+        id: html-output
         run: |
-          echo "file=$(find build/meson-logs/scanbuild/ -name results-merged.sarif)" >> ${GITHUB_OUTPUT}
-      - name: upload SARIF results
-        uses: github/codeql-action/upload-sarif@v3
+          scan_index="$(find build/meson-logs/scanbuild/ -name index.html)"
+          if [ -n "$scan_index" ]; then
+              echo ::warning::clang-analyzer detected errors
+              echo "dir=$(dirname "$scan_index")" >> ${GITHUB_OUTPUT}
+          else
+              echo "dir=" >> ${GITHUB_OUTPUT}
+          fi
+      - name: upload HTML report
+        uses: actions/upload-artifact@v4
+        # If clang-analyzer didn't detect any issues, there's no
+        # report to upload.
+        if: steps.html-output.outputs.dir
         with:
-          sarif_file: ${{ steps.sarif-output.outputs.file }}
-          checkout_path: ${{ env.CONTAINER_WORKSPACE }}
+          name: clang-analyzer-report
+          path: ${{ steps.html-output.outputs.dir }}
 
   cppcheck:
     runs-on: ubuntu-24.04
