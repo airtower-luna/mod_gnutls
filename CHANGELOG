@@ -1,3 +1,14 @@
+** Version 0.13.0 (UNRELEASED)
+
+- Replace Autotools with Meson
+- Drop SRP support
+- Drop Monkeysphere support
+- Update Valgrind suppressions for tests
+- Fix some compiler warnings
+- Tidy up tests, remove dependency on Bash
+- Remove unused configuration options
+- Remove remnants of support for different certificate types
+
 ** Version 0.12.2 (2024-03-12)
 
 - Update project URL

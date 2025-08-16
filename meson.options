@@ -1,0 +1,20 @@
+option('gnutls-debug-log', type: 'boolean', value: false,
+       description: 'Write GnuTLS debug output to /tmp/gnutls_debug, for debugging only!')
+option('pdf-doc', type: 'boolean', value: true,
+       description: 'build PDF documentation')
+option('apxs-bin', type: 'string', value: 'apxs', description: 'path to apxs')
+
+option('test-host', type: 'string', value: 'localhost',
+       description: 'server hostname to use in tests, must resolve to test-ips')
+option('test-ips', type: 'array', value: ['[::1]', '127.0.0.1'],
+       description: 'server addresses to use in tests')
+option('valgrind-test', type: 'boolean', value: false,
+       description: 'if enabled, server instances in tests run under valgrind')
+option('softhsm-lib', type: 'string',
+       description: 'SoftHSM PKCS #11 library to use. If unset, the test suite will search common library paths.')
+
+# Maybe add replacing GnuTLS with build from Git?
+# LIBGNUTLS_CFLAGS="-I${gnutls_dir}/lib/includes"
+# LIBGNUTLS_LIBS="-lgnutls -L${gnutls_dir}/lib/.libs -R${gnutls_dir}/lib/.libs"
+
+# Drop entirely: SRP, MSVA

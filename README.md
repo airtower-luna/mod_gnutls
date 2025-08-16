@@ -17,8 +17,9 @@ Past maintainers and other contributors:
 
 * [GnuTLS](https://www.gnutls.org/) >= 3.6.3
 * [Apache HTTPD](https://httpd.apache.org/) >= 2.4.17
-* autotools, GNU make, & GCC or Clang
-* libmsv >= 0.1 (deprecated, enable with ./configure --enable-msva)
+* [Meson](https://mesonbuild.com/) >= 1.1
+* GCC or Clang
+* GNU Make
 * Python 3 (for tests)
 * [PyYAML](https://pyyaml.org/)
 * [Pandoc](https://pandoc.org/) (for documentation, optional)
@@ -26,27 +27,25 @@ Past maintainers and other contributors:
 
 ## Installation
 
-After cloning the repository or unpacking a release archive, run:
+The build uses Meson, the example below puts the build in a directory
+called `build/`.
 
 ```sh
-autoreconf -fiv
-./configure
-make
-make check
-make install
+meson setup build
+meson compile -C build/
+meson test -C build/
+meson install -C build/
 ```
 
 Then configure and restart Apache.
 
-While not strictly required, it is recommended to run `make check`
-before `make install`. You may need to pass `TEST_HOST` or `TEST_IP`
-to `./configure` for the tests to work correctly if you have an
-unusual network setup, please see [test/README.md](test/README.md) for
-details.
+You may need to set `-Dtest-host` or `-Dtest-ips` in the setup stage
+for the tests to work correctly if you have an unusual network setup,
+please see [test/README.md](test/README.md) for details.
 
 If Doxygen is available, you can build internal API documentation
-using `make doxygen-doc`. The documentation will be placed in
-doc/api/.
+using `meson compile -C build/ api-doc`. The documentation will be
+placed in `build/doc/api/html/`.
 
 ## Configuration
 

@@ -1,6 +1,3 @@
-#!/usr/bin/python3
-# PYTHON_ARGCOMPLETE_OK
-
 # Copyright 2020 Fiona Klute
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,8 +20,8 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(
         description='Initialize a SoftHSM test token')
-    parser.add_argument('--token-dir', type=str, required=True,
-                        help='private key to store in the token')
+    parser.add_argument('--token-dir', type=Path, required=True,
+                        help='token location')
     parser.add_argument('--privkey', type=str, required=True,
                         help='private key to store in the token')
     parser.add_argument('--certificate', type=str, default=None,
@@ -47,7 +44,7 @@ if __name__ == '__main__':
         token.store_key(args.privkey, mgstest.softhsm.test_label)
         if args.certificate:
             token.store_cert(args.certificate, mgstest.softhsm.test_label)
-    except:
+    except Exception:
         # Don't leave a half-done token around, the next make call
         # only checks the directory and would assume it's done.
         shutil.rmtree(args.token_dir)

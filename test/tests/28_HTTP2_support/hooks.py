@@ -7,11 +7,11 @@ from unittest import SkipTest
 
 def prepare_env():
     require_apache_modules('mod_http2.so')
-    curl = os.environ['HTTP_CLI']
-    if curl == 'no':
+    curl = os.environ.get('CURL')
+    if curl is None:
         raise SkipTest('curl not found!')
-    proc = subprocess.run([curl, '-V'], stdout=subprocess.PIPE,
-                          check=True, text=True)
+    proc = subprocess.run(
+        [curl, '-V'], stdout=subprocess.PIPE, check=True, text=True)
     if not re.search(r'\bHTTP2\b', proc.stdout):
         raise SkipTest(f'{curl} does not support HTTP/2!')
 
@@ -21,7 +21,7 @@ def run_connection(testname, conn_log, response_log):
 
     url = f'https://{os.environ["TEST_HOST"]}:{os.environ["TEST_PORT"]}' \
         '/status?auto'
-    command = [os.environ['HTTP_CLI'], '--http2', '--location', '--verbose',
+    command = [os.environ['CURL'], '--http2', '--location', '--verbose',
                '--cacert', 'authority/x509.pem', url]
 
     proc = subprocess.run(command,

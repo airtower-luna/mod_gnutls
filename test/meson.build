@@ -1,0 +1,170 @@
+gen_ocsp_index = executable(
+  'gen_ocsp_index', 'gen_ocsp_index.c', 'cert_helper.c',
+  dependencies: [gnutls])
+
+python = import('python').find_installation(modules: ['yaml'])
+
+testscripts = files(
+  [
+    'doctest-mgstest.py',
+    'tap.py',
+    'test_ca.mk',
+    'unittest-mgstest.py',
+  ])
+doctest = testscripts[0]
+tap_py = testscripts[1]
+test_ca = testscripts[2]
+unittest = testscripts[3]
+
+# check permission to use namespaces
+unshare = find_program('unshare', required: false)
+if unshare.found()
+  namespace_test = run_command(
+    unshare, '--net', '-r', 'sh', '-c', 'ip link set up lo && ip addr show',
+    check: false)
+endif
+
+softhsm = find_program('softhsm2-util', required: false)
+openssl = find_program('openssl', required: false)
+curl = find_program('curl', required: false)
+
+subdir('apache-conf')
+port = 9932
+suite_timeout = 30
+
+env = environment()
+env.set('srcdir', meson.current_source_dir())
+env.set('builddir', meson.current_build_dir())
+env.set('MESON_BUILD_ROOT', meson.project_build_root())
+env.set('TEST_HOST', get_option('test-host'))
+env.set('TEST_IP', get_option('test-ips'), separator: ' ')
+env.set('TEST_PORT', f'@port@')
+env.set('TEST_HTTP_PORT', '@0@'.format(port + 1))
+env.set('BACKEND_HOST', get_option('test-host'))
+env.set('BACKEND_PORT', '@0@'.format(port + 2))
+env.set('APACHE2', httpd.path())
+env.set('AP_LIBEXECDIR', mod_dir)
+env.set('PYTHON', python.path())
+
+env.set('OCSP_URI_TEMPLATE',
+	'ocsp_uri = http://@0@:@1@/ocsp/'.format(
+	  get_option('test-host'), port + 4))
+if openssl.found()
+  env.set('OCSP_PORT', '@0@'.format(port + 4))
+  env.set('OPENSSL', openssl.path())
+endif
+
+if unshare.found() and namespace_test.returncode() == 0
+  env.set('UNSHARE', unshare.path())
+  env.set('USE_TEST_NAMESPACE', '1')
+else
+  suite_timeout = 90
+endif
+
+if curl.found()
+  env.set('CURL', curl.path())
+endif
+
+if get_option('valgrind-test')
+  env.set('ENABLE_VALGRIND', 'true')
+  env.set('TEST_QUERY_TIMEOUT', '30')
+  suite_timeout = 900
+endif
+
+if softhsm.found()
+  env.set('SOFTHSM', softhsm.path())
+  softhsm_db = ['authority/server/softhsm2.db']
+else
+  softhsm_db = []
+endif
+softhsm_lib = get_option('softhsm-lib')
+if softhsm_lib != ''
+  env.set('SOFTHSM_LIB', softhsm_lib)
+endif
+
+test_dirs = custom_target(
+  'create directories used for tests',
+  output: ['cache', 'logs', 'outputs'],
+  input: [],
+  command: ['mkdir', '-p', '@OUTPUT@'])
+
+test_pki = custom_target(
+  'build test PKI',
+  build_always_stale: true,
+  output: ['authority', 'rogueca'],
+  input: [
+    test_ca,
+    'authority/meow.test/template.in',
+    'authority/subca/ocsp-responder/template.in',
+    'authority/subca/server/template.in',
+    'authority/subca/template.in',
+    'authority/client/template.in',
+    'authority/ocsp-responder/template.in',
+    'authority/server/template.in',
+    'authority/template.in',
+    'rogueca/rogueclient/template.in',
+    'rogueca/imposter/template.in',
+    'rogueca/template.in',
+  ],
+  depends: [gen_ocsp_index],
+  command: [
+    'make', '--no-builtin-rules',
+    '-C', '@OUTDIR@',
+    '-f', meson.project_source_root() / 'test' / 'test_ca.mk',
+    'authority/x509.pem',
+    'authority/x509-chain.pem',
+    'authority/client/x509.pem',
+    'authority/meow.test/x509-chain.pem',
+    'authority/meow.test/x509.pem',
+    'authority/ocsp-responder/x509.pem',
+    'authority/server/x509-chain.pem',
+    'authority/server/x509.pem',
+    'authority/server/crl.pem',
+    softhsm_db,
+    'authority/subca/x509-chain.pem',
+    'authority/subca/x509.pem',
+    'authority/subca/ocsp-responder/x509.pem',
+    'authority/subca/server/x509-chain.pem',
+    'authority/subca/server/x509.pem',
+    'rogueca/x509.pem',
+    'rogueca/imposter/x509.pem',
+    'rogueca/rogueclient/x509.pem',
+    'authority/ocsp_index.txt',
+    'authority/ocsp_index.txt.attr',
+    'authority/subca/ocsp_index.txt',
+    'authority/subca/ocsp_index.txt.attr',
+  ],
+  env: env)
+
+test('integration', python, args: [tap_py],
+     env: env,
+     protocol: 'tap',
+     workdir: meson.current_build_dir(),
+     timeout: suite_timeout,
+     verbose: true,
+     depends: [test_pki, test_dirs, mod_gnutls, listen_conf, modules_conf])
+
+test('doctest', python, args: [doctest],
+     env: env,
+     depends: [test_pki, mod_gnutls])
+
+test('unittest', python, args: [unittest],
+     env: env,
+     depends: [test_pki, mod_gnutls])
+
+if pandoc.found()
+  test_doc = custom_target(
+    'test-doc',
+    output : 'README.html',
+    input : [
+      'README.md',
+      doc_style],
+    command : [
+      pandoc, '--css', '@INPUT1@',
+      '--toc', '--self-contained',
+      '-f', 'markdown',
+      '--metadata', 'title=mod_gnutls test system',
+      '-o', '@OUTPUT@',
+      '@INPUT0@'],
+    install_tag: 'doc')
+endif

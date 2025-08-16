@@ -1,6 +1,4 @@
-#!/usr/bin/python3
-
-# Copyright 2019-2020 Fiona Klute
+# Copyright 2019-2024 Fiona Klute
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,6 +30,7 @@ class HTTPSubprocessConnection(HTTPConnection):
 
     """
     def __init__(self, command, host, port=None,
+                 cwd=None,
                  output_filter=None,
                  stderr_log=None,
                  timeout=socket.getdefaulttimeout(),
@@ -42,6 +41,8 @@ class HTTPSubprocessConnection(HTTPConnection):
         # "command" must be a list containing binary and command line
         # parameters
         self.command = command
+        # working directory for the command
+        self.cwd = cwd
         # This will be the subprocess reference when connected
         self._sproc = None
         # The subprocess return code is stored here on close()
@@ -71,6 +72,7 @@ class HTTPSubprocessConnection(HTTPConnection):
                                            stdout=subprocess.PIPE,
                                            stderr=subprocess.PIPE,
                                            stdin=s_remote, close_fds=True,
+                                           cwd=self.cwd,
                                            bufsize=0)
             self._fthread = Thread(target=self._output_filter,
                                    args=(self._sproc.stdout, s_remote))
@@ -79,6 +81,7 @@ class HTTPSubprocessConnection(HTTPConnection):
             self._sproc = subprocess.Popen(self.command, stdout=s_remote,
                                            stderr=subprocess.PIPE,
                                            stdin=s_remote, close_fds=True,
+                                           cwd=self.cwd,
                                            bufsize=0)
         self._ethread = Thread(target=_stderr_writer,
                                args=(self._sproc.stderr, self._stderr_log))

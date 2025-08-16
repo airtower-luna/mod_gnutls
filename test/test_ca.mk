@@ -25,36 +25,6 @@
 
 .PRECIOUS: %/secret.key
 
-%/secret.pgp.raw: %/uid %/secret.key
-	PEM2OPENPGP_USAGE_FLAGS=authenticate,certify,sign pem2openpgp "$$(cat $<)" < $(dir $@)secret.key > $@
-
-%/secret.pgp: %/secret.pgp.raw pgpcrc
-	(printf -- '-----BEGIN PGP PRIVATE KEY BLOCK-----\nVersion: test\n\n' && \
-	base64 < $< && \
-	printf -- '=' && \
-	./pgpcrc < $< | base64 && \
-	printf -- '-----END PGP PRIVATE KEY BLOCK-----\n' ) > $@
-
-%/gpg.conf: %/secret.pgp
-	rm -f $(dir $@)pubring.gpg $(dir $@)secring.gpg $(dir $@)trustdb.gpg $(dir $@)pubring.kbx $(dir $@)private-keys-v1.d/*.key
-	GNUPGHOME=$(dir $@) gpg --import $<
-	printf "%s:6:\n" "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" | GNUPGHOME=$(dir $@) gpg --import-ownertrust
-	printf "default-key %s\n" "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)" > $@
-
-%/minimal.pgp: %/gpg.conf
-	if test -r $@; then rm $@; fi
-	GNUPGHOME=$(dir $@) gpg --output $@ --armor --export "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)"
-
-# Import and signing modify the shared keyring, which leads to race
-# conditions with parallel make. Locking avoids this problem. Building
-# authority/minimal.pgp (instead of just authority/gpg.conf) before
-# */cert.pgp avoids having to lock for all */minimal.pgp, too.
-%/cert.pgp: %/minimal.pgp authority/minimal.pgp
-	if test -r $@; then rm $@; fi
-	GNUPGHOME=authority/ $(GPG_FLOCK) gpg --import $<
-	GNUPGHOME=authority/ $(GPG_FLOCK) gpg --batch --sign-key --no-tty --yes "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)"
-	GNUPGHOME=authority/ $(GPG_FLOCK) gpg --output $@ --armor --export "$$(GNUPGHOME=$(dir $@) gpg --with-colons --list-secret-keys --fingerprint | grep ^fpr: | cut -f 10 -d :)"
-
 # special rule for root CAs
 root_cert_rule = certtool --outfile $@ --generate-self-signed --load-privkey $(dir $@)secret.key --template $<
 root_chain_rule = cp $< $@
@@ -99,3 +69,12 @@ rogueca/%/x509.pem: rogueca/%/template rogueca/%/secret.key rogueca/x509.pem
 		--load-ca-certificate authority/x509.pem \
 		--load-certificate $< \
 		--template "$(srcdir)/$(*)/crl.template"
+
+# The "find" command builds a list of all certificates directly below
+# the CA that aren't for the ocsp-responder.
+%/ocsp_index.txt: $(x509_tokens) gen_ocsp_index
+	./gen_ocsp_index $$(find $(*) -mindepth 2 -maxdepth 2 ! -path '*/ocsp-responder/*' -name x509.pem) > $@
+
+%/ocsp_index.txt.attr:
+	@mkdir -m 0700 -p $(dir $@)
+	echo "unique_subject = no" > $@

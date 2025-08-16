@@ -19,7 +19,6 @@
 #include <gnutls/x509.h>
 
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,14 +52,14 @@ size_t read_cert(const char* filename, gnutls_datum_t* cert)
         certfile = open(filename, O_RDONLY);
         if (certfile == -1)
         {
-            error(0, errno, "opening certificate file %s failed",
-                  filename);
+            fprintf(stderr, "opening certificate file %s failed",
+                    filename);
             return errno;
         }
         struct stat filestat;
         if (fstat(certfile, &filestat))
         {
-            error(0, errno, "fstat on certificate file failed");
+            perror("fstat on certificate file failed");
             return errno;
         }
         /* buffer size with one extra byte for NULL termination */
@@ -70,7 +69,7 @@ size_t read_cert(const char* filename, gnutls_datum_t* cert)
     cert->data = malloc(bufsize);
     if (!cert->data)
     {
-        error(0, errno, "allocating certificate buffer failed");
+        perror("allocating certificate buffer failed");
         return errno;
     }
 
@@ -88,7 +87,7 @@ size_t read_cert(const char* filename, gnutls_datum_t* cert)
     /* report error, if any */
     if (r < 0)
     {
-        error(0, errno, "reading certificate file failed");
+        perror("reading certificate file failed");
         free(cert->data);
         cert->data = NULL;
         cert->size = 0;
@@ -101,7 +100,7 @@ size_t read_cert(const char* filename, gnutls_datum_t* cert)
     cert->data = realloc(cert->data, cert->size);
     if (!cert->data)
     {
-        error(0, errno, "trimming certificate buffer failed");
+        perror("trimming certificate buffer failed");
         return errno;
     }
 
@@ -110,41 +109,4 @@ size_t read_cert(const char* filename, gnutls_datum_t* cert)
         close(certfile);
 
     return GNUTLS_E_SUCCESS;
-}
-
-
-
-/**
- * Transform a DER encoded X.509 certificate to PEM using GnuTLS
- * import/export functions. The caller is responsible for releasing
- * the returned data structure when it is no longer needed. A return
- * value of NULL indicates an error.
- */
-gnutls_datum_t* der_to_pem(const gnutls_datum_t* der)
-{
-    gnutls_x509_crt_t cert;
-    gnutls_datum_t* pem = calloc(1, sizeof(gnutls_datum_t));
-
-    gnutls_x509_crt_init(&cert);
-    int rv = gnutls_x509_crt_import(cert, der, GNUTLS_X509_FMT_DER);
-
-    if (rv == GNUTLS_E_SUCCESS)
-    {
-        size_t s = CERT_BUF_SIZE;
-        pem->data = malloc(s);
-        rv = gnutls_x509_crt_export(cert, GNUTLS_X509_FMT_PEM, pem->data, &s);
-        pem->size = s;
-    }
-
-    if (rv != GNUTLS_E_SUCCESS)
-    {
-        fprintf(stderr, "certificate transformation failed: %s\n",
-                gnutls_strerror(rv));
-        free(pem->data);
-        free(pem);
-        pem = NULL;
-    }
-
-    gnutls_x509_crt_deinit(cert);
-    return pem;
 }

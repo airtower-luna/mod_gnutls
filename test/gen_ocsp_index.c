@@ -45,16 +45,16 @@ static int index_line(const char* filename)
     /* For each certificate the index file contains a line with the
      * tab separated fields declared below (in that order). */
     /* status, one of: V (valid), R (revoked), E (expired) */
-    char* flag = "V";
+    const char* flag = "V";
     /* expiration time (YYMMDDHHMMSSZ) */
     char expires[14];
     /* revocation time & optional reason (YYMMDDHHMMSSZ[,reason]), if
      * any */
-    char* revocation = "";
+    const char* revocation = "";
     /* serial number (hex), allocated when the length is known */
     char* serial = NULL;
     /* certificate filename, or "unknown" */
-    char* fname = "unknown";
+    const char* fname = "unknown";
     /* certificate DN */
     char dn[512];
 
@@ -73,7 +73,7 @@ static int index_line(const char* filename)
     /* actually get the serial */
     gnutls_x509_crt_get_serial(cert, sno, &serial_size);
     /* print serial into the buffer byte for byte */
-    for (int i = 0; i < serial_size; i++)
+    for (size_t i = 0; i < serial_size; i++)
         snprintf(serial + (2 * i), 3, "%.2X", sno[i]);
     /* free binary serial */
     free(sno);

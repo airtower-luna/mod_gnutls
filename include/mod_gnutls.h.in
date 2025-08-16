@@ -57,12 +57,6 @@ extern module AP_MODULE_DECLARE_DATA gnutls_module;
 /* Internal cache data, defined in gnutls_cache.h */
 typedef struct mgs_cache* mgs_cache_t;
 
-typedef enum {
-    mgs_cvm_unset,
-    mgs_cvm_cartel,
-    mgs_cvm_msva
-} mgs_client_verification_method_e;
-
 
 /* Directory Configuration Record */
 typedef struct {
@@ -107,9 +101,6 @@ typedef struct {
     char *priorities_str;
     char *proxy_priorities_str;
 
-    const char* srp_tpasswd_file;
-    const char* srp_tpasswd_conf_file;
-
 	/* Cache timeout value */
     int cache_timeout;
     /* Enable cache */
@@ -132,8 +123,6 @@ typedef struct {
     const char* proxy_x509_crl_file;
     /* GnuTLS priorities for proxy connections */
     gnutls_priority_t proxy_priorities;
-    /* SRP Certificate Structure*/
-    gnutls_srp_server_credentials_t srp_creds;
     /* Anonymous Certificate Structure */
     gnutls_anon_server_credentials_t anon_creds;
     /* Anonymous Client Certificate Structure, used for proxy
@@ -160,8 +149,6 @@ typedef struct {
     unsigned int ca_list_size;
 	/* Client Certificate Verification Mode */
     int client_verify_mode;
-	/* Client Certificate Verification Method */
-    mgs_client_verification_method_e client_verify_method;
 
     /* Enable OCSP stapling */
     unsigned char ocsp_staple;
@@ -301,10 +288,6 @@ int mgs_pkcs11_reinit(server_rec * s);
 int mgs_load_files(apr_pool_t *pconf, apr_pool_t *ptemp, server_rec *s)
     __attribute__((nonnull));
 
-const char *mgs_set_srp_tpasswd_conf_file(cmd_parms * parms, void *dummy,
-                                        const char *arg);
-const char *mgs_set_srp_tpasswd_file(cmd_parms * parms, void *dummy,
-                                        const char *arg);
 const char *mgs_set_dh_file(cmd_parms * parms, void *dummy,
                                         const char *arg);
 const char *mgs_set_cert_file(cmd_parms * parms, void *dummy,
@@ -317,9 +300,6 @@ const char *mgs_set_timeout(cmd_parms *parms, void *dummy, const char *arg);
 
 const char *mgs_set_client_verify(cmd_parms * parms, void *dummy,
                                   const char *arg);
-
-const char *mgs_set_client_verify_method(cmd_parms * parms, void *dummy,
-                                         const char *arg);
 
 const char *mgs_set_client_ca_file(cmd_parms * parms, void *dummy,
                                    const char *arg);

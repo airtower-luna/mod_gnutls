@@ -1,25 +1,4 @@
 *~
-*.o
-*.lo
-*.la
-Makefile
-Makefile.in
-config
-autom4te.cache
-configure
-config.*
-libtool
-src/.deps
-src/.libs
-include/mod_gnutls.h
-include/mod_gnutls_config.h
-include/stamp-h1
-aclocal.m4
-m4/libtool.m4
-m4/ltoptions.m4
-m4/ltsugar.m4
-m4/ltversion.m4
-m4/lt~obsolete.m4
 # clangd cache and compile config
 /.cache
 /compile_commands.json

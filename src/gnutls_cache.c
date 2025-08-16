@@ -64,7 +64,7 @@ APLOG_USE_MODULE(gnutls);
  *
  * @return `0` on success, `-1` on failure
  */
-static int mgs_session_id2dbm(conn_rec *c, unsigned char *id, int idlen,
+static int mgs_session_id2dbm(conn_rec *c, const unsigned char *id, int idlen,
                               gnutls_datum_t *dbmkey)
 {
     char sz[GNUTLS_SESSION_ID_STRING_LEN];

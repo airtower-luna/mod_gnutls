@@ -53,7 +53,7 @@
     - x509cafile=authority/x509.pem
   actions:
     - !request
-      path: /dump.cgi
+      path: /test.txt
       headers:
         Host: meow.test
       expect:

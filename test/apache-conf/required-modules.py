@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 import os
 import re
 import subprocess
@@ -14,8 +13,7 @@ result = subprocess.run([apache2, '-l'], check=True,
 built_in_modules = set()
 mod_re = re.compile(r'^\s+mod_(\w+)\.c')
 for line in result.stdout.splitlines():
-    m = mod_re.match(line)
-    if m:
+    if (m := mod_re.match(line)):
         built_in_modules.add(m.group(1))
 
 for mod in (required_modules - built_in_modules):
@@ -25,7 +23,7 @@ for mod in (required_modules - built_in_modules):
 mpm_choices = ['event', 'worker']
 mod_dir = Path(os.environ['AP_LIBEXECDIR'])
 for mpm in mpm_choices:
-    mod = mod_dir.joinpath(f'mod_mpm_{mpm}.so')
-    if mod.exists():
-        print(f'LoadModule\tmpm_{mpm}_module\t{mod!s}')
+    mod_lib = mod_dir / f'mod_mpm_{mpm}.so'
+    if mod_lib.exists():
+        print(f'LoadModule\tmpm_{mpm}_module\t{mod_lib!s}')
         break

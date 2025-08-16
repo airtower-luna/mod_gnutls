@@ -213,9 +213,17 @@ def tmp_softhsm_conf(db):
             prefix='mod_gnutls_test-', suffix='.conf', delete=False) as conf:
         try:
             conf.write(b'objectstore.backend = file\n')
-            conf.write(f'directories.tokendir = {Path(db).resolve()!s}\n'
+            conf.write(f'directories.tokendir = {db.resolve()!s}\n'
                        .encode())
-        except:
-            Path(conf).unlink()
+            conf.flush()
+        except Exception:
+            Path(conf.name).unlink()
             raise
         return conf.name
+
+
+if __name__ == '__main__':
+    import shlex
+    t = Token(os.environ['SOFTHSM2_CONF'])
+    for k, v in t.test_env.items():
+        print(f'{k}={shlex.quote(v)}')

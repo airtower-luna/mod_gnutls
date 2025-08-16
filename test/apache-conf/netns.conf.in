@@ -1,4 +1,0 @@
-# This file contains options that are different depending on whether
-# tests use namespaces or not.
-@MUTEX_CONF@
-PidFile	apache2@PID_AFFIX@.pid

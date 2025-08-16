@@ -20,7 +20,7 @@ permissions:
 jobs:
 
   clang:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     container: debian:bookworm
     name: clang-analyzer
     steps:
@@ -28,37 +28,42 @@ jobs:
         run: |
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
-          apt-get -y install git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev pkgconf procps clang clang-tools
+          apt-get -y install meson make git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev pkgconf procps clang clang-tools
       - uses: actions/checkout@v4
-      - name: find usable IPs for tests
-        run: |
-          echo "test_ips=$(python3 test/check_test_ips.py -H localhost)" >> ${GITHUB_ENV}
-      - name: autoreconf
-        run: autoreconf -fiv
-      - name: configure
-        run: scan-build --use-cc=clang ./configure TEST_IP="${test_ips}" APACHE_MUTEX=pthread CFLAGS=-Wno-error=null-pointer-subtraction
-      - name: store config.log
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: scan-build-config-log
-          path: config.log
-      - name: make
-        run: scan-build -sarif -o sarif-output --use-cc=clang make
-      - name: find output directory
-        run: |
-          echo "SARIF_DIR=$(ls -d sarif-output/*)" >> ${GITHUB_ENV}
+      - name: 'workaround for Meson versions < 1.1'
+        run: ln -s meson.options meson_options.txt
       - name: define CONTAINER_WORKSPACE
         run: |
           echo "CONTAINER_WORKSPACE=${PWD}" >> ${GITHUB_ENV}
-      - name: upload SARIF results
-        uses: github/codeql-action/upload-sarif@v3
+      - name: meson setup
+        run: |
+          meson setup -Dpdf-doc=false build
+      - name: ninja scan-build
+        env:
+          SCANBUILD: '${{ env.CONTAINER_WORKSPACE }}/support/scan-build-wrapper.sh'
+        run: |
+          ninja -C build/ scan-build
+      - name: find output file
+        id: html-output
+        run: |
+          scan_index="$(find build/meson-logs/scanbuild/ -name index.html)"
+          if [ -n "$scan_index" ]; then
+              echo ::warning::clang-analyzer detected errors
+              echo "dir=$(dirname "$scan_index")" >> ${GITHUB_OUTPUT}
+          else
+              echo "dir=" >> ${GITHUB_OUTPUT}
+          fi
+      - name: upload HTML report
+        uses: actions/upload-artifact@v4
+        # If clang-analyzer didn't detect any issues, there's no
+        # report to upload.
+        if: steps.html-output.outputs.dir
         with:
-          sarif_file: ${{ env.SARIF_DIR }}
-          checkout_path: ${{ env.CONTAINER_WORKSPACE }}
+          name: clang-analyzer-report
+          path: ${{ steps.html-output.outputs.dir }}
 
   cppcheck:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     container: debian:bookworm
     name: cppcheck
     steps:
@@ -66,21 +71,19 @@ jobs:
         run: |
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
-          apt-get -y install git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev pkgconf procps bear cppcheck
+          apt-get -y install meson make git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev pkgconf procps cppcheck
       - uses: actions/checkout@v4
-      - name: autoreconf
-        run: autoreconf -fiv
-      - name: configure
-        run: ./configure APACHE_MUTEX=pthread
-      - name: make and create compile_commands.json
-        run: bear -- make -j4
+      - name: 'workaround for Meson versions < 1.1'
+        run: ln -s meson.options meson_options.txt
+      - name: meson setup
+        run: meson setup -Dpdf-doc=false build
       - name: cppcheck
         run: |
-          cppcheck --project=compile_commands.json -DAF_UNIX=1 --enable=warning,style,unusedFunction --xml 2>cppcheck.xml
+          ninja -C build/ cppcheck-xml
       - uses: airtower-luna/convert-to-sarif@v1.0.4
         with:
           tool: 'CppCheck'
-          input_file: 'cppcheck.xml'
+          input_file: 'build/cppcheck.xml'
           sarif_file: 'cppcheck.sarif'
       - name: define CONTAINER_WORKSPACE
         run: |
@@ -92,23 +95,21 @@ jobs:
           checkout_path: ${{ env.CONTAINER_WORKSPACE }}
 
   codeql:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     name: CodeQL
     steps:
       - uses: actions/checkout@v4
       - name: install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y install python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev pkgconf procps
+          sudo apt-get -y install meson make python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev pkgconf procps
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: cpp
-      - name: autoreconf
-        run: autoreconf -fiv
-      - name: configure
-        run: ./configure --disable-pdf-doc
-      - name: make
-        run: make -j4
+      - name: meson setup
+        run: meson setup -Dpdf-doc=false build
+      - name: meson compile
+        run: meson compile -C build/
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3

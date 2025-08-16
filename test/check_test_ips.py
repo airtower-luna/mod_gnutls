@@ -1,5 +1,3 @@
-#!/usr/bin/python3
-
 # Copyright 2020 Fiona Klute
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,6 +23,7 @@ addresses to sys.stdout. IPv6 addresses in the output are enclosed in
 square brackets.
 
 """
+import ipaddress
 import socket
 import sys
 
@@ -68,7 +67,7 @@ if __name__ == "__main__":
 
     test_ips = []
     for name in args.hosts:
-        addrs = list(map(lambda t: t[-1][0],
+        addrs = list(map(lambda t: ipaddress.ip_address(t[-1][0]),
                          filter(try_connect,
                                 socket.getaddrinfo(name, 12345,
                                                    proto=socket.IPPROTO_UDP))))
@@ -76,4 +75,6 @@ if __name__ == "__main__":
             print(f'{name}: {addrs}', file=sys.stderr)
         test_ips += addrs
 
-    print(' '.join(f'[{i}]' if ':' in i else i for i in test_ips[:2]))
+    print(repr([
+        f'[{i!s}]' if isinstance(i, ipaddress.IPv6Address) else str(i)
+        for i in test_ips[:2]]))
