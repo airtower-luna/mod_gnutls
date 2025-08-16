@@ -29,7 +29,7 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
           apt-get -y install meson make git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev pkgconf procps clang clang-tools
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: 'workaround for Meson versions < 1.1'
         run: ln -s meson.options meson_options.txt
       - name: define CONTAINER_WORKSPACE
@@ -72,7 +72,7 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
           apt-get -y install meson make git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev pkgconf procps cppcheck
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: 'workaround for Meson versions < 1.1'
         run: ln -s meson.options meson_options.txt
       - name: meson setup
@@ -98,7 +98,7 @@ jobs:
     runs-on: ubuntu-24.04
     name: CodeQL
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: install dependencies
         run: |
           sudo apt-get update
