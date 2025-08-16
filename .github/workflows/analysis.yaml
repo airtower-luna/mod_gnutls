@@ -56,6 +56,7 @@ jobs:
         with:
           sarif_file: ${{ env.SARIF_DIR }}
           checkout_path: ${{ env.CONTAINER_WORKSPACE }}
+          category: clang-analyzer
 
   cppcheck:
     runs-on: ubuntu-22.04
@@ -90,6 +91,7 @@ jobs:
         with:
           sarif_file: 'cppcheck.sarif'
           checkout_path: ${{ env.CONTAINER_WORKSPACE }}
+          category: cppcheck
 
   codeql:
     runs-on: ubuntu-22.04
