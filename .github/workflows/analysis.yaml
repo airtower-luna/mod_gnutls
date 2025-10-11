@@ -80,7 +80,7 @@ jobs:
       - name: cppcheck
         run: |
           ninja -C build/ cppcheck-xml
-      - uses: airtower-luna/convert-to-sarif@v1.0.4
+      - uses: airtower-luna/convert-to-sarif@v1.1.0
         with:
           tool: 'CppCheck'
           input_file: 'build/cppcheck.xml'
