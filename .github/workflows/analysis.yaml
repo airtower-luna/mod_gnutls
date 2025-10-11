@@ -89,7 +89,7 @@ jobs:
         run: |
           echo "CONTAINER_WORKSPACE=${PWD}" >> ${GITHUB_ENV}
       - name: upload SARIF results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'cppcheck.sarif'
           checkout_path: ${{ env.CONTAINER_WORKSPACE }}
@@ -104,7 +104,7 @@ jobs:
           sudo apt-get update
           sudo apt-get -y install meson make python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev pkgconf procps
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: cpp
       - name: meson setup
@@ -112,4 +112,4 @@ jobs:
       - name: meson compile
         run: meson compile -C build/
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
