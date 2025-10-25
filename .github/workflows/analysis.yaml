@@ -54,7 +54,7 @@ jobs:
               echo "dir=" >> ${GITHUB_OUTPUT}
           fi
       - name: upload HTML report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         # If clang-analyzer didn't detect any issues, there's no
         # report to upload.
         if: steps.html-output.outputs.dir
