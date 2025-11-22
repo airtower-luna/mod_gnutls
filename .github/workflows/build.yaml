@@ -26,7 +26,7 @@ jobs:
     container: ${{ matrix.container }}
     name: ${{ matrix.container }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: install dependencies (Debian)
         if: startsWith(matrix.container, 'debian')
         run: |
@@ -57,7 +57,7 @@ jobs:
     container: debian:trixie
     name: coverage
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: install dependencies
         run: |
           export DEBIAN_FRONTEND=noninteractive
