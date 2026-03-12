@@ -1,5 +1,6 @@
 project('mod_gnutls', 'c',
 	version: '0.12.3',
+	meson_version: '>=1.1',
 	license: 'Apache-2.0',
 	# enable when all CI jobs use Meson >= 1.1 (Trixie release)
 	# license_files: 'LICENSE',
@@ -53,4 +54,4 @@ run_target(
 run_target(
   'cppcheck-xml',
   command: ['support/cppcheck-wrapper.sh', '--xml',
-	    '--output-file=' + join_paths(meson.build_root(), 'cppcheck.xml')])
+	    '--output-file=' + join_paths(meson.project_build_root(), 'cppcheck.xml')])
