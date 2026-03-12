@@ -1621,6 +1621,12 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
                 "GnuTLS: Failed to Verify Peer: "
                 "Client did not submit a certificate");
         return HTTP_FORBIDDEN;
+    } else if (cert_list_size > MAX_CHAIN_SIZE) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
+                      "Client sent certificate chain with length %u, "
+                      "maximum supported length is %u",
+                      cert_list_size, MAX_CHAIN_SIZE);
+        return HTTP_FORBIDDEN;
     }
 
     if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_X509) {
