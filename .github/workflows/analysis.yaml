@@ -21,7 +21,7 @@ jobs:
 
   clang:
     runs-on: ubuntu-24.04
-    container: debian:bookworm
+    container: debian:trixie
     name: clang-analyzer
     steps:
       - name: install dependencies
@@ -30,8 +30,6 @@ jobs:
           apt-get update
           apt-get -y install meson make git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev pkgconf procps clang clang-tools
       - uses: actions/checkout@v6
-      - name: 'workaround for Meson versions < 1.1'
-        run: ln -s meson.options meson_options.txt
       - name: define CONTAINER_WORKSPACE
         run: |
           echo "CONTAINER_WORKSPACE=${PWD}" >> ${GITHUB_ENV}
@@ -64,7 +62,7 @@ jobs:
 
   cppcheck:
     runs-on: ubuntu-24.04
-    container: debian:bookworm
+    container: debian:trixie
     name: cppcheck
     steps:
       - name: install dependencies
@@ -73,8 +71,6 @@ jobs:
           apt-get update
           apt-get -y install meson make git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev pkgconf procps cppcheck
       - uses: actions/checkout@v6
-      - name: 'workaround for Meson versions < 1.1'
-        run: ln -s meson.options meson_options.txt
       - name: meson setup
         run: meson setup -Dpdf-doc=false build
       - name: cppcheck

@@ -27,9 +27,6 @@ runs:
       shell: sh
       run: |
         echo "test_ips=$(python3 test/check_test_ips.py -H localhost)" >> ${GITHUB_ENV}
-    - name: 'workaround for Meson versions < 1.1'
-      shell: sh
-      run: ln -s meson.options meson_options.txt
     - name: meson setup
       shell: sh
       run: meson setup -Dtest-ips="${TEST_IPS}" ${{ inputs.configure-options }} build

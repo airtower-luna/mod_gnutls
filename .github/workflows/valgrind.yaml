@@ -17,9 +17,9 @@ permissions:
   contents: read
 
 jobs:
-  debian-bookworm:
+  debian-trixie:
     runs-on: ubuntu-latest
-    container: debian:bookworm
+    container: debian:trixie
     steps:
       - uses: actions/checkout@v6
       - name: install dependencies
