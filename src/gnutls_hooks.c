@@ -1611,7 +1611,15 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
     if (r == NULL || ctxt == NULL || ctxt->session == NULL)
         return HTTP_FORBIDDEN;
 
-    int rv = gnutls_certificate_verify_peers(ctxt->session, NULL, 0, &status);
+    /* TODO: make configurable with current value as default, add
+     * test for different (configured) value */
+    gnutls_typed_vdata_st verify_data = {
+        .type = GNUTLS_DT_KEY_PURPOSE_OID,
+        .data = (unsigned char *) GNUTLS_KP_TLS_WWW_CLIENT,
+        .size = strlen(GNUTLS_KP_TLS_WWW_CLIENT),
+    };
+
+    int rv = gnutls_certificate_verify_peers(ctxt->session, &verify_data, 1, &status);
     if (rv < 0) {
         ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
                 "Failed to verify peer certificate: (%d) %s",

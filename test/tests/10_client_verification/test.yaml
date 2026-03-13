@@ -44,3 +44,22 @@
           contains:
             - 'Forbidden'
             - "You don't have permission to access this resource."
+
+- !connection
+  description: >-
+    The server requires authentication, a client with a trusted
+    certificate with invalid Extended Key Usage receives a 403
+    Forbidden response.
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+    - x509keyfile=authority/client-eku-server/secret.key
+    - x509certfile=authority/client-eku-server/x509.pem
+  actions:
+    - !request
+      path: /test.txt
+      expect:
+        status: 403
+        body:
+          contains:
+            - 'Forbidden'
+            - "You don't have permission to access this resource."
