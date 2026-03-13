@@ -726,6 +726,18 @@ int mgs_hook_post_config(apr_pool_t *pconf,
             return HTTP_UNAUTHORIZED;
         }
 
+        if (sc->ca_list != NULL) {
+            rv = gnutls_certificate_set_x509_trust(sc->certs, sc->ca_list, sc->ca_list_size);
+            if (rv < 0) {
+                ap_log_error(APLOG_MARK, APLOG_STARTUP, APR_EGENERAL, s,
+                             "%s: failed to load client CA list for %s:%d: %s (%d)",
+                              __func__, s->server_hostname, s->addrs->host_port,
+                              gnutls_strerror(rv), rv);
+                return HTTP_UNAUTHORIZED;
+            }
+            /* if anyone needs it, CRL could be added after */
+        }
+
         if (sc->certs_x509_chain_num > 0
             && gnutls_x509_tlsfeatures_check_crt(*must_staple,
                                                  sc->certs_x509_crt_chain[0])
@@ -1592,116 +1604,25 @@ static void mgs_add_common_cert_vars(request_rec * r, gnutls_x509_crt_t cert, in
 
 
 static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
-    const gnutls_datum_t *cert_list;
-    unsigned int cert_list_size;
     /* assume the certificate is invalid unless explicitly set
      * otherwise */
     unsigned int status = GNUTLS_CERT_INVALID;
-    int rv = GNUTLS_E_NO_CERTIFICATE_FOUND, ret;
-    unsigned int ch_size = 0;
-
-    gnutls_x509_crt_t cert[MAX_CHAIN_SIZE];
-    apr_time_t expiration_time, cur_time;
+    int ret = HTTP_FORBIDDEN;
 
     if (r == NULL || ctxt == NULL || ctxt->session == NULL)
         return HTTP_FORBIDDEN;
 
-    _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
-    cert_list =
-            gnutls_certificate_get_peers(ctxt->session, &cert_list_size);
-
-    if (cert_list == NULL || cert_list_size == 0) {
-        /* It is perfectly OK for a client not to send a certificate
-         * in REQUEST mode */
-        if (ctxt->sc->client_verify_mode == GNUTLS_CERT_REQUEST)
-            return DECLINED;
-
-        /* no certificate provided by the client, but one was required. */
-        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                "GnuTLS: Failed to Verify Peer: "
-                "Client did not submit a certificate");
-        return HTTP_FORBIDDEN;
-    } else if (cert_list_size > MAX_CHAIN_SIZE) {
-        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r,
-                      "Client sent certificate chain with length %u, "
-                      "maximum supported length is %u",
-                      cert_list_size, MAX_CHAIN_SIZE);
-        return HTTP_FORBIDDEN;
-    }
-
-    if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_X509) {
-        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
-                "GnuTLS: A Chain of %d certificate(s) was provided for validation",
-                cert_list_size);
-
-        for (ch_size = 0; ch_size < cert_list_size; ch_size++) {
-            gnutls_x509_crt_init(&cert[ch_size]);
-            rv = gnutls_x509_crt_import(cert[ch_size],
-                    &cert_list[ch_size],
-                    GNUTLS_X509_FMT_DER);
-            // When failure to import, leave the loop
-            if (rv != GNUTLS_E_SUCCESS) {
-                if (ch_size < 1) {
-                    ap_log_rerror(APLOG_MARK,
-                            APLOG_INFO, 0, r,
-                            "GnuTLS: Failed to Verify Peer: "
-                            "Failed to import peer certificates.");
-                    ret = HTTP_FORBIDDEN;
-                    goto exit;
-                }
-                ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                        "GnuTLS: Failed to import some peer certificates. Using %d certificates",
-                        ch_size);
-                rv = GNUTLS_E_SUCCESS;
-                break;
-            }
-        }
-    } else
-        return HTTP_FORBIDDEN;
-
+    int rv = gnutls_certificate_verify_peers(ctxt->session, NULL, 0, &status);
     if (rv < 0) {
         ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                "GnuTLS: Failed to Verify Peer: "
-                "Failed to import peer certificates.");
-        ret = HTTP_FORBIDDEN;
-        goto exit;
-    }
-
-    if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_X509) {
-        apr_time_ansi_put(&expiration_time,
-                          gnutls_x509_crt_get_expiration_time(cert[0]));
-
-        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r,
-                      "GnuTLS: Verifying list of %d certificate(s)",
-                      ch_size);
-        rv = gnutls_x509_crt_list_verify(cert, ch_size,
-                                         ctxt->sc->ca_list,
-                                         ctxt->sc->ca_list_size,
-                                         NULL, 0, 0, &status);
-    } else {
-        /* Unknown certificate type */
-        rv = GNUTLS_E_UNIMPLEMENTED_FEATURE;
-    }
-
-    /* "goto exit" at the end of this block skips evaluation of the
-     * "status" variable */
-    if (rv < 0) {
-        ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
-                "GnuTLS: Failed to Verify Peer certificate: (%d) %s",
+                "Failed to verify peer certificate: (%d) %s",
                 rv, gnutls_strerror(rv));
-        if (rv == GNUTLS_E_NO_CERTIFICATE_FOUND)
-            ap_log_rerror(APLOG_MARK, APLOG_EMERG, 0, r,
-                "GnuTLS: No certificate was found for verification. Did you set the GnuTLSClientCAFile directive?");
-        ret = HTTP_FORBIDDEN;
-        goto exit;
-    }
-
-    /* TODO: Maybe add X509 CRL Verification if anyone needs it. */
-    /* ret = gnutls_x509_crt_check_revocation(crt, crl_list, crl_list_size); */
-
-    cur_time = apr_time_now();
-
-    if (status != 0) {
+        return HTTP_FORBIDDEN;
+    } else if (status == 0) {
+        apr_table_setn(r->subprocess_env, "SSL_CLIENT_VERIFY",
+                "SUCCESS");
+        ret = DECLINED;
+    } else {
         gnutls_datum_t errmsg;
         gnutls_certificate_verification_status_print(
             status, gnutls_certificate_type_get(ctxt->session),
@@ -1709,37 +1630,70 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
         ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
                       "Client authentication failed: %s", errmsg.data);
         gnutls_free(errmsg.data);
-    }
-
-    mgs_add_common_cert_vars(r, cert[0], 1, ctxt->sc->export_certificates_size);
-
-    {
-        /* days remaining */
-        unsigned long remain =
-                (apr_time_sec(expiration_time) -
-                apr_time_sec(cur_time)) / 86400;
-        apr_table_setn(r->subprocess_env, "SSL_CLIENT_V_REMAIN",
-                apr_psprintf(r->pool, "%lu", remain));
-    }
-
-    if (status == 0) {
         apr_table_setn(r->subprocess_env, "SSL_CLIENT_VERIFY",
-                "SUCCESS");
-        ret = DECLINED;
-    } else {
-        apr_table_setn(r->subprocess_env, "SSL_CLIENT_VERIFY",
-                "FAILED");
+                       "FAILED");
         if (ctxt->sc->client_verify_mode == GNUTLS_CERT_REQUEST)
             ret = DECLINED;
         else
-            ret = HTTP_FORBIDDEN;
+            return HTTP_FORBIDDEN;
     }
 
-exit:
-    if (gnutls_certificate_type_get(ctxt->session) == GNUTLS_CRT_X509)
-        for (unsigned int i = 0; i < ch_size; i++)
-            gnutls_x509_crt_deinit(cert[i]);
+    unsigned int cert_list_size;
+    const gnutls_datum_t *cert_list =
+        gnutls_certificate_get_peers(ctxt->session, &cert_list_size);
 
+    if (cert_list == NULL || cert_list_size == 0) {
+        /* It is perfectly OK for a client not to send a certificate
+         * in REQUEST mode. */
+        if (ctxt->sc->client_verify_mode == GNUTLS_CERT_REQUEST)
+            return DECLINED;
+
+        /* In any other case we should not get past peer verification
+         * above. */
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, APR_EINVAL, r,
+                "gnutls_certificate_verify_peers() did not fail, but peer certificate list is empty!");
+        return HTTP_FORBIDDEN;
+    }
+
+    if (gnutls_certificate_type_get(ctxt->session) != GNUTLS_CRT_X509) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, APR_EINVAL, r,
+                "Client sent a non-X.509 certificate!");
+        return HTTP_FORBIDDEN;
+    }
+
+    gnutls_x509_crt_t cert;
+    gnutls_x509_crt_init(&cert);
+    if (rv != GNUTLS_E_SUCCESS) {
+        ap_log_rerror(APLOG_MARK,
+                      APLOG_ERR, APR_EGENERAL, r,
+                      "gnutls_x509_crt_init() failed: %s (%d)", gnutls_strerror(rv), rv);
+        return HTTP_FORBIDDEN;
+    }
+
+    rv = gnutls_x509_crt_import(cert, &cert_list[0], GNUTLS_X509_FMT_DER);
+    if (rv != GNUTLS_E_SUCCESS) {
+        ap_log_rerror(APLOG_MARK,
+                      APLOG_INFO, APR_EGENERAL, r,
+                      "Failed to import peer certificate: %s (%d)", gnutls_strerror(rv), rv);
+        ret = HTTP_FORBIDDEN;
+        goto exit;
+    }
+
+    mgs_add_common_cert_vars(r, cert, 1, ctxt->sc->export_certificates_size);
+
+    apr_time_t expiration_time;
+    apr_time_t cur_time = apr_time_now();
+    apr_time_ansi_put(&expiration_time,
+                      gnutls_x509_crt_get_expiration_time(cert));
+    /* days remaining */
+    unsigned long remain =
+        (apr_time_sec(expiration_time) -
+         apr_time_sec(cur_time)) / 86400;
+    apr_table_setn(r->subprocess_env, "SSL_CLIENT_V_REMAIN",
+                   apr_psprintf(r->pool, "%lu", remain));
+
+exit:
+    gnutls_x509_crt_deinit(cert);
     return ret;
 }
 
