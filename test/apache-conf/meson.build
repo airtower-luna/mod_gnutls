@@ -12,6 +12,6 @@ modules_conf = custom_target(
   capture: true,
   command: [python, '@INPUT@'],
   env: {
-	 'APACHE2': httpd.path(),
+	 'APACHE2': httpd.full_path(),
 	 'AP_LIBEXECDIR': mod_dir,
        })

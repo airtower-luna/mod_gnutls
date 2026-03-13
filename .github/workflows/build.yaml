@@ -18,9 +18,9 @@ jobs:
       fail-fast: false
       matrix:
         container:
-          - 'debian:bookworm'
+          - 'debian:trixie'
           - 'debian:sid'
-          - 'fedora:40'
+          - 'fedora:44'
           - 'alpine:latest'
     runs-on: ubuntu-latest
     container: ${{ matrix.container }}
