@@ -1,3 +1,8 @@
+** Version 0.12.3 (2026-03-20)
+
+- Security fix (CVE-2026-33307): Reject client certificate chain
+  longer than buffer
+
 ** Version 0.12.2 (2024-03-12)
 
 - Update project URL
