@@ -1,5 +1,5 @@
 project('mod_gnutls', 'c',
-	version: '0.12.3',
+	version: '0.13.0',
 	meson_version: '>=1.1',
 	license: 'Apache-2.0',
 	# enable when all CI jobs use Meson >= 1.1 (Trixie release)

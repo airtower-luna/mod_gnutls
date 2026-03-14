@@ -1,6 +1,15 @@
-** Version 0.13.0 (UNRELEASED)
+** Version 0.13.0 (2026-03-20)
 
-- Replace Autotools with Meson
+- Security fix (CVE-2026-33307): Fix out-of-bounds write when
+  receiving a client certificate chain longer than the buffer. The
+  limited length buffer and custom verification logic has been removed
+  in favor of using gnutls_certificate_verify_peers().
+- Security fix (CVE-2026-33308): Check Key Purpose during client
+  certificate verification. Use the new GnuTLSClientKeyPurpose option
+  if you expect a Key Purpose other than id-kp-clientAuth.
+- Replace Autotools with Meson. This means the release tarball
+  contains nothing the git repository as tagged does not (no generated
+  ./configure script etc.).
 - Drop SRP support
 - Drop Monkeysphere support
 - Update Valgrind suppressions for tests
@@ -8,6 +17,11 @@
 - Tidy up tests, remove dependency on Bash
 - Remove unused configuration options
 - Remove remnants of support for different certificate types
+
+** Version 0.12.3 (2026-03-20)
+
+- Security fix (CVE-2026-33307): Reject client certificate chain
+  longer than buffer
 
 ** Version 0.12.2 (2024-03-12)
 
