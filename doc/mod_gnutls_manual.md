@@ -147,7 +147,7 @@ Enable Session Tickets for the server
 
     GnuTLSSessionTickets [on|off]
 
-Default: `off`
+Default: `off`\
 Context: server config, virtual host
 
 Session tickets allow TLS session resumption without session state
@@ -372,6 +372,24 @@ resources that require authentication, you can set `GnuTLSClientVerify
 request` at the server or virtual host level so clients can
 authenticate during the initial handshake.
 
+### GnuTLSClientKeyPurpose
+
+Set the expected key purpose (Extended Key Usage extension)
+in client certificates.
+
+    GnuTLSClientKeyPurpose OID
+
+Default: `1.3.6.1.5.5.7.3.2` (id-kp-clientAuth)\
+Context: server config, virtual host
+
+Set the expected key purpose in client certificates, certificates with
+different key purpose(s) will be rejected. Note that client
+certificates without an Extended Key Usage extension will be accepted.
+
+See [RFC5280, Section
+4.2.1.12](https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.12)
+for OID definitions.
+
 ### GnuTLSClientCAFile
 
 Set the PEM encoded Certificate Authority list to use for X.509 base
@@ -379,7 +397,7 @@ client authentication
 
     GnuTLSClientCAFile FILEPATH
 
-Default: *none*
+Default: *none*\
 Context: server config, virtual host
 
 Takes an absolute or relative path to a PEM Encoded Certificate to use

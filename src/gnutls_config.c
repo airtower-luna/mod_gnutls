@@ -642,6 +642,20 @@ const char *mgs_set_client_verify(cmd_parms * parms,
     return NULL;
 }
 
+const char *mgs_set_client_key_purpose(cmd_parms * parms,
+                                       void *dummy __attribute__((unused)),
+                                       const char *arg)
+{
+    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+        ap_get_module_config(parms->server->module_config,
+                             &gnutls_module);
+    sc->client_key_purpose = apr_pcalloc(parms->pool, sizeof(gnutls_typed_vdata_st));
+    sc->client_key_purpose->type = GNUTLS_DT_KEY_PURPOSE_OID;
+    sc->client_key_purpose->data = (unsigned char *) apr_pstrdup(parms->pool, arg);
+    sc->client_key_purpose->size = strlen(arg);
+    return NULL;
+}
+
 const char *mgs_set_client_ca_file(cmd_parms * parms, void *dummy __attribute__((unused)),
         const char *arg) {
     mgs_srvconf_rec *sc =
@@ -796,6 +810,7 @@ static mgs_srvconf_rec *_mgs_config_server_create(apr_pool_t * p,
     sc->dh_file = NULL;
     sc->ca_list = NULL;
     sc->ca_list_size = 0;
+    sc->client_key_purpose = NULL;
     sc->proxy_enabled = GNUTLS_ENABLED_UNSET;
     sc->export_certificates_size = -1;
 
@@ -858,6 +873,7 @@ void *mgs_config_server_merge(apr_pool_t * p, void *BASE, void *ADD)
     gnutls_srvconf_merge(proxy_enabled, GNUTLS_ENABLED_UNSET);
     gnutls_srvconf_merge(export_certificates_size, -1);
     gnutls_srvconf_merge(client_verify_mode, -1);
+    gnutls_srvconf_merge(client_key_purpose, NULL);
     gnutls_srvconf_merge(x509_cert_file, NULL);
 
     gnutls_srvconf_merge(x509_key_file, NULL);

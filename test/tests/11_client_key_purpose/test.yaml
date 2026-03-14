@@ -1,0 +1,81 @@
+- !connection
+  description: >-
+    Client presenting a valid certificate with id-kp-serverAuth key
+    purpose to the default vhost receives a good response. This tests
+    the global GnuTLSClientKeyPurpose setting.
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+    - x509keyfile=authority/client-eku-server/secret.key
+    - x509certfile=authority/client-eku-server/x509.pem
+  actions:
+    - !request
+      path: /test.txt
+      expect:
+        status: 200
+        body:
+          exactly: |
+            test
+
+- !connection
+  description: >-
+    Client presenting a valid certificate with id-kp-clientAuth key
+    purpose to the default vhost receives a 403 Forbidden
+    response. This tests the global GnuTLSClientKeyPurpose setting.
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+    - x509keyfile=authority/client/secret.key
+    - x509certfile=authority/client/x509.pem
+  actions:
+    - !request
+      path: /test.txt
+      expect:
+        status: 403
+        body:
+          contains:
+            - 'Forbidden'
+            - "You don't have permission to access this resource."
+
+- !connection
+  description: >-
+    Client presenting a valid certificate with id-kp-clientAuth key
+    purpose to the meow.test vhost receives a good response. This
+    tests the vhost GnuTLSClientKeyPurpose setting.
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+    - x509keyfile=authority/client/secret.key
+    - x509certfile=authority/client/x509.pem
+    - verify-hostname=meow.test
+    - sni-hostname=meow.test
+  actions:
+    - !request
+      path: /test.txt
+      headers:
+        Host: meow.test
+      expect:
+        status: 200
+        body:
+          exactly: |
+            test
+
+- !connection
+  description: >-
+    Client presenting a valid certificate with id-kp-serverAuth key
+    purpose to the meow.test vhost receives a 403 Forbidden
+    response. This tests the vhost GnuTLSClientKeyPurpose setting.
+  gnutls_params:
+    - x509cafile=authority/x509.pem
+    - x509keyfile=authority/client-eku-server/secret.key
+    - x509certfile=authority/client-eku-server/x509.pem
+    - verify-hostname=meow.test
+    - sni-hostname=meow.test
+  actions:
+    - !request
+      path: /test.txt
+      headers:
+        Host: meow.test
+      expect:
+        status: 403
+        body:
+          contains:
+            - 'Forbidden'
+            - "You don't have permission to access this resource."

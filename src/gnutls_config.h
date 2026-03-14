@@ -29,4 +29,7 @@
 const char *mgs_set_cache(cmd_parms * parms, void *dummy,
                           const char *type, const char* arg);
 
+const char *mgs_set_client_key_purpose(cmd_parms * parms, void *dummy,
+                                       const char *arg);
+
 #endif /* __MOD_GNUTLS_CONFIG_H__ */

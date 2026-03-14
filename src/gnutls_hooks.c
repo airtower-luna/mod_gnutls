@@ -737,6 +737,14 @@ int mgs_hook_post_config(apr_pool_t *pconf,
             /* if anyone needs it, CRL could be added after */
         }
 
+        if (sc->client_key_purpose == NULL) {
+            /* default to id-kp-clientAuth */
+            sc->client_key_purpose = apr_pcalloc(pconf, sizeof(gnutls_typed_vdata_st));
+            sc->client_key_purpose->type = GNUTLS_DT_KEY_PURPOSE_OID;
+            sc->client_key_purpose->data = (unsigned char *) GNUTLS_KP_TLS_WWW_CLIENT;
+            sc->client_key_purpose->size = strlen(GNUTLS_KP_TLS_WWW_CLIENT);
+        }
+
         if (sc->certs_x509_chain_num > 0
             && gnutls_x509_tlsfeatures_check_crt(*must_staple,
                                                  sc->certs_x509_crt_chain[0])
@@ -1611,15 +1619,7 @@ static int mgs_cert_verify(request_rec * r, mgs_handle_t * ctxt) {
     if (r == NULL || ctxt == NULL || ctxt->session == NULL)
         return HTTP_FORBIDDEN;
 
-    /* TODO: make configurable with current value as default, add
-     * test for different (configured) value */
-    gnutls_typed_vdata_st verify_data = {
-        .type = GNUTLS_DT_KEY_PURPOSE_OID,
-        .data = (unsigned char *) GNUTLS_KP_TLS_WWW_CLIENT,
-        .size = strlen(GNUTLS_KP_TLS_WWW_CLIENT),
-    };
-
-    int rv = gnutls_certificate_verify_peers(ctxt->session, &verify_data, 1, &status);
+    int rv = gnutls_certificate_verify_peers(ctxt->session, ctxt->sc->client_key_purpose, 1, &status);
     if (rv < 0) {
         ap_log_rerror(APLOG_MARK, APLOG_INFO, 0, r,
                 "Failed to verify peer certificate: (%d) %s",

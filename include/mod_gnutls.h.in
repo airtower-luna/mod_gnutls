@@ -143,12 +143,15 @@ typedef struct {
     gnutls_priority_t priorities;
 	/* GnuTLS DH Parameters */
     gnutls_dh_params_t dh_params;
-	/* A list of CA Certificates */
+    /* List of CA Certificates for client certificate verification */
     gnutls_x509_crt_t *ca_list;
 	/* CA Certificate list size */
     unsigned int ca_list_size;
 	/* Client Certificate Verification Mode */
     int client_verify_mode;
+    /* Key purpose (Extended Key Usage) required in client
+     * certificates */
+    gnutls_typed_vdata_st *client_key_purpose;
 
     /* Enable OCSP stapling */
     unsigned char ocsp_staple;
