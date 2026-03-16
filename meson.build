@@ -50,11 +50,15 @@ subdir('test')
 run_target(
   'cppcheck',
   command: [
-    'support/cppcheck-wrapper.sh', '-DGNUTLS_VERSION="' + gnutls.version() + '"'])
+    'support/cppcheck-wrapper.sh', '-DGNUTLS_VERSION="' + gnutls.version() + '"',
+    '--enable=warning,style',
+  ])
 
 run_target(
   'cppcheck-xml',
   command: [
     'support/cppcheck-wrapper.sh', '-DGNUTLS_VERSION="' + gnutls.version() + '"',
+    '--enable=warning',
     '--xml',
-    '--output-file=' + join_paths(meson.project_build_root(), 'cppcheck.xml')])
+    '--output-file=' + join_paths(meson.project_build_root(), 'cppcheck.xml')
+  ])
