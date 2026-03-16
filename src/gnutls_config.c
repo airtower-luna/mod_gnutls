@@ -902,7 +902,7 @@ void *mgs_config_server_merge(apr_pool_t * p, void *BASE, void *ADD)
 
 void *mgs_config_dir_merge(apr_pool_t * p,
                            void *basev __attribute__((unused)),
-                           void *addv __attribute__((unused))) {
+                           void *addv) {
     mgs_dirconf_rec *new;
     /*    mgs_dirconf_rec *base = (mgs_dirconf_rec *) basev; */
     const mgs_dirconf_rec *add = (const mgs_dirconf_rec *) addv;
