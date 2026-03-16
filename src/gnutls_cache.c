@@ -325,7 +325,7 @@ static int socache_delete_session(void *baton, gnutls_datum_t key)
 
 
 
-const char *mgs_cache_inst_config(mgs_cache_t *cache, server_rec *server,
+const char *mgs_cache_inst_config(mgs_cache_t *cache, const server_rec *server,
                                   const char* type, const char* config,
                                   apr_pool_t *pconf, apr_pool_t *ptemp)
 {
@@ -507,7 +507,7 @@ int mgs_cache_post_config(apr_pool_t *pconf, apr_pool_t *ptemp,
     return APR_SUCCESS;
 }
 
-int mgs_cache_child_init(apr_pool_t *p, server_rec *server,
+int mgs_cache_child_init(apr_pool_t *p, const server_rec *server,
                          mgs_cache_t cache, const char *mutex_name)
 {
     /* reinit cache mutex */

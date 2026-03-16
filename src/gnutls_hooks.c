@@ -450,7 +450,7 @@ static int cert_retrieve_fn(gnutls_session_t session,
  * `gnutls_pk_bits_to_sec_param` for the key properties, or
  * GNUTLS_SEC_PARAM_UNKNOWN in case of error
  */
-static gnutls_sec_param_t sec_param_from_privkey(server_rec *server,
+static gnutls_sec_param_t sec_param_from_privkey(const server_rec *server,
                                                  gnutls_privkey_t key)
 {
     unsigned int bits = 0;
@@ -752,17 +752,8 @@ int mgs_hook_post_config(apr_pool_t *pconf,
 
 
     ap_add_version_component(pconf, "mod_gnutls/" MOD_GNUTLS_VERSION);
-
-    {
-        const char* libvers = gnutls_check_version(NULL);
-        char* gnutls_version = NULL;
-        if(libvers && (gnutls_version = apr_psprintf(pconf, "GnuTLS/%s", libvers))) {
-            ap_add_version_component(pconf, gnutls_version);
-        } else {
-            // In case we could not create the above string go for the static version instead
-            ap_add_version_component(pconf, "GnuTLS/" GNUTLS_VERSION "-static");
-        }
-    }
+    const char* gnutls_version = gnutls_check_version(NULL);
+    ap_add_version_component(pconf, apr_psprintf(pconf, "GnuTLS/%s", gnutls_version));
 
     return OK;
 }
@@ -808,14 +799,11 @@ void mgs_hook_child_init(apr_pool_t *p, server_rec *s)
 }
 
 const char *mgs_hook_http_scheme(const request_rec * r) {
-    mgs_srvconf_rec *sc;
-
     if (r == NULL)
         return NULL;
 
-    sc = (mgs_srvconf_rec *) ap_get_module_config(r->
-            server->module_config,
-            &gnutls_module);
+    const mgs_srvconf_rec *sc = (const mgs_srvconf_rec *)
+        ap_get_module_config(r->server->module_config, &gnutls_module);
 
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
     if (sc->enabled == GNUTLS_ENABLED_FALSE) {
@@ -826,14 +814,11 @@ const char *mgs_hook_http_scheme(const request_rec * r) {
 }
 
 apr_port_t mgs_hook_default_port(const request_rec * r) {
-    mgs_srvconf_rec *sc;
-
     if (r == NULL)
         return 0;
 
-    sc = (mgs_srvconf_rec *) ap_get_module_config(r->
-            server->module_config,
-            &gnutls_module);
+    const mgs_srvconf_rec *sc = (const mgs_srvconf_rec *)
+        ap_get_module_config(r->server->module_config, &gnutls_module);
 
     _gnutls_log(debug_log_fp, "%s: %d\n", __func__, __LINE__);
     if (sc->enabled == GNUTLS_ENABLED_FALSE) {
@@ -1220,9 +1205,9 @@ int mgs_hook_pre_connection(conn_rec * c, void *csd __attribute__((unused)))
         return DECLINED;
     }
 
-    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+    const mgs_srvconf_rec *sc = (const mgs_srvconf_rec *)
         ap_get_module_config(c->base_server->module_config, &gnutls_module);
-    mgs_handle_t *ctxt = (mgs_handle_t *)
+    const mgs_handle_t *ctxt = (const mgs_handle_t *)
         ap_get_module_config(c->conn_config, &gnutls_module);
 
     if ((sc && (!sc->enabled))
@@ -1247,7 +1232,7 @@ int mgs_hook_pre_connection(conn_rec * c, void *csd __attribute__((unused)))
  */
 int mgs_hook_process_connection(conn_rec* c)
 {
-    mgs_handle_t *ctxt = (mgs_handle_t *)
+    const mgs_handle_t *ctxt = (const mgs_handle_t *)
         ap_get_module_config(c->conn_config, &gnutls_module);
 
     if ((ctxt != NULL) && (ctxt->enabled == GNUTLS_ENABLED_TRUE))
@@ -1269,7 +1254,7 @@ int mgs_hook_process_connection(conn_rec* c)
 int mgs_req_vhost_check(request_rec *r)
 {
     /* mod_gnutls server record for the request vhost */
-    mgs_srvconf_rec *r_sc = (mgs_srvconf_rec *)
+    const mgs_srvconf_rec *r_sc = (const mgs_srvconf_rec *)
         ap_get_module_config(r->server->module_config, &gnutls_module);
     mgs_handle_t *ctxt = get_effective_gnutls_ctxt(r->connection);
 
@@ -1391,7 +1376,7 @@ int mgs_hook_authz(request_rec *r)
     if (r == NULL)
         return DECLINED;
 
-    mgs_dirconf_rec *dc = ap_get_module_config(
+    const mgs_dirconf_rec *dc = ap_get_module_config(
         r->per_dir_config, &gnutls_module);
 
     mgs_handle_t *ctxt = get_effective_gnutls_ctxt(r->connection);

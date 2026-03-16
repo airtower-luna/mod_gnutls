@@ -129,8 +129,8 @@ mgs_handle_t* get_effective_gnutls_ctxt(conn_rec *c)
  */
 int ssl_is_https(conn_rec *c)
 {
-    mgs_handle_t *ctxt = get_effective_gnutls_ctxt(c);
-    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+    const mgs_handle_t *ctxt = get_effective_gnutls_ctxt(c);
+    const mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(c->base_server->module_config, &gnutls_module);
 
     if(sc->enabled == GNUTLS_ENABLED_FALSE

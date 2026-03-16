@@ -21,7 +21,7 @@
 
 APLOG_USE_MODULE(gnutls);
 
-struct mgs_watchdog* mgs_new_singleton_watchdog(server_rec *s, char *name,
+struct mgs_watchdog* mgs_new_singleton_watchdog(const server_rec *s, char *name,
                                                 apr_pool_t* p)
 {
     APR_OPTIONAL_FN_TYPE(ap_watchdog_get_instance) *inst_fn =

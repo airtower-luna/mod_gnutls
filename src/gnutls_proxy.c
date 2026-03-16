@@ -35,7 +35,7 @@ APLOG_USE_MODULE(gnutls);
  */
 static int gtls_check_server_cert(gnutls_session_t session)
 {
-    mgs_handle_t *ctxt = (mgs_handle_t *) gnutls_session_get_ptr(session);
+    const mgs_handle_t *ctxt = (mgs_handle_t *) gnutls_session_get_ptr(session);
     unsigned int status;
 
     /* Get peer hostname from a note left by mod_proxy */

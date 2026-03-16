@@ -6,5 +6,5 @@ mkdir -p "${CPPCHECK_DIR}"
 cppcheck --project="${MESON_BUILD_ROOT}/compile_commands.json" \
 	--cppcheck-build-dir="${CPPCHECK_DIR}" \
 	-DAF_UNIX=1 \
-	--enable=warning,style \
+	--suppressions-list="$(dirname "${0}")/cppcheck-suppressions.txt" \
 	"$@"

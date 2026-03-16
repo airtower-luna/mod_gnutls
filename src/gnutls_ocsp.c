@@ -54,7 +54,7 @@ APLOG_USE_MODULE(gnutls);
 /**
  * Log all matching reasons for verification failure
  */
-static void _log_verify_fail_reason(const unsigned int verify, server_rec *s)
+static void _log_verify_fail_reason(const unsigned int verify, const server_rec *s)
 {
     if (verify & GNUTLS_OCSP_VERIFY_SIGNER_NOT_FOUND)
         _log_one_ocsp_fail("Signer cert not found", s);
@@ -279,7 +279,7 @@ int check_ocsp_response(server_rec *s, mgs_ocsp_data_t req_data,
                         const gnutls_datum_t *ocsp_response,
                         apr_time_t* expiry, const gnutls_datum_t *nonce)
 {
-    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+    const mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
 
     gnutls_ocsp_resp_t resp;
@@ -481,7 +481,7 @@ static apr_status_t do_ocsp_request(apr_pool_t *p, server_rec *s,
                                     const gnutls_datum_t *request,
                                     gnutls_datum_t *response)
 {
-    mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
+    const mgs_srvconf_rec *sc = (mgs_srvconf_rec *)
         ap_get_module_config(s->module_config, &gnutls_module);
 
     if (apr_strnatcmp(uri->scheme, "http"))
