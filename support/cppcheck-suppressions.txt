@@ -1,0 +1,3 @@
+# produces false warnings wherever the ap_log_error() macro is used,
+# because its expansion contains a NULL pointer check.
+nullPointerRedundantCheck
