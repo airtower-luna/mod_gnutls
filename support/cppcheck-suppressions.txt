@@ -1,3 +1,9 @@
 # produces false warnings wherever the ap_log_error() macro is used,
 # because its expansion contains a NULL pointer check.
 nullPointerRedundantCheck
+
+# making these parameters const would require casting the function
+# pointers to match function signatures defined in GnuTLS and Apache
+# HTTPD
+constParameterCallback:src/gnutls_config.c:34
+constParameterPointer:src/gnutls_config.c:920

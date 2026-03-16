@@ -37,7 +37,7 @@ static int pin_callback(void *user, int attempt __attribute__((unused)),
                         const char *token_label, unsigned int flags,
                         char *pin, size_t pin_max)
 {
-    mgs_srvconf_rec *sc = user;
+    const mgs_srvconf_rec *sc = user;
 
     if (sc->pin == NULL || flags & GNUTLS_PIN_FINAL_TRY ||
 	flags & GNUTLS_PIN_WRONG) {
@@ -905,7 +905,7 @@ void *mgs_config_dir_merge(apr_pool_t * p,
                            void *addv __attribute__((unused))) {
     mgs_dirconf_rec *new;
     /*    mgs_dirconf_rec *base = (mgs_dirconf_rec *) basev; */
-    mgs_dirconf_rec *add = (mgs_dirconf_rec *) addv;
+    const mgs_dirconf_rec *add = (const mgs_dirconf_rec *) addv;
 
     new = (mgs_dirconf_rec *) apr_pcalloc(p, sizeof(mgs_dirconf_rec));
     new->client_verify_mode = add->client_verify_mode;

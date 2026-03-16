@@ -40,7 +40,7 @@ struct mgs_watchdog {
  *
  * @return pointer to the new mgs_watchdog, or `NULL` on error
  */
-struct mgs_watchdog* mgs_new_singleton_watchdog(server_rec *s, char *name,
+struct mgs_watchdog* mgs_new_singleton_watchdog(const server_rec *s, char *name,
                                                 apr_pool_t *p);
 
 #endif /* __MOD_GNUTLS_WATCHDOG_H__ */
