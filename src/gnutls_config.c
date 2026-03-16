@@ -39,15 +39,15 @@ static int pin_callback(void *user, int attempt __attribute__((unused)),
 {
     const mgs_srvconf_rec *sc = user;
 
-    if (sc->pin == NULL || flags & GNUTLS_PIN_FINAL_TRY ||
-	flags & GNUTLS_PIN_WRONG) {
-	return -1;
+    if (sc->pin == NULL || flags & GNUTLS_PIN_FINAL_TRY
+        || flags & GNUTLS_PIN_WRONG) {
+        return -1;
     }
 
     if (token_label && strcmp(token_label, "SRK") == 0) {
-	 snprintf(pin, pin_max, "%s", sc->srk_pin);
+        snprintf(pin, pin_max, "%s", sc->srk_pin);
     } else {
-         snprintf(pin, pin_max, "%s", sc->pin);
+        snprintf(pin, pin_max, "%s", sc->pin);
     }
     return 0;
 }
