@@ -52,13 +52,15 @@ run_target(
   command: [
     'support/cppcheck-wrapper.sh', '-DGNUTLS_VERSION="' + gnutls.version() + '"',
     '--enable=warning,style',
+    '--check-level=exhaustive'
   ])
 
 run_target(
-  'cppcheck-xml',
+  'cppcheck-sarif',
   command: [
     'support/cppcheck-wrapper.sh', '-DGNUTLS_VERSION="' + gnutls.version() + '"',
     '--enable=warning',
-    '--xml',
-    '--output-file=' + join_paths(meson.project_build_root(), 'cppcheck.xml')
+    '--check-level=exhaustive',
+    '--output-format=sarif',
+    '--output-file=' + join_paths(meson.project_build_root(), 'cppcheck.sarif')
   ])
