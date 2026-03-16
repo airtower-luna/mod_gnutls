@@ -20,7 +20,6 @@
 #include "gnutls_cache.h"
 #include "gnutls_config.h"
 #include "mod_gnutls.h"
-#include "gnutls_ocsp.h"
 
 #include "apr_lib.h"
 #include <apr_strings.h>
