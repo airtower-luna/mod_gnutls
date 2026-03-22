@@ -1,5 +1,5 @@
 project('mod_gnutls', 'c',
-	version: '0.13.0',
+	version: '0.13.1',
 	meson_version: '>=1.1',
 	license: 'Apache-2.0',
 	# enable when all CI jobs use Meson >= 1.1 (Trixie release)
@@ -39,7 +39,7 @@ if pandoc.found()
     pandoc, '--version', check: true, capture: true).stdout().split()[1]
   message('Found Pandoc version:', pandoc_version)
 endif
-httpd = find_program('apache2', 'httpd', dirs: ['/usr/sbin'], required: true)
+httpd = find_program(get_option('httpd-bin'), 'apache2', 'httpd', required: true)
 
 incdir = include_directories('include')
 subdir('include')
