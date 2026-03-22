@@ -32,6 +32,7 @@
 #include "gnutls_config.h"
 #include "gnutls_ocsp.h"
 
+#include <http_protocol.h>
 #include <ap_socache.h>
 #include <apr_strings.h>
 #include <mod_status.h>
