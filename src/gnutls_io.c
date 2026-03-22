@@ -22,6 +22,7 @@
 #include "gnutls_proxy.h"
 
 #include <http_connection.h>
+#include <http_core.h>
 
 #ifdef APLOG_USE_MODULE
 APLOG_USE_MODULE(gnutls);

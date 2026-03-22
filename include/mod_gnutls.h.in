@@ -19,12 +19,13 @@
 /* Apache Runtime Headers */
 #include "httpd.h"
 #include "http_config.h"
-#include "http_core.h"
 #include "http_log.h"
 #include "apr_buckets.h"
+#include "apr_optional.h"
 #include "apr_portable.h"
 #include "apr_tables.h"
 #include "ap_release.h"
+#include <util_filter.h>
 /* GnuTLS Library Headers */
 #include <gnutls/gnutls.h>
 #include <gnutls/abstract.h>
