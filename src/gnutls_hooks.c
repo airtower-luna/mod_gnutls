@@ -28,7 +28,8 @@
 #include "gnutls_util.h"
 #include "gnutls_watchdog.h"
 
-#include "http_vhost.h"
+#include <http_protocol.h>
+#include <http_vhost.h>
 #include <mod_status.h>
 #include <util_mutex.h>
 #include <apr_escape.h>

@@ -21,6 +21,7 @@
 
 #include <apr_strings.h>
 #include <gnutls/gnutls.h>
+#include <http_log.h>
 
 APLOG_USE_MODULE(gnutls);
 
