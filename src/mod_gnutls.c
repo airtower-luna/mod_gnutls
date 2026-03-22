@@ -25,6 +25,7 @@
 
 #include <apr_strings.h>
 #include <http_connection.h>
+#include <http_log.h>
 #include <http_protocol.h>
 #include <http_request.h>
 

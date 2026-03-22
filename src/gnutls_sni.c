@@ -18,6 +18,7 @@
 
 #include <apr_lib.h>
 #include <apr_strings.h>
+#include <http_log.h>
 #include <byteswap.h>
 #include <gnutls/gnutls.h>
 #include <inttypes.h>
