@@ -24,6 +24,7 @@
 #include "gnutls_util.h"
 
 #include <apr_strings.h>
+#include <http_connection.h>
 #include <http_protocol.h>
 
 #ifdef APLOG_USE_MODULE
