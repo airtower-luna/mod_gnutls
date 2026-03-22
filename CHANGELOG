@@ -1,3 +1,8 @@
+** Version 0.13.1 (UNRELEASED)
+
+- Add "httpd-bin" build option to select httpd binary to use in
+  tests. Search without PATH modifications otherwise.
+
 ** Version 0.13.0 (2026-03-20)
 
 - Security fix (CVE-2026-33307): Fix out-of-bounds write when

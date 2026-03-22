@@ -3,6 +3,7 @@ option('gnutls-debug-log', type: 'boolean', value: false,
 option('pdf-doc', type: 'boolean', value: true,
        description: 'build PDF documentation')
 option('apxs-bin', type: 'string', value: 'apxs', description: 'path to apxs')
+option('httpd-bin', type: 'string', description: 'path to httpd binary to use for tests, default is to search "httpd" and "apache2" in PATH')
 
 option('test-host', type: 'string', value: 'localhost',
        description: 'server hostname to use in tests, must resolve to test-ips')
