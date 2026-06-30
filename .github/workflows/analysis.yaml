@@ -29,7 +29,7 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
           apt-get -y install meson make git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev pkgconf procps clang clang-tools
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: define CONTAINER_WORKSPACE
         run: |
           echo "CONTAINER_WORKSPACE=${PWD}" >> ${GITHUB_ENV}
@@ -70,7 +70,7 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
           apt-get -y install meson make git python3-yaml apache2-bin apache2-dev gnutls-bin libapr1-dev libgnutls28-dev pkgconf procps cppcheck
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: meson setup
         run: meson setup -Dpdf-doc=false build
       - name: cppcheck
@@ -89,7 +89,7 @@ jobs:
     runs-on: ubuntu-24.04
     name: CodeQL
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: install dependencies
         run: |
           sudo apt-get update
